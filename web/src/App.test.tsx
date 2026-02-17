@@ -133,8 +133,8 @@ describe('Vision tab', () => {
     await waitFor(() => {
       expect(screen.getByText('Mission Statement')).toBeInTheDocument();
       expect(screen.getByText('Product Vision Summary')).toBeInTheDocument();
-      expect(screen.getByText('What We Are')).toBeInTheDocument();
-      expect(screen.getByText('What We Are Not')).toBeInTheDocument();
+      expect(screen.getByText('This Product Is')).toBeInTheDocument();
+      expect(screen.getByText('This Product Is Not')).toBeInTheDocument();
     });
   });
 
@@ -174,10 +174,10 @@ describe('Vision tab', () => {
     });
   });
 
-  it('shows file references', async () => {
+  it('shows agent context tooltips', async () => {
     render(<App />);
     await waitFor(() => {
-      expect(screen.getAllByText('context/vision.yaml').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Injected into every agent/).length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -229,7 +229,7 @@ describe('Users & Stories tab', () => {
   it('shows design agents context badge', async () => {
     await openUsersTab();
     await waitFor(() => {
-      expect(screen.getByText('Design agents')).toBeInTheDocument();
+      expect(screen.getAllByText('Design agents').length).toBeGreaterThanOrEqual(1);
     });
   });
 });
@@ -254,10 +254,10 @@ describe('Design tab', () => {
     });
   });
 
-  it('shows file reference in heading', async () => {
+  it('shows agent context in heading', async () => {
     await openDesignTab();
     await waitFor(() => {
-      expect(screen.getByText('product/design.md')).toBeInTheDocument();
+      expect(screen.getByText('Design agents')).toBeInTheDocument();
     });
   });
 });
@@ -282,10 +282,10 @@ describe('Architecture tab', () => {
     });
   });
 
-  it('shows file reference in heading', async () => {
+  it('shows agent context in heading', async () => {
     await openArchTab();
     await waitFor(() => {
-      expect(screen.getByText('product/architecture.md')).toBeInTheDocument();
+      expect(screen.getByText('Engineering agents')).toBeInTheDocument();
     });
   });
 });

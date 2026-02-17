@@ -23,6 +23,135 @@ interface FileData {
   path: string;
 }
 
+// ── Theme toggle — light default (Stripe style), dark on toggle ──
+function ThemeToggle() {
+  const [dark, setDark] = useState(() => {
+    try {
+      return localStorage.getItem('bobbit-theme') === 'dark';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    try { localStorage.setItem('bobbit-theme', dark ? 'dark' : 'light'); } catch {}
+  }, [dark]);
+
+  return (
+    <button className="theme-toggle" onClick={() => setDark(d => !d)} title={dark ? 'Switch to light mode' : 'Switch to dark mode'}>
+      {dark ? '\u2600' : '\u263E'}
+    </button>
+  );
+}
+
+// ── Agent context descriptions per file ──
+const FILE_CONTEXT: Record<string, { label: string; description: string }> = {
+  'context/vision.yaml': { label: 'All agents', description: 'Injected into every agent\'s context window' },
+  'context/personas.yaml': { label: 'Design agents', description: 'Injected into the context for Product Designer, Product Owner, and Architect agents' },
+  'product/design.md': { label: 'Design agents', description: 'Guides visual and interaction patterns' },
+  'product/architecture.md': { label: 'Engineering agents', description: 'Informs technical implementation decisions' },
+  'product/glossary.yaml': { label: 'All agents', description: 'Ensures consistent terminology across tasks' },
+  'delivery/roadmap.yaml': { label: 'Planning agents', description: 'Drives prioritization and scheduling' },
+};
+
+// ── Neon context icons per agent scope ──
+const CONTEXT_ICONS: Record<string, JSX.Element> = {
+  'All agents': (
+    <svg viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 0C8 4.4 4.4 8 0 8c4.4 0 8 3.6 8 8 0-4.4 3.6-8 8-8-4.4 0-8-3.6-8-8Z"/>
+    </svg>
+  ),
+  'Design agents': (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11.5 1.5l3 3-9 9-4 1 1-4Z"/>
+    </svg>
+  ),
+  'Engineering agents': (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 3L1 8l4 5M11 3l4 5-4 5"/>
+    </svg>
+  ),
+  'Planning agents': (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 1v14M3 2.5c4-2 8 2 11 0v7c-4 2-7-2-11 0"/>
+    </svg>
+  ),
+};
+
+const PAGE_ICONS: Record<string, JSX.Element> = {
+  /* vision: uses default from CONTEXT_ICONS['All agents'] */
+  users: (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6" cy="5" r="2.5"/>
+      <path d="M1.5 14c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5"/>
+      <circle cx="11.5" cy="5.5" r="2"/>
+      <path d="M11.5 9c1.9 0 3.5 1.6 3.5 3.5"/>
+    </svg>
+  ),
+  design: (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 14l2-6 6-6 4 4-6 6z"/>
+      <path d="M10 4l2 2"/>
+      <path d="M4 8l4 4"/>
+      <circle cx="3" cy="13" r="1" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+  architecture: (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 3L1 8l4 5M11 3l4 5-4 5"/>
+    </svg>
+  ),
+  glossary: (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 2h10a2 2 0 012 2v8a2 2 0 01-2 2H2"/>
+      <path d="M2 2v12"/>
+      <path d="M5 6h5"/>
+      <path d="M5 9h3"/>
+    </svg>
+  ),
+  roadmap: (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 14c2-2 4 0 6-3s2-5 6-7"/>
+      <circle cx="2" cy="14" r="1.5" fill="currentColor" stroke="none"/>
+      <circle cx="14" cy="4" r="1.5" fill="currentColor" stroke="none"/>
+    </svg>
+  ),
+};
+
+// ── Icon + heading wrapper with hover popover ──
+function InfoTooltip({ label, description, icon: iconOverride, children }: { label?: string; description?: string; icon?: JSX.Element; children?: React.ReactNode }) {
+  if (!label) return <>{children}</>;
+  const icon = iconOverride || CONTEXT_ICONS[label];
+  return (
+    <span className="ctx-hover-target">
+      {icon && <span className="ctx-icon">{icon}</span>}
+      {children}
+      {description && (
+        <span className="ctx-popover">
+          <strong className="ctx-popover-label">{label}</strong>
+          {description}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// Logo — light colors for the always-dark nav
+const LOGO_SVG = (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" width="28" height="28">
+    <path d="M16 2L28.66 9.5V24.5L16 32L3.34 24.5V9.5L16 2Z" fill="#635bff"/>
+    <circle cx="16" cy="17" r="5" fill="#fff" fillOpacity="0.9"/>
+    <circle cx="16" cy="17" r="2" fill="#635bff"/>
+    <line x1="16" y1="12" x2="16" y2="7" stroke="#fff" strokeOpacity="0.6" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="20.33" y1="14.5" x2="24.33" y2="11.5" stroke="#fff" strokeOpacity="0.6" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="20.33" y1="19.5" x2="24.33" y2="22.5" stroke="#fff" strokeOpacity="0.6" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="16" y1="22" x2="16" y2="27" stroke="#fff" strokeOpacity="0.6" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="11.67" y1="19.5" x2="7.67" y2="22.5" stroke="#fff" strokeOpacity="0.6" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="11.67" y1="14.5" x2="7.67" y2="11.5" stroke="#fff" strokeOpacity="0.6" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
 function App() {
   const [activeTab, setActiveTab] = useState('vision');
   const [fileData, setFileData] = useState<FileData | null>(null);
@@ -47,11 +176,14 @@ function App() {
   return (
     <>
       <div className="chrome">
+        <span className="chrome-logo">{LOGO_SVG}</span>
         <span className="chrome-brand">Bobbit</span>
+        <div className="spacer" />
         <div className="product-tabs">
           <button className="product-tab active">Bobbit</button>
-          <button className="product-tab" style={{ borderStyle: 'dashed', fontSize: 14, padding: '5px 10px' }}>+</button>
+          <button className="product-tab product-add" title="New project">+</button>
         </div>
+        <ThemeToggle />
       </div>
 
       <div className="app-layout">
@@ -91,9 +223,10 @@ function FileView({ id, label, filePath, data, onSaved }: { id: string; label: s
 
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-        {label}
-        <span className="file-ref">{filePath}</span>
+      <h2 style={{ fontSize: 25, fontWeight: 700, marginBottom: 20, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center' }}>
+        <InfoTooltip label={FILE_CONTEXT[filePath]?.label} description={FILE_CONTEXT[filePath]?.description} icon={PAGE_ICONS[id]}>
+          {label}
+        </InfoTooltip>
       </h2>
 
       {id === 'vision' && isYaml && <VisionView data={parsed as VisionData} fullData={parsed as VisionData} filePath={filePath} onSaved={onSaved} />}
@@ -115,11 +248,44 @@ interface VisionData {
 
 type VisionField = 'mission' | 'vision' | 'what_we_are' | 'what_we_are_not';
 
-const VISION_SECTIONS: { field: VisionField; title: string }[] = [
-  { field: 'mission', title: 'Mission Statement' },
-  { field: 'vision', title: 'Product Vision Summary' },
-  { field: 'what_we_are', title: 'What We Are' },
-  { field: 'what_we_are_not', title: 'What We Are Not' },
+const MISSION_ICON = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 15l5-9 3 5 2-3 4 7H1z"/>
+    <path d="M6 6V2"/>
+    <path d="M6 2l3 1.5L6 4.5"/>
+  </svg>
+);
+
+const VISION_ICON = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="8" cy="8" r="3"/>
+    <path d="M1 8c2-4 5-6 7-6s5 2 7 6c-2 4-5 6-7 6s-5-2-7-6z"/>
+  </svg>
+);
+
+const WHAT_WE_ARE_ICON = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="8" cy="8" r="5"/>
+    <path d="M8 3V1"/>
+    <path d="M8 15v-2"/>
+    <path d="M3 8H1"/>
+    <path d="M15 8h-2"/>
+    <path d="M12.5 8A4.5 4.5 0 008 3.5"/>
+  </svg>
+);
+
+const WHAT_WE_ARE_NOT_ICON = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="8" cy="8" r="6.5"/>
+    <path d="M3.4 3.4l9.2 9.2"/>
+  </svg>
+);
+
+const VISION_SECTIONS: { field: VisionField; title: string; icon?: JSX.Element }[] = [
+  { field: 'mission', title: 'Mission Statement', icon: MISSION_ICON },
+  { field: 'vision', title: 'Product Vision Summary', icon: VISION_ICON },
+  { field: 'what_we_are', title: 'This Product Is', icon: WHAT_WE_ARE_ICON },
+  { field: 'what_we_are_not', title: 'This Product Is Not', icon: WHAT_WE_ARE_NOT_ICON },
 ];
 
 function VisionView({ data, fullData, filePath, onSaved }: { data: VisionData; fullData: VisionData; filePath: string; onSaved: () => void }) {
@@ -157,12 +323,13 @@ function VisionView({ data, fullData, filePath, onSaved }: { data: VisionData; f
 
   return (
     <>
-      {VISION_SECTIONS.map(({ field, title }) => (
+      {VISION_SECTIONS.map(({ field, title, icon }) => (
         <Section
           key={field}
           title={title}
-          ctx="All agents"
-          file="context/vision.yaml"
+          ctxLabel="All agents"
+          ctxDescription="Injected into every agent's context window"
+          icon={icon}
           editing={editing === field}
           onEdit={() => startEdit(field)}
           onCancel={cancelEdit}
@@ -178,7 +345,7 @@ function VisionView({ data, fullData, filePath, onSaved }: { data: VisionData; f
             />
           ) : (
             field === 'what_we_are_not' ? (
-              <ul>{data.what_we_are_not.map((item, i) => <li key={i}>{item}</li>)}</ul>
+              <ul style={{ paddingLeft: 20, margin: 0 }}>{data.what_we_are_not.map((item, i) => <li key={i}>{item}</li>)}</ul>
             ) : (
               <p>{data[field]}</p>
             )
@@ -231,8 +398,8 @@ function PersonasView({ data, filePath, onSaved }: { data: PersonasData; filePat
 
   return (
     <>
-      <p style={{ color: 'var(--text-3)', fontSize: 13, marginBottom: 16 }}>
-        Personas and their context. <span className="ctx">Design agents</span>
+      <p style={{ color: 'var(--text-3)', fontSize: 14, marginBottom: 16 }}>
+        Personas and their context. Shapes user-centered design decisions.
       </p>
       {data.personas.map(p => (
         <div className="section" key={p.id}>
@@ -328,7 +495,7 @@ function GlossaryView({ data, filePath, onSaved }: { data: GlossaryData; filePat
 
   return (
     <>
-      <p style={{ color: 'var(--text-3)', fontSize: 13, marginBottom: 16 }}>
+      <p style={{ color: 'var(--text-3)', fontSize: 14, marginBottom: 16 }}>
         Shared vocabulary. Agents must use these terms consistently.
       </p>
       <div className="section">
@@ -351,7 +518,7 @@ function GlossaryView({ data, filePath, onSaved }: { data: GlossaryData; filePat
               ) : (
                 <>
                   <div style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--accent)' }}>{t.term}</div>
-                  <div style={{ padding: '10px 16px', color: 'var(--text-2)', fontSize: 13 }}>{t.definition}</div>
+                  <div style={{ padding: '10px 16px', color: 'var(--text-2)', fontSize: 14 }}>{t.definition}</div>
                   <div style={{ padding: '10px 16px' }}>
                     <button className="edit-btn" onClick={() => startEdit(i)}>Edit</button>
                   </div>
@@ -421,8 +588,8 @@ function RoadmapView({ data, filePath, onSaved }: { data: RoadmapData; filePath:
       {data.workstreams.map((ws, i) => (
         <div key={i} style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border-s)' }}>
-            <strong style={{ fontSize: 14, flex: 1 }}>{ws.name}</strong>
-            {ws.description && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{ws.description}</span>}
+            <strong style={{ fontSize: 16, flex: 1 }}>{ws.name}</strong>
+            {ws.description && <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{ws.description}</span>}
           </div>
           {ws.milestones.map((ms, j) => (
             <div key={j} style={{
@@ -441,7 +608,7 @@ function RoadmapView({ data, filePath, onSaved }: { data: RoadmapData; filePath:
               ) : (
                 <>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{ms.title}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{ms.title}</div>
                   </div>
                   <span className={`pill ${STATUS_PILL[ms.status] || 'pill-gray'}`}>
                     {ms.status.replace('_', ' ')}
@@ -496,7 +663,7 @@ function MarkdownView({ raw, filePath, onSaved }: { raw: string; filePath: strin
           <button className="edit-btn" onClick={startEdit}>Edit</button>
         )}
       </div>
-      <div className="section-body" style={{ fontFamily: "'SF Mono', monospace", fontSize: 12, whiteSpace: 'pre-wrap' }}>
+      <div className="section-body" style={{ fontFamily: "'SF Mono', 'Consolas', monospace", fontSize: 13, whiteSpace: 'pre-wrap' }}>
         {editing ? (
           <textarea
             className="edit-textarea edit-textarea-full"
@@ -513,10 +680,11 @@ function MarkdownView({ raw, filePath, onSaved }: { raw: string; filePath: strin
 }
 
 // ── Shared section wrapper ──
-function Section({ title, ctx, file, editing, onEdit, onCancel, onSave, saving, children }: {
+function Section({ title, ctxLabel, ctxDescription, icon, editing, onEdit, onCancel, onSave, saving, children }: {
   title: string;
-  ctx?: string;
-  file?: string;
+  ctxLabel?: string;
+  ctxDescription?: string;
+  icon?: JSX.Element;
   editing?: boolean;
   onEdit?: () => void;
   onCancel?: () => void;
@@ -527,10 +695,10 @@ function Section({ title, ctx, file, editing, onEdit, onCancel, onSave, saving, 
   return (
     <div className="section">
       <div className="section-head">
-        {title}
-        {ctx && <span className="ctx">{ctx}</span>}
+        <InfoTooltip label={ctxLabel} description={ctxDescription} icon={icon}>
+          {title}
+        </InfoTooltip>
         <span className="spacer" />
-        {file && <span className="file-ref">{file}</span>}
         {editing ? (
           <span className="edit-actions">
             <button className="save-btn" onClick={onSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
