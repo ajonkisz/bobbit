@@ -1,18 +1,19 @@
-mission: >
-  Give one human the leverage of an entire product team by making AI agent
-  workforces easy to direct, align, and trust.
+mission: |
+  Give one human the leverage of an entire product team by making AI agent workforces easy to direct, align, and trust.
+vision: |
+  Bobbit provides an easy to use interface which supports you to:
+  1. Define the product vision, design, and architecture to ensure (agentic) contributors understand the big picture 
+  2. Document key concepts, personas, and user stories to provide vital context for (agentic) contributors
+  3. Define technological and behavioural guardrails for (agentic) contributors
+  4. Create a delivery roadmap to steer (agentic) contributors in the right direction
+  5. Monitor and intervene in agentic activity to maintain productivity
+  6. Understand development costs and contention, so you can scale optimially
 
-vision: >
-  A web UI where a Product Owner defines their product vision, design, and
-  architecture as living documents. Bobbit injects the right context into
-  the right agents at the right time. The human stays in control of what
-  gets built and why. The agents handle how.
-
-what_we_are: >
-  A workforce manager for AI agents. A tool that turns product documents
-  into agent context, tracks delivery, and keeps multiple agents coherent
-  with a single shared vision. Think "Linear meets CLAUDE.md".
-
+  Bobbit injects the right context into the right agents at the right time. 
+  Humans stay in control of what gets built and why. 
+  Agents handle how.
+what_we_are: |
+  A workforce manager for AI agents. A tool that turns product documents into agent context, tracks delivery, and keeps multiple agents coherent with a single shared vision. Think "Linear meets CLAUDE.md".
 what_we_are_not:
   - Not an AI coding tool — we don't generate code, we manage agents that do
   - Not a project management tool — no sprints, no story points, no burndown charts
