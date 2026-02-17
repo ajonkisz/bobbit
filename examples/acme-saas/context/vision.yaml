@@ -1,0 +1,19 @@
+mission: >
+  Build the simplest, most powerful analytics platform for small B2B teams.
+  We believe data-driven decisions shouldn't require a data team.
+
+vision: >
+  A single dashboard where small teams feel at home. Self-serve onboarding,
+  team workspaces with role-based access, usage-based billing, and an API
+  developers actually enjoy. A new user should see their first insight
+  within 5 minutes.
+
+what_we_are: >
+  The fastest path from "I need data" to "I see the answer." A lightweight,
+  opinionated analytics tool for small teams who don't have (and don't want)
+  a data team.
+
+what_we_are_not:
+  - Not an enterprise BI tool — No 50-page reports, no OLAP cubes
+  - Not a data warehouse — We connect to your data, we don't replace where it lives
+  - Not a notebook — No SQL editor, no Python runtime

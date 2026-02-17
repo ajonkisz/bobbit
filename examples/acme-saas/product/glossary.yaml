@@ -1,0 +1,13 @@
+terms:
+  - term: Workspace
+    definition: Top-level container for a team's data. Never "organization" or "tenant" in UI.
+  - term: Dashboard
+    definition: A saved view of charts and KPI cards. Not "report" or "view".
+  - term: Insight
+    definition: A single visualization or metric card. Not "widget" or "tile".
+  - term: Member
+    definition: A person in a workspace. Not "user" (internal only).
+  - term: Event
+    definition: A data point sent to the ingestion API. Not "log" or "record".
+  - term: Alert
+    definition: A threshold-based notification. Not "alarm" or "trigger".

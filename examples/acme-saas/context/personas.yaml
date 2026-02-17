@@ -1,0 +1,26 @@
+personas:
+  - id: sarah
+    name: Sarah
+    title: Startup Ops Lead
+    tier: primary
+    background: >
+      Head of ops at a 12-person B2B startup. Non-technical but data-literate.
+      Currently using spreadsheets and Metabase.
+    quote: "I just want to open a page and see if we're on track."
+
+  - id: marcus
+    name: Marcus
+    title: Integration Developer
+    tier: secondary
+    background: >
+      Full-stack dev at a 30-person SaaS company. Needs to pipe analytics
+      into their own dashboards and trigger alerts from events.
+    quote: "If your API docs are wrong, I'll find out at 2am when my integration breaks."
+
+  - id: priya
+    name: Priya
+    title: Team Manager
+    tier: tertiary
+    background: >
+      Engineering manager at a 200-person company. Tracks team velocity,
+      deploys, and incident metrics across 4 squads.

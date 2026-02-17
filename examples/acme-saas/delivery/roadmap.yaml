@@ -1,0 +1,25 @@
+workstreams:
+  - name: Auth & Identity
+    milestones:
+      - title: Email/password auth
+        status: done
+      - title: OAuth integration (Google + GitHub)
+        status: in_progress
+      - title: Token refresh & session management
+        status: in_progress
+      - title: Auth integration test suite
+        status: not_started
+
+  - name: Core UI
+    milestones:
+      - title: Design system foundations
+        status: done
+      - title: Navigation & layout shell
+        status: review
+
+  - name: Data Pipeline
+    milestones:
+      - title: Event ingestion service
+        status: in_progress
+      - title: Aggregation workers
+        status: not_started

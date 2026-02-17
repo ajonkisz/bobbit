@@ -1,0 +1,35 @@
+stories:
+  - id: US-01
+    persona: sarah
+    story: Sign up with email or Google and see first dashboard within 5 minutes
+    status: in_progress
+
+  - id: US-02
+    persona: priya
+    story: Invite team members, assign roles, and restrict access per-squad
+    status: draft
+
+  - id: US-03
+    persona: marcus
+    story: Generate an API key and query data using a documented REST API
+    status: done
+
+  - id: US-04
+    persona: sarah
+    story: Create custom dashboard views and share with CEO via a link
+    status: planning
+
+  - id: US-05
+    persona: priya
+    story: View usage across all squads, manage billing, and download invoices
+    status: draft
+
+  - id: US-06
+    persona: sarah
+    story: Get notified when a KPI crosses a threshold I set
+    status: draft
+
+  - id: US-07
+    persona: marcus
+    story: Configure webhooks to fire on specific events with automatic retries
+    status: draft
