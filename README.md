@@ -12,7 +12,7 @@ bobbit/
 ├── mockups/                # UI design mockups
 ├── docs/                   # Tool documentation
 └── examples/
-    └── acme-saas/          # Example product managed by Bobbit
+    └── bobbit/             # Bobbit's own product definition (dogfooding)
         ├── context/        # Vision, personas, stories (YAML/MD)
         ├── product/        # Design, architecture, glossary
         └── delivery/       # Roadmap, tasks

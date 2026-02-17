@@ -1,0 +1,42 @@
+workstreams:
+  - name: Product Definition UI
+    description: The sidebar-driven document viewer/editor for context, product, and delivery files
+    milestones:
+      - title: Static mockup of all views
+        status: done
+      - title: File-backed rendering (read YAML/MD, render in UI)
+        status: not_started
+      - title: Inline editing (direct markdown edit)
+        status: not_started
+      - title: Agent revision request flow
+        status: not_started
+
+  - name: Context Injection
+    description: System that reads product docs and injects relevant sections into agent prompts
+    milestones:
+      - title: Define injection rules schema
+        status: not_started
+      - title: Context builder (assemble prompt sections per role)
+        status: not_started
+      - title: CLAUDE.md generator (output injection as CLAUDE.md)
+        status: not_started
+
+  - name: Delivery Tracking
+    description: Roadmap, tasks, and agent status views
+    milestones:
+      - title: Roadmap view (read from roadmap.yaml)
+        status: not_started
+      - title: Task list view
+        status: not_started
+      - title: Agent status view
+        status: not_started
+
+  - name: Activity & Review
+    description: Feed of agent changes with approve/reject/feedback workflow
+    milestones:
+      - title: Activity feed UI
+        status: not_started
+      - title: Diff rendering for revisions
+        status: not_started
+      - title: Role-scoped feedback system
+        status: not_started
