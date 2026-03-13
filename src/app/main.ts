@@ -1125,12 +1125,6 @@ function renderSidebar() {
 							: gatewaySessions.map(renderSidebarSession)
 				}
 			</div>
-
-			<!-- Footer -->
-			<div class="px-3 py-2 border-t border-border flex items-center gap-1 shrink-0">
-				<div class="flex-1"></div>
-				<theme-toggle></theme-toggle>
-			</div>
 		</div>
 	`;
 }
