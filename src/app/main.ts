@@ -70,6 +70,7 @@ interface GatewaySession {
 let gatewaySessions: GatewaySession[] = [];
 let sessionsLoading = false;
 let sessionsError = "";
+let sessionPollTimer: ReturnType<typeof setInterval> | null = null;
 
 const SIDEBAR_BREAKPOINT = 768;
 let windowWidth = window.innerWidth;
@@ -444,6 +445,7 @@ async function authenticateGateway(url: string, token: string): Promise<void> {
 	}
 	renderApp();
 	await refreshSessions();
+	startSessionPolling();
 }
 
 /** Fetch session list from the gateway */
@@ -460,19 +462,53 @@ function updateLocalSessionTitle(sessionId: string, title: string): void {
 	}
 }
 
+function updateLocalSessionStatus(sessionId: string, status: string): void {
+	const idx = gatewaySessions.findIndex((s) => s.id === sessionId);
+	if (idx >= 0) {
+		gatewaySessions[idx] = { ...gatewaySessions[idx], status, lastActivity: Date.now() };
+		renderApp();
+	}
+}
+
+/** Poll session list every 5s to keep sidebar status/activity up to date */
+function startSessionPolling(): void {
+	stopSessionPolling();
+	sessionPollTimer = setInterval(() => {
+		// Only poll if we're authenticated and the page is visible
+		if (appView === "authenticated" && document.visibilityState === "visible") {
+			refreshSessions();
+		}
+	}, 5_000);
+}
+
+function stopSessionPolling(): void {
+	if (sessionPollTimer) {
+		clearInterval(sessionPollTimer);
+		sessionPollTimer = null;
+	}
+}
+
 async function refreshSessions(): Promise<void> {
-	sessionsLoading = true;
-	sessionsError = "";
-	renderApp();
+	// Only show loading spinner on initial fetch, not background polls
+	const isInitial = gatewaySessions.length === 0 && !sessionsError;
+	if (isInitial) {
+		sessionsLoading = true;
+		sessionsError = "";
+		renderApp();
+	}
 
 	try {
 		const res = await gatewayFetch("/api/sessions");
 		if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`);
 		const data = await res.json();
 		gatewaySessions = data.sessions || [];
+		sessionsError = "";
 	} catch (err) {
-		sessionsError = err instanceof Error ? err.message : String(err);
-		gatewaySessions = [];
+		// On background poll failure, keep existing data instead of clearing
+		if (isInitial) {
+			sessionsError = err instanceof Error ? err.message : String(err);
+			gatewaySessions = [];
+		}
 	} finally {
 		sessionsLoading = false;
 		renderApp();
@@ -517,6 +553,12 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 		renderApp();
 		// Also refresh the sidebar from server for full consistency
 		refreshSessions();
+	};
+
+	// Update sidebar status dot in real-time when agent starts/stops streaming
+	remote.onStatusChange = (status: string) => {
+		updateLocalSessionStatus(sessionId, status);
+		renderApp();
 	};
 
 	remoteAgent = remote;

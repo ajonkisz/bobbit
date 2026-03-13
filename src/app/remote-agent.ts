@@ -25,6 +25,7 @@ export class RemoteAgent {
 
 	/** Callback fired when the session title changes (e.g. AI-generated summary). */
 	onTitleChange?: (title: string) => void;
+	onStatusChange?: (status: string) => void;
 	private _title = "New session";
 
 	constructor() {
@@ -302,6 +303,7 @@ export class RemoteAgent {
 
 			case "session_status":
 				this._state.isStreaming = msg.status === "streaming";
+				this.onStatusChange?.(msg.status);
 				break;
 
 			case "session_title":
