@@ -8,13 +8,15 @@ import {
 	ChatPanel,
 	CustomProvidersStore,
 	IndexedDBStorageBackend,
+	ModelSelector,
 	ProviderKeysStore,
 	SessionsStore,
 	SettingsStore,
 	setAppStorage,
 } from "../ui/index.js";
+import { Select, type SelectOption } from "@mariozechner/mini-lit/dist/Select.js";
 import { html, render } from "lit";
-import { KeyRound, QrCode, Server, Unplug } from "lucide";
+import { ArrowLeft, Brain, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users } from "lucide";
 import QRCode from "qrcode";
 import "./app.css";
 import { RemoteAgent } from "./remote-agent.js";
@@ -52,11 +54,66 @@ setAppStorage(storage);
 // ============================================================================
 let chatPanel: ChatPanel;
 let remoteAgent: RemoteAgent | null = null;
-let isConnected = false;
+
+type AppView = "disconnected" | "landing" | "connected";
+let appView: AppView = "disconnected";
+
+interface GatewaySession {
+	id: string;
+	cwd: string;
+	status: string;
+	createdAt: number;
+	clientCount: number;
+}
+let gatewaySessions: GatewaySession[] = [];
+let sessionsLoading = false;
+let sessionsError = "";
 
 const GW_URL_KEY = "gateway.url";
 const GW_TOKEN_KEY = "gateway.token";
 const GW_SESSION_KEY = "gateway.sessionId";
+
+// ============================================================================
+// URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected)
+// ============================================================================
+
+function getRouteFromHash(): { view: "landing" | "session"; sessionId?: string } {
+	const hash = window.location.hash || "";
+	const sessionMatch = hash.match(/^#\/session\/([a-f0-9-]+)$/i);
+	if (sessionMatch) {
+		return { view: "session", sessionId: sessionMatch[1] };
+	}
+	return { view: "landing" };
+}
+
+function setHashRoute(view: "landing" | "session", sessionId?: string): void {
+	const newHash = view === "session" && sessionId ? `#/session/${sessionId}` : "#/";
+	if (window.location.hash !== newHash) {
+		window.location.hash = newHash;
+	}
+}
+
+// ============================================================================
+// PER-SESSION MODEL PERSISTENCE
+// ============================================================================
+
+function saveSessionModel(sessionId: string, provider: string, modelId: string): void {
+	localStorage.setItem(`session.${sessionId}.model`, JSON.stringify({ provider, modelId }));
+}
+
+function loadSessionModel(sessionId: string): { provider: string; modelId: string } | null {
+	const raw = localStorage.getItem(`session.${sessionId}.model`);
+	if (!raw) return null;
+	try {
+		const parsed = JSON.parse(raw);
+		if (parsed.provider && parsed.modelId) return parsed;
+	} catch {}
+	return null;
+}
+
+function clearSessionModel(sessionId: string): void {
+	localStorage.removeItem(`session.${sessionId}.model`);
+}
 
 // ============================================================================
 // GATEWAY API HELPERS
@@ -246,14 +303,14 @@ function openOAuthDialog(): Promise<boolean> {
 }
 
 // ============================================================================
-// GATEWAY CONNECTION
+// GATEWAY CONNECTION (Phase 1: authenticate, Phase 2: show landing, Phase 3: join session)
 // ============================================================================
-async function connectToGateway(url: string, token: string, existingSessionId?: string): Promise<void> {
-	// Save credentials early so gatewayFetch() works for OAuth checks
+
+/** Phase 1: Verify gateway reachable + OAuth, then show session landing page */
+async function authenticateGateway(url: string, token: string): Promise<void> {
 	localStorage.setItem(GW_URL_KEY, url);
 	localStorage.setItem(GW_TOKEN_KEY, token);
 
-	// Verify gateway is reachable
 	const healthRes = await fetch(`${url}/api/health`, {
 		headers: { Authorization: `Bearer ${token}` },
 	});
@@ -262,74 +319,135 @@ async function connectToGateway(url: string, token: string, existingSessionId?: 
 		throw new Error(`Gateway error: ${healthRes.status}`);
 	}
 
-	// Check OAuth BEFORE creating a session so the coding agent picks up credentials
 	const hasAuth = await checkOAuthStatus();
 	if (!hasAuth) {
 		const success = await openOAuthDialog();
 		if (!success) throw new Error("OAuth login required");
 	}
 
-	let sessionId = existingSessionId;
-
-	// Try reconnecting to a saved session first
-	if (sessionId) {
-		const checkRes = await fetch(`${url}/api/sessions/${sessionId}`, {
-			headers: { Authorization: `Bearer ${token}` },
-		});
-		if (!checkRes.ok) {
-			// Session is gone — fall through to create a new one
-			sessionId = undefined;
-		}
+	// Authenticated — show landing page unless URL already points to a session
+	const route = getRouteFromHash();
+	if (route.view !== "session") {
+		appView = "landing";
+		setHashRoute("landing");
+		renderApp();
+		await refreshSessions();
 	}
+}
 
-	if (!sessionId) {
-		// Create a new session
-		const res = await fetch(`${url}/api/sessions`, {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${token}`,
-				"Content-Type": "application/json",
-			},
-		});
+/** Fetch session list from the gateway */
+async function refreshSessions(): Promise<void> {
+	sessionsLoading = true;
+	sessionsError = "";
+	renderApp();
 
-		if (!res.ok) {
-			throw new Error(`Session creation failed: ${res.status}`);
-		}
-
-		({ id: sessionId } = await res.json());
+	try {
+		const res = await gatewayFetch("/api/sessions");
+		if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`);
+		const data = await res.json();
+		gatewaySessions = data.sessions || [];
+	} catch (err) {
+		sessionsError = err instanceof Error ? err.message : String(err);
+		gatewaySessions = [];
+	} finally {
+		sessionsLoading = false;
+		renderApp();
 	}
+}
+
+/** Phase 2: Connect to a specific session (existing or newly created) */
+async function connectToSession(sessionId: string, isExisting: boolean): Promise<void> {
+	const url = localStorage.getItem(GW_URL_KEY)!;
+	const token = localStorage.getItem(GW_TOKEN_KEY)!;
 
 	const remote = new RemoteAgent();
-	await remote.connect(url, token, sessionId!);
+	await remote.connect(url, token, sessionId);
+
+	// Restore saved model for this session (if any)
+	const savedModel = loadSessionModel(sessionId);
+	if (savedModel) {
+		const { getModel } = await import("@mariozechner/pi-ai");
+		try {
+			const model = getModel(savedModel.provider as any, savedModel.modelId);
+			remote.setModel(model);
+		} catch {
+			// Model no longer available — ignore, use server default
+		}
+	}
+
+	// Intercept setModel to persist the choice per session and re-render header
+	const originalSetModel = remote.setModel.bind(remote);
+	remote.setModel = (model: any) => {
+		originalSetModel(model);
+		if (model?.provider && model?.id) {
+			saveSessionModel(sessionId, model.provider, model.id);
+		}
+		renderApp();
+	};
 
 	remoteAgent = remote;
-	isConnected = true;
-	localStorage.setItem(GW_SESSION_KEY, sessionId!);
+	appView = "connected";
+	localStorage.setItem(GW_SESSION_KEY, sessionId);
+	setHashRoute("session", sessionId);
 
-	// Set a dummy API key so AgentInterface's key check doesn't block sending.
-	// The real API key is on the gateway's coding agent, not in the browser.
 	const modelProvider = remote.state.model?.provider || "anthropic";
 	await storage.providerKeys.set(modelProvider, "gateway-managed");
 
-	// Wire remote agent to ChatPanel (duck-typed Agent interface)
+	// Create a fresh ChatPanel each time so old messages don't linger
+	chatPanel = new ChatPanel();
 	await chatPanel.setAgent(remote as any, {
-		// Always approve — keys are managed server-side
 		onApiKeyRequired: async () => true,
 	});
 
-	// If reconnecting to an existing session, fetch the message history
-	if (existingSessionId) {
+	// Model and thinking selectors are in the header bar, not the message editor
+	if (chatPanel.agentInterface) {
+		chatPanel.agentInterface.enableModelSelector = false;
+		chatPanel.agentInterface.enableThinkingSelector = false;
+	}
+
+	if (isExisting) {
 		remote.requestMessages();
 	}
 
 	renderApp();
 }
 
+/** Create a brand-new session on the gateway, then connect to it */
+async function createAndConnectSession(): Promise<void> {
+	const res = await gatewayFetch("/api/sessions", { method: "POST" });
+	if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
+	const { id } = await res.json();
+	await connectToSession(id, false);
+}
+
+/** Terminate a session on the gateway */
+async function terminateSession(sessionId: string): Promise<void> {
+	const res = await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+	if (!res.ok && res.status !== 404) {
+		throw new Error(`Failed to terminate session: ${res.status}`);
+	}
+	clearSessionModel(sessionId);
+	await refreshSessions();
+}
+
+/** Disconnect from current session and go back to landing page */
+function backToSessions(): void {
+	remoteAgent?.disconnect();
+	remoteAgent = null;
+	localStorage.removeItem(GW_SESSION_KEY);
+	appView = "landing";
+	setHashRoute("landing");
+	renderApp();
+	refreshSessions();
+}
+
+/** Full disconnect from gateway */
 function disconnectGateway(): void {
 	remoteAgent?.disconnect();
 	remoteAgent = null;
-	isConnected = false;
+	appView = "disconnected";
 	localStorage.removeItem(GW_SESSION_KEY);
+	setHashRoute("landing");
 	renderApp();
 }
 
@@ -357,7 +475,7 @@ function openGatewayDialog(): void {
 		renderDialog();
 
 		try {
-			await connectToGateway(urlValue.trim(), tokenValue.trim());
+			await authenticateGateway(urlValue.trim(), tokenValue.trim());
 			cleanup();
 		} catch (err) {
 			error = err instanceof Error ? err.message : String(err);
@@ -506,77 +624,332 @@ async function showQrCodeDialog(): Promise<void> {
 }
 
 // ============================================================================
+// RENDER HELPERS
+// ============================================================================
+
+function formatSessionAge(createdAt: number): string {
+	const diff = Date.now() - createdAt;
+	const mins = Math.floor(diff / 60_000);
+	if (mins < 1) return "just now";
+	if (mins < 60) return `${mins}m ago`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+}
+
+function statusDot(status: string) {
+	const colors: Record<string, string> = {
+		idle: "#22c55e",
+		streaming: "#3b82f6",
+		starting: "#eab308",
+		terminated: "#ef4444",
+	};
+	const color = colors[status] || "#6b7280";
+	return html`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>`;
+}
+
+function renderSessionCard(session: GatewaySession) {
+	return html`
+		<div
+			class="group flex items-center gap-4 p-4 rounded-lg border border-border hover:border-foreground/20 hover:bg-secondary/50 cursor-pointer transition-all"
+			@click=${() => connectToSession(session.id, true)}
+		>
+			<div class="flex-1 min-w-0">
+				<div class="flex items-center gap-2 mb-1">
+					${statusDot(session.status)}
+					<span class="text-sm font-medium text-foreground">${session.status}</span>
+					<span class="text-xs text-muted-foreground">·</span>
+					<span class="text-xs text-muted-foreground">${formatSessionAge(session.createdAt)}</span>
+				</div>
+				<div class="text-xs text-muted-foreground font-mono truncate" title=${session.cwd}>${session.cwd}</div>
+				<div class="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+					<span class="inline-flex items-center gap-1">${icon(Users, "xs")} ${session.clientCount} connected</span>
+					<span class="font-mono text-[10px] opacity-60" title=${session.id}>${session.id.slice(0, 8)}…</span>
+				</div>
+			</div>
+			<button
+				class="opacity-0 group-hover:opacity-100 p-2 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
+				@click=${(e: Event) => {
+					e.stopPropagation();
+					terminateSession(session.id);
+				}}
+				title="Terminate session"
+			>
+				${icon(Trash2, "sm")}
+			</button>
+		</div>
+	`;
+}
+
+function renderLandingPage() {
+	return html`
+		<div class="flex-1 flex flex-col items-center overflow-y-auto">
+			<div class="w-full max-w-xl px-4 py-8 flex flex-col gap-6">
+				<div class="flex items-center justify-between">
+					<div>
+						<h2 class="text-lg font-semibold text-foreground">Sessions</h2>
+						<p class="text-sm text-muted-foreground mt-0.5">Connect to an existing session or start a new one</p>
+					</div>
+					${Button({
+						variant: "default",
+						size: "sm",
+						onClick: createAndConnectSession,
+						children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Session</span>`,
+					})}
+				</div>
+
+				${sessionsLoading
+					? html`<div class="text-center py-12 text-muted-foreground text-sm">Loading sessions…</div>`
+					: sessionsError
+						? html`<div class="text-center py-12">
+								<p class="text-sm text-red-500 mb-3">${sessionsError}</p>
+								${Button({ variant: "ghost", size: "sm", onClick: refreshSessions, children: "Retry" })}
+							</div>`
+						: gatewaySessions.length === 0
+							? html`<div class="text-center py-12">
+									<div class="text-muted-foreground mb-3">${icon(Server, "lg")}</div>
+									<p class="text-sm text-muted-foreground mb-4">No active sessions</p>
+									${Button({
+										variant: "default",
+										onClick: createAndConnectSession,
+										children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} Start a Session</span>`,
+									})}
+								</div>`
+							: html`<div class="flex flex-col gap-2">
+									${gatewaySessions.map(renderSessionCard)}
+								</div>`}
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
 // RENDER
 // ============================================================================
 const renderApp = () => {
 	const app = document.getElementById("app");
 	if (!app) return;
 
-	const appHtml = html`
-		<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
-			<!-- Header -->
-			<div class="flex items-center justify-between border-b border-border shrink-0">
-				<div class="flex items-center gap-2 px-4 py-1">
-					<span class="text-base font-semibold text-foreground">Pi Gateway</span>
-				</div>
+	const headerLeft = () => {
+		if (appView === "connected" && remoteAgent) {
+			const model = remoteAgent.state.model;
+			const supportsThinking = model?.reasoning === true;
+
+			return html`
 				<div class="flex items-center gap-1 px-2">
-					${isConnected
-						? [Button({
-								variant: "ghost",
-								size: "sm",
-								children: html`${icon(QrCode, "sm")}`,
-								onClick: showQrCodeDialog,
-								title: "Show QR code to continue on phone",
-							}), Button({
-								variant: "ghost",
-								size: "sm",
-								children: html`<span style="display:inline-flex;align-items:center;gap:6px">
-									<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e"></span>
-									<span class="text-xs">Connected</span>
-								</span>`,
-								onClick: disconnectGateway,
-								title: "Disconnect from gateway",
-							})]
-						: Button({
-								variant: "ghost",
-								size: "sm",
-								children: html`<span class="inline-flex items-center gap-1">
-									${icon(Server, "sm")}
-									<span class="text-xs">Connect</span>
-								</span>`,
-								onClick: openGatewayDialog,
-								title: "Connect to gateway",
-							})}
+					${Button({
+						variant: "ghost",
+						size: "sm",
+						children: html`<span class="inline-flex items-center gap-1">${icon(ArrowLeft, "sm")} <span class="text-xs">Sessions</span></span>`,
+						onClick: backToSessions,
+						title: "Back to session list",
+					})}
+					${model ? Button({
+						variant: "ghost",
+						size: "sm",
+						onClick: () => {
+							ModelSelector.open(model, (m) => remoteAgent?.setModel(m));
+						},
+						children: html`<span class="inline-flex items-center gap-1">${icon(Sparkles, "sm")} <span class="text-xs">${model.id}</span></span>`,
+						className: "h-8 text-xs truncate max-w-[200px]",
+						title: "Change model",
+					}) : ""}
+					${supportsThinking ? Select({
+						value: remoteAgent.state.thinkingLevel || "off",
+						placeholder: "Off",
+						options: [
+							{ value: "off", label: "Off", icon: icon(Brain, "sm") },
+							{ value: "minimal", label: "Minimal", icon: icon(Brain, "sm") },
+							{ value: "low", label: "Low", icon: icon(Brain, "sm") },
+							{ value: "medium", label: "Medium", icon: icon(Brain, "sm") },
+							{ value: "high", label: "High", icon: icon(Brain, "sm") },
+						] as SelectOption[],
+						onChange: (value: string) => {
+							remoteAgent?.setThinkingLevel(value as any);
+							renderApp();
+						},
+						width: "80px",
+						size: "sm",
+						variant: "ghost",
+						fitContent: true,
+					}) : ""}
+				</div>
+			`;
+		}
+		return html`
+			<div class="flex items-center gap-2 px-4 py-1">
+				<span class="text-base font-semibold text-foreground">Bobbit</span>
+			</div>
+		`;
+	};
+
+	const headerRight = () => {
+		if (appView === "connected") {
+			return html`
+				<div class="flex items-center gap-1 px-2">
+					${Button({
+						variant: "ghost",
+						size: "sm",
+						children: html`${icon(QrCode, "sm")}`,
+						onClick: showQrCodeDialog,
+						title: "Show QR code to continue on phone",
+					})}
+					${Button({
+						variant: "ghost",
+						size: "sm",
+						children: html`<span style="display:inline-flex;align-items:center;gap:6px">
+							<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e"></span>
+							<span class="text-xs">Connected</span>
+						</span>`,
+						onClick: disconnectGateway,
+						title: "Disconnect from gateway",
+					})}
 					<theme-toggle></theme-toggle>
 				</div>
-			</div>
+			`;
+		}
 
-			<!-- Main content -->
-			${isConnected
-				? chatPanel
-				: html`
-						<div class="flex-1 flex flex-col items-center justify-center gap-6 p-8">
-							<div class="flex flex-col items-center gap-3 text-center">
-								<div class="text-muted-foreground">${icon(Unplug, "lg")}</div>
-								<h2 class="text-lg font-medium text-foreground">Not connected</h2>
-								<p class="text-sm text-muted-foreground max-w-sm">
-									Connect to a Pi Gateway to start working with the coding agent.
-								</p>
-							</div>
-							${Button({
-								variant: "default",
-								onClick: openGatewayDialog,
-								children: html`<span class="inline-flex items-center gap-2">
-									${icon(Server, "sm")} Connect to Gateway
-								</span>`,
-							})}
+		if (appView === "landing") {
+			return html`
+				<div class="flex items-center gap-1 px-2">
+					${Button({
+						variant: "ghost",
+						size: "sm",
+						children: html`${icon(QrCode, "sm")}`,
+						onClick: showQrCodeDialog,
+						title: "Show QR code",
+					})}
+					${Button({
+						variant: "ghost",
+						size: "sm",
+						children: html`<span class="inline-flex items-center gap-1">${icon(Unplug, "sm")} <span class="text-xs">Disconnect</span></span>`,
+						onClick: disconnectGateway,
+						title: "Disconnect from gateway",
+					})}
+					<theme-toggle></theme-toggle>
+				</div>
+			`;
+		}
+
+		return html`
+			<div class="flex items-center gap-1 px-2">
+				${Button({
+					variant: "ghost",
+					size: "sm",
+					children: html`<span class="inline-flex items-center gap-1">
+						${icon(Server, "sm")}
+						<span class="text-xs">Connect</span>
+					</span>`,
+					onClick: openGatewayDialog,
+					title: "Connect to gateway",
+				})}
+				<theme-toggle></theme-toggle>
+			</div>
+		`;
+	};
+
+	const mainContent = () => {
+		switch (appView) {
+			case "connected":
+				return chatPanel;
+			case "landing":
+				return renderLandingPage();
+			default:
+				return html`
+					<div class="flex-1 flex flex-col items-center justify-center gap-6 p-8">
+						<div class="flex flex-col items-center gap-3 text-center">
+							<div class="text-muted-foreground">${icon(Unplug, "lg")}</div>
+							<h2 class="text-lg font-medium text-foreground">Not connected</h2>
+							<p class="text-sm text-muted-foreground max-w-sm">
+								Connect to a Pi Gateway to start working with the coding agent.
+							</p>
 						</div>
-					`}
+						${Button({
+							variant: "default",
+							onClick: openGatewayDialog,
+							children: html`<span class="inline-flex items-center gap-2">
+								${icon(Server, "sm")} Connect to Gateway
+							</span>`,
+						})}
+					</div>
+				`;
+		}
+	};
+
+	const appHtml = html`
+		<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
+			<div class="flex items-center justify-between border-b border-border shrink-0">
+				${headerLeft()}
+				${headerRight()}
+			</div>
+			${mainContent()}
 		</div>
 	`;
 
 	render(appHtml, app);
 };
+
+// ============================================================================
+// INIT
+// ============================================================================
+// ============================================================================
+// HASH CHANGE HANDLER (browser back/forward)
+// ============================================================================
+
+let handlingHashChange = false;
+
+async function handleHashChange(): Promise<void> {
+	if (handlingHashChange) return;
+	handlingHashChange = true;
+
+	try {
+		const route = getRouteFromHash();
+		const savedUrl = localStorage.getItem(GW_URL_KEY);
+		const savedToken = localStorage.getItem(GW_TOKEN_KEY);
+
+		if (!savedUrl || !savedToken) {
+			// Not authenticated — stay disconnected
+			appView = "disconnected";
+			renderApp();
+			return;
+		}
+
+		if (route.view === "session" && route.sessionId) {
+			// If already connected to this session, nothing to do
+			if (appView === "connected" && remoteAgent?.gatewaySessionId === route.sessionId) {
+				return;
+			}
+			// Disconnect from current session if any
+			if (remoteAgent) {
+				remoteAgent.disconnect();
+				remoteAgent = null;
+			}
+			// Verify session still exists on the server
+			const checkRes = await gatewayFetch(`/api/sessions/${route.sessionId}`);
+			if (checkRes.ok) {
+				await connectToSession(route.sessionId, true);
+			} else {
+				// Session gone — go to landing
+				setHashRoute("landing");
+				appView = "landing";
+				renderApp();
+				await refreshSessions();
+			}
+		} else {
+			// Landing page
+			if (remoteAgent) {
+				remoteAgent.disconnect();
+				remoteAgent = null;
+			}
+			appView = "landing";
+			renderApp();
+			await refreshSessions();
+		}
+	} finally {
+		handlingHashChange = false;
+	}
+}
 
 // ============================================================================
 // INIT
@@ -593,23 +966,36 @@ async function initApp() {
 	if (urlToken) {
 		localStorage.setItem(GW_URL_KEY, window.location.origin);
 		localStorage.setItem(GW_TOKEN_KEY, urlToken);
-		// Strip token from URL bar so it's not visible or shared
-		window.history.replaceState({}, "", window.location.pathname);
+		// Strip token from URL bar, keep the hash
+		window.history.replaceState({}, "", window.location.pathname + window.location.hash);
 	}
 
 	const savedUrl = localStorage.getItem(GW_URL_KEY);
 	const savedToken = localStorage.getItem(GW_TOKEN_KEY);
-	const savedSession = localStorage.getItem(GW_SESSION_KEY) || undefined;
 
 	renderApp();
 
 	if (savedUrl && savedToken) {
 		try {
-			await connectToGateway(savedUrl, savedToken, savedSession);
+			// Authenticate first (health + OAuth)
+			await authenticateGateway(savedUrl, savedToken);
+
+			// Now check if the URL has a session to reconnect to
+			const route = getRouteFromHash();
+			if (route.view === "session" && route.sessionId) {
+				const checkRes = await gatewayFetch(`/api/sessions/${route.sessionId}`);
+				if (checkRes.ok) {
+					await connectToSession(route.sessionId, true);
+				}
+				// If session is gone, we're already on the landing page from authenticateGateway
+			}
 		} catch {
 			renderApp();
 		}
 	}
+
+	// Listen for browser back/forward navigation
+	window.addEventListener("hashchange", handleHashChange);
 }
 
 initApp();

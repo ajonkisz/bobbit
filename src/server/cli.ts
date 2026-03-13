@@ -18,9 +18,24 @@ interface CliArgs {
 	agentCliPath?: string;
 }
 
+/** Find the NordLynx (NordVPN mesh) interface IPv4 address, or null if not found. */
+function findNordLynxIp(): string | null {
+	const interfaces = os.networkInterfaces();
+	for (const [name, addrs] of Object.entries(interfaces)) {
+		if (!addrs) continue;
+		if (!name.toLowerCase().includes("nordlynx")) continue;
+		for (const addr of addrs) {
+			if (addr.family === "IPv4" && !addr.internal) {
+				return addr.address;
+			}
+		}
+	}
+	return null;
+}
+
 function parseArgs(argv: string[]): CliArgs {
 	const result: CliArgs = {
-		host: "0.0.0.0",
+		host: "",  // resolved after parsing
 		port: 3001,
 		cwd: process.cwd(),
 		newToken: false,
@@ -84,6 +99,20 @@ async function main() {
 		return;
 	}
 
+	// Auto-detect NordLynx mesh IP if no --host was given
+	if (!args.host) {
+		const nordIp = findNordLynxIp();
+		if (nordIp) {
+			args.host = nordIp;
+		} else {
+			console.error(
+				"Error: NordVPN mesh (NordLynx) interface not found.\n" +
+				"  Start NordVPN, or pass --host <addr> to bind manually."
+			);
+			process.exit(1);
+		}
+	}
+
 	const authToken = loadOrCreateToken(args.newToken);
 
 	const gateway = createGateway({
@@ -109,17 +138,18 @@ async function main() {
 		}
 	}
 
-	const localUrl = `http://localhost:${args.port}`;
+	const baseUrl = `http://${args.host}:${args.port}`;
+	const fullUrl = `${baseUrl}/?token=${encodeURIComponent(authToken)}`;
 
 	console.log(`\nPi Gateway v0.1.0`);
-	console.log(`  Listening:  http://${args.host}:${args.port}`);
+	console.log(`  Listening:  ${baseUrl}`);
 	console.log(`  Auth token: ${authToken}`);
 	console.log(`  Agent CWD:  ${args.cwd}`);
 	if (args.staticDir) {
-		console.log(`  UI:         ${localUrl}`);
+		console.log(`  UI:         ${fullUrl}`);
 	}
 	if (addresses.length > 0) {
-		console.log(`  Accessible from: localhost, ${addresses.join(", ")}`);
+		console.log(`  Accessible from: ${addresses.join(", ")}`);
 	}
 	console.log();
 	console.log(`  \u26A0 This token grants full shell access to this machine.`);
@@ -128,10 +158,9 @@ async function main() {
 
 	// Auto-open browser when serving the UI, passing token so the UI auto-connects
 	if (args.staticDir) {
-		const openUrl = `${localUrl}?token=${encodeURIComponent(authToken)}`;
 		const cmd =
 			process.platform === "win32" ? "start" : process.platform === "darwin" ? "open" : "xdg-open";
-		import("node:child_process").then(({ exec }) => exec(`${cmd} ${openUrl}`));
+		import("node:child_process").then(({ exec }) => exec(`${cmd} ${fullUrl}`));
 	}
 
 	// Graceful shutdown

@@ -237,6 +237,40 @@ export class MessageEditor extends LitElement {
 		const model = this.currentModel;
 		const supportsThinking = model?.reasoning === true; // Models with reasoning:true support thinking
 
+		const attachButton = this.showAttachmentButton
+			? this.processingFiles
+				? html`<div class="h-8 w-8 flex items-center justify-center shrink-0">${icon(Loader2, "sm", "animate-spin text-muted-foreground")}</div>`
+				: Button({
+						variant: "ghost",
+						size: "icon",
+						className: "h-8 w-8 shrink-0",
+						onClick: this.handleAttachmentClick,
+						children: icon(Paperclip, "sm"),
+					})
+			: "";
+
+		const sendButton = this.isStreaming
+			? Button({
+					variant: "ghost",
+					size: "icon",
+					onClick: this.onAbort,
+					children: icon(Square, "sm"),
+					className: "h-8 w-8 shrink-0",
+				})
+			: Button({
+					variant: "ghost",
+					size: "icon",
+					onClick: this.handleSend,
+					disabled: (!this.value.trim() && this.attachments.length === 0) || this.processingFiles,
+					children: html`<div style="transform: rotate(-45deg)">${icon(Send, "sm")}</div>`,
+					className: "h-8 w-8 shrink-0",
+				});
+
+		// Bottom bar with model selector and thinking selector (only if enabled)
+		const hasBottomBar =
+			(this.showModelSelector && this.currentModel) ||
+			(supportsThinking && this.showThinkingSelector);
+
 		return html`
 			<div
 				class="bg-card rounded-xl border shadow-sm relative ${this.isDragging ? "border-primary border-2 bg-primary/5" : "border-border"}"
@@ -259,7 +293,7 @@ export class MessageEditor extends LitElement {
 				${
 					this.attachments.length > 0
 						? html`
-							<div class="px-4 pt-3 pb-2 flex flex-wrap gap-2">
+							<div class="px-4 pt-3 pb-1 flex flex-wrap gap-2">
 								${this.attachments.map(
 									(attachment) => html`
 										<attachment-tile
@@ -274,17 +308,22 @@ export class MessageEditor extends LitElement {
 						: ""
 				}
 
-				<textarea
-					class="w-full bg-transparent p-4 text-foreground placeholder-muted-foreground outline-none resize-none overflow-y-auto"
-					placeholder=${i18n("Type a message...")}
-					rows="1"
-					style="max-height: 200px; field-sizing: content; min-height: 1lh; height: auto;"
-					.value=${this.value}
-					@input=${this.handleTextareaInput}
-					@keydown=${this.handleKeyDown}
-					@paste=${this.handlePaste}
-					${ref(this.textareaRef)}
-				></textarea>
+				<!-- Compact input row: [attach] [textarea] [send] -->
+				<div class="flex items-end gap-1 px-2 py-2">
+					${attachButton}
+					<textarea
+						class="flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none resize-none overflow-y-auto py-1 px-1"
+						placeholder=${i18n("Type a message...")}
+						rows="1"
+						style="max-height: 200px; field-sizing: content; min-height: 1lh; height: auto;"
+						.value=${this.value}
+						@input=${this.handleTextareaInput}
+						@keydown=${this.handleKeyDown}
+						@paste=${this.handlePaste}
+						${ref(this.textareaRef)}
+					></textarea>
+					${sendButton}
+				</div>
 
 				<!-- Hidden file input -->
 				<input
@@ -296,29 +335,9 @@ export class MessageEditor extends LitElement {
 					style="display: none;"
 				/>
 
-				<!-- Button Row -->
-				<div class="px-2 pb-2 flex items-center justify-between">
-					<!-- Left side - attachment and thinking selector -->
-					<div class="flex gap-2 items-center">
-						${
-							this.showAttachmentButton
-								? this.processingFiles
-									? html`
-										<div class="h-8 w-8 flex items-center justify-center">
-											${icon(Loader2, "sm", "animate-spin text-muted-foreground")}
-										</div>
-									`
-									: html`
-										${Button({
-											variant: "ghost",
-											size: "icon",
-											className: "h-8 w-8",
-											onClick: this.handleAttachmentClick,
-											children: icon(Paperclip, "sm"),
-										})}
-									`
-								: ""
-						}
+				<!-- Optional bottom bar for model/thinking selectors -->
+				${hasBottomBar ? html`
+					<div class="px-2 pb-2 flex items-center gap-2">
 						${
 							supportsThinking && this.showThinkingSelector
 								? html`
@@ -343,10 +362,7 @@ export class MessageEditor extends LitElement {
 								`
 								: ""
 						}
-					</div>
-
-					<!-- Model selector and send on the right -->
-					<div class="flex gap-2 items-center">
+						<div class="flex-1"></div>
 						${
 							this.showModelSelector && this.currentModel
 								? html`
@@ -354,9 +370,7 @@ export class MessageEditor extends LitElement {
 										variant: "ghost",
 										size: "sm",
 										onClick: () => {
-											// Focus textarea before opening model selector so focus returns there
 											this.textareaRef.value?.focus();
-											// Wait for next frame to ensure focus takes effect before dialog captures it
 											requestAnimationFrame(() => {
 												this.onModelSelect?.();
 											});
@@ -370,30 +384,8 @@ export class MessageEditor extends LitElement {
 								`
 								: ""
 						}
-						${
-							this.isStreaming
-								? html`
-									${Button({
-										variant: "ghost",
-										size: "icon",
-										onClick: this.onAbort,
-										children: icon(Square, "sm"),
-										className: "h-8 w-8",
-									})}
-								`
-								: html`
-									${Button({
-										variant: "ghost",
-										size: "icon",
-										onClick: this.handleSend,
-										disabled: (!this.value.trim() && this.attachments.length === 0) || this.processingFiles,
-										children: html`<div style="transform: rotate(-45deg)">${icon(Send, "sm")}</div>`,
-										className: "h-8 w-8",
-									})}
-								`
-						}
 					</div>
-				</div>
+				` : ""}
 			</div>
 		`;
 	}

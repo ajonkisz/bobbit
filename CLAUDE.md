@@ -64,7 +64,11 @@ If you need to change UI components or server behavior, edit the forked code dir
 - All API + WS require token. Constant-time comparison. Rate limiting on failures.
 - **The token grants full shell access.** Treat it like an SSH private key.
 - Static file serving has traversal guard.
-- Bind `--host` to restrict network interfaces.
+- **Gateway and Vite auto-detect the NordLynx mesh IP** and bind to it. If NordVPN isn't running, the gateway exits with an error. Pass `--host <addr>` to override. Never bind to `0.0.0.0` — restrict access to the mesh network only.
+
+## QR code / multi-device access
+
+The QR code dialog (`src/app/main.ts` `showQrCodeDialog()`) encodes `window.location.origin` + the auth token. Since both the gateway and Vite auto-detect and bind to the NordLynx mesh IP, the QR code will contain a routable mesh address by default. The startup logs print the full URL with the token — users can copy-paste or scan from any device on the mesh.
 
 ## Common tasks
 

@@ -29,7 +29,7 @@ npm run build     # compile server + bundle UI
 npm start         # start gateway on :3001, serves UI
 ```
 
-Opens a browser with the UI auto-connected. The auth token is printed to the terminal.
+The gateway and Vite dev server auto-detect the NordLynx (NordVPN mesh) interface and bind to it. If NordVPN isn't running, the gateway exits with an error and Vite falls back to localhost with a warning. Open the printed URL from any device on the mesh. The auth token is printed to the terminal.
 
 ### Development (hot reload)
 
@@ -38,14 +38,14 @@ npm run build:server   # compile server TypeScript
 npm run dev            # starts gateway + vite dev server concurrently
 ```
 
-Vite runs on `:5173` and proxies `/api` and `/ws` to the gateway on `:3001`. UI changes hot-reload instantly.
+Both the gateway (`:3001`) and Vite (`:5173`) auto-bind to the NordLynx mesh IP. Vite proxies `/api` and `/ws` to the gateway. UI changes hot-reload instantly.
 
 ### CLI flags
 
 ```
 bobbit [options]
 
---host <addr>       Bind address (default: 0.0.0.0)
+--host <addr>       Bind address (default: auto-detect NordLynx mesh IP)
 --port <n>          Port (default: 3001)
 --cwd <dir>         Working directory for agent sessions (default: .)
 --agent-cli <path>  Path to pi-coding-agent cli.js (auto-resolved from node_modules)
@@ -117,6 +117,12 @@ Forked from `@mariozechner/pi-web-ui`. Lit-based web components.
 - `dialogs/` — ModelSelector, Settings, Sessions, API keys, etc.
 - `tools/` — Tool call renderers (Bash, artifacts, JS REPL)
 - `storage/` — IndexedDB-backed persistence for sessions, settings, provider keys
+
+## QR code / multi-device access
+
+The QR code encodes whatever origin the browser is currently using. Since the gateway and Vite auto-bind to the NordLynx mesh IP, the QR code will contain a routable mesh address by default — scannable from any phone on the same NordVPN mesh network.
+
+If you override `--host` to `localhost` and open via `http://localhost:...`, the QR code will point to localhost and won't work from a phone. Always open via the mesh IP printed in the startup logs.
 
 ## Security model
 
