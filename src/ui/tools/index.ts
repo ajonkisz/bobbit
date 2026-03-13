@@ -9,6 +9,7 @@ import { FindRenderer } from "./renderers/FindRenderer.js";
 import { GrepRenderer } from "./renderers/GrepRenderer.js";
 import { LsRenderer } from "./renderers/LsRenderer.js";
 import { ReadRenderer } from "./renderers/ReadRenderer.js";
+import { ScreenshotRenderer } from "./renderers/ScreenshotRenderer.js";
 import { WriteRenderer } from "./renderers/WriteRenderer.js";
 import type { ToolRenderResult } from "./types.js";
 
@@ -20,6 +21,7 @@ registerToolRenderer("edit", new EditRenderer());
 registerToolRenderer("ls", new LsRenderer());
 registerToolRenderer("find", new FindRenderer());
 registerToolRenderer("grep", new GrepRenderer());
+registerToolRenderer("browser_screenshot", new ScreenshotRenderer());
 
 const defaultRenderer = new DefaultRenderer();
 

@@ -207,6 +207,8 @@ declare module "@mariozechner/mini-lit" {
 		"API key required": string;
 		"API key required — set up in Settings > Providers": string;
 		// Coding tool renderers
+		Screenshot: string;
+		"Full page screenshot": string;
 		Reading: string;
 		"Reading file...": string;
 		Writing: string;
@@ -446,6 +448,8 @@ export const translations = {
 		"API key required": "API key required",
 		"API key required — set up in Settings > Providers": "API key required — set up in Settings > Providers",
 		// Coding tool renderers
+		Screenshot: "Screenshot",
+		"Full page screenshot": "Full page screenshot",
 		Reading: "Reading",
 		"Reading file...": "Reading file...",
 		Writing: "Writing",
