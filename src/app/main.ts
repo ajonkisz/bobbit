@@ -1128,22 +1128,6 @@ function renderSidebar() {
 
 			<!-- Footer -->
 			<div class="px-3 py-2 border-t border-border flex items-center gap-1 shrink-0">
-				${Button({
-					variant: "ghost",
-					size: "sm",
-					children: html`${icon(QrCode, "sm")}`,
-					onClick: showQrCodeDialog,
-					title: "Show QR code",
-					className: "h-7 w-7",
-				})}
-				${Button({
-					variant: "ghost",
-					size: "sm",
-					children: html`${icon(Unplug, "sm")}`,
-					onClick: disconnectGateway,
-					title: "Disconnect from gateway",
-					className: "h-7 w-7",
-				})}
 				<div class="flex-1"></div>
 				<theme-toggle></theme-toggle>
 			</div>
@@ -1312,9 +1296,15 @@ const renderApp = () => {
 
 	const headerRight = () => {
 		if (desktop) {
-			// Desktop: QR + theme only (disconnect is in sidebar footer)
 			return html`
 				<div class="flex items-center gap-1 px-2">
+					${Button({
+						variant: "ghost",
+						size: "sm",
+						children: html`${icon(Unplug, "sm")}`,
+						onClick: disconnectGateway,
+						title: "Disconnect from gateway",
+					})}
 					${Button({
 						variant: "ghost",
 						size: "sm",
