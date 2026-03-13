@@ -13,6 +13,7 @@
     "dev": "concurrently -n gw,ui -c blue,green \"node dist/server/cli.js --cwd . --no-ui\" \"vite\"",
     "start": "node dist/server/cli.js --cwd .",
     "check": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "playwright test tests/mobile-header.spec.ts --config tests/playwright.config.ts",
     "clean": "shx rm -rf dist"
   },
   "dependencies": {

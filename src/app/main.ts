@@ -93,59 +93,51 @@ function activeSessionId(): string | undefined {
 }
 
 // ============================================================================
-// MOBILE HEADER AUTO-HIDE (scroll-direction tracking)
+// MOBILE HEADER AUTO-HIDE
+//
+// Uses capture-phase scroll listening on #app-main so we don't need to
+// query for the specific scroll container inside Lit custom elements.
+// Scroll events don't bubble, but capture: true intercepts them from
+// any descendant.
 // ============================================================================
 let mobileHeaderVisible = true;
 let _scrollCleanup: (() => void) | null = null;
-let _scrollEl: HTMLElement | null = null;
 
-/**
- * After each render, find the messages scroll container and attach a
- * scroll-direction listener. On mobile, scrolling down hides the header
- * and scrolling up reveals it.
- */
 function setupMobileScrollTracking(): void {
-	// Only on mobile when connected
+	teardownMobileScrollTracking();
+
 	if (isDesktop() || !hasActiveSession()) {
-		teardownMobileScrollTracking();
 		mobileHeaderVisible = true;
 		return;
 	}
 
-	// Walk the DOM: #app-main > pi-chat-panel > agent-interface > div.overflow-y-auto
-	const scrollEl = document.querySelector("#app-main .overflow-y-auto") as HTMLElement | null;
-	if (!scrollEl) return;
+	const mainEl = document.getElementById("app-main");
+	if (!mainEl) return;
 
-	// Already tracking this element — don't re-attach
-	if (_scrollEl === scrollEl && _scrollCleanup) return;
+	let lastScrollTop = 0;
 
-	// Clean up old listener if switching elements
-	teardownMobileScrollTracking();
-	_scrollEl = scrollEl;
-
-	let lastScrollTop = scrollEl.scrollTop;
-
-	const onScroll = () => {
+	const onScroll = (e: Event) => {
 		const headerEl = document.getElementById("app-header");
 		if (!headerEl) return;
 
-		const currentTop = scrollEl.scrollTop;
+		// The scroll target is the element that actually scrolled
+		const target = e.target as HTMLElement;
+		if (!target || !target.scrollTop && target.scrollTop !== 0) return;
+
+		const currentTop = target.scrollTop;
 		const delta = currentTop - lastScrollTop;
 
-		// Near the top — always show
 		if (currentTop < 20) {
 			if (!mobileHeaderVisible) {
 				mobileHeaderVisible = true;
 				headerEl.style.transform = "translateY(0)";
 			}
 		} else if (delta < -3) {
-			// Scrolling up — show
 			if (!mobileHeaderVisible) {
 				mobileHeaderVisible = true;
 				headerEl.style.transform = "translateY(0)";
 			}
 		} else if (delta > 3) {
-			// Scrolling down — hide
 			if (mobileHeaderVisible) {
 				mobileHeaderVisible = false;
 				headerEl.style.transform = "translateY(-100%)";
@@ -155,41 +147,24 @@ function setupMobileScrollTracking(): void {
 		lastScrollTop = currentTop;
 	};
 
-	scrollEl.addEventListener("scroll", onScroll, { passive: true });
-	_scrollCleanup = () => {
-		scrollEl.removeEventListener("scroll", onScroll);
-		_scrollEl = null;
-	};
+	// Capture phase: intercepts scroll events from ANY descendant,
+	// even though scroll events don't bubble.
+	mainEl.addEventListener("scroll", onScroll, { capture: true, passive: true });
+	_scrollCleanup = () => mainEl.removeEventListener("scroll", onScroll, { capture: true } as EventListenerOptions);
 }
 
 function teardownMobileScrollTracking(): void {
 	_scrollCleanup?.();
 	_scrollCleanup = null;
-	_scrollEl = null;
 }
 
-let _syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Sync header padding and set up scroll tracking, retrying until the DOM is ready */
-function syncMobileHeader(retries = 10): void {
-	if (_syncRetryTimer) {
-		clearTimeout(_syncRetryTimer);
-		_syncRetryTimer = null;
-	}
-
+function syncMobileHeader(): void {
 	const headerEl = document.getElementById("app-header");
 	const mainEl = document.getElementById("app-main");
 	if (headerEl && mainEl) {
 		mainEl.style.paddingTop = `${headerEl.offsetHeight}px`;
 	}
-
-	const scrollEl = document.querySelector("#app-main .overflow-y-auto") as HTMLElement | null;
-	if (scrollEl) {
-		setupMobileScrollTracking();
-	} else if (retries > 0) {
-		// Lit components haven't rendered yet — retry
-		_syncRetryTimer = setTimeout(() => syncMobileHeader(retries - 1), 50);
-	}
+	setupMobileScrollTracking();
 }
 
 const GW_URL_KEY = "gateway.url";
@@ -1136,7 +1111,7 @@ const renderApp = () => {
 						${headerLeft()}
 						${headerRight()}
 					</div>
-					<div id="app-main" class="flex-1 min-h-0">${mainArea()}</div>
+					<div id="app-main" class="flex-1 min-h-0 flex flex-col">${mainArea()}</div>
 				</div>
 			</div>
 		`, app);
@@ -1150,7 +1125,7 @@ const renderApp = () => {
 					${headerLeft()}
 					${headerRight()}
 				</div>
-				<div id="app-main" class="flex-1 min-h-0">${mainArea()}</div>
+				<div id="app-main" class="flex-1 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>
 		`, app);
 		// Wire up scroll tracking and sync header height after render.
@@ -1165,7 +1140,7 @@ const renderApp = () => {
 					${headerLeft()}
 					${headerRight()}
 				</div>
-				<div id="app-main" class="flex-1 min-h-0">${mainArea()}</div>
+				<div id="app-main" class="flex-1 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>
 		`, app);
 	}
