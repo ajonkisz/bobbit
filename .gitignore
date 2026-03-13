@@ -6,3 +6,4 @@ dist/
 Thumbs.db
 *.log
 bobbit2/
+test-results/
