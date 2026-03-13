@@ -312,6 +312,118 @@ export class SessionManager {
 		}
 	}
 
+	/**
+	 * Abort the agent. If the graceful abort doesn't resolve within a timeout,
+	 * force-kill the agent process and restart it so the session remains usable.
+	 */
+	async forceAbort(id: string, gracePeriodMs = 3000): Promise<void> {
+		const session = this.sessions.get(id);
+		if (!session) return;
+
+		// If not streaming, nothing to abort
+		if (session.status !== "streaming") return;
+
+		// Try graceful abort first
+		try {
+			await session.rpcClient.abort();
+		} catch {
+			// Abort RPC itself may fail/timeout — proceed to force kill
+		}
+
+		// Wait for the agent to become idle
+		const settled = await new Promise<boolean>((resolve) => {
+			if (session.status !== "streaming") {
+				resolve(true);
+				return;
+			}
+			const timer = setTimeout(() => {
+				unsub();
+				resolve(false);
+			}, gracePeriodMs);
+			const unsub = session.rpcClient.onEvent((event: any) => {
+				if (event.type === "agent_end") {
+					clearTimeout(timer);
+					unsub();
+					resolve(true);
+				}
+			});
+		});
+
+		if (settled) return;
+
+		// Graceful abort didn't work — force kill and restart the agent
+		console.log(`[session-manager] Force-aborting session ${id} — killing agent process`);
+
+		// Get the agent session file before killing so we can restore
+		let agentSessionFile: string | undefined;
+		try {
+			const stateResp = await session.rpcClient.getState();
+			if (stateResp.success) {
+				agentSessionFile = stateResp.data?.sessionFile;
+			}
+		} catch {
+			// Process may be unresponsive — try the persisted store
+			const persisted = this.store.get(id);
+			agentSessionFile = persisted?.agentSessionFile;
+		}
+
+		// Kill the process
+		session.unsubscribe();
+		await session.rpcClient.stop();
+
+		// Emit agent_end so clients know streaming stopped
+		session.status = "idle";
+		broadcast(session.clients, { type: "event", data: { type: "agent_end", messages: [] } });
+		broadcast(session.clients, { type: "session_status", status: "idle" });
+
+		// Restart the agent process
+		try {
+			const bridgeOptions: RpcBridgeOptions = { cwd: session.cwd };
+			if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
+			if (this.systemPromptPath) bridgeOptions.systemPromptPath = this.systemPromptPath;
+
+			const rpcClient = new RpcBridge(bridgeOptions);
+			const unsub = rpcClient.onEvent((event: any) => {
+				session.lastActivity = Date.now();
+				this.store.update(id, { lastActivity: session.lastActivity });
+
+				if (event.type === "agent_start") {
+					session.status = "streaming";
+					broadcast(session.clients, { type: "session_status", status: "streaming" });
+				} else if (event.type === "agent_end") {
+					session.status = "idle";
+					broadcast(session.clients, { type: "session_status", status: "idle" });
+				}
+
+				session.eventBuffer.push(event);
+				broadcast(session.clients, { type: "event", data: event });
+			});
+
+			await rpcClient.start();
+
+			// Resume session if we have the session file
+			if (agentSessionFile && fs.existsSync(agentSessionFile)) {
+				const switchResp = await rpcClient.sendCommand(
+					{ type: "switch_session", sessionPath: agentSessionFile },
+					15_000,
+				);
+				if (!switchResp.success) {
+					console.error(`[session-manager] switch_session failed after force abort: ${switchResp.error}`);
+				}
+			}
+
+			// Swap in the new bridge
+			session.rpcClient = rpcClient;
+			session.unsubscribe = unsub;
+			session.status = "idle";
+			console.log(`[session-manager] Session ${id} agent restarted after force abort`);
+		} catch (err) {
+			console.error(`[session-manager] Failed to restart agent after force abort:`, err);
+			session.status = "terminated";
+			broadcast(session.clients, { type: "session_status", status: "terminated" });
+		}
+	}
+
 	async shutdown(): Promise<void> {
 		// Don't remove from store on shutdown — sessions should survive restart
 		const ids = Array.from(this.sessions.keys());

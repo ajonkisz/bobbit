@@ -113,6 +113,7 @@ export function handleWebSocketConnection(
 		try {
 			switch (msg.type) {
 				case "prompt":
+					console.log(`[ws-handler] Prompt received: text="${msg.text?.substring(0, 50)}...", images=${msg.images?.length ?? 0}`);
 					await session.rpcClient.prompt(msg.text, msg.images);
 					break;
 				case "steer":
@@ -122,7 +123,9 @@ export function handleWebSocketConnection(
 					await session.rpcClient.followUp(msg.text);
 					break;
 				case "abort":
-					await session.rpcClient.abort();
+					sessionManager.forceAbort(sessionId).catch((err) => {
+						send(ws, { type: "error", message: `Abort failed: ${err}`, code: "ABORT_ERROR" });
+					});
 					break;
 				case "set_model":
 					await session.rpcClient.setModel(msg.provider, msg.modelId);
