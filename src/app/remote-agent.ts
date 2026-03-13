@@ -308,6 +308,25 @@ export class RemoteAgent {
 				this._title = msg.title;
 				this.onTitleChange?.(msg.title);
 				break;
+
+			case "error":
+				console.error(`[RemoteAgent] Server error: ${msg.message} (${msg.code})`);
+				// If we were streaming, stop. If there's a pending prompt that
+				// failed, the user message was already cleared from the editor
+				// but never echoed back — surface the error so the user knows.
+				this._state.isStreaming = false;
+				this._state.error = msg.message || "Unknown server error";
+				this._pendingAttachments = null;
+				// Add a dismissable error message to the chat history
+				this._state.messages = [...this._state.messages, {
+					role: "error",
+					content: msg.message || "Unknown server error",
+					code: msg.code,
+					timestamp: Date.now(),
+					id: `err_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+				} as any];
+				this.emit({ type: "error", error: msg.message });
+				break;
 		}
 	}
 
