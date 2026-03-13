@@ -5,11 +5,17 @@ import type { Model } from "@mariozechner/pi-ai";
 import { html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createRef, ref } from "lit/directives/ref.js";
-import { Brain, Loader2, Paperclip, Send, Sparkles, Square } from "lucide";
+import { Brain, Loader2, Paperclip, Send, Sparkles, Square, Zap, X } from "lucide";
 import { type Attachment, loadAttachment } from "../utils/attachment-utils.js";
 import { i18n } from "../utils/i18n.js";
 import "./AttachmentTile.js";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
+
+export interface QueuedMessage {
+	id: string;
+	text: string;
+	attachments?: Attachment[];
+}
 
 @customElement("message-editor")
 export class MessageEditor extends LitElement {
@@ -39,7 +45,10 @@ export class MessageEditor extends LitElement {
 	@property() onModelSelect?: () => void;
 	@property() onThinkingChange?: (level: "off" | "minimal" | "low" | "medium" | "high") => void;
 	@property() onFilesChange?: (files: Attachment[]) => void;
+	@property() onSteer?: (msg: QueuedMessage) => void;
+	@property() onRemoveQueued?: (id: string) => void;
 	@property() attachments: Attachment[] = [];
+	@property({ type: Array }) queuedMessages: QueuedMessage[] = [];
 	@property() maxFiles = 10;
 	@property() maxFileSize = 20 * 1024 * 1024; // 20MB
 	@property() acceptedTypes =
@@ -309,6 +318,27 @@ export class MessageEditor extends LitElement {
 						`
 						: ""
 				}
+
+				<!-- Queued messages -->
+				${this.queuedMessages.length > 0 ? html`
+					<div class="px-3 pt-2 pb-1 flex flex-col gap-1.5">
+						${this.queuedMessages.map((msg) => html`
+							<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-border/50 text-xs text-muted-foreground group">
+								<span class="flex-1 truncate font-mono">${msg.text}</span>
+								<button
+									@click=${() => this.onSteer?.(msg)}
+									class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.65rem] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors cursor-pointer"
+									title="Send now — interrupts the current turn"
+								>${icon(Zap, "xs")} Steer</button>
+								<button
+									@click=${() => this.onRemoveQueued?.(msg.id)}
+									class="shrink-0 p-0.5 rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+									title="Remove from queue"
+								>${icon(X, "xs")}</button>
+							</div>
+						`)}
+					</div>
+				` : ""}
 
 				<!-- Compact input row: [attach] [textarea] [send] -->
 				<div class="flex items-end gap-1 px-2 py-2">

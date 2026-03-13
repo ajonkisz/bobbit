@@ -2,7 +2,7 @@ import { streamSimple, type ToolResultMessage, type Usage } from "@mariozechner/
 import { html, LitElement } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
-import type { MessageEditor } from "./MessageEditor.js";
+import type { MessageEditor, QueuedMessage } from "./MessageEditor.js";
 import "./MessageEditor.js";
 import "./MessageList.js";
 import "./Messages.js"; // Import for side effects to register the custom elements
@@ -43,6 +43,8 @@ export class AgentInterface extends LitElement {
 	private _scrollContainer?: HTMLElement;
 	private _resizeObserver?: ResizeObserver;
 	private _unsubscribeSession?: () => void;
+	private _queuedMessages: QueuedMessage[] = [];
+	private _queueIdCounter = 0;
 
 	public setInput(text: string, attachments?: Attachment[]) {
 		const update = () => {
@@ -177,6 +179,8 @@ export class AgentInterface extends LitElement {
 						this._streamingContainer.isStreaming = false;
 						this._streamingContainer.setMessage(null, true);
 					}
+					// Drain queued messages — send the first as a prompt, rest as follow-ups
+					this.drainQueue();
 					this.requestUpdate();
 					break;
 				case "message_update":
@@ -257,18 +261,13 @@ export class AgentInterface extends LitElement {
 		this._autoScroll = true; // Enable auto-scroll when sending a message
 
 		if (isStreaming) {
-			// Agent is busy — queue as follow-up, delivered after current turn
-			if (attachments && attachments.length > 0) {
-				const message: UserMessageWithAttachments = {
-					role: "user-with-attachments",
-					content: input,
-					attachments,
-					timestamp: Date.now(),
-				};
-				session.followUp(message);
-			} else {
-				session.followUp({ role: "user", content: input, timestamp: Date.now() });
-			}
+			// Agent is busy — add to local queue, will be sent on agent_end
+			this._queuedMessages = [...this._queuedMessages, {
+				id: `q_${++this._queueIdCounter}`,
+				text: input,
+				attachments: attachments?.length ? attachments : undefined,
+			}];
+			this.requestUpdate();
 		} else {
 			// Agent is idle — send as regular prompt
 			if (attachments && attachments.length > 0) {
@@ -283,6 +282,67 @@ export class AgentInterface extends LitElement {
 				await session.prompt(input);
 			}
 		}
+	}
+
+	/** Send queued messages to the agent now that it's idle */
+	private async drainQueue() {
+		if (this._queuedMessages.length === 0 || !this.session) return;
+		const queue = this._queuedMessages;
+		this._queuedMessages = [];
+		this.requestUpdate();
+
+		// Send the first message as a prompt (starts a new turn)
+		const first = queue[0];
+		if (first.attachments?.length) {
+			const msg: UserMessageWithAttachments = {
+				role: "user-with-attachments",
+				content: first.text,
+				attachments: first.attachments,
+				timestamp: Date.now(),
+			};
+			await this.session.prompt(msg);
+		} else {
+			await this.session.prompt(first.text);
+		}
+
+		// Queue the rest as follow-ups
+		for (let i = 1; i < queue.length; i++) {
+			const q = queue[i];
+			if (q.attachments?.length) {
+				this.session.followUp({
+					role: "user-with-attachments",
+					content: q.text,
+					attachments: q.attachments,
+					timestamp: Date.now(),
+				} as any);
+			} else {
+				this.session.followUp({ role: "user", content: q.text, timestamp: Date.now() });
+			}
+		}
+	}
+
+	/** Promote a queued message to a steer — interrupts the current turn */
+	private steerMessage(msg: QueuedMessage) {
+		if (!this.session) return;
+		this._queuedMessages = this._queuedMessages.filter((m) => m.id !== msg.id);
+		this.requestUpdate();
+
+		if (msg.attachments?.length) {
+			this.session.steer({
+				role: "user-with-attachments",
+				content: msg.text,
+				attachments: msg.attachments,
+				timestamp: Date.now(),
+			} as any);
+		} else {
+			this.session.steer({ role: "user", content: msg.text, timestamp: Date.now() });
+		}
+	}
+
+	/** Remove a message from the queue without sending */
+	private removeQueuedMessage(id: string) {
+		this._queuedMessages = this._queuedMessages.filter((m) => m.id !== id);
+		this.requestUpdate();
 	}
 
 	private renderMessages() {
@@ -423,10 +483,13 @@ export class AgentInterface extends LitElement {
 							.showAttachmentButton=${this.enableAttachments}
 							.showModelSelector=${this.enableModelSelector}
 							.showThinkingSelector=${this.enableThinkingSelector}
+							.queuedMessages=${this._queuedMessages}
 							.onSend=${(input: string, attachments: Attachment[]) => {
 								this.sendMessage(input, attachments);
 							}}
 							.onAbort=${() => session.abort()}
+							.onSteer=${(msg: QueuedMessage) => this.steerMessage(msg)}
+							.onRemoveQueued=${(id: string) => this.removeQueuedMessage(id)}
 							.onModelSelect=${() => {
 								ModelSelector.open(state.model, (model) => session.setModel(model));
 							}}
