@@ -55,7 +55,7 @@ setAppStorage(storage);
 let chatPanel: ChatPanel;
 let remoteAgent: RemoteAgent | null = null;
 
-type AppView = "disconnected" | "landing" | "connected";
+type AppView = "disconnected" | "authenticated";
 let appView: AppView = "disconnected";
 
 interface GatewaySession {
@@ -68,6 +68,129 @@ interface GatewaySession {
 let gatewaySessions: GatewaySession[] = [];
 let sessionsLoading = false;
 let sessionsError = "";
+
+const SIDEBAR_BREAKPOINT = 768;
+let windowWidth = window.innerWidth;
+window.addEventListener("resize", () => {
+	const prev = windowWidth;
+	windowWidth = window.innerWidth;
+	// Only re-render if we crossed the breakpoint
+	if ((prev < SIDEBAR_BREAKPOINT) !== (windowWidth < SIDEBAR_BREAKPOINT)) {
+		renderApp();
+	}
+});
+
+function isDesktop(): boolean {
+	return windowWidth >= SIDEBAR_BREAKPOINT;
+}
+
+function hasActiveSession(): boolean {
+	return remoteAgent !== null && remoteAgent.connected;
+}
+
+function activeSessionId(): string | undefined {
+	return remoteAgent?.gatewaySessionId;
+}
+
+// ============================================================================
+// MOBILE HEADER AUTO-HIDE (scroll-direction tracking)
+// ============================================================================
+let mobileHeaderVisible = true;
+let _scrollCleanup: (() => void) | null = null;
+let _scrollEl: HTMLElement | null = null;
+
+/**
+ * After each render, find the messages scroll container and attach a
+ * scroll-direction listener. On mobile, scrolling down hides the header
+ * and scrolling up reveals it.
+ */
+function setupMobileScrollTracking(): void {
+	// Only on mobile when connected
+	if (isDesktop() || !hasActiveSession()) {
+		teardownMobileScrollTracking();
+		mobileHeaderVisible = true;
+		return;
+	}
+
+	// Walk the DOM: #app-main > pi-chat-panel > agent-interface > div.overflow-y-auto
+	const scrollEl = document.querySelector("#app-main .overflow-y-auto") as HTMLElement | null;
+	if (!scrollEl) return;
+
+	// Already tracking this element — don't re-attach
+	if (_scrollEl === scrollEl && _scrollCleanup) return;
+
+	// Clean up old listener if switching elements
+	teardownMobileScrollTracking();
+	_scrollEl = scrollEl;
+
+	let lastScrollTop = scrollEl.scrollTop;
+
+	const onScroll = () => {
+		const headerEl = document.getElementById("app-header");
+		if (!headerEl) return;
+
+		const currentTop = scrollEl.scrollTop;
+		const delta = currentTop - lastScrollTop;
+
+		// Near the top — always show
+		if (currentTop < 20) {
+			if (!mobileHeaderVisible) {
+				mobileHeaderVisible = true;
+				headerEl.style.transform = "translateY(0)";
+			}
+		} else if (delta < -3) {
+			// Scrolling up — show
+			if (!mobileHeaderVisible) {
+				mobileHeaderVisible = true;
+				headerEl.style.transform = "translateY(0)";
+			}
+		} else if (delta > 3) {
+			// Scrolling down — hide
+			if (mobileHeaderVisible) {
+				mobileHeaderVisible = false;
+				headerEl.style.transform = "translateY(-100%)";
+			}
+		}
+
+		lastScrollTop = currentTop;
+	};
+
+	scrollEl.addEventListener("scroll", onScroll, { passive: true });
+	_scrollCleanup = () => {
+		scrollEl.removeEventListener("scroll", onScroll);
+		_scrollEl = null;
+	};
+}
+
+function teardownMobileScrollTracking(): void {
+	_scrollCleanup?.();
+	_scrollCleanup = null;
+	_scrollEl = null;
+}
+
+let _syncRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Sync header padding and set up scroll tracking, retrying until the DOM is ready */
+function syncMobileHeader(retries = 10): void {
+	if (_syncRetryTimer) {
+		clearTimeout(_syncRetryTimer);
+		_syncRetryTimer = null;
+	}
+
+	const headerEl = document.getElementById("app-header");
+	const mainEl = document.getElementById("app-main");
+	if (headerEl && mainEl) {
+		mainEl.style.paddingTop = `${headerEl.offsetHeight}px`;
+	}
+
+	const scrollEl = document.querySelector("#app-main .overflow-y-auto") as HTMLElement | null;
+	if (scrollEl) {
+		setupMobileScrollTracking();
+	} else if (retries > 0) {
+		// Lit components haven't rendered yet — retry
+		_syncRetryTimer = setTimeout(() => syncMobileHeader(retries - 1), 50);
+	}
+}
 
 const GW_URL_KEY = "gateway.url";
 const GW_TOKEN_KEY = "gateway.token";
@@ -325,14 +448,14 @@ async function authenticateGateway(url: string, token: string): Promise<void> {
 		if (!success) throw new Error("OAuth login required");
 	}
 
-	// Authenticated — show landing page unless URL already points to a session
+	// Authenticated — show session UI
+	appView = "authenticated";
 	const route = getRouteFromHash();
 	if (route.view !== "session") {
-		appView = "landing";
 		setHashRoute("landing");
-		renderApp();
-		await refreshSessions();
 	}
+	renderApp();
+	await refreshSessions();
 }
 
 /** Fetch session list from the gateway */
@@ -386,7 +509,7 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 	};
 
 	remoteAgent = remote;
-	appView = "connected";
+	appView = "authenticated";
 	localStorage.setItem(GW_SESSION_KEY, sessionId);
 	setHashRoute("session", sessionId);
 
@@ -410,6 +533,8 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 	}
 
 	renderApp();
+	// Refresh sidebar session list so active session appears highlighted
+	refreshSessions();
 }
 
 /** Create a brand-new session on the gateway, then connect to it */
@@ -422,6 +547,15 @@ async function createAndConnectSession(): Promise<void> {
 
 /** Terminate a session on the gateway */
 async function terminateSession(sessionId: string): Promise<void> {
+	// If terminating the active session, disconnect first
+	if (activeSessionId() === sessionId) {
+		remoteAgent?.disconnect();
+		remoteAgent = null;
+		localStorage.removeItem(GW_SESSION_KEY);
+		setHashRoute("landing");
+		renderApp();
+	}
+
 	const res = await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
 	if (!res.ok && res.status !== 404) {
 		throw new Error(`Failed to terminate session: ${res.status}`);
@@ -430,12 +564,13 @@ async function terminateSession(sessionId: string): Promise<void> {
 	await refreshSessions();
 }
 
-/** Disconnect from current session and go back to landing page */
+/** Disconnect from current session and go back to session list */
 function backToSessions(): void {
 	remoteAgent?.disconnect();
 	remoteAgent = null;
 	localStorage.removeItem(GW_SESSION_KEY);
-	appView = "landing";
+	appView = "authenticated";
+	mobileHeaderVisible = true;
 	setHashRoute("landing");
 	renderApp();
 	refreshSessions();
@@ -649,6 +784,39 @@ function statusDot(status: string) {
 	return html`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>`;
 }
 
+/** Compact session row for sidebar */
+function renderSidebarSession(session: GatewaySession) {
+	const active = activeSessionId() === session.id;
+	return html`
+		<div
+			class="group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm
+				${active ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
+			@click=${() => {
+				if (!active) connectToSession(session.id, true);
+			}}
+		>
+			${statusDot(session.status)}
+			<div class="flex-1 min-w-0">
+				<div class="truncate text-xs font-mono" title=${session.cwd}>
+					${session.cwd.split(/[/\\]/).pop() || session.cwd}
+				</div>
+				<div class="text-[10px] opacity-60">${formatSessionAge(session.createdAt)}</div>
+			</div>
+			<button
+				class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity shrink-0"
+				@click=${(e: Event) => {
+					e.stopPropagation();
+					terminateSession(session.id);
+				}}
+				title="Terminate session"
+			>
+				${icon(Trash2, "xs")}
+			</button>
+		</div>
+	`;
+}
+
+/** Full-size session card for mobile landing page */
 function renderSessionCard(session: GatewaySession) {
 	return html`
 		<div
@@ -682,7 +850,73 @@ function renderSessionCard(session: GatewaySession) {
 	`;
 }
 
-function renderLandingPage() {
+// ============================================================================
+// SIDEBAR (desktop only, when authenticated)
+// ============================================================================
+
+function renderSidebar() {
+	return html`
+		<div class="w-[240px] shrink-0 h-full border-r border-border flex flex-col bg-background">
+			<!-- Header -->
+			<div class="px-3 py-2 flex items-center justify-between border-b border-border shrink-0">
+				<span class="text-sm font-semibold text-foreground">Sessions</span>
+				<button
+					class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+					@click=${createAndConnectSession}
+					title="New session"
+				>
+					${icon(Plus, "sm")}
+				</button>
+			</div>
+
+			<!-- Session list -->
+			<div class="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5">
+				${sessionsLoading
+					? html`<div class="text-center py-6 text-muted-foreground text-xs">Loading…</div>`
+					: sessionsError
+						? html`<div class="text-center py-6">
+								<p class="text-xs text-red-500 mb-2">${sessionsError}</p>
+								<button class="text-xs text-muted-foreground hover:text-foreground underline" @click=${refreshSessions}>Retry</button>
+							</div>`
+						: gatewaySessions.length === 0
+							? html`<div class="text-center py-6">
+									<p class="text-xs text-muted-foreground mb-2">No sessions</p>
+									<button class="text-xs text-primary hover:underline" @click=${createAndConnectSession}>Create one</button>
+								</div>`
+							: gatewaySessions.map(renderSidebarSession)
+				}
+			</div>
+
+			<!-- Footer -->
+			<div class="px-3 py-2 border-t border-border flex items-center gap-1 shrink-0">
+				${Button({
+					variant: "ghost",
+					size: "sm",
+					children: html`${icon(QrCode, "sm")}`,
+					onClick: showQrCodeDialog,
+					title: "Show QR code",
+					className: "h-7 w-7",
+				})}
+				${Button({
+					variant: "ghost",
+					size: "sm",
+					children: html`${icon(Unplug, "sm")}`,
+					onClick: disconnectGateway,
+					title: "Disconnect from gateway",
+					className: "h-7 w-7",
+				})}
+				<div class="flex-1"></div>
+				<theme-toggle></theme-toggle>
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
+// MOBILE LANDING PAGE (small screens, when authenticated but no active session)
+// ============================================================================
+
+function renderMobileLanding() {
 	return html`
 		<div class="flex-1 flex flex-col items-center overflow-y-auto">
 			<div class="w-full max-w-xl px-4 py-8 flex flex-col gap-6">
@@ -731,20 +965,66 @@ const renderApp = () => {
 	const app = document.getElementById("app");
 	if (!app) return;
 
+	// ── Disconnected state ──────────────────────────────────────────
+	if (appView === "disconnected") {
+		render(html`
+			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
+				<div class="flex items-center justify-between border-b border-border shrink-0">
+					<div class="flex items-center gap-2 px-4 py-1">
+						<span class="text-base font-semibold text-foreground">Bobbit</span>
+					</div>
+					<div class="flex items-center gap-1 px-2">
+						${Button({
+							variant: "ghost",
+							size: "sm",
+							children: html`<span class="inline-flex items-center gap-1">${icon(Server, "sm")} <span class="text-xs">Connect</span></span>`,
+							onClick: openGatewayDialog,
+							title: "Connect to gateway",
+						})}
+						<theme-toggle></theme-toggle>
+					</div>
+				</div>
+				<div class="flex-1 flex flex-col items-center justify-center gap-6 p-8">
+					<div class="flex flex-col items-center gap-3 text-center">
+						<div class="text-muted-foreground">${icon(Unplug, "lg")}</div>
+						<h2 class="text-lg font-medium text-foreground">Not connected</h2>
+						<p class="text-sm text-muted-foreground max-w-sm">
+							Connect to a Pi Gateway to start working with the coding agent.
+						</p>
+					</div>
+					${Button({
+						variant: "default",
+						onClick: openGatewayDialog,
+						children: html`<span class="inline-flex items-center gap-2">${icon(Server, "sm")} Connect to Gateway</span>`,
+					})}
+				</div>
+			</div>
+		`, app);
+		return;
+	}
+
+	// ── Authenticated state ─────────────────────────────────────────
+	const desktop = isDesktop();
+	const connected = hasActiveSession();
+
+	// Header: model/thinking controls when connected
 	const headerLeft = () => {
-		if (appView === "connected" && remoteAgent) {
+		if (connected && remoteAgent) {
 			const model = remoteAgent.state.model;
 			const supportsThinking = model?.reasoning === true;
 
+			// On mobile, show back button to return to session list
+			const backBtn = !desktop ? Button({
+				variant: "ghost",
+				size: "sm",
+				children: html`<span class="inline-flex items-center gap-1">${icon(ArrowLeft, "sm")} <span class="text-xs">Sessions</span></span>`,
+				onClick: backToSessions,
+				title: "Back to session list",
+			}) : "";
+
 			return html`
 				<div class="flex items-center gap-1 px-2">
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: html`<span class="inline-flex items-center gap-1">${icon(ArrowLeft, "sm")} <span class="text-xs">Sessions</span></span>`,
-						onClick: backToSessions,
-						title: "Back to session list",
-					})}
+					${backBtn}
 					${model ? Button({
 						variant: "ghost",
 						size: "sm",
@@ -777,40 +1057,19 @@ const renderApp = () => {
 				</div>
 			`;
 		}
-		return html`
-			<div class="flex items-center gap-2 px-4 py-1">
+
+		// Not connected to a session — show title on mobile only (desktop has sidebar)
+		if (!desktop) {
+			return html`<div class="flex items-center gap-2 px-4 py-1">
 				<span class="text-base font-semibold text-foreground">Bobbit</span>
-			</div>
-		`;
+			</div>`;
+		}
+		return html`<div></div>`;
 	};
 
 	const headerRight = () => {
-		if (appView === "connected") {
-			return html`
-				<div class="flex items-center gap-1 px-2">
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: html`${icon(QrCode, "sm")}`,
-						onClick: showQrCodeDialog,
-						title: "Show QR code to continue on phone",
-					})}
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: html`<span style="display:inline-flex;align-items:center;gap:6px">
-							<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e"></span>
-							<span class="text-xs">Connected</span>
-						</span>`,
-						onClick: disconnectGateway,
-						title: "Disconnect from gateway",
-					})}
-					<theme-toggle></theme-toggle>
-				</div>
-			`;
-		}
-
-		if (appView === "landing") {
+		if (desktop) {
+			// Desktop: QR + theme only (disconnect is in sidebar footer)
 			return html`
 				<div class="flex items-center gap-1 px-2">
 					${Button({
@@ -820,74 +1079,96 @@ const renderApp = () => {
 						onClick: showQrCodeDialog,
 						title: "Show QR code",
 					})}
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						children: html`<span class="inline-flex items-center gap-1">${icon(Unplug, "sm")} <span class="text-xs">Disconnect</span></span>`,
-						onClick: disconnectGateway,
-						title: "Disconnect from gateway",
-					})}
 					<theme-toggle></theme-toggle>
 				</div>
 			`;
 		}
-
+		// Mobile
 		return html`
 			<div class="flex items-center gap-1 px-2">
 				${Button({
 					variant: "ghost",
 					size: "sm",
-					children: html`<span class="inline-flex items-center gap-1">
-						${icon(Server, "sm")}
-						<span class="text-xs">Connect</span>
-					</span>`,
-					onClick: openGatewayDialog,
-					title: "Connect to gateway",
+					children: html`${icon(QrCode, "sm")}`,
+					onClick: showQrCodeDialog,
+					title: "Show QR code",
+				})}
+				${Button({
+					variant: "ghost",
+					size: "sm",
+					children: html`${icon(Unplug, "sm")}`,
+					onClick: disconnectGateway,
+					title: "Disconnect from gateway",
 				})}
 				<theme-toggle></theme-toggle>
 			</div>
 		`;
 	};
 
-	const mainContent = () => {
-		switch (appView) {
-			case "connected":
-				return chatPanel;
-			case "landing":
-				return renderLandingPage();
-			default:
-				return html`
-					<div class="flex-1 flex flex-col items-center justify-center gap-6 p-8">
-						<div class="flex flex-col items-center gap-3 text-center">
-							<div class="text-muted-foreground">${icon(Unplug, "lg")}</div>
-							<h2 class="text-lg font-medium text-foreground">Not connected</h2>
-							<p class="text-sm text-muted-foreground max-w-sm">
-								Connect to a Pi Gateway to start working with the coding agent.
-							</p>
-						</div>
-						${Button({
-							variant: "default",
-							onClick: openGatewayDialog,
-							children: html`<span class="inline-flex items-center gap-2">
-								${icon(Server, "sm")} Connect to Gateway
-							</span>`,
-						})}
-					</div>
-				`;
+	const mainArea = () => {
+		if (connected) return chatPanel;
+
+		// No active session — empty state (desktop) or landing page (mobile)
+		if (desktop) {
+			return html`
+				<div class="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
+					<div class="text-muted-foreground">${icon(Server, "lg")}</div>
+					<p class="text-sm text-muted-foreground">Select a session from the sidebar or create a new one</p>
+					${Button({
+						variant: "default",
+						size: "sm",
+						onClick: createAndConnectSession,
+						children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Session</span>`,
+					})}
+				</div>
+			`;
 		}
+		return renderMobileLanding();
 	};
 
-	const appHtml = html`
-		<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
-			<div class="flex items-center justify-between border-b border-border shrink-0">
-				${headerLeft()}
-				${headerRight()}
+	if (desktop) {
+		// Desktop layout: sidebar | header+main
+		render(html`
+			<div class="w-full h-screen flex bg-background text-foreground overflow-hidden">
+				${renderSidebar()}
+				<div class="flex-1 flex flex-col min-w-0">
+					<div class="flex items-center justify-between border-b border-border shrink-0">
+						${headerLeft()}
+						${headerRight()}
+					</div>
+					<div id="app-main" class="flex-1 min-h-0">${mainArea()}</div>
+				</div>
 			</div>
-			${mainContent()}
-		</div>
-	`;
-
-	render(appHtml, app);
+		`, app);
+	} else if (connected) {
+		// Mobile connected: floating header that auto-hides on scroll-down
+		render(html`
+			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden relative">
+				<div id="app-header"
+					class="absolute top-0 left-0 right-0 z-50 bg-background border-b border-border flex items-center justify-between transition-transform duration-200"
+					style="transform: translateY(${mobileHeaderVisible ? "0" : "-100%"})">
+					${headerLeft()}
+					${headerRight()}
+				</div>
+				<div id="app-main" class="flex-1 min-h-0">${mainArea()}</div>
+			</div>
+		`, app);
+		// Wire up scroll tracking and sync header height after render.
+		// The scroll container inside AgentInterface may not exist yet
+		// (Lit renders async), so poll briefly until it appears.
+		syncMobileHeader();
+	} else {
+		// Mobile not connected: normal static header
+		render(html`
+			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
+				<div class="flex items-center justify-between border-b border-border shrink-0">
+					${headerLeft()}
+					${headerRight()}
+				</div>
+				<div id="app-main" class="flex-1 min-h-0">${mainArea()}</div>
+			</div>
+		`, app);
+	}
 };
 
 // ============================================================================
@@ -909,7 +1190,6 @@ async function handleHashChange(): Promise<void> {
 		const savedToken = localStorage.getItem(GW_TOKEN_KEY);
 
 		if (!savedUrl || !savedToken) {
-			// Not authenticated — stay disconnected
 			appView = "disconnected";
 			renderApp();
 			return;
@@ -917,7 +1197,7 @@ async function handleHashChange(): Promise<void> {
 
 		if (route.view === "session" && route.sessionId) {
 			// If already connected to this session, nothing to do
-			if (appView === "connected" && remoteAgent?.gatewaySessionId === route.sessionId) {
+			if (remoteAgent?.gatewaySessionId === route.sessionId) {
 				return;
 			}
 			// Disconnect from current session if any
@@ -930,19 +1210,18 @@ async function handleHashChange(): Promise<void> {
 			if (checkRes.ok) {
 				await connectToSession(route.sessionId, true);
 			} else {
-				// Session gone — go to landing
 				setHashRoute("landing");
-				appView = "landing";
+				appView = "authenticated";
 				renderApp();
 				await refreshSessions();
 			}
 		} else {
-			// Landing page
+			// No session in URL — disconnect from current session
 			if (remoteAgent) {
 				remoteAgent.disconnect();
 				remoteAgent = null;
 			}
-			appView = "landing";
+			appView = "authenticated";
 			renderApp();
 			await refreshSessions();
 		}

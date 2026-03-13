@@ -57,6 +57,13 @@ body {
 	animation: shimmer 2s ease-in-out infinite;
 }
 
+/* Let code blocks and tool output use full available width */
+.max-w-5xl code-block,
+.max-w-5xl console-block,
+.max-w-5xl .tool-content {
+	max-width: none;
+}
+
 /* User message with fancy pill styling */
 .user-message-container {
 	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
