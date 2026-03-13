@@ -93,13 +93,9 @@ export class ToolGroup extends LitElement {
 
 		// Build the file/item list for the summary
 		const labels = this.toolCalls.map((tc) => summarizeCall(this.toolName, tc.arguments));
-		const maxInline = 3;
-		const inlineLabels = labels.slice(0, maxInline);
-		const remaining = labels.length - maxInline;
-
-		const summaryParts: TemplateResult[] = inlineLabels.map(
-			(l) => html`<span class="font-mono text-foreground/80">${l}</span>`,
-		);
+		const maxShown = 5;
+		const shownLabels = labels.slice(0, maxShown);
+		const remaining = labels.length - maxShown;
 
 		const statusIcon = (iconComponent: any, color: string) =>
 			html`<span class="inline-block ${color}">${icon(iconComponent, "sm")}</span>`;
@@ -114,13 +110,17 @@ export class ToolGroup extends LitElement {
 					@click=${this._toggle}
 					class="flex items-center justify-between gap-2 text-sm text-muted-foreground w-full text-left hover:text-foreground transition-colors cursor-pointer"
 				>
-					<div class="flex items-center gap-2 min-w-0">
-						${statusIcon(toolIcon, iconColor)}
-						<span>
-							${label.verb} ${count} ${count === 1 ? label.noun : label.nounPlural}${html`<span class="text-muted-foreground/70"> — </span>`}${summaryParts.map(
-								(p, i) => html`${i > 0 ? html`<span class="text-muted-foreground/50">, </span>` : ""}${p}`,
-							)}${remaining > 0 ? html`<span class="text-muted-foreground/50">, +${remaining} more</span>` : ""}
-						</span>
+					<div class="flex items-start gap-2 min-w-0">
+						<span class="mt-0.5">${statusIcon(toolIcon, iconColor)}</span>
+						<div class="flex flex-col gap-0">
+							<span>${label.verb} ${count} ${count === 1 ? label.noun : label.nounPlural}</span>
+							${!this._expanded ? html`
+								${shownLabels.map(
+									(l) => html`<span class="font-mono text-[0.75rem] leading-snug text-foreground/60">${l}</span>`,
+								)}
+								${remaining > 0 ? html`<span class="text-[0.75rem] text-muted-foreground/50">+${remaining} more</span>` : ""}
+							` : ""}
+						</div>
 					</div>
 					<span class="inline-block text-muted-foreground shrink-0">
 						${this._expanded
