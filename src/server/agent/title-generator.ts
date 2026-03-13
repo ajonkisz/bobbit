@@ -87,16 +87,26 @@ export async function generateSessionTitle(messages: any[]): Promise<string | nu
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				"x-api-key": token,
+				// OAuth tokens use Bearer auth, not x-api-key
+				"Authorization": `Bearer ${token}`,
 				"anthropic-version": "2023-06-01",
+				// Required beta headers for OAuth access
+				"anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
 			},
 			body: JSON.stringify({
 				model: TITLE_MODEL,
 				max_tokens: 30,
+				// OAuth tokens require Claude Code identity in system prompt
+				system: [
+					{
+						type: "text",
+						text: "You are Claude Code, Anthropic's official CLI for Claude. Generate a very short title (3-7 words, no quotes) summarizing the conversation you are shown.",
+					},
+				],
 				messages: [
 					{
 						role: "user",
-						content: `Generate a very short title (3-7 words, no quotes) summarizing this conversation:\n\n${preview}`,
+						content: preview,
 					},
 				],
 			}),
