@@ -82,9 +82,54 @@ body {
 .bobbit-blob {
 	display: flex;
 	align-items: end;
+	position: relative;
 	padding: 4px 0 0 0;
 	margin-bottom: -16px;
 	overflow: visible;
+}
+
+/* Pixel shadow under the blob — shrinks when he's airborne */
+.bobbit-blob__shadow {
+	position: absolute;
+	bottom: 2px;
+	left: 50%;
+	width: 5px;
+	height: 1px;
+	transform-origin: center;
+	transform: translateX(-50%) scale(3.5);
+	background: rgba(0, 0, 0, 0.12);
+	image-rendering: pixelated;
+	animation: blob-shadow 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes blob-shadow {
+	0% { transform: translateX(-50%) scale(3.5) scaleX(1); opacity: 0.12; }
+	8% { transform: translateX(-50%) scale(3.5) scaleX(1.1); opacity: 0.14; }
+	18% { transform: translateX(-50%) scale(3.5) scaleX(0.7); opacity: 0.06; }
+	30% { transform: translateX(-50%) scale(3.5) scaleX(0.5); opacity: 0.04; }
+	38% { transform: translateX(-50%) scale(3.5) scaleX(0.55); opacity: 0.04; }
+	48% { transform: translateX(-50%) scale(3.5) scaleX(0.7); opacity: 0.06; }
+	55% { transform: translateX(-50%) scale(3.5) scaleX(1.15); opacity: 0.14; }
+	65% { transform: translateX(-50%) scale(3.5) scaleX(0.85); opacity: 0.09; }
+	73% { transform: translateX(-50%) scale(3.5) scaleX(1.05); opacity: 0.12; }
+	85% { transform: translateX(-50%) scale(3.5) scaleX(1); opacity: 0.11; }
+	100% { transform: translateX(-50%) scale(3.5) scaleX(1); opacity: 0.12; }
+}
+
+/* Idle shadow — static, offset left to match idle position */
+.bobbit-blob--idle .bobbit-blob__shadow {
+	animation: none !important;
+	transform: translateX(calc(-50% - 35px)) scale(3.5);
+	opacity: 0.10;
+}
+
+/* Hide shadow during transitions */
+.bobbit-blob--enter .bobbit-blob__shadow,
+.bobbit-blob--enter-roll .bobbit-blob__shadow,
+.bobbit-blob--exit .bobbit-blob__shadow,
+.bobbit-blob--exit-roll .bobbit-blob__shadow {
+	opacity: 0 !important;
+	animation: none !important;
 }
 
 .bobbit-blob__sprite {
