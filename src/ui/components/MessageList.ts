@@ -8,6 +8,7 @@ import { html, LitElement, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { renderMessage } from "./message-renderer-registry.js";
+import "./ErrorMessage.js";
 import "./ToolGroup.js";
 
 /** Tool names eligible for cross-message grouping */
@@ -42,6 +43,7 @@ export class MessageList extends LitElement {
 	@property({ type: Object }) pendingToolCalls?: Set<string>;
 	@property({ type: Boolean }) isStreaming: boolean = false;
 	@property({ attribute: false }) onCostClick?: () => void;
+	@property({ attribute: false }) onDismissError?: (id: string) => void;
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
 		return this;
@@ -70,6 +72,20 @@ export class MessageList extends LitElement {
 
 			// Skip artifact messages
 			if (msg.role === "artifact") { i++; continue; }
+
+			// Render error messages as dismissable banners
+			if ((msg as any).role === "error") {
+				const errMsg = msg as any;
+				items.push({
+					key: `err:${errMsg.id}`,
+					template: html`<error-message
+						.message=${errMsg}
+						.onDismiss=${this.onDismissError}
+					></error-message>`,
+				});
+				i++;
+				continue;
+			}
 
 			// Try custom renderer first
 			const customTemplate = renderMessage(msg);

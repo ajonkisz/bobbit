@@ -377,6 +377,13 @@ export class AgentInterface extends LitElement {
 					.pendingToolCalls=${this.session ? this.session.state.pendingToolCalls : new Set<string>()}
 					.isStreaming=${state.isStreaming}
 					.onCostClick=${this.onCostClick}
+					.onDismissError=${(id: string) => {
+						if (!this.session) return;
+						this.session.state.messages = this.session.state.messages.filter(
+							(m: any) => !(m.role === "error" && m.id === id)
+						);
+						this.requestUpdate();
+					}}
 				></message-list>
 
 				<!-- Streaming message container - manages its own updates -->
