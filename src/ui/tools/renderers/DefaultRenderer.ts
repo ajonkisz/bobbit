@@ -6,6 +6,26 @@ import { renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
 
 export class DefaultRenderer implements ToolRenderer {
+	private toolName?: string;
+
+	constructor(toolName?: string) {
+		this.toolName = toolName;
+	}
+
+	/** Create a renderer with a specific tool name for display */
+	withToolName(name: string): DefaultRenderer {
+		return new DefaultRenderer(name);
+	}
+
+	private get label(): string {
+		if (!this.toolName) return "Tool Call";
+		// Format tool name: snake_case/camelCase → Title Case
+		return this.toolName
+			.replace(/[_-]/g, " ")
+			.replace(/([a-z])([A-Z])/g, "$1 $2")
+			.replace(/\b\w/g, (c) => c.toUpperCase());
+	}
+
 	render(params: any | undefined, result: ToolResultMessage | undefined, isStreaming?: boolean): ToolRenderResult {
 		const state = result ? (result.isError ? "error" : "complete") : isStreaming ? "inprogress" : "complete";
 
@@ -44,7 +64,7 @@ export class DefaultRenderer implements ToolRenderer {
 			return {
 				content: html`
 					<div class="space-y-3">
-						${renderHeader(state, Code, "Tool Call")}
+						${renderHeader(state, Code, this.label)}
 						${
 							paramsJson
 								? html`<div>
@@ -69,7 +89,7 @@ export class DefaultRenderer implements ToolRenderer {
 				return {
 					content: html`
 						<div>
-							${renderHeader(state, Code, "Preparing tool parameters...")}
+							${renderHeader(state, Code, `${i18n("Preparing")} ${this.label.toLowerCase()}...`)}
 						</div>
 					`,
 					isCustom: false,
@@ -79,7 +99,7 @@ export class DefaultRenderer implements ToolRenderer {
 			return {
 				content: html`
 					<div class="space-y-3">
-						${renderHeader(state, Code, "Tool Call")}
+						${renderHeader(state, Code, this.label)}
 						<div>
 							<div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Input")}</div>
 							<code-block .code=${paramsJson} language="json"></code-block>
@@ -94,7 +114,7 @@ export class DefaultRenderer implements ToolRenderer {
 		return {
 			content: html`
 				<div>
-					${renderHeader(state, Code, "Preparing tool...")}
+					${renderHeader(state, Code, `${i18n("Preparing")} ${this.label.toLowerCase()}...`)}
 				</div>
 			`,
 			isCustom: false,

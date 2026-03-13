@@ -4,10 +4,22 @@ import "./extract-document.js"; // Auto-registers the renderer
 import { getToolRenderer, registerToolRenderer } from "./renderer-registry.js";
 import { BashRenderer } from "./renderers/BashRenderer.js";
 import { DefaultRenderer } from "./renderers/DefaultRenderer.js";
+import { EditRenderer } from "./renderers/EditRenderer.js";
+import { FindRenderer } from "./renderers/FindRenderer.js";
+import { GrepRenderer } from "./renderers/GrepRenderer.js";
+import { LsRenderer } from "./renderers/LsRenderer.js";
+import { ReadRenderer } from "./renderers/ReadRenderer.js";
+import { WriteRenderer } from "./renderers/WriteRenderer.js";
 import type { ToolRenderResult } from "./types.js";
 
 // Register all built-in tool renderers
 registerToolRenderer("bash", new BashRenderer());
+registerToolRenderer("read", new ReadRenderer());
+registerToolRenderer("write", new WriteRenderer());
+registerToolRenderer("edit", new EditRenderer());
+registerToolRenderer("ls", new LsRenderer());
+registerToolRenderer("find", new FindRenderer());
+registerToolRenderer("grep", new GrepRenderer());
 
 const defaultRenderer = new DefaultRenderer();
 
@@ -40,7 +52,7 @@ export function renderTool(
 	if (renderer) {
 		return renderer.render(params, result, isStreaming);
 	}
-	return defaultRenderer.render(params, result, isStreaming);
+	return defaultRenderer.withToolName(toolName).render(params, result, isStreaming);
 }
 
 export { getToolRenderer, registerToolRenderer };

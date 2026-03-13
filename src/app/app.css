@@ -1,1 +1,12 @@
 @import "../ui/app.css";
+
+/*
+ * Mobile header: when [data-mobile-header] is on the root container,
+ * add top padding to the message scroll area so the first message
+ * isn't hidden behind the fixed header overlay (~44px).
+ * The selector targets the scroll content div inside AgentInterface.
+ * Uses !important to override Tailwind's p-4 utility.
+ */
+[data-mobile-header] agent-interface .overflow-y-auto > .max-w-5xl {
+	padding-top: 60px !important; /* 44px header + 16px breathing room */
+}
