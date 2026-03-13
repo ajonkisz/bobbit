@@ -218,27 +218,31 @@ export class AgentInterface extends LitElement {
 	};
 
 	public async sendMessage(input: string, attachments?: Attachment[]) {
-		if ((!input.trim() && attachments?.length === 0) || this.session?.state.isStreaming) return;
+		if (!input.trim() && (!attachments || attachments.length === 0)) return;
 		const session = this.session;
 		if (!session) throw new Error("No session set on AgentInterface");
 		if (!session.state.model) throw new Error("No model set on AgentInterface");
 
-		// Check if API key exists for the provider (only needed in direct mode)
-		const provider = session.state.model.provider;
-		const apiKey = await getAppStorage().providerKeys.get(provider);
+		const isStreaming = session.state.isStreaming;
 
-		// If no API key, prompt for it
-		if (!apiKey) {
-			if (!this.onApiKeyRequired) {
-				console.error("No API key configured and no onApiKeyRequired handler set");
-				return;
-			}
+		// Check if API key exists for the provider (only needed in direct mode, skip for queued messages)
+		if (!isStreaming) {
+			const provider = session.state.model.provider;
+			const apiKey = await getAppStorage().providerKeys.get(provider);
 
-			const success = await this.onApiKeyRequired(provider);
+			// If no API key, prompt for it
+			if (!apiKey) {
+				if (!this.onApiKeyRequired) {
+					console.error("No API key configured and no onApiKeyRequired handler set");
+					return;
+				}
 
-			// If still no API key, abort the send
-			if (!success) {
-				return;
+				const success = await this.onApiKeyRequired(provider);
+
+				// If still no API key, abort the send
+				if (!success) {
+					return;
+				}
 			}
 		}
 
@@ -252,17 +256,32 @@ export class AgentInterface extends LitElement {
 		this._messageEditor.attachments = [];
 		this._autoScroll = true; // Enable auto-scroll when sending a message
 
-		// Compose message with attachments if any
-		if (attachments && attachments.length > 0) {
-			const message: UserMessageWithAttachments = {
-				role: "user-with-attachments",
-				content: input,
-				attachments,
-				timestamp: Date.now(),
-			};
-			await this.session?.prompt(message);
+		if (isStreaming) {
+			// Agent is busy — queue as follow-up, delivered after current turn
+			if (attachments && attachments.length > 0) {
+				const message: UserMessageWithAttachments = {
+					role: "user-with-attachments",
+					content: input,
+					attachments,
+					timestamp: Date.now(),
+				};
+				session.followUp(message);
+			} else {
+				session.followUp({ role: "user", content: input, timestamp: Date.now() });
+			}
 		} else {
-			await this.session?.prompt(input);
+			// Agent is idle — send as regular prompt
+			if (attachments && attachments.length > 0) {
+				const message: UserMessageWithAttachments = {
+					role: "user-with-attachments",
+					content: input,
+					attachments,
+					timestamp: Date.now(),
+				};
+				await session.prompt(message);
+			} else {
+				await session.prompt(input);
+			}
 		}
 	}
 

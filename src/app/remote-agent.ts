@@ -15,6 +15,9 @@ export class RemoteAgent {
 	// Assistant message deferred until tool execution completes to avoid
 	// showing it simultaneously in both message-list and streaming-container.
 	private _deferredAssistantMessage: any = null;
+	// Attachments from the most recent prompt, used to enrich the echoed
+	// user message so thumbnails render in the message list.
+	private _pendingAttachments: any[] | null = null;
 
 	// Agent interface properties (used by AgentInterface / ChatPanel)
 	getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
@@ -147,17 +150,36 @@ export class RemoteAgent {
 
 	async prompt(input: string | any | any[], images?: any[]): Promise<void> {
 		let text: string;
+		let attachments: any[] | undefined;
+		let imageData: any[] | undefined;
+
 		if (typeof input === "string") {
 			text = input;
 		} else if (Array.isArray(input)) {
 			text = input.map((m) => extractText(m)).join("\n");
 		} else {
 			text = extractText(input);
+			// Preserve attachments from user-with-attachments messages
+			if (input.role === "user-with-attachments" && input.attachments?.length) {
+				attachments = input.attachments;
+				// Extract image attachments as ImageContent objects for the LLM
+				imageData = attachments
+					?.filter((a: any) => a.type === "image" && a.content)
+					.map((a: any) => ({ type: "image", data: a.content, mimeType: a.mimeType }));
+			}
 		}
+
+		// Stash attachments so we can enrich the echoed user message
+		this._pendingAttachments = attachments || null;
 
 		// Don't add the user message locally — the server will echo it back
 		// as message_start/message_end events, keeping a single source of truth.
-		this.send({ type: "prompt", text });
+		this.send({
+			type: "prompt",
+			text,
+			...(imageData?.length ? { images: imageData } : {}),
+			...(attachments?.length ? { attachments } : {}),
+		});
 	}
 
 	steer(message: any): void {
@@ -199,6 +221,7 @@ export class RemoteAgent {
 		this._state.pendingToolCalls = new Set();
 		this._state.error = undefined;
 		this._deferredAssistantMessage = null;
+		this._pendingAttachments = null;
 	}
 
 	// ── Setters (Agent interface) ────────────────────────────────────
@@ -365,7 +388,20 @@ export class RemoteAgent {
 						// appears before this message in the correct order.
 						this.flushDeferredMessage();
 						this._state.streamMessage = null;
-						this._state.messages = [...this._state.messages, event.message];
+
+						let msg = event.message;
+						// Enrich echoed user messages with stashed attachments
+						// so image thumbnails render in the message list.
+						if (msg.role === "user" && this._pendingAttachments) {
+							msg = {
+								...msg,
+								role: "user-with-attachments",
+								attachments: this._pendingAttachments,
+							};
+							this._pendingAttachments = null;
+						}
+
+						this._state.messages = [...this._state.messages, msg];
 					}
 				}
 				break;

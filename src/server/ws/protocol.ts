@@ -1,7 +1,7 @@
 /** Client → Server messages over WebSocket */
 export type ClientMessage =
 	| { type: "auth"; token: string }
-	| { type: "prompt"; text: string; attachments?: unknown[] }
+	| { type: "prompt"; text: string; images?: Array<{ type: "image"; data: string; mimeType: string }>; attachments?: unknown[] }
 	| { type: "steer"; text: string }
 	| { type: "follow_up"; text: string }
 	| { type: "abort" }

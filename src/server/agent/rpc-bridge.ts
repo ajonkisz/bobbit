@@ -95,7 +95,7 @@ export class RpcBridge {
 
 	// --- Convenience methods matching the RPC protocol ---
 
-	prompt(text: string, images?: string[]) {
+	prompt(text: string, images?: Array<{ type: "image"; data: string; mimeType: string }>) {
 		return this.sendCommand({ type: "prompt", message: text, ...(images?.length ? { images } : {}) });
 	}
 

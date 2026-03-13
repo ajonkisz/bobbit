@@ -113,7 +113,7 @@ export function handleWebSocketConnection(
 		try {
 			switch (msg.type) {
 				case "prompt":
-					await session.rpcClient.prompt(msg.text);
+					await session.rpcClient.prompt(msg.text, msg.images);
 					break;
 				case "steer":
 					await session.rpcClient.steer(msg.text);

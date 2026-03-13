@@ -62,7 +62,7 @@ export class MessageEditor extends LitElement {
 	private handleKeyDown = (e: KeyboardEvent) => {
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
-			if (!this.isStreaming && !this.processingFiles && (this.value.trim() || this.attachments.length > 0)) {
+			if (!this.processingFiles && (this.value.trim() || this.attachments.length > 0)) {
 				this.handleSend();
 			}
 		} else if (e.key === "Escape" && this.isStreaming) {
@@ -249,7 +249,8 @@ export class MessageEditor extends LitElement {
 					})
 			: "";
 
-		const sendButton = this.isStreaming
+		const hasContent = this.value.trim() || this.attachments.length > 0;
+		const abortButton = this.isStreaming
 			? Button({
 					variant: "ghost",
 					size: "icon",
@@ -257,14 +258,15 @@ export class MessageEditor extends LitElement {
 					children: icon(Square, "sm"),
 					className: "h-8 w-8 shrink-0",
 				})
-			: Button({
-					variant: "ghost",
-					size: "icon",
-					onClick: this.handleSend,
-					disabled: (!this.value.trim() && this.attachments.length === 0) || this.processingFiles,
-					children: html`<div style="transform: rotate(-45deg)">${icon(Send, "sm")}</div>`,
-					className: "h-8 w-8 shrink-0",
-				});
+			: "";
+		const sendButton = Button({
+			variant: "ghost",
+			size: "icon",
+			onClick: this.handleSend,
+			disabled: !hasContent || this.processingFiles,
+			children: html`<div style="transform: rotate(-45deg)">${icon(Send, "sm")}</div>`,
+			className: "h-8 w-8 shrink-0",
+		});
 
 		// Bottom bar with model selector and thinking selector (only if enabled)
 		const hasBottomBar =
@@ -322,7 +324,7 @@ export class MessageEditor extends LitElement {
 						@paste=${this.handlePaste}
 						${ref(this.textareaRef)}
 					></textarea>
-					${sendButton}
+					${abortButton}${sendButton}
 				</div>
 
 				<!-- Hidden file input -->
