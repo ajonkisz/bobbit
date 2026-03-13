@@ -287,9 +287,12 @@ export class AgentInterface extends LitElement {
 	/** Send queued messages to the agent now that it's idle */
 	private async drainQueue() {
 		if (this._queuedMessages.length === 0 || !this.session) return;
-		const queue = this._queuedMessages;
+		// Filter out steered messages — they were already sent
+		const queue = this._queuedMessages.filter((m) => !m.steered);
 		this._queuedMessages = [];
 		this.requestUpdate();
+
+		if (queue.length === 0) return;
 
 		// Send the first message as a prompt (starts a new turn)
 		const first = queue[0];
@@ -324,7 +327,10 @@ export class AgentInterface extends LitElement {
 	/** Promote a queued message to a steer — interrupts the current turn */
 	private steerMessage(msg: QueuedMessage) {
 		if (!this.session) return;
-		this._queuedMessages = this._queuedMessages.filter((m) => m.id !== msg.id);
+		// Mark as steered — stays visible with "Sent" indicator until agent_end
+		this._queuedMessages = this._queuedMessages.map((m) =>
+			m.id === msg.id ? { ...m, steered: true } : m,
+		);
 		this.requestUpdate();
 
 		if (msg.attachments?.length) {
