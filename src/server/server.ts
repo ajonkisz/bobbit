@@ -101,7 +101,9 @@ export function createGateway(config: GatewayConfig) {
 	return {
 		server,
 		sessionManager,
-		start() {
+		async start() {
+			// Restore persisted sessions before accepting connections
+			await sessionManager.restoreSessions();
 			return new Promise<void>((resolve) => {
 				server.listen(config.port, config.host, () => resolve());
 			});

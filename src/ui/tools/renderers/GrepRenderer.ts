@@ -1,6 +1,6 @@
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import { html } from "lit";
-import { createRef } from "lit/directives/ref.js";
+import { createRef, ref } from "lit/directives/ref.js";
 import { FileText } from "lucide";
 import { i18n } from "../../utils/i18n.js";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
@@ -54,7 +54,7 @@ export class GrepRenderer implements ToolRenderer<GrepParams, any> {
 				content: html`
 					<div>
 						${renderCollapsibleHeader(state, FileText, headerText, contentRef, chevronRef, false)}
-						<div ${contentRef} class="max-h-0 overflow-hidden transition-all duration-300">
+						<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
 							<console-block .content=${output}></console-block>
 						</div>
 					</div>

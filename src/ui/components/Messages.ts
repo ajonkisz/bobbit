@@ -13,7 +13,14 @@ import type { Attachment } from "../utils/attachment-utils.js";
 import { formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
 import "./ThinkingBlock.js";
+import "./ToolGroup.js";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
+
+/** Minimum consecutive same-name completed tool calls to form a group */
+const MIN_GROUP_SIZE = 2;
+
+/** Tool names eligible for grouping */
+const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep"]);
 
 export type UserMessageWithAttachments = {
 	role: "user-with-attachments";
@@ -105,36 +112,85 @@ export class AssistantMessage extends LitElement {
 		// Render content in the order it appears
 		const orderedParts: TemplateResult[] = [];
 
-		for (const chunk of this.message.content) {
+		// Collect tool calls into runs for grouping (only when not streaming)
+		const content = this.message.content;
+		let i = 0;
+		while (i < content.length) {
+			const chunk = content[i];
+
 			if (chunk.type === "text" && chunk.text.trim() !== "") {
 				orderedParts.push(html`<markdown-block .content=${chunk.text}></markdown-block>`);
+				i++;
 			} else if (chunk.type === "thinking" && chunk.thinking.trim() !== "") {
 				orderedParts.push(
 					html`<thinking-block .content=${chunk.thinking} .isStreaming=${this.isStreaming}></thinking-block>`,
 				);
+				i++;
 			} else if (chunk.type === "toolCall") {
-				if (!this.hideToolCalls) {
-					const tool = this.tools?.find((t) => t.name === chunk.name);
-					const pending = this.pendingToolCalls?.has(chunk.id) ?? false;
-					const result = this.toolResultsById?.get(chunk.id);
-					// Skip rendering pending tool calls when hidePendingToolCalls is true
-					// (used to prevent duplication when StreamingMessageContainer is showing them)
+				if (this.hideToolCalls) {
+					i++;
+					continue;
+				}
+
+				// Try to build a run of consecutive same-name, completed tool calls
+				const run: ToolCall[] = [];
+				let j = i;
+				while (j < content.length && content[j].type === "toolCall") {
+					const tc = content[j] as ToolCall;
+					// Only group if same name as first, groupable, and completed (has result, not pending)
+					if (run.length > 0 && tc.name !== run[0].name) break;
+					const pending = this.pendingToolCalls?.has(tc.id) ?? false;
+					const result = this.toolResultsById?.get(tc.id);
+					if (pending && !result) break; // still in-flight — stop grouping here
+					run.push(tc);
+					j++;
+				}
+
+				const canGroup =
+					!this.isStreaming &&
+					run.length >= MIN_GROUP_SIZE &&
+					GROUPABLE_TOOLS.has(run[0].name) &&
+					run.every((tc) => {
+						const pending = this.pendingToolCalls?.has(tc.id) ?? false;
+						const result = this.toolResultsById?.get(tc.id);
+						return !pending && !!result;
+					});
+
+				if (canGroup) {
+					orderedParts.push(
+						html`<tool-group
+							.toolName=${run[0].name}
+							.toolCalls=${run}
+							.tools=${this.tools || []}
+							.toolResultsById=${this.toolResultsById}
+						></tool-group>`,
+					);
+					i = j;
+				} else {
+					// Render individually (single call, or streaming, or not groupable)
+					const tc = chunk as ToolCall;
+					const tool = this.tools?.find((t) => t.name === tc.name);
+					const pending = this.pendingToolCalls?.has(tc.id) ?? false;
+					const result = this.toolResultsById?.get(tc.id);
 					if (this.hidePendingToolCalls && pending && !result) {
+						i++;
 						continue;
 					}
-					// A tool call is aborted if the message was aborted and there's no result for this tool call
 					const aborted = this.message.stopReason === "aborted" && !result;
 					orderedParts.push(
 						html`<tool-message
 							.tool=${tool}
-							.toolCall=${chunk}
+							.toolCall=${tc}
 							.result=${result}
 							.pending=${pending}
 							.aborted=${aborted}
 							.isStreaming=${this.isStreaming}
 						></tool-message>`,
 					);
+					i++;
 				}
+			} else {
+				i++;
 			}
 		}
 

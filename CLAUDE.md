@@ -32,9 +32,22 @@ npm run build          # Full build (server + UI)
 npm run build:server   # Compile server TypeScript only
 npm run build:ui       # Vite bundle UI only
 npm run dev            # Gateway + vite dev server with hot reload
+npm run dev:harness    # Gateway via restart harness + vite (use this for development)
+npm run restart-server # Signal the harness to rebuild & restart the server
 npm start              # Run built gateway (serves embedded UI)
 npm run check          # Type-check both server and web without emitting
 ```
+
+### Dev server harness
+
+When developing Bobbit itself, use `npm run dev:harness` instead of `npm run dev`. The harness wraps the server process and watches a sentinel file (`~/.pi/gateway-restart`). When an agent finishes making server-side changes, it runs `npm run restart-server` to trigger:
+
+1. Kill the running server
+2. Wait for the port to clear
+3. `npm run build:server` to recompile TypeScript
+4. Relaunch the server
+
+The harness also auto-restarts on unexpected crashes. Sessions survive restarts thanks to disk persistence (`~/.pi/gateway-sessions.json`).
 
 ## Key concepts
 

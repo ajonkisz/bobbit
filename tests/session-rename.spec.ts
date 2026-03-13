@@ -214,6 +214,54 @@ test.describe("Session rename", () => {
 		expect(tentRelated).toBe(true);
 	});
 
+	test("manual rename is not overwritten by auto-title race", async ({ page }) => {
+		await openApp(page, token);
+		await createNewSession(page);
+
+		// 1) Send a message so the auto-title generation fires on agent_end
+		await sendMessage(page, "Tell me about TypeScript generics");
+		await waitForAgentIdle(page);
+
+		// 2) IMMEDIATELY rename — don't wait for auto-title to complete.
+		//    The auto-title Haiku API call is in-flight right now.
+		const activeRow = page.locator(".bg-secondary").first();
+		await activeRow.hover();
+		await activeRow.locator('button[title="Rename session"]').click();
+
+		const dialog = page.locator(".fixed.z-50.bg-background").filter({ hasText: "Rename Session" });
+		await expect(dialog).toBeVisible({ timeout: 5_000 });
+		await dialog.locator("input").fill("My Manual Name");
+		await dialog.getByRole("button", { name: "Rename" }).click();
+		await expect(dialog).not.toBeVisible({ timeout: 5_000 });
+
+		// 3) Confirm it took effect immediately
+		await page.waitForTimeout(500);
+		expect(await getActiveSessionTitle(page)).toBe("My Manual Name");
+		console.log(`Title set to "My Manual Name" immediately after agent_end`);
+
+		// 4) Wait long enough for the auto-title API call to complete (if it races)
+		await page.waitForTimeout(5_000);
+		const titleAfterWait = await getActiveSessionTitle(page);
+		console.log(`Title after 5s wait (should still be manual): "${titleAfterWait}"`);
+		expect(titleAfterWait).toBe("My Manual Name");
+
+		// 5) Switch away to a new session
+		await createNewSession(page);
+		await page.waitForTimeout(1_500);
+
+		// 6) The old session (now inactive in sidebar) should still say "My Manual Name"
+		const allTitles = await page.locator(".overflow-y-auto .truncate.text-xs").allTextContents();
+		console.log(`All sidebar titles after switch: ${JSON.stringify(allTitles.map(t => t.trim()))}`);
+		expect(allTitles.map((t) => t.trim())).toContain("My Manual Name");
+
+		// 7) Switch back and verify
+		await page.locator(".truncate.text-xs", { hasText: "My Manual Name" }).first().locator("..").locator("..").click();
+		await page.waitForTimeout(1_000);
+		const restored = await getActiveSessionTitle(page);
+		console.log(`Title after switching back: "${restored}"`);
+		expect(restored).toBe("My Manual Name");
+	});
+
 	test("renamed title persists after switching to another session and back", async ({ page }) => {
 		await openApp(page, token);
 

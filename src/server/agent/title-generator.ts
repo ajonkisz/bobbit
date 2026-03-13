@@ -122,20 +122,21 @@ export async function generateSessionTitle(messages: any[]): Promise<string | nu
 		headers["x-api-key"] = auth.access;
 	}
 
+	const coreInstruction = "Output a 2-3 word label for this conversation. MAXIMUM 3 words. Examples: \"Fix Login Bug\", \"Redis Setup\", \"CSV Parser\", \"Dark Mode\". Output ONLY the label. No quotes, no markdown, no explanation.";
 	const systemText = auth.type === "oauth"
-		? "You are Claude Code, Anthropic's official CLI for Claude. Your ONLY job right now: read the conversation below and output a short title (3-7 words). Output ONLY the title text. No quotes, no markdown, no explanation, no preamble."
-		: "Read the conversation below and output a short title (3-7 words). Output ONLY the title text. No quotes, no markdown, no explanation, no preamble.";
+		? `You are Claude Code, Anthropic's official CLI for Claude. ${coreInstruction}`
+		: coreInstruction;
 
 	const body = {
 		model: TITLE_MODEL,
-		max_tokens: 30,
+		max_tokens: 12,
 		system: auth.type === "oauth"
 			? [{ type: "text", text: systemText }]
 			: systemText,
 		messages: [
 			{
 				role: "user",
-				content: `Generate a short title for this conversation:\n\n---\n${preview}\n---\n\nTitle:`,
+				content: `Conversation:\n\n---\n${preview}\n---\n\n2-3 word label:`,
 			},
 		],
 	};
@@ -173,7 +174,7 @@ export async function generateSessionTitle(messages: any[]): Promise<string | nu
 			.replace(/^["'"']+|["'"']+$/g, "") // strip quotes
 			.replace(/\n.*/s, "")              // only first line
 			.trim();
-		if (title.length > 60) title = title.slice(0, 57) + "…";
+		if (title.length > 30) title = title.slice(0, 27) + "…";
 
 		console.log(`[title-gen] Generated title: "${title}"`);
 		return title || null;

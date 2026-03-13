@@ -1,6 +1,6 @@
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import { html } from "lit";
-import { createRef } from "lit/directives/ref.js";
+import { createRef, ref } from "lit/directives/ref.js";
 import { FileCode2 } from "lucide";
 import { i18n } from "../../utils/i18n.js";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
@@ -52,7 +52,7 @@ export class EditRenderer implements ToolRenderer<EditParams, EditDetails> {
 					content: html`
 						<div>
 							${renderCollapsibleHeader(state, FileCode2, headerText, contentRef, chevronRef, false)}
-							<div ${contentRef} class="max-h-0 overflow-hidden transition-all duration-300">
+							<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
 								<code-block .code=${diff} language="diff"></code-block>
 							</div>
 						</div>

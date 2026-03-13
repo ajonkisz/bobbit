@@ -64,6 +64,7 @@ interface GatewaySession {
 	cwd: string;
 	status: string;
 	createdAt: number;
+	lastActivity: number;
 	clientCount: number;
 }
 let gatewaySessions: GatewaySession[] = [];
@@ -774,8 +775,16 @@ async function showQrCodeDialog(): Promise<void> {
 // RENDER HELPERS
 // ============================================================================
 
-function formatSessionAge(createdAt: number): string {
-	const diff = Date.now() - createdAt;
+/** Show the last 3 segments of a path, e.g. "Users/joe/project" */
+function shortenPath(fullPath: string): string {
+	const parts = fullPath.split(/[/\\]/).filter(Boolean);
+	if (parts.length <= 3) return parts.join("/");
+	return "…/" + parts.slice(-3).join("/");
+}
+
+function formatSessionAge(timestamp: number): string {
+	if (!timestamp || !Number.isFinite(timestamp)) return "";
+	const diff = Date.now() - timestamp;
 	const mins = Math.floor(diff / 60_000);
 	if (mins < 1) return "just now";
 	if (mins < 60) return `${mins}m ago`;
@@ -961,8 +970,11 @@ function renderSidebarSession(session: GatewaySession) {
 				<div class="truncate text-xs" title=${displayTitle}>
 					${displayTitle}
 				</div>
-				<div class="text-[10px] opacity-60 font-mono truncate" title=${session.cwd}>
-					${session.cwd.split(/[/\\]/).pop() || session.cwd} · ${formatSessionAge(session.createdAt)}
+				<div class="text-[10px] opacity-60 font-mono break-all leading-tight" title=${session.cwd}>
+					${session.cwd}
+				</div>
+				<div class="text-[10px] opacity-60 mt-0.5">
+					${formatSessionAge(session.lastActivity)}
 				</div>
 			</div>
 			<button
@@ -1001,7 +1013,7 @@ function renderSessionCard(session: GatewaySession) {
 					${statusDot(session.status)}
 					<span class="text-sm font-medium text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
-					<span class="text-xs text-muted-foreground">${formatSessionAge(session.createdAt)}</span>
+					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
 				</div>
 				<div class="text-xs text-muted-foreground font-mono truncate" title=${session.cwd}>${session.cwd}</div>
 				<div class="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">

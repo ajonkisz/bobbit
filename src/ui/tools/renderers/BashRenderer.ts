@@ -1,20 +1,53 @@
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import { html } from "lit";
+import { createRef, ref } from "lit/directives/ref.js";
 import { SquareTerminal } from "lucide";
 import { i18n } from "../../utils/i18n.js";
-import { renderHeader } from "../renderer-registry.js";
+import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
 
 interface BashParams {
 	command: string;
 }
 
+/**
+ * Extract a short, human-readable label from a bash command string.
+ * Strips leading env vars, sudo, etc. and returns the base command name.
+ */
+function summarizeCommand(command: string): string {
+	const trimmed = command.trim();
+	if (!trimmed) return "command";
+
+	// Take the first line for multi-line commands
+	const firstLine = trimmed.split("\n")[0].trim();
+
+	// Strip leading env assignments (FOO=bar ...) and common prefixes
+	let rest = firstLine;
+	// Remove env vars like KEY=value at the start
+	rest = rest.replace(/^(\w+=\S+\s+)+/, "");
+	// Remove sudo/nohup/time/nice etc.
+	rest = rest.replace(/^(sudo|nohup|time|nice|env|command)\s+/g, "");
+
+	// Get the base command (first token), strip path
+	const baseCmd = rest.split(/\s/)[0];
+	const cmdName = baseCmd.split("/").pop() || baseCmd;
+
+	// Build a short summary: command name + a few key args
+	const maxLen = 80;
+	if (firstLine.length <= maxLen) return firstLine;
+	return firstLine.slice(0, maxLen) + "…";
+}
+
 // Bash tool has undefined details (only uses output)
 export class BashRenderer implements ToolRenderer<BashParams, undefined> {
-	render(params: BashParams | undefined, result: ToolResultMessage<undefined> | undefined): ToolRenderResult {
-		const state = result ? (result.isError ? "error" : "complete") : "inprogress";
+	render(params: BashParams | undefined, result: ToolResultMessage<undefined> | undefined, isStreaming?: boolean): ToolRenderResult {
+		const state = result ? (result.isError ? "error" : "complete") : isStreaming ? "inprogress" : "complete";
 
-		// With result: show command + output
+		const headerText = params?.command
+			? html`<span class="font-mono">${summarizeCommand(params.command)}</span>`
+			: i18n("Running command...");
+
+		// With result: collapsible command + output
 		if (result && params?.command) {
 			const output =
 				result.content
@@ -22,24 +55,33 @@ export class BashRenderer implements ToolRenderer<BashParams, undefined> {
 					.map((c: any) => c.text)
 					.join("\n") || "";
 			const combined = output ? `> ${params.command}\n\n${output}` : `> ${params.command}`;
+
+			const contentRef = createRef<HTMLDivElement>();
+			const chevronRef = createRef<HTMLSpanElement>();
 			return {
 				content: html`
-					<div class="space-y-3">
-						${renderHeader(state, SquareTerminal, i18n("Running command..."))}
-						<console-block .content=${combined} .variant=${result.isError ? "error" : "default"}></console-block>
+					<div>
+						${renderCollapsibleHeader(state, SquareTerminal, headerText, contentRef, chevronRef, false)}
+						<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
+							<console-block .content=${combined} .variant=${result.isError ? "error" : "default"}></console-block>
+						</div>
 					</div>
 				`,
 				isCustom: false,
 			};
 		}
 
-		// Just params (streaming or waiting)
+		// Streaming / in-progress with params — show command collapsible, expanded
 		if (params?.command) {
+			const contentRef = createRef<HTMLDivElement>();
+			const chevronRef = createRef<HTMLSpanElement>();
 			return {
 				content: html`
-					<div class="space-y-3">
-						${renderHeader(state, SquareTerminal, i18n("Running command..."))}
-						<console-block .content=${`> ${params.command}`}></console-block>
+					<div>
+						${renderCollapsibleHeader(state, SquareTerminal, headerText, contentRef, chevronRef, true)}
+						<div ${ref(contentRef)} class="max-h-[2000px] mt-3 overflow-hidden transition-all duration-300">
+							<console-block .content=${`> ${params.command}`}></console-block>
+						</div>
 					</div>
 				`,
 				isCustom: false,
@@ -47,6 +89,6 @@ export class BashRenderer implements ToolRenderer<BashParams, undefined> {
 		}
 
 		// No params yet
-		return { content: renderHeader(state, SquareTerminal, i18n("Waiting for command...")), isCustom: false };
+		return { content: renderHeader(state, SquareTerminal, i18n("Running command...")), isCustom: false };
 	}
 }
