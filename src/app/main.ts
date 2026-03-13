@@ -19,7 +19,7 @@ import { html, render } from "lit";
 import { ArrowLeft, Brain, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users, WandSparkles } from "lucide";
 import QRCode from "qrcode";
 import "./app.css";
-import { RemoteAgent } from "./remote-agent.js";
+import { RemoteAgent, type ConnectionStatus } from "./remote-agent.js";
 
 // ============================================================================
 // STORAGE (required by web-ui components)
@@ -54,6 +54,7 @@ setAppStorage(storage);
 // ============================================================================
 let chatPanel: ChatPanel;
 let remoteAgent: RemoteAgent | null = null;
+let connectionStatus: ConnectionStatus = "disconnected";
 
 type AppView = "disconnected" | "authenticated";
 let appView: AppView = "disconnected";
@@ -561,6 +562,13 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 		renderApp();
 	};
 
+	// Track WebSocket connection status for reconnect banner
+	remote.onConnectionStatusChange = (status: ConnectionStatus) => {
+		connectionStatus = status;
+		renderApp();
+	};
+	connectionStatus = "connected";
+
 	remoteAgent = remote;
 	appView = "authenticated";
 	localStorage.setItem(GW_SESSION_KEY, sessionId);
@@ -604,6 +612,7 @@ async function terminateSession(sessionId: string): Promise<void> {
 	if (activeSessionId() === sessionId) {
 		remoteAgent?.disconnect();
 		remoteAgent = null;
+		connectionStatus = "disconnected";
 		localStorage.removeItem(GW_SESSION_KEY);
 		setHashRoute("landing");
 		renderApp();
@@ -621,6 +630,7 @@ async function terminateSession(sessionId: string): Promise<void> {
 function backToSessions(): void {
 	remoteAgent?.disconnect();
 	remoteAgent = null;
+	connectionStatus = "disconnected";
 	localStorage.removeItem(GW_SESSION_KEY);
 	appView = "authenticated";
 	mobileHeaderVisible = true;
@@ -634,6 +644,7 @@ function backToSessions(): void {
 function disconnectGateway(): void {
 	remoteAgent?.disconnect();
 	remoteAgent = null;
+	connectionStatus = "disconnected";
 	appView = "disconnected";
 	localStorage.removeItem(GW_SESSION_KEY);
 	teardownMobileScrollTracking();
@@ -844,7 +855,8 @@ function statusDot(status: string) {
 		terminated: "#ef4444",
 	};
 	const color = colors[status] || "#6b7280";
-	return html`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>`;
+	const cls = status === "streaming" ? "status-dot-streaming" : "";
+	return html`<span class="${cls}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>`;
 }
 
 /** Show a rename dialog for a session */
@@ -1002,7 +1014,7 @@ function renderSidebarSession(session: GatewaySession) {
 	return html`
 		<div
 			class="group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm
-				${active ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
+				${active ? "bg-secondary text-foreground sidebar-session-active" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
 			@click=${() => {
 				if (!active) connectToSession(session.id, true);
 			}}
@@ -1044,10 +1056,11 @@ function renderSidebarSession(session: GatewaySession) {
 }
 
 /** Full-size session card for mobile landing page */
-function renderSessionCard(session: GatewaySession) {
+function renderSessionCard(session: GatewaySession, index = 0) {
 	return html`
 		<div
-			class="group flex items-center gap-4 p-4 rounded-lg border border-border hover:border-foreground/20 hover:bg-secondary/50 cursor-pointer transition-all"
+			class="group session-card-enter flex items-center gap-4 p-4 rounded-lg border border-border hover:border-foreground/20 hover:bg-secondary/50 cursor-pointer transition-all"
+			style="animation-delay: ${index * 50}ms"
 			@click=${() => connectToSession(session.id, true)}
 		>
 			<div class="flex-1 min-w-0">
@@ -1159,7 +1172,7 @@ function renderMobileLanding() {
 							</div>`
 						: gatewaySessions.length === 0
 							? html`<div class="text-center py-12">
-									<div class="text-muted-foreground mb-3">${icon(Server, "lg")}</div>
+									<div class="text-muted-foreground mb-3 empty-state-icon">${icon(Server, "lg")}</div>
 									<p class="text-sm text-muted-foreground mb-4">No active sessions</p>
 									${Button({
 										variant: "default",
@@ -1168,7 +1181,7 @@ function renderMobileLanding() {
 									})}
 								</div>`
 							: html`<div class="flex flex-col gap-2">
-									${gatewaySessions.map(renderSessionCard)}
+									${gatewaySessions.map((s, i) => renderSessionCard(s, i))}
 								</div>`}
 			</div>
 		</div>
@@ -1203,7 +1216,7 @@ const renderApp = () => {
 				</div>
 				<div class="flex-1 flex flex-col items-center justify-center gap-6 p-8">
 					<div class="flex flex-col items-center gap-3 text-center">
-						<div class="text-muted-foreground">${icon(Unplug, "lg")}</div>
+						<div class="text-muted-foreground empty-state-icon">${icon(Unplug, "lg")}</div>
 						<h2 class="text-lg font-medium text-foreground">Not connected</h2>
 						<p class="text-sm text-muted-foreground max-w-sm">
 							Connect to a Pi Gateway to start working with the coding agent.
@@ -1332,14 +1345,32 @@ const renderApp = () => {
 		`;
 	};
 
+	const reconnectBanner = () => {
+		if (!connected || connectionStatus === "connected") return "";
+		return html`
+			<div class="reconnect-banner shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium
+				${connectionStatus === "reconnecting"
+					? "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400"
+					: "bg-red-500/15 text-red-700 dark:text-red-400"}">
+				${connectionStatus === "reconnecting"
+					? html`
+						<svg class="animate-spin shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+						</svg>
+						<span>Reconnecting to server…</span>`
+					: html`<span>Disconnected from server</span>`}
+			</div>
+		`;
+	};
+
 	const mainArea = () => {
-		if (connected) return chatPanel;
+		if (connected) return html`${reconnectBanner()}${chatPanel}`;
 
 		// No active session — empty state (desktop) or landing page (mobile)
 		if (desktop) {
 			return html`
 				<div class="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
-					<div class="text-muted-foreground">${icon(Server, "lg")}</div>
+					<div class="text-muted-foreground empty-state-icon">${icon(Server, "lg")}</div>
 					<p class="text-sm text-muted-foreground">Select a session from the sidebar or create a new one</p>
 					${Button({
 						variant: "default",
@@ -1433,6 +1464,7 @@ async function handleHashChange(): Promise<void> {
 			if (remoteAgent) {
 				remoteAgent.disconnect();
 				remoteAgent = null;
+				connectionStatus = "disconnected";
 			}
 			// Verify session still exists on the server
 			const checkRes = await gatewayFetch(`/api/sessions/${route.sessionId}`);
@@ -1449,6 +1481,7 @@ async function handleHashChange(): Promise<void> {
 			if (remoteAgent) {
 				remoteAgent.disconnect();
 				remoteAgent = null;
+				connectionStatus = "disconnected";
 			}
 			appView = "authenticated";
 			renderApp();
@@ -1504,6 +1537,28 @@ async function initApp() {
 
 	// Listen for browser back/forward navigation
 	window.addEventListener("hashchange", handleHashChange);
+
+	// Global keyboard shortcuts
+	window.addEventListener("keydown", (e: KeyboardEvent) => {
+		const mod = e.ctrlKey || e.metaKey;
+
+		// Ctrl+T / Cmd+T — New session
+		if (mod && e.key === "t") {
+			if (appView === "authenticated") {
+				e.preventDefault();
+				createAndConnectSession();
+			}
+		}
+
+		// Ctrl+/ / Cmd+/ — Focus message input
+		if (mod && e.key === "/") {
+			e.preventDefault();
+			const textarea = document.querySelector("message-editor")?.querySelector("textarea");
+			if (textarea) {
+				textarea.focus();
+			}
+		}
+	});
 }
 
 initApp();

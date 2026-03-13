@@ -10,3 +10,82 @@
 [data-mobile-header] agent-interface .overflow-y-auto > .max-w-5xl {
 	padding-top: 60px !important; /* 44px header + 16px breathing room */
 }
+
+/* ============================================================================
+ * STREAMING STATUS DOT — pulsing glow for active sessions
+ * ============================================================================ */
+.status-dot-streaming {
+	animation: status-pulse 2s ease-in-out infinite;
+	box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+}
+
+@keyframes status-pulse {
+	0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.45); }
+	50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
+}
+
+/* ============================================================================
+ * SESSION CARD ENTRANCE — staggered fade-in for session list items
+ * ============================================================================ */
+.session-card-enter {
+	animation: card-slide-in 0.25s ease-out both;
+}
+
+@keyframes card-slide-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* ============================================================================
+ * SIDEBAR SESSION — active indicator bar
+ * ============================================================================ */
+.sidebar-session-active {
+	position: relative;
+}
+
+.sidebar-session-active::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 25%;
+	bottom: 25%;
+	width: 3px;
+	border-radius: 0 3px 3px 0;
+	background: var(--color-primary, #3b82f6);
+}
+
+/* ============================================================================
+ * EMPTY STATE — gentle floating animation for placeholder icons
+ * ============================================================================ */
+.empty-state-icon {
+	animation: gentle-float 4s ease-in-out infinite;
+}
+
+@keyframes gentle-float {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-6px); }
+}
+
+/* ============================================================================
+ * RECONNECT BANNER — slide-down entrance
+ * ============================================================================ */
+.reconnect-banner {
+	animation: banner-slide-down 0.3s ease-out;
+}
+
+@keyframes banner-slide-down {
+	from {
+		opacity: 0;
+		transform: translateY(-100%);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}

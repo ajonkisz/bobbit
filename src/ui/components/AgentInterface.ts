@@ -493,7 +493,7 @@ export class AgentInterface extends LitElement {
 				</div>
 
 				<!-- Input Area -->
-				<div class="shrink-0">
+				<div class="shrink-0 pt-3">
 					<div class="max-w-5xl mx-auto px-2">
 						<message-editor
 							.isStreaming=${state.isStreaming}

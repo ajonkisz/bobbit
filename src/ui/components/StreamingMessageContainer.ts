@@ -11,6 +11,7 @@ export class StreamingMessageContainer extends LitElement {
 	@property({ attribute: false }) onCostClick?: () => void;
 
 	@state() private _message: AgentMessage | null = null;
+	@state() private _blobState: 'hidden' | 'active' | 'exiting' | 'idle' = 'hidden';
 	private _pendingMessage: AgentMessage | null = null;
 	private _updateScheduled = false;
 	private _immediateUpdate = false;
@@ -22,6 +23,30 @@ export class StreamingMessageContainer extends LitElement {
 	override connectedCallback(): void {
 		super.connectedCallback();
 		this.style.display = "block";
+	}
+
+	override updated(changed: Map<string, unknown>) {
+		if (changed.has("isStreaming")) {
+			if (this.isStreaming) {
+				this._blobState = 'active';
+			} else if (this._blobState === 'active') {
+				// Streaming stopped — play exit, then go idle
+				this._blobState = 'exiting';
+				setTimeout(() => {
+					this._blobState = 'idle';
+				}, 700); // match exit animation duration
+			}
+		}
+	}
+
+	private get _blobVisible() {
+		return this._blobState !== 'hidden';
+	}
+
+	private get _blobClass() {
+		if (this._blobState === 'exiting') return 'bobbit-blob bobbit-blob--exit';
+		if (this._blobState === 'idle') return 'bobbit-blob bobbit-blob--idle';
+		return 'bobbit-blob';
 	}
 
 	// Public method to update the message with batching for performance
@@ -63,9 +88,11 @@ export class StreamingMessageContainer extends LitElement {
 	override render() {
 		// Show loading indicator if loading but no message yet
 		if (!this._message) {
-			if (this.isStreaming)
+			if (this._blobVisible)
 				return html`<div class="flex flex-col gap-3 mb-3">
-					<span class="mx-4 inline-block w-2 h-4 bg-muted-foreground animate-pulse"></span>
+					<div class="${this._blobClass}">
+						<div class="bobbit-blob__sprite"></div>
+					</div>
 				</div>`;
 			return html``; // Empty until a message is set
 		}
@@ -90,7 +117,9 @@ export class StreamingMessageContainer extends LitElement {
 						.hideToolCalls=${false}
 						.onCostClick=${this.onCostClick}
 					></assistant-message>
-					${this.isStreaming ? html`<span class="mx-4 inline-block w-2 h-4 bg-muted-foreground animate-pulse"></span>` : ""}
+					${this._blobVisible ? html`<div class="${this._blobClass}">
+						<div class="bobbit-blob__sprite"></div>
+					</div>` : ""}
 				</div>
 			`;
 		}

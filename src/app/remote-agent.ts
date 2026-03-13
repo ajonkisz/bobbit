@@ -5,6 +5,8 @@ import { getModel } from "@mariozechner/pi-ai";
  * Duck-types the Agent interface from pi-agent-core so it can be used
  * with ChatPanel / AgentInterface without changes.
  */
+export type ConnectionStatus = "connected" | "reconnecting" | "disconnected";
+
 export class RemoteAgent {
 	private ws: WebSocket | null = null;
 	private subscribers: Array<(event: any) => void> = [];
@@ -19,6 +21,14 @@ export class RemoteAgent {
 	// user message so thumbnails render in the message list.
 	private _pendingAttachments: any[] | null = null;
 
+	// Auto-reconnect state
+	private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	private _reconnectAttempt = 0;
+	private _intentionalDisconnect = false;
+	private _connectionStatus: ConnectionStatus = "disconnected";
+	private static readonly MAX_RECONNECT_DELAY = 30_000;
+	private static readonly BASE_RECONNECT_DELAY = 1_000;
+
 	// Agent interface properties (used by AgentInterface / ChatPanel)
 	getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
 	streamFn: any;
@@ -26,6 +36,8 @@ export class RemoteAgent {
 	/** Callback fired when the session title changes (e.g. AI-generated summary). */
 	onTitleChange?: (title: string) => void;
 	onStatusChange?: (status: string) => void;
+	/** Callback fired when connection status changes (connected/reconnecting/disconnected). */
+	onConnectionStatusChange?: (status: ConnectionStatus) => void;
 	private _title = "New session";
 
 	constructor() {
@@ -60,6 +72,9 @@ export class RemoteAgent {
 	get connected() {
 		return this.ws?.readyState === WebSocket.OPEN;
 	}
+	get connectionStatus(): ConnectionStatus {
+		return this._connectionStatus;
+	}
 	get gatewaySessionId() {
 		return this._sessionId;
 	}
@@ -73,15 +88,26 @@ export class RemoteAgent {
 		this._gatewayUrl = gatewayUrl;
 		this._authToken = token;
 		this._sessionId = sessionId;
+		this._intentionalDisconnect = false;
+		this._reconnectAttempt = 0;
 
-		const wsUrl = gatewayUrl.replace(/^http/, "ws");
+		await this._connectWs(true);
+	}
+
+	/**
+	 * Internal WebSocket connect. When `initial` is true the returned promise
+	 * resolves/rejects for the caller of `connect()`. On reconnect attempts
+	 * (`initial` false) failures schedule the next retry silently.
+	 */
+	private _connectWs(initial: boolean): Promise<void> {
+		const wsUrl = this._gatewayUrl.replace(/^http/, "ws");
 
 		return new Promise<void>((resolve, reject) => {
-			this.ws = new WebSocket(`${wsUrl}/ws/${sessionId}`);
+			this.ws = new WebSocket(`${wsUrl}/ws/${this._sessionId}`);
 			let settled = false;
 
 			this.ws.onopen = () => {
-				this.ws!.send(JSON.stringify({ type: "auth", token }));
+				this.ws!.send(JSON.stringify({ type: "auth", token: this._authToken }));
 			};
 
 			this.ws.onmessage = (evt) => {
@@ -95,14 +121,25 @@ export class RemoteAgent {
 				if (!settled) {
 					if (msg.type === "auth_ok") {
 						settled = true;
+						this._reconnectAttempt = 0;
+						this._setConnectionStatus("connected");
 						resolve();
+						// On reconnect, request current messages to resync state
+						if (!initial) {
+							this.requestMessages();
+							this.send({ type: "get_state" });
+						}
 					} else if (msg.type === "auth_failed") {
 						settled = true;
-						reject(new Error("Authentication failed"));
+						if (initial) {
+							reject(new Error("Authentication failed"));
+						}
 						return;
 					} else if (msg.type === "error") {
 						settled = true;
-						reject(new Error(msg.message || "Connection error"));
+						if (initial) {
+							reject(new Error(msg.message || "Connection error"));
+						}
 						return;
 					}
 				}
@@ -113,22 +150,66 @@ export class RemoteAgent {
 			this.ws.onerror = () => {
 				if (!settled) {
 					settled = true;
-					reject(new Error("WebSocket connection failed"));
+					if (initial) {
+						reject(new Error("WebSocket connection failed"));
+					}
 				}
 			};
 
 			this.ws.onclose = () => {
 				if (!settled) {
 					settled = true;
-					reject(new Error("Connection closed before auth"));
+					if (initial) {
+						reject(new Error("Connection closed before auth"));
+						return;
+					}
+				}
+				// If this wasn't an intentional disconnect, attempt to reconnect
+				if (!this._intentionalDisconnect) {
+					this._scheduleReconnect();
 				}
 			};
 		});
 	}
 
+	private _setConnectionStatus(status: ConnectionStatus): void {
+		if (this._connectionStatus === status) return;
+		this._connectionStatus = status;
+		this.onConnectionStatusChange?.(status);
+	}
+
+	private _scheduleReconnect(): void {
+		if (this._intentionalDisconnect) return;
+
+		this._setConnectionStatus("reconnecting");
+
+		const delay = Math.min(
+			RemoteAgent.BASE_RECONNECT_DELAY * Math.pow(2, this._reconnectAttempt),
+			RemoteAgent.MAX_RECONNECT_DELAY,
+		);
+		this._reconnectAttempt++;
+
+		this._reconnectTimer = setTimeout(async () => {
+			this._reconnectTimer = null;
+			if (this._intentionalDisconnect) return;
+			try {
+				await this._connectWs(false);
+			} catch {
+				// _connectWs failure on reconnect — onclose will fire and
+				// schedule the next attempt automatically.
+			}
+		}, delay);
+	}
+
 	disconnect(): void {
+		this._intentionalDisconnect = true;
+		if (this._reconnectTimer) {
+			clearTimeout(this._reconnectTimer);
+			this._reconnectTimer = null;
+		}
 		this.ws?.close();
 		this.ws = null;
+		this._setConnectionStatus("disconnected");
 	}
 
 	// ── Event subscription (Agent interface) ─────────────────────────
