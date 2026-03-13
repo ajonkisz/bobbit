@@ -132,12 +132,21 @@ export class AssistantMessage extends LitElement {
 					continue;
 				}
 
-				// Try to build a run of consecutive same-name, completed tool calls
+				// Try to build a run of consecutive same-name, completed tool calls.
+				// Skip over invisible chunks (empty text / empty thinking) that the
+				// agent may emit between tool calls — they render nothing but would
+				// otherwise break the consecutive run.
 				const run: ToolCall[] = [];
 				let j = i;
-				while (j < content.length && content[j].type === "toolCall") {
-					const tc = content[j] as ToolCall;
-					// Only group if same name as first, groupable, and completed (has result, not pending)
+				while (j < content.length) {
+					const c = content[j];
+					// Skip invisible chunks
+					if (c.type === "text" && !c.text.trim()) { j++; continue; }
+					if (c.type === "thinking" && !(c as any).thinking?.trim()) { j++; continue; }
+					// Stop at any non-toolCall visible chunk
+					if (c.type !== "toolCall") break;
+					const tc = c as ToolCall;
+					// Only group if same name as first
 					if (run.length > 0 && tc.name !== run[0].name) break;
 					const pending = this.pendingToolCalls?.has(tc.id) ?? false;
 					const result = this.toolResultsById?.get(tc.id);
