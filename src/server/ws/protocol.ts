@@ -9,6 +9,7 @@ export type ClientMessage =
 	| { type: "compact" }
 	| { type: "get_state" }
 	| { type: "get_messages" }
+	| { type: "set_title"; title: string }
 	| { type: "ping" };
 
 /** Server → Client messages over WebSocket */
@@ -22,4 +23,5 @@ export type ServerMessage =
 	| { type: "client_left"; clientId: string }
 	| { type: "error"; message: string; code: string }
 	| { type: "session_status"; status: string }
+	| { type: "session_title"; sessionId: string; title: string }
 	| { type: "pong" };

@@ -3,11 +3,13 @@ import type { WebSocket } from "ws";
 import type { ServerMessage } from "../ws/protocol.js";
 import { EventBuffer } from "./event-buffer.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
+import { generateSessionTitle } from "./title-generator.js";
 
 export type SessionStatus = "starting" | "idle" | "streaming" | "terminated";
 
 export interface SessionInfo {
 	id: string;
+	title: string;
 	cwd: string;
 	status: SessionStatus;
 	createdAt: number;
@@ -62,6 +64,7 @@ export class SessionManager {
 
 		const session: SessionInfo = {
 			id,
+			title: "New session",
 			cwd,
 			status: "starting",
 			createdAt: Date.now(),
@@ -71,6 +74,8 @@ export class SessionManager {
 			unsubscribe: () => {},
 		};
 
+		let titleGenerated = false;
+
 		// Subscribe to agent events — broadcast to all connected clients
 		const unsub = rpcClient.onEvent((event: any) => {
 			if (event.type === "agent_start") {
@@ -79,6 +84,12 @@ export class SessionManager {
 			} else if (event.type === "agent_end") {
 				session.status = "idle";
 				broadcast(session.clients, { type: "session_status", status: "idle" });
+
+				// Auto-generate title after the first agent turn completes
+				if (!titleGenerated) {
+					titleGenerated = true;
+					this.autoGenerateTitle(session);
+				}
 			}
 
 			eventBuffer.push(event);
@@ -100,6 +111,7 @@ export class SessionManager {
 
 	listSessions(): Array<{
 		id: string;
+		title: string;
 		cwd: string;
 		status: string;
 		createdAt: number;
@@ -107,11 +119,38 @@ export class SessionManager {
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
+			title: s.title,
 			cwd: s.cwd,
 			status: s.status,
 			createdAt: s.createdAt,
 			clientCount: s.clients.size,
 		}));
+	}
+
+	setTitle(id: string, title: string): boolean {
+		const session = this.sessions.get(id);
+		if (!session) return false;
+		session.title = title;
+		broadcast(session.clients, { type: "session_title", sessionId: id, title });
+		return true;
+	}
+
+	private async autoGenerateTitle(session: SessionInfo): Promise<void> {
+		try {
+			const msgsResp = await session.rpcClient.getMessages();
+			if (!msgsResp.success) return;
+
+			const messages = msgsResp.data?.messages || msgsResp.data;
+			if (!Array.isArray(messages) || messages.length === 0) return;
+
+			const title = await generateSessionTitle(messages);
+			if (title) {
+				session.title = title;
+				broadcast(session.clients, { type: "session_title", sessionId: session.id, title });
+			}
+		} catch (err) {
+			console.error(`[session ${session.id}] Title generation failed:`, err);
+		}
 	}
 
 	async terminateSession(id: string): Promise<boolean> {

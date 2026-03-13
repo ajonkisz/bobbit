@@ -167,6 +167,7 @@ async function handleApiRoute(
 			}
 			json({
 				id: session.id,
+				title: session.title,
 				cwd: session.cwd,
 				status: session.status,
 				createdAt: session.createdAt,

@@ -20,6 +20,10 @@ export class RemoteAgent {
 	getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined;
 	streamFn: any;
 
+	/** Callback fired when the session title changes (e.g. AI-generated summary). */
+	onTitleChange?: (title: string) => void;
+	private _title = "New session";
+
 	constructor() {
 		this._state = {
 			systemPrompt: "",
@@ -54,6 +58,9 @@ export class RemoteAgent {
 	}
 	get gatewaySessionId() {
 		return this._sessionId;
+	}
+	get title() {
+		return this._title;
 	}
 
 	// ── Connection ────────────────────────────────────────────────────
@@ -262,6 +269,11 @@ export class RemoteAgent {
 
 			case "session_status":
 				this._state.isStreaming = msg.status === "streaming";
+				break;
+
+			case "session_title":
+				this._title = msg.title;
+				this.onTitleChange?.(msg.title);
 				break;
 		}
 	}

@@ -99,6 +99,7 @@ export function handleWebSocketConnection(
 			}
 
 			send(ws, { type: "session_status", status: session.status });
+			send(ws, { type: "session_title", sessionId, title: session.title });
 			return;
 		}
 
@@ -143,6 +144,9 @@ export function handleWebSocketConnection(
 					}
 					break;
 				}
+				case "set_title":
+					sessionManager.setTitle(sessionId, msg.title);
+					break;
 				case "ping":
 					send(ws, { type: "pong" });
 					break;

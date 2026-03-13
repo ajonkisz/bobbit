@@ -60,6 +60,7 @@ let appView: AppView = "disconnected";
 
 interface GatewaySession {
 	id: string;
+	title: string;
 	cwd: string;
 	status: string;
 	createdAt: number;
@@ -99,22 +100,30 @@ function activeSessionId(): string | undefined {
 // query for the specific scroll container inside Lit custom elements.
 // Scroll events don't bubble, but capture: true intercepts them from
 // any descendant.
+//
+// The header overlays content (no paddingTop management) and slides in/out
+// via translateY. A CSS rule in app.css adds extra top-padding to the
+// message area on mobile so the first message isn't hidden behind the header.
 // ============================================================================
 let mobileHeaderVisible = true;
 let _scrollCleanup: (() => void) | null = null;
+let _lastTrackedScrollTop = 0;
 
 function setupMobileScrollTracking(): void {
-	teardownMobileScrollTracking();
-
 	if (isDesktop() || !hasActiveSession()) {
+		teardownMobileScrollTracking();
 		mobileHeaderVisible = true;
 		return;
 	}
 
+	// If already tracking, don't recreate
+	// (avoids resetting _lastTrackedScrollTop on every renderApp)
+	if (_scrollCleanup) return;
+
 	const mainEl = document.getElementById("app-main");
 	if (!mainEl) return;
 
-	let lastScrollTop = 0;
+	_lastTrackedScrollTop = 0;
 
 	const onScroll = (e: Event) => {
 		const headerEl = document.getElementById("app-header");
@@ -122,48 +131,51 @@ function setupMobileScrollTracking(): void {
 
 		// The scroll target is the element that actually scrolled
 		const target = e.target as HTMLElement;
-		if (!target || !target.scrollTop && target.scrollTop !== 0) return;
+		if (!target || (!target.scrollTop && target.scrollTop !== 0)) return;
 
 		const currentTop = target.scrollTop;
-		const delta = currentTop - lastScrollTop;
+		const delta = currentTop - _lastTrackedScrollTop;
 
 		if (currentTop < 20) {
+			// Near top of content — always show header
 			if (!mobileHeaderVisible) {
 				mobileHeaderVisible = true;
 				headerEl.style.transform = "translateY(0)";
+				headerEl.style.boxShadow = "";
 			}
-		} else if (delta < -3) {
+		} else if (delta < -4) {
+			// Scrolling UP — show header
 			if (!mobileHeaderVisible) {
 				mobileHeaderVisible = true;
 				headerEl.style.transform = "translateY(0)";
+				headerEl.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
 			}
-		} else if (delta > 3) {
+		} else if (delta > 4) {
+			// Scrolling DOWN — hide header
 			if (mobileHeaderVisible) {
 				mobileHeaderVisible = false;
 				headerEl.style.transform = "translateY(-100%)";
+				headerEl.style.boxShadow = "";
 			}
 		}
 
-		lastScrollTop = currentTop;
+		_lastTrackedScrollTop = currentTop;
 	};
 
 	// Capture phase: intercepts scroll events from ANY descendant,
 	// even though scroll events don't bubble.
 	mainEl.addEventListener("scroll", onScroll, { capture: true, passive: true });
-	_scrollCleanup = () => mainEl.removeEventListener("scroll", onScroll, { capture: true } as EventListenerOptions);
+	_scrollCleanup = () => {
+		mainEl.removeEventListener("scroll", onScroll, { capture: true } as EventListenerOptions);
+		_scrollCleanup = null;
+	};
 }
 
 function teardownMobileScrollTracking(): void {
 	_scrollCleanup?.();
-	_scrollCleanup = null;
 }
 
-function syncMobileHeader(): void {
-	const headerEl = document.getElementById("app-header");
-	const mainEl = document.getElementById("app-main");
-	if (headerEl && mainEl) {
-		mainEl.style.paddingTop = `${headerEl.offsetHeight}px`;
-	}
+function ensureMobileScrollTracking(): void {
 	setupMobileScrollTracking();
 }
 
@@ -483,6 +495,13 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 		renderApp();
 	};
 
+	// Re-render when the session title is updated (e.g. AI-generated summary)
+	remote.onTitleChange = () => {
+		renderApp();
+		// Also refresh the sidebar so the title appears for this session
+		refreshSessions();
+	};
+
 	remoteAgent = remote;
 	appView = "authenticated";
 	localStorage.setItem(GW_SESSION_KEY, sessionId);
@@ -546,6 +565,7 @@ function backToSessions(): void {
 	localStorage.removeItem(GW_SESSION_KEY);
 	appView = "authenticated";
 	mobileHeaderVisible = true;
+	teardownMobileScrollTracking();
 	setHashRoute("landing");
 	renderApp();
 	refreshSessions();
@@ -557,6 +577,7 @@ function disconnectGateway(): void {
 	remoteAgent = null;
 	appView = "disconnected";
 	localStorage.removeItem(GW_SESSION_KEY);
+	teardownMobileScrollTracking();
 	setHashRoute("landing");
 	renderApp();
 }
@@ -762,6 +783,8 @@ function statusDot(status: string) {
 /** Compact session row for sidebar */
 function renderSidebarSession(session: GatewaySession) {
 	const active = activeSessionId() === session.id;
+	// Use live title from RemoteAgent if this is the active session
+	const displayTitle = active && remoteAgent ? remoteAgent.title : session.title;
 	return html`
 		<div
 			class="group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm
@@ -772,10 +795,12 @@ function renderSidebarSession(session: GatewaySession) {
 		>
 			${statusDot(session.status)}
 			<div class="flex-1 min-w-0">
-				<div class="truncate text-xs font-mono" title=${session.cwd}>
-					${session.cwd.split(/[/\\]/).pop() || session.cwd}
+				<div class="truncate text-xs" title=${displayTitle}>
+					${displayTitle}
 				</div>
-				<div class="text-[10px] opacity-60">${formatSessionAge(session.createdAt)}</div>
+				<div class="text-[10px] opacity-60 font-mono truncate" title=${session.cwd}>
+					${session.cwd.split(/[/\\]/).pop() || session.cwd} · ${formatSessionAge(session.createdAt)}
+				</div>
 			</div>
 			<button
 				class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity shrink-0"
@@ -801,7 +826,7 @@ function renderSessionCard(session: GatewaySession) {
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2 mb-1">
 					${statusDot(session.status)}
-					<span class="text-sm font-medium text-foreground">${session.status}</span>
+					<span class="text-sm font-medium text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.createdAt)}</span>
 				</div>
@@ -997,9 +1022,13 @@ const renderApp = () => {
 				title: "Back to session list",
 			}) : "";
 
+			const sessionTitle = remoteAgent.title || "New session";
+
 			return html`
 				<div class="flex items-center gap-1 px-2">
 					${backBtn}
+					<span class="text-sm font-medium text-foreground truncate max-w-[160px]" title=${sessionTitle}>${sessionTitle}</span>
+					<span class="text-muted-foreground text-xs mx-1">·</span>
 					${model ? Button({
 						variant: "ghost",
 						size: "sm",
@@ -1102,7 +1131,8 @@ const renderApp = () => {
 	};
 
 	if (desktop) {
-		// Desktop layout: sidebar | header+main
+		// Desktop layout: sidebar | header+main — tear down mobile scroll tracking
+		teardownMobileScrollTracking();
 		render(html`
 			<div class="w-full h-screen flex bg-background text-foreground overflow-hidden">
 				${renderSidebar()}
@@ -1116,22 +1146,23 @@ const renderApp = () => {
 			</div>
 		`, app);
 	} else if (connected) {
-		// Mobile connected: floating header that auto-hides on scroll-down
+		// Mobile connected: floating header overlays content, auto-hides on
+		// scroll-down and reappears on scroll-up.  A CSS rule adds extra
+		// top-padding to the message area so the first message isn't hidden.
 		render(html`
-			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden relative">
+			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden relative"
+				data-mobile-header>
 				<div id="app-header"
-					class="absolute top-0 left-0 right-0 z-50 bg-background border-b border-border flex items-center justify-between transition-transform duration-200"
-					style="transform: translateY(${mobileHeaderVisible ? "0" : "-100%"})">
+					class="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border flex items-center justify-between"
+					style="transform: translateY(${mobileHeaderVisible ? "0" : "-100%"}); transition: transform 200ms ease, box-shadow 200ms ease; will-change: transform;">
 					${headerLeft()}
 					${headerRight()}
 				</div>
 				<div id="app-main" class="flex-1 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>
 		`, app);
-		// Wire up scroll tracking and sync header height after render.
-		// The scroll container inside AgentInterface may not exist yet
-		// (Lit renders async), so poll briefly until it appears.
-		syncMobileHeader();
+		// Set up scroll tracking (idempotent — won't recreate if already active)
+		ensureMobileScrollTracking();
 	} else {
 		// Mobile not connected: normal static header
 		render(html`
