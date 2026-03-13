@@ -6,6 +6,8 @@
  *
  * The browser launches lazily on first tool use and is reused across calls.
  * It is closed when the session shuts down.
+ *
+ * All tools respect the AbortSignal so they can be cancelled via the abort button.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -38,6 +40,20 @@ async function cleanup() {
 	page = null;
 }
 
+/** Race a promise against an AbortSignal. Throws if aborted. */
+function withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+	if (!signal) return promise;
+	if (signal.aborted) return Promise.reject(new Error("Aborted"));
+	return new Promise<T>((resolve, reject) => {
+		const onAbort = () => reject(new Error("Aborted"));
+		signal.addEventListener("abort", onAbort, { once: true });
+		promise.then(
+			(val) => { signal.removeEventListener("abort", onAbort); resolve(val); },
+			(err) => { signal.removeEventListener("abort", onAbort); reject(err); },
+		);
+	});
+}
+
 export default function (pi: ExtensionAPI) {
 	// Clean up browser on session shutdown
 	pi.on("session_shutdown", async () => {
@@ -52,9 +68,9 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			url: Type.String({ description: "URL to navigate to" }),
 		}),
-		async execute(_toolCallId, params) {
-			const p = await ensurePage();
-			await p.goto(params.url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+		async execute(_toolCallId, params, signal) {
+			const p = await withAbort(ensurePage(), signal);
+			await withAbort(p.goto(params.url, { waitUntil: "domcontentloaded", timeout: 30_000 }), signal);
 			const title = await p.title();
 			return {
 				content: [{ type: "text", text: `Navigated to ${params.url}\nTitle: ${title}` }],
@@ -75,15 +91,15 @@ export default function (pi: ExtensionAPI) {
 			savePath: Type.Optional(Type.String({ description: "File path to save the screenshot to (png). Optional." })),
 			fullPage: Type.Optional(Type.Boolean({ description: "Capture the full scrollable page. Default false." })),
 		}),
-		async execute(_toolCallId, params) {
-			const p = await ensurePage();
+		async execute(_toolCallId, params, signal) {
+			const p = await withAbort(ensurePage(), signal);
 
 			let buffer: Buffer;
 			if (params.selector) {
 				const el = p.locator(params.selector).first();
-				buffer = await el.screenshot({ type: "png" }) as Buffer;
+				buffer = await withAbort(el.screenshot({ type: "png" }), signal) as Buffer;
 			} else {
-				buffer = await p.screenshot({ type: "png", fullPage: params.fullPage ?? false }) as Buffer;
+				buffer = await withAbort(p.screenshot({ type: "png", fullPage: params.fullPage ?? false }), signal) as Buffer;
 			}
 
 			if (params.savePath) {
@@ -100,7 +116,8 @@ export default function (pi: ExtensionAPI) {
 				content: [
 					{
 						type: "image" as const,
-						source: { type: "base64" as const, media_type: "image/png" as const, data: base64 },
+						mimeType: "image/png" as const,
+						data: base64,
 					},
 					{ type: "text", text: `Screenshot of ${url} (${title})${params.savePath ? ` — saved to ${params.savePath}` : ""}` },
 				],
@@ -117,9 +134,9 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			selector: Type.String({ description: "CSS selector of the element to click" }),
 		}),
-		async execute(_toolCallId, params) {
-			const p = await ensurePage();
-			await p.locator(params.selector).first().click({ timeout: 10_000 });
+		async execute(_toolCallId, params, signal) {
+			const p = await withAbort(ensurePage(), signal);
+			await withAbort(p.locator(params.selector).first().click({ timeout: 10_000 }), signal);
 			return {
 				content: [{ type: "text", text: `Clicked: ${params.selector}` }],
 				details: {},
@@ -137,13 +154,13 @@ export default function (pi: ExtensionAPI) {
 			text: Type.String({ description: "Text to type" }),
 			clear: Type.Optional(Type.Boolean({ description: "Clear the field before typing. Default true." })),
 		}),
-		async execute(_toolCallId, params) {
-			const p = await ensurePage();
+		async execute(_toolCallId, params, signal) {
+			const p = await withAbort(ensurePage(), signal);
 			const el = p.locator(params.selector).first();
 			if (params.clear !== false) {
-				await el.fill(params.text, { timeout: 10_000 });
+				await withAbort(el.fill(params.text, { timeout: 10_000 }), signal);
 			} else {
-				await el.pressSequentially(params.text, { timeout: 10_000 });
+				await withAbort(el.pressSequentially(params.text, { timeout: 10_000 }), signal);
 			}
 			return {
 				content: [{ type: "text", text: `Typed into ${params.selector}: "${params.text}"` }],
@@ -160,9 +177,9 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			expression: Type.String({ description: "JavaScript expression to evaluate in the page context" }),
 		}),
-		async execute(_toolCallId, params) {
-			const p = await ensurePage();
-			const result = await p.evaluate(params.expression);
+		async execute(_toolCallId, params, signal) {
+			const p = await withAbort(ensurePage(), signal);
+			const result = await withAbort(p.evaluate(params.expression), signal);
 			const text = typeof result === "string" ? result : JSON.stringify(result, null, 2);
 			return {
 				content: [{ type: "text", text: text ?? "(undefined)" }],
@@ -180,12 +197,15 @@ export default function (pi: ExtensionAPI) {
 			selector: Type.String({ description: "CSS selector to wait for" }),
 			timeout: Type.Optional(Type.Number({ description: "Max wait time in milliseconds. Default 10000." })),
 		}),
-		async execute(_toolCallId, params) {
-			const p = await ensurePage();
-			await p.locator(params.selector).first().waitFor({
-				state: "visible",
-				timeout: params.timeout ?? 10_000,
-			});
+		async execute(_toolCallId, params, signal) {
+			const p = await withAbort(ensurePage(), signal);
+			await withAbort(
+				p.locator(params.selector).first().waitFor({
+					state: "visible",
+					timeout: params.timeout ?? 10_000,
+				}),
+				signal,
+			);
 			return {
 				content: [{ type: "text", text: `Element visible: ${params.selector}` }],
 				details: {},
