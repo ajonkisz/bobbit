@@ -99,8 +99,8 @@ export class MessageList extends LitElement {
 
 					while (j < msgs.length) {
 						const m = msgs[j];
-						if (m.role === "toolResult") {
-							// Skip tool results — they're looked up via resultByCallId
+						// Skip non-rendering message types between tool turns
+						if (m.role === "toolResult" || m.role === "artifact") {
 							j++;
 							continue;
 						}
