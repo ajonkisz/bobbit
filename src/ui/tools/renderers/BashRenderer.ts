@@ -5,6 +5,7 @@ import { SquareTerminal } from "lucide";
 import { i18n } from "../../utils/i18n.js";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
+import { renderInlineImages } from "./image-utils.js";
 
 interface BashParams {
 	command: string;
@@ -55,15 +56,18 @@ export class BashRenderer implements ToolRenderer<BashParams, undefined> {
 					.map((c: any) => c.text)
 					.join("\n") || "";
 			const combined = output ? `> ${params.command}\n\n${output}` : `> ${params.command}`;
+			const images = renderInlineImages(result.content);
+			const hasImages = result.content?.some((c: any) => c.type === "image");
 
 			const contentRef = createRef<HTMLDivElement>();
 			const chevronRef = createRef<HTMLSpanElement>();
 			return {
 				content: html`
 					<div>
-						${renderCollapsibleHeader(state, SquareTerminal, headerText, contentRef, chevronRef, false)}
-						<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
+						${renderCollapsibleHeader(state, SquareTerminal, headerText, contentRef, chevronRef, hasImages || false)}
+						<div ${ref(contentRef)} class="${hasImages ? "max-h-[2000px] mt-3" : "max-h-0"} overflow-hidden transition-all duration-300">
 							<console-block .content=${combined} .variant=${result.isError ? "error" : "default"}></console-block>
+							${images}
 						</div>
 					</div>
 				`,

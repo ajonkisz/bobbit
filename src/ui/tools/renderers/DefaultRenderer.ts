@@ -4,6 +4,7 @@ import { Code } from "lucide";
 import { i18n } from "../../utils/i18n.js";
 import { renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
+import { renderInlineImages } from "./image-utils.js";
 
 export class DefaultRenderer implements ToolRenderer {
 	private toolName?: string;
@@ -61,6 +62,7 @@ export class DefaultRenderer implements ToolRenderer {
 				// Not valid JSON, leave as-is and use text highlighting
 			}
 
+			const images = renderInlineImages(result.content);
 			return {
 				content: html`
 					<div class="space-y-3">
@@ -77,6 +79,7 @@ export class DefaultRenderer implements ToolRenderer {
 							<div class="text-xs font-medium mb-1 text-muted-foreground">${i18n("Output")}</div>
 							<code-block .code=${outputJson} language="${outputLanguage}"></code-block>
 						</div>
+						${images}
 					</div>
 				`,
 				isCustom: false,

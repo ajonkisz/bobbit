@@ -5,6 +5,7 @@ import { FileText } from "lucide";
 import { i18n } from "../../utils/i18n.js";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
+import { renderInlineImages } from "./image-utils.js";
 
 interface ReadParams {
 	path: string;
@@ -25,6 +26,8 @@ export class ReadRenderer implements ToolRenderer<ReadParams, any> {
 				?.filter((c: any) => c.type === "text")
 				.map((c: any) => c.text)
 				.join("\n") || "";
+			const images = renderInlineImages(result.content);
+			const hasImages = result.content?.some((c: any) => c.type === "image");
 
 			if (result.isError) {
 				return {
@@ -38,7 +41,24 @@ export class ReadRenderer implements ToolRenderer<ReadParams, any> {
 				};
 			}
 
-			// Successful read — collapsible output
+			// Image read — show header + inline image(s), default expanded
+			if (hasImages) {
+				const contentRef = createRef<HTMLDivElement>();
+				const chevronRef = createRef<HTMLSpanElement>();
+				return {
+					content: html`
+						<div>
+							${renderCollapsibleHeader(state, FileText, headerText, contentRef, chevronRef, true)}
+							<div ${ref(contentRef)} class="max-h-[2000px] mt-3 overflow-hidden transition-all duration-300">
+								${images}
+							</div>
+						</div>
+					`,
+					isCustom: false,
+				};
+			}
+
+			// Successful text read — collapsible output
 			const contentRef = createRef<HTMLDivElement>();
 			const chevronRef = createRef<HTMLSpanElement>();
 			return {
