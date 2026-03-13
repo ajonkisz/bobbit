@@ -446,6 +446,19 @@ async function authenticateGateway(url: string, token: string): Promise<void> {
 }
 
 /** Fetch session list from the gateway */
+/**
+ * Optimistically update a session's title in the local gatewaySessions array.
+ * This ensures the sidebar shows the new title immediately, even before the
+ * server round-trip completes (avoids stale data when switching sessions).
+ */
+function updateLocalSessionTitle(sessionId: string, title: string): void {
+	const idx = gatewaySessions.findIndex((s) => s.id === sessionId);
+	if (idx >= 0) {
+		gatewaySessions[idx] = { ...gatewaySessions[idx], title };
+		renderApp();
+	}
+}
+
 async function refreshSessions(): Promise<void> {
 	sessionsLoading = true;
 	sessionsError = "";
@@ -496,9 +509,12 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 	};
 
 	// Re-render when the session title is updated (e.g. AI-generated summary)
-	remote.onTitleChange = () => {
+	remote.onTitleChange = (newTitle: string) => {
+		// Optimistically update local sidebar data so title isn't lost if user
+		// navigates away before the next refreshSessions() REST call completes.
+		updateLocalSessionTitle(sessionId, newTitle);
 		renderApp();
-		// Also refresh the sidebar so the title appears for this session
+		// Also refresh the sidebar from server for full consistency
 		refreshSessions();
 	};
 
@@ -802,6 +818,10 @@ function showRenameDialog(sessionId: string, currentTitle: string): void {
 			cleanup();
 			return;
 		}
+		// Optimistically update the local sidebar data so the title survives
+		// even if the user navigates away before the server round-trip completes.
+		updateLocalSessionTitle(sessionId, trimmed);
+
 		// If this is the active session, use the RemoteAgent to rename (updates server + broadcasts)
 		if (remoteAgent && activeSessionId() === sessionId) {
 			remoteAgent.setTitle(trimmed);

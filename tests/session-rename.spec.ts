@@ -213,4 +213,63 @@ test.describe("Session rename", () => {
 			lower.includes("rain");
 		expect(tentRelated).toBe(true);
 	});
+
+	test("renamed title persists after switching to another session and back", async ({ page }) => {
+		await openApp(page, token);
+
+		// 1) Create first session and rename it manually
+		await createNewSession(page);
+		const firstSessionTitle = await getActiveSessionTitle(page);
+		expect(firstSessionTitle).toBe("New session");
+
+		// Open rename dialog on the active session
+		const activeRow = page.locator(".bg-secondary").first();
+		await activeRow.hover();
+		await activeRow.locator('button[title="Rename session"]').click();
+
+		const dialog = page.locator(".fixed.z-50.bg-background").filter({ hasText: "Rename Session" });
+		await expect(dialog).toBeVisible({ timeout: 5_000 });
+
+		// Clear input and type a custom name
+		const titleInput = dialog.locator("input");
+		await titleInput.fill("My Custom Title");
+
+		// Click Rename
+		dialog.getByRole("button", { name: "Rename" }).click();
+		await expect(dialog).not.toBeVisible({ timeout: 5_000 });
+
+		// Confirm sidebar shows the new name
+		await page.waitForTimeout(500);
+		const renamedTitle = await getActiveSessionTitle(page);
+		expect(renamedTitle).toBe("My Custom Title");
+		console.log(`Renamed first session to: "${renamedTitle}"`);
+
+		// 2) Create a second session (switches focus away from the first)
+		await createNewSession(page);
+		await page.waitForTimeout(1_000);
+		const secondSessionTitle = await getActiveSessionTitle(page);
+		expect(secondSessionTitle).toBe("New session");
+		console.log(`Second session title: "${secondSessionTitle}"`);
+
+		// 3) Check the first session still shows "My Custom Title" in the sidebar
+		//    It's now an inactive row, so it reads from gatewaySessions (REST data).
+		const allSessionRows = page.locator(".overflow-y-auto .truncate.text-xs");
+		const titles: string[] = [];
+		const count = await allSessionRows.count();
+		for (let i = 0; i < count; i++) {
+			titles.push((await allSessionRows.nth(i).textContent())?.trim() || "");
+		}
+		console.log(`All sidebar titles: ${JSON.stringify(titles)}`);
+		expect(titles).toContain("My Custom Title");
+
+		// 4) Click back on the first session and verify its title
+		const customRow = page.locator(".truncate.text-xs", { hasText: "My Custom Title" }).first();
+		// Click the parent session row
+		await customRow.locator("..").locator("..").click();
+		await page.waitForTimeout(1_000);
+
+		const restoredTitle = await getActiveSessionTitle(page);
+		console.log(`Restored title after switching back: "${restoredTitle}"`);
+		expect(restoredTitle).toBe("My Custom Title");
+	});
 });
