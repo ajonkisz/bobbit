@@ -1,12 +1,39 @@
 import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
 import type {
 	AssistantMessage as AssistantMessageType,
+	ToolCall,
 	ToolResultMessage as ToolResultMessageType,
 } from "@mariozechner/pi-ai";
 import { html, LitElement, type TemplateResult } from "lit";
 import { property } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { renderMessage } from "./message-renderer-registry.js";
+import "./ToolGroup.js";
+
+/** Tool names eligible for cross-message grouping */
+const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep"]);
+
+/**
+ * Check if an assistant message contains only tool calls (no visible text or thinking).
+ * Returns the tool name if it's a pure single-tool-type message, or null otherwise.
+ */
+function getPureToolName(msg: AssistantMessageType): string | null {
+	let toolName: string | null = null;
+	for (const chunk of msg.content) {
+		if (chunk.type === "text" && chunk.text.trim()) return null;
+		if (chunk.type === "thinking" && (chunk as any).thinking?.trim()) return null;
+		if (chunk.type === "toolCall") {
+			if (toolName === null) toolName = chunk.name;
+			else if (chunk.name !== toolName) return null; // mixed tool types
+		}
+	}
+	return toolName;
+}
+
+/** Extract all ToolCall objects from an assistant message */
+function getToolCalls(msg: AssistantMessageType): ToolCall[] {
+	return msg.content.filter((c): c is ToolCall => c.type === "toolCall");
+}
 
 export class MessageList extends LitElement {
 	@property({ type: Array }) messages: AgentMessage[] = [];
@@ -34,32 +61,75 @@ export class MessageList extends LitElement {
 		}
 
 		const items: Array<{ key: string; template: TemplateResult }> = [];
-		let index = 0;
-		for (const msg of this.messages) {
-			// Skip artifact messages - they're for session persistence only, not UI display
-			if (msg.role === "artifact") {
-				continue;
-			}
+		let i = 0;
+		const msgs = this.messages;
+
+		while (i < msgs.length) {
+			const msg = msgs[i];
+
+			// Skip artifact messages
+			if (msg.role === "artifact") { i++; continue; }
 
 			// Try custom renderer first
 			const customTemplate = renderMessage(msg);
 			if (customTemplate) {
-				items.push({ key: `msg:${index}`, template: customTemplate });
-				index++;
+				items.push({ key: `msg:${i}`, template: customTemplate });
+				i++;
 				continue;
 			}
 
-			// Fall back to built-in renderers
 			if (msg.role === "user" || msg.role === "user-with-attachments") {
 				items.push({
-					key: `msg:${index}`,
+					key: `msg:${i}`,
 					template: html`<user-message .message=${msg}></user-message>`,
 				});
-				index++;
-			} else if (msg.role === "assistant") {
+				i++;
+				continue;
+			}
+
+			if (msg.role === "assistant") {
 				const amsg = msg as AssistantMessageType;
+				const toolName = getPureToolName(amsg);
+
+				// Try to build a cross-message group of pure tool-only assistant messages
+				if (toolName && GROUPABLE_TOOLS.has(toolName) && !this.isStreaming) {
+					const groupCalls: ToolCall[] = [];
+					let j = i;
+
+					while (j < msgs.length) {
+						const m = msgs[j];
+						if (m.role === "toolResult") {
+							// Skip tool results — they're looked up via resultByCallId
+							j++;
+							continue;
+						}
+						if (m.role !== "assistant") break;
+						const name = getPureToolName(m as AssistantMessageType);
+						if (name !== toolName) break;
+						groupCalls.push(...getToolCalls(m as AssistantMessageType));
+						j++;
+					}
+
+					if (groupCalls.length >= 2) {
+						items.push({
+							key: `group:${i}`,
+							template: html`<div class="px-4">
+								<tool-group
+									.toolName=${toolName}
+									.toolCalls=${groupCalls}
+									.tools=${this.tools}
+									.toolResultsById=${resultByCallId}
+								></tool-group>
+							</div>`,
+						});
+						i = j;
+						continue;
+					}
+				}
+
+				// Single assistant message — render normally
 				items.push({
-					key: `msg:${index}`,
+					key: `msg:${i}`,
 					template: html`<assistant-message
 						.message=${amsg}
 						.tools=${this.tools}
@@ -71,11 +141,12 @@ export class MessageList extends LitElement {
 						.onCostClick=${this.onCostClick}
 					></assistant-message>`,
 				});
-				index++;
-			} else {
-				// Skip standalone toolResult messages; they are rendered via paired tool-message above
-				// Skip unknown roles
+				i++;
+				continue;
 			}
+
+			// Skip standalone toolResult messages and unknown roles
+			i++;
 		}
 		return items;
 	}
