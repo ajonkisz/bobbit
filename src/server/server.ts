@@ -15,10 +15,14 @@ export interface GatewayConfig {
 	defaultCwd: string;
 	staticDir?: string;
 	agentCliPath?: string;
+	systemPromptPath?: string;
 }
 
 export function createGateway(config: GatewayConfig) {
-	const sessionManager = new SessionManager({ agentCliPath: config.agentCliPath });
+	const sessionManager = new SessionManager({
+		agentCliPath: config.agentCliPath,
+		systemPromptPath: config.systemPromptPath,
+	});
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
 

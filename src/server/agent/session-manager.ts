@@ -29,14 +29,18 @@ function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
 export interface SessionManagerOptions {
 	/** Override the path to pi-coding-agent cli.js */
 	agentCliPath?: string;
+	/** Path to a custom system prompt file */
+	systemPromptPath?: string;
 }
 
 export class SessionManager {
 	private sessions = new Map<string, SessionInfo>();
 	private agentCliPath?: string;
+	private systemPromptPath?: string;
 
 	constructor(options?: SessionManagerOptions) {
 		this.agentCliPath = options?.agentCliPath;
+		this.systemPromptPath = options?.systemPromptPath;
 	}
 
 	async createSession(cwd: string, agentArgs?: string[]): Promise<SessionInfo> {
@@ -48,6 +52,9 @@ export class SessionManager {
 		};
 		if (this.agentCliPath) {
 			bridgeOptions.cliPath = this.agentCliPath;
+		}
+		if (this.systemPromptPath) {
+			bridgeOptions.systemPromptPath = this.systemPromptPath;
 		}
 
 		const rpcClient = new RpcBridge(bridgeOptions);

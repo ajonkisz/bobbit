@@ -115,6 +115,15 @@ async function main() {
 
 	const authToken = loadOrCreateToken(args.newToken);
 
+	// Resolve custom system prompt: check config/system-prompt.md relative to project root
+	const __cliDir = path.dirname(fileURLToPath(import.meta.url));
+	const projectRoot = path.resolve(__cliDir, "..", "..");
+	const systemPromptFile = path.join(projectRoot, "config", "system-prompt.md");
+	const systemPromptPath = fs.existsSync(systemPromptFile) ? systemPromptFile : undefined;
+	if (systemPromptPath) {
+		console.log(`  System prompt: ${systemPromptPath}`);
+	}
+
 	const gateway = createGateway({
 		host: args.host,
 		port: args.port,
@@ -122,6 +131,7 @@ async function main() {
 		defaultCwd: args.cwd,
 		staticDir: args.staticDir,
 		agentCliPath: args.agentCliPath,
+		systemPromptPath,
 	});
 
 	await gateway.start();

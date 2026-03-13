@@ -9,6 +9,8 @@ export interface RpcBridgeOptions {
 	cwd?: string;
 	/** Additional CLI arguments */
 	args?: string[];
+	/** Path to a custom system prompt file. When set, passed as --system-prompt to the agent. */
+	systemPromptPath?: string;
 	/** Extra environment variables */
 	env?: Record<string, string>;
 }
@@ -32,6 +34,7 @@ export class RpcBridge {
 		const cliPath = this.options.cliPath || findAgentCli();
 		const args = ["--mode", "rpc"];
 		if (this.options.cwd) args.push("--cwd", this.options.cwd);
+		if (this.options.systemPromptPath) args.push("--system-prompt", this.options.systemPromptPath);
 		if (this.options.args) args.push(...this.options.args);
 
 		this.process = spawn("node", [cliPath, ...args], {
