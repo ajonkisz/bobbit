@@ -1,4 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { appendFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -96,6 +98,9 @@ export class RpcBridge {
 	// --- Convenience methods matching the RPC protocol ---
 
 	prompt(text: string, images?: Array<{ type: "image"; data: string; mimeType: string }>) {
+		if (images?.length) {
+			console.log(`[rpc-bridge] Sending prompt with ${images.length} image(s), first image: type=${images[0].type}, mimeType=${images[0].mimeType}, data length=${images[0].data?.length}`);
+		}
 		return this.sendCommand({ type: "prompt", message: text, ...(images?.length ? { images } : {}) });
 	}
 
@@ -165,6 +170,19 @@ export class RpcBridge {
 				parsed = JSON.parse(trimmed);
 			} catch {
 				continue; // skip non-JSON output (e.g. log lines)
+			}
+
+			// Debug: log events to file
+			try {
+				const debugPath = path.join(homedir(), ".pi", "rpc-debug.log");
+				appendFileSync(debugPath, `EVENT: type=${parsed.type}, id=${parsed.id}, msg_role=${parsed.message?.role}\n`);
+				if (parsed.type === "message_end" && parsed.message?.role === "user") {
+					const content = parsed.message.content;
+					const types = Array.isArray(content) ? content.map((c: any) => c.type) : [typeof content];
+					appendFileSync(debugPath, `  User msg content types: ${JSON.stringify(types)}\n`);
+				}
+			} catch(e) {
+				process.stderr.write(`Debug log error: ${e}\n`);
 			}
 
 			// Response to a pending request
