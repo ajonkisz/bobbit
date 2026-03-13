@@ -12,6 +12,7 @@ export class StreamingMessageContainer extends LitElement {
 
 	@state() private _message: AgentMessage | null = null;
 	@state() private _blobState: 'hidden' | 'active' | 'exiting' | 'idle' = 'hidden';
+	private _exitVariant: 'exit' | 'exit-roll' = 'exit';
 	private _pendingMessage: AgentMessage | null = null;
 	private _updateScheduled = false;
 	private _immediateUpdate = false;
@@ -30,11 +31,12 @@ export class StreamingMessageContainer extends LitElement {
 			if (this.isStreaming) {
 				this._blobState = 'active';
 			} else if (this._blobState === 'active') {
-				// Streaming stopped — play exit, then go idle
+				// Streaming stopped — randomly pick exit variant, then go idle
+				this._exitVariant = Math.random() < 0.5 ? 'exit' : 'exit-roll';
 				this._blobState = 'exiting';
 				setTimeout(() => {
 					this._blobState = 'idle';
-				}, 700); // match exit animation duration
+				}, this._exitVariant === 'exit-roll' ? 900 : 700); // match animation durations
 			}
 		}
 	}
@@ -44,7 +46,7 @@ export class StreamingMessageContainer extends LitElement {
 	}
 
 	private get _blobClass() {
-		if (this._blobState === 'exiting') return 'bobbit-blob bobbit-blob--exit';
+		if (this._blobState === 'exiting') return `bobbit-blob bobbit-blob--${this._exitVariant}`;
 		if (this._blobState === 'idle') return 'bobbit-blob bobbit-blob--idle';
 		return 'bobbit-blob';
 	}
