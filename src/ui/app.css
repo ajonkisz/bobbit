@@ -290,7 +290,78 @@ body {
 	}
 }
 
-/* Exit + Idle states — no busy effects */
+/* Entry animation A — hop right from idle position into center */
+.bobbit-blob--enter .bobbit-blob__sprite {
+	animation:
+		blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+}
+
+/* Entry animation B — barrel roll from idle into center */
+.bobbit-blob--enter-roll .bobbit-blob__sprite {
+	animation:
+		blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+}
+
+@keyframes blob-enter {
+	0% {
+		transform: scale(3.5) translateX(-10px) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+	}
+	/* Squat before hop */
+	15% {
+		transform: scale(3.5) translateX(-10px) translateY(1px) scaleX(1.25) scaleY(0.65) rotate(0deg);
+	}
+	/* Launch right */
+	35% {
+		transform: scale(3.5) translateX(-7px) translateY(-2px) scaleX(0.9) scaleY(1.1) rotate(3deg);
+	}
+	55% {
+		transform: scale(3.5) translateX(-3px) translateY(-1px) scaleX(1) scaleY(1) rotate(-2deg);
+	}
+	/* Land with squash */
+	75% {
+		transform: scale(3.5) translateX(0) translateY(1px) scaleX(1.15) scaleY(0.85) rotate(1deg);
+	}
+	/* Settle */
+	100% {
+		transform: scale(3.5) translateX(0) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+	}
+}
+
+@keyframes blob-enter-roll {
+	0% {
+		transform: scale(3.5) translateX(-10px) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+	}
+	/* Squat */
+	12% {
+		transform: scale(3.5) translateX(-10px) translateY(1px) scaleX(1.2) scaleY(0.7) rotate(0deg);
+	}
+	/* Launch up spinning */
+	30% {
+		transform: scale(3.5) translateX(-7px) translateY(-5px) scaleX(0.9) scaleY(1.1) rotate(120deg);
+	}
+	/* Peak — mid roll */
+	50% {
+		transform: scale(3.5) translateX(-4px) translateY(-7px) scaleX(1) scaleY(1) rotate(250deg);
+	}
+	/* Coming down */
+	70% {
+		transform: scale(3.5) translateX(-1px) translateY(-3px) scaleX(1) scaleY(1) rotate(340deg);
+	}
+	/* Land with squash */
+	85% {
+		transform: scale(3.5) translateX(0) translateY(1px) scaleX(1.15) scaleY(0.85) rotate(360deg);
+	}
+	/* Settle */
+	100% {
+		transform: scale(3.5) translateX(0) translateY(0) scaleX(1) scaleY(1) rotate(360deg);
+	}
+}
+
+/* Entry + Exit + Idle states — no busy effects */
+.bobbit-blob--enter .bobbit-blob__sprite::before,
+.bobbit-blob--enter .bobbit-blob__sprite::after,
+.bobbit-blob--enter-roll .bobbit-blob__sprite::before,
+.bobbit-blob--enter-roll .bobbit-blob__sprite::after,
 .bobbit-blob--exit .bobbit-blob__sprite::before,
 .bobbit-blob--exit .bobbit-blob__sprite::after,
 .bobbit-blob--exit-roll .bobbit-blob__sprite::before,

@@ -11,8 +11,9 @@ export class StreamingMessageContainer extends LitElement {
 	@property({ attribute: false }) onCostClick?: () => void;
 
 	@state() private _message: AgentMessage | null = null;
-	@state() private _blobState: 'hidden' | 'active' | 'exiting' | 'idle' = 'hidden';
+	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' = 'hidden';
 	private _exitVariant: 'exit' | 'exit-roll' = 'exit';
+	private _entryVariant: 'enter' | 'enter-roll' = 'enter';
 	private _pendingMessage: AgentMessage | null = null;
 	private _updateScheduled = false;
 	private _immediateUpdate = false;
@@ -28,7 +29,14 @@ export class StreamingMessageContainer extends LitElement {
 
 	override updated(changed: Map<string, unknown>) {
 		if (changed.has("isStreaming")) {
-			if (this.isStreaming) {
+			if (this.isStreaming && this._blobState === 'idle') {
+				// Coming from idle — play entry animation
+				this._entryVariant = Math.random() < 0.5 ? 'enter' : 'enter-roll';
+				this._blobState = 'entering';
+				setTimeout(() => {
+					this._blobState = 'active';
+				}, this._entryVariant === 'enter-roll' ? 900 : 700);
+			} else if (this.isStreaming) {
 				this._blobState = 'active';
 			} else if (this._blobState === 'active') {
 				// Streaming stopped — randomly pick exit variant, then go idle
@@ -46,6 +54,7 @@ export class StreamingMessageContainer extends LitElement {
 	}
 
 	private get _blobClass() {
+		if (this._blobState === 'entering') return `bobbit-blob bobbit-blob--${this._entryVariant}`;
 		if (this._blobState === 'exiting') return `bobbit-blob bobbit-blob--${this._exitVariant}`;
 		if (this._blobState === 'idle') return 'bobbit-blob bobbit-blob--idle';
 		return 'bobbit-blob';
