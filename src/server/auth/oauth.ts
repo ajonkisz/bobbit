@@ -1,0 +1,179 @@
+/**
+ * Server-side OAuth handler for the gateway.
+ * Generates PKCE server-side, returns auth URL to the client,
+ * then exchanges the authorization code for tokens.
+ * Stores credentials in ~/.pi/agent/auth.json for the coding agent.
+ */
+
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+
+// Anthropic OAuth constants (same as in @mariozechner/pi-ai)
+const CLIENT_ID = Buffer.from("OWQxYzI1MGEtZTYxYi00NGQ5LTg4ZWQtNTk0NGQxOTYyZjVl", "base64").toString();
+const AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
+const TOKEN_URL = "https://console.anthropic.com/v1/oauth/token";
+const REDIRECT_URI = "https://console.anthropic.com/oauth/code/callback";
+const SCOPES = "org:create_api_key user:profile user:inference";
+
+interface PendingOAuth {
+	verifier: string;
+	createdAt: number;
+}
+
+// In-memory store for pending OAuth flows (verifier keyed by a flow ID)
+const pendingFlows = new Map<string, PendingOAuth>();
+const FLOW_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function getAuthJsonPath(): string {
+	return join(homedir(), ".pi", "agent", "auth.json");
+}
+
+function base64urlEncode(buf: Buffer): string {
+	return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+async function generatePKCE(): Promise<{ verifier: string; challenge: string }> {
+	const { randomBytes, createHash } = await import("node:crypto");
+	const verifierBuf = randomBytes(32);
+	const verifier = base64urlEncode(verifierBuf);
+	const challenge = base64urlEncode(createHash("sha256").update(verifier).digest());
+	return { verifier, challenge };
+}
+
+/**
+ * Start an OAuth flow. Returns the authorization URL and a flow ID.
+ */
+export async function oauthStart(): Promise<{ flowId: string; url: string }> {
+	// Clean up expired flows
+	const now = Date.now();
+	for (const [id, flow] of pendingFlows) {
+		if (now - flow.createdAt > FLOW_TTL_MS) pendingFlows.delete(id);
+	}
+
+	const { randomBytes } = await import("node:crypto");
+	const flowId = randomBytes(16).toString("hex");
+	const { verifier, challenge } = await generatePKCE();
+
+	pendingFlows.set(flowId, { verifier, createdAt: now });
+
+	const params = new URLSearchParams({
+		code: "true",
+		client_id: CLIENT_ID,
+		response_type: "code",
+		redirect_uri: REDIRECT_URI,
+		scope: SCOPES,
+		code_challenge: challenge,
+		code_challenge_method: "S256",
+		state: verifier,
+	});
+
+	return { flowId, url: `${AUTHORIZE_URL}?${params.toString()}` };
+}
+
+/**
+ * Complete an OAuth flow. Exchanges the authorization code for tokens
+ * and stores them in ~/.pi/agent/auth.json.
+ */
+export async function oauthComplete(
+	flowId: string,
+	authCode: string,
+): Promise<{ success: boolean; error?: string }> {
+	const flow = pendingFlows.get(flowId);
+	if (!flow) {
+		return { success: false, error: "Unknown or expired flow ID" };
+	}
+
+	if (Date.now() - flow.createdAt > FLOW_TTL_MS) {
+		pendingFlows.delete(flowId);
+		return { success: false, error: "OAuth flow expired" };
+	}
+
+	pendingFlows.delete(flowId);
+
+	// The auth code from the callback page is in format "code#state"
+	const parts = authCode.split("#");
+	const code = parts[0];
+	const state = parts[1];
+
+	try {
+		const tokenResponse = await fetch(TOKEN_URL, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				grant_type: "authorization_code",
+				client_id: CLIENT_ID,
+				code,
+				state,
+				redirect_uri: REDIRECT_URI,
+				code_verifier: flow.verifier,
+			}),
+		});
+
+		if (!tokenResponse.ok) {
+			const errorText = await tokenResponse.text();
+			return { success: false, error: `Token exchange failed: ${errorText}` };
+		}
+
+		const tokenData = (await tokenResponse.json()) as {
+			access_token: string;
+			refresh_token: string;
+			expires_in: number;
+		};
+
+		// Store in ~/.pi/agent/auth.json
+		const authPath = getAuthJsonPath();
+		const dir = dirname(authPath);
+		if (!existsSync(dir)) {
+			mkdirSync(dir, { recursive: true, mode: 0o700 });
+		}
+
+		let authData: Record<string, unknown> = {};
+		if (existsSync(authPath)) {
+			try {
+				authData = JSON.parse(readFileSync(authPath, "utf-8"));
+			} catch {
+				// Corrupted file, start fresh
+			}
+		}
+
+		authData.anthropic = {
+			type: "oauth",
+			access: tokenData.access_token,
+			refresh: tokenData.refresh_token,
+			expires: Date.now() + tokenData.expires_in * 1000 - 5 * 60 * 1000,
+		};
+
+		writeFileSync(authPath, JSON.stringify(authData, null, 2), "utf-8");
+		try {
+			chmodSync(authPath, 0o600);
+		} catch {
+			// chmod may fail on Windows, that's OK
+		}
+
+		return { success: true };
+	} catch (err) {
+		return { success: false, error: String(err) };
+	}
+}
+
+/**
+ * Check if Anthropic OAuth credentials exist and are valid.
+ */
+export function oauthStatus(): { authenticated: boolean; expires?: number } {
+	const authPath = getAuthJsonPath();
+	if (!existsSync(authPath)) return { authenticated: false };
+
+	try {
+		const data = JSON.parse(readFileSync(authPath, "utf-8"));
+		const cred = data.anthropic;
+		if (!cred || cred.type !== "oauth") return { authenticated: false };
+
+		return {
+			authenticated: true,
+			expires: cred.expires,
+		};
+	} catch {
+		return { authenticated: false };
+	}
+}

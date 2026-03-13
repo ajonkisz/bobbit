@@ -1,9 +1,8 @@
 node_modules/
+dist/
 .env
 .env.local
-dist/
 .DS_Store
 Thumbs.db
 *.log
-server/package-lock.json
-web/package-lock.json
+bobbit2/

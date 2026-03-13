@@ -1,66 +1,161 @@
 # Bobbit
 
-Agent workforce manager for product owners.
+A remote gateway for AI coding agents. Run a coding agent on a powerful machine, control it from any browser — desktop, phone, or tablet.
 
-Code generation is cheap. Coherence is hard. Bobbit gives a human Product Owner control over an AI agent workforce — keeping multiple agents aligned with a shared vision, design, and architecture.
+Bobbit wraps [pi-coding-agent](https://github.com/nickarrow/nickarrow) in a WebSocket gateway with a browser UI built on Lit. You start the server, open the URL (or scan a QR code on your phone), and interact with a coding agent that has full shell access to the host machine.
 
-## Quick Start
+## How it works
+
+```
+┌─────────────┐         ┌──────────────────────────┐
+│  Browser UI  │◄──WS──►│     Bobbit Gateway        │
+│  (any device)│         │                           │
+└─────────────┘         │  ┌──────────────────────┐ │
+                        │  │ pi-coding-agent (RPC) │ │
+                        │  │  stdin/stdout JSONL    │ │
+                        │  └──────────────────────┘ │
+                        └──────────────────────────┘
+```
+
+1. **Gateway** (`src/server/`) — Node.js HTTP + WebSocket server. Manages agent sessions as child processes communicating over JSONL on stdin/stdout. Serves the built UI as static files or runs headless behind a vite dev server.
+2. **Browser client** (`src/app/`) — Connects to the gateway via WebSocket. Renders the chat UI using components from `src/ui/`. Supports session persistence (reconnect on refresh), multi-device access, and QR code sharing.
+3. **UI components** (`src/ui/`) — Lit-based component library (forked from pi-web-ui). Message rendering, tool call visualization, model selection, settings, artifacts, and more.
+
+## Quick start
 
 ```bash
 npm install
-npm run dev        # starts server on :3001 and web UI on :5173
+npm run build     # compile server + bundle UI
+npm start         # start gateway on :3001, serves UI
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Opens a browser with the UI auto-connected. The auth token is printed to the terminal.
 
-## Project Structure
-
-```
-bobbit/
-├── server/                 # Hono API server (TypeScript)
-│   └── index.ts            # File read/write API over project data
-├── web/                    # React + Vite frontend
-│   ├── src/App.tsx         # All UI components
-│   ├── src/App.test.tsx    # 48 tests (Vitest + happy-dom)
-│   ├── src/index.css       # Stripe-inspired theme system
-│   └── src/api.ts          # API client helpers
-├── examples/bobbit/        # Bobbit's own product definition (dogfooding)
-│   ├── context/            # vision.yaml, personas.yaml, stories.yaml
-│   ├── product/            # design.md, architecture.md, glossary.yaml
-│   └── delivery/           # roadmap.yaml
-└── mockups/                # Legacy HTML mockups
-```
-
-## How It Works
-
-A Bobbit **project** is a Git repo containing YAML and Markdown files that define a product. The server reads/writes these files. The web UI provides structured editing with context about which agents consume each document.
-
-### Architecture
-
-- **Server:** Hono on Node.js. Serves project files as parsed YAML/raw Markdown via REST API (`GET/PUT /api/files/*`). Defaults to reading from `examples/bobbit/`, configurable via `BOBBIT_PROJECT` env var.
-- **Frontend:** React 19 + Vite. Single-page app with sidebar navigation across six document types: Vision, Users & Stories, Design, Architecture, Glossary, and Roadmap. Each document has inline editing with save/cancel.
-- **Theming:** Light (default) and dark mode. Stripe docs-inspired design with always-dark chrome bar, neon SVG icons, and hover tooltips showing agent context.
-
-### Tabs
-
-| Tab | File | Format | Agent scope |
-|-----|------|--------|-------------|
-| Vision | `context/vision.yaml` | 4 structured sections | All agents |
-| Users & Stories | `context/personas.yaml` | Persona cards | Design agents |
-| Design | `product/design.md` | Markdown | Design agents |
-| Architecture | `product/architecture.md` | Markdown | Engineering agents |
-| Glossary | `product/glossary.yaml` | Term/definition pairs | All agents |
-| Roadmap | `delivery/roadmap.yaml` | Workstreams + milestones | Planning agents |
-
-## Testing
+### Development (hot reload)
 
 ```bash
-npm test           # Run all 48 tests
-npm run test:watch # Watch mode
+npm run build:server   # compile server TypeScript
+npm run dev            # starts gateway + vite dev server concurrently
 ```
 
-Tests use Vitest with happy-dom and @testing-library/react. They cover rendering, navigation, inline editing (save/cancel), and content display for all six tabs.
+Vite runs on `:5173` and proxies `/api` and `/ws` to the gateway on `:3001`. UI changes hot-reload instantly.
 
-## Status
+### CLI flags
 
-Active development — functional web UI with full CRUD for all document types.
+```
+bobbit [options]
+
+--host <addr>       Bind address (default: 0.0.0.0)
+--port <n>          Port (default: 3001)
+--cwd <dir>         Working directory for agent sessions (default: .)
+--agent-cli <path>  Path to pi-coding-agent cli.js (auto-resolved from node_modules)
+--static <dir>      Serve a custom UI build directory
+--no-ui             Don't serve any UI (gateway-only mode)
+--new-token         Force-generate a new auth token
+--show-token        Print the current token and exit
+```
+
+## Architecture
+
+### Server (`src/server/`)
+
+| File | Purpose |
+|---|---|
+| `cli.ts` | Entry point. Parses args, auto-detects embedded UI at `dist/ui/`, starts the gateway. |
+| `server.ts` | HTTP server with REST API routes + WebSocket upgrade handling + static file serving. |
+| `agent/session-manager.ts` | Creates/destroys agent sessions. Each session is an `RpcBridge` child process + a set of connected WebSocket clients. Events are broadcast to all clients. |
+| `agent/rpc-bridge.ts` | Spawns `pi-coding-agent --mode rpc` as a child process. Sends commands via JSONL on stdin, receives responses and streaming events on stdout. |
+| `agent/event-buffer.ts` | Buffers recent agent events so late-joining clients can catch up. |
+| `auth/token.ts` | Generates 256-bit tokens, persists to `~/.pi/gateway-token`, validates with constant-time comparison. |
+| `auth/rate-limit.ts` | IP-based rate limiting for failed auth attempts. |
+| `auth/oauth.ts` | OAuth flow support for provider API keys. |
+| `ws/protocol.ts` | TypeScript types for the WebSocket protocol (client and server message types). |
+| `ws/handler.ts` | WebSocket message handler. Authenticates the connection, then routes commands (prompt, abort, set_model, etc.) to the agent RPC bridge. |
+
+### REST API
+
+All routes require `Authorization: Bearer <token>`.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/health` | Health check + session count |
+| `GET` | `/api/sessions` | List active sessions |
+| `POST` | `/api/sessions` | Create a new agent session |
+| `GET` | `/api/sessions/:id` | Get session details |
+| `DELETE` | `/api/sessions/:id` | Terminate a session |
+| `GET` | `/api/connection-info` | List network addresses for multi-device access |
+| `GET` | `/api/oauth/status` | OAuth provider status |
+| `POST` | `/api/oauth/start` | Begin an OAuth flow |
+| `POST` | `/api/oauth/complete` | Complete an OAuth flow |
+
+### WebSocket protocol
+
+Connect to `ws://<host>:<port>/ws/<session-id>`. First message must be `{ "type": "auth", "token": "<token>" }`. After `auth_ok`, the client can send commands and receives streaming events.
+
+**Client → Server:** `auth`, `prompt`, `steer`, `follow_up`, `abort`, `set_model`, `compact`, `get_state`, `get_messages`, `ping`
+
+**Server → Client:** `auth_ok`, `auth_failed`, `state`, `messages`, `event`, `session_status`, `client_joined`, `client_left`, `error`, `pong`
+
+### Browser client (`src/app/`)
+
+| File | Purpose |
+|---|---|
+| `main.ts` | App bootstrap. Gateway connection flow, session persistence (localStorage), QR code dialog for phone access, OAuth integration. |
+| `remote-agent.ts` | `RemoteAgent` class — WebSocket adapter that implements the `Agent` interface expected by the UI's `ChatPanel`. Translates WebSocket events into the streaming message model. Uses a deferred-message pattern to prevent duplicate rendering of tool-call messages. |
+| `custom-messages.ts` | Custom message type registration (system notifications). |
+| `oauth.ts` | OAuth UI flow helpers. |
+
+### UI components (`src/ui/`)
+
+Forked from `@mariozechner/pi-web-ui`. Lit-based web components.
+
+- `ChatPanel.ts` — Top-level orchestrator: wires agent, message list, input, model selector
+- `components/AgentInterface.ts` — Bridges agent events to message-list + streaming-message-container
+- `components/MessageList.ts` — Renders completed messages
+- `components/StreamingMessageContainer.ts` — Renders in-progress streaming content
+- `components/Messages.ts` — User, Assistant, Tool message renderers
+- `dialogs/` — ModelSelector, Settings, Sessions, API keys, etc.
+- `tools/` — Tool call renderers (Bash, artifacts, JS REPL)
+- `storage/` — IndexedDB-backed persistence for sessions, settings, provider keys
+
+## Security model
+
+**This tool grants full shell access to the host machine.** The auth token is equivalent to an SSH key.
+
+- 256-bit cryptographically random token generated on first run, persisted at `~/.pi/gateway-token` with mode `0600`
+- All API routes and WebSocket connections require the token
+- Constant-time token comparison prevents timing attacks
+- IP-based rate limiting on failed auth attempts (automatic lockout)
+- 5-second auth timeout on WebSocket connections
+- Static file serving has directory traversal prevention
+- Bind to a specific `--host` address to restrict network access (e.g., VPN-only interface)
+- Token is passed in the URL query string for browser auto-connect — the URL itself is the credential
+
+## Dependencies
+
+Uses these packages from npm (not forked):
+- `@mariozechner/pi-ai` — AI model abstraction (providers, streaming, tool calling)
+- `@mariozechner/pi-agent-core` — Agent interface types and event model
+- `@mariozechner/pi-coding-agent` — The actual coding agent (spawned as subprocess)
+- `@mariozechner/mini-lit` — Minimal Lit component library (buttons, dialogs, alerts)
+- `lit` — Web component framework
+- `ws` — WebSocket server
+- `qrcode` — QR code generation for mobile access
+
+Forked into this repo (not npm dependencies):
+- `pi-web-ui` → `src/ui/` — Chat UI components, customized for gateway use
+- `pi-gateway` → `src/server/` — Gateway server, combined into same package
+
+## Build structure
+
+```
+dist/
+├── server/         # tsc output (Node16 modules)
+│   └── cli.js      # bin entry point
+└── ui/             # vite output (browser bundle)
+    └── index.html  # SPA entry
+```
+
+Two separate TypeScript configs:
+- `tsconfig.server.json` — Node16 module resolution, `src/server/` → `dist/server/`
+- `tsconfig.web.json` — Bundler resolution + DOM libs, `src/ui/` + `src/app/` (bundled by vite, not emitted by tsc)

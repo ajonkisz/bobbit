@@ -2,15 +2,44 @@
   "name": "bobbit",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
-    "dev:server": "npm run dev -w server",
-    "dev:web": "npm run dev -w web",
-    "test": "npm run test -w web",
-    "test:watch": "npm run test:watch -w web"
+  "type": "module",
+  "bin": {
+    "bobbit": "dist/server/cli.js"
   },
-  "workspaces": ["server", "web"],
+  "scripts": {
+    "build:server": "tsc -p tsconfig.server.json && shx chmod +x dist/server/cli.js",
+    "build:ui": "vite build",
+    "build": "npm run build:server && npm run build:ui",
+    "dev": "concurrently -n gw,ui -c blue,green \"node dist/server/cli.js --cwd . --no-ui\" \"vite\"",
+    "start": "node dist/server/cli.js --cwd .",
+    "check": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "clean": "shx rm -rf dist"
+  },
+  "dependencies": {
+    "@mariozechner/mini-lit": "^0.2.0",
+    "@mariozechner/pi-ai": "^0.57.1",
+    "@mariozechner/pi-agent-core": "^0.57.1",
+    "@mariozechner/pi-coding-agent": "^0.57.1",
+    "@mariozechner/pi-tui": "^0.57.1",
+    "@lmstudio/sdk": "^1.5.0",
+    "docx-preview": "^0.3.7",
+    "jszip": "^3.10.1",
+    "lit": "^3.3.1",
+    "lucide": "^0.544.0",
+    "ollama": "^0.6.0",
+    "pdfjs-dist": "5.4.394",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "@playwright/test": "^1.58.2",
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.14",
+    "concurrently": "^9.2.1",
+    "shx": "^0.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^7.1.6"
   }
 }
