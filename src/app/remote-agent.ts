@@ -244,7 +244,7 @@ export class RemoteAgent {
 	}
 
 	replaceMessages(msgs: any[]): void {
-		this._state.messages = msgs;
+		this._state.messages = msgs.map(enrichUserMessage);
 	}
 
 	appendMessage(msg: any): void {
@@ -287,9 +287,9 @@ export class RemoteAgent {
 			case "messages": {
 				const msgs = Array.isArray(msg.data) ? msg.data : msg.data?.messages;
 				if (Array.isArray(msgs)) {
-					this._state.messages = msgs;
+					this._state.messages = msgs.map(enrichUserMessage);
 					// Emit message_end for each message so AgentInterface re-renders
-					for (const m of msgs) {
+					for (const m of this._state.messages) {
 						this.emit({ type: "message_end", message: m });
 					}
 				}
@@ -443,6 +443,35 @@ export class RemoteAgent {
 		// Forward event to UI subscribers
 		this.emit(event);
 	}
+}
+
+/**
+ * When restoring messages from the server (page refresh, reconnect),
+ * user messages with image content arrive as `{ role: "user", content: [...] }`
+ * but the UI needs `role: "user-with-attachments"` with an `attachments` array
+ * to render image thumbnails. This function reconstructs that format.
+ */
+function enrichUserMessage(msg: any): any {
+	if (msg.role !== "user" || !Array.isArray(msg.content)) return msg;
+
+	const imageChunks = msg.content.filter((c: any) => c.type === "image" && c.data);
+	if (imageChunks.length === 0) return msg;
+
+	const attachments = imageChunks.map((img: any, i: number) => ({
+		id: `restored_${i}_${Date.now()}`,
+		type: "image" as const,
+		fileName: `image-${i + 1}.png`,
+		mimeType: img.mimeType || img.media_type || "image/png",
+		size: img.data?.length || 0,
+		content: img.data,
+		preview: img.data,
+	}));
+
+	return {
+		...msg,
+		role: "user-with-attachments",
+		attachments,
+	};
 }
 
 function extractText(message: any): string {
