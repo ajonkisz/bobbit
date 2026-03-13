@@ -14,14 +14,15 @@ import "./ToolGroup.js";
 const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep"]);
 
 /**
- * Check if an assistant message contains only tool calls (no visible text or thinking).
- * Returns the tool name if it's a pure single-tool-type message, or null otherwise.
+ * Check if an assistant message is groupable — contains tool calls of a single type
+ * with no visible user-facing text (thinking blocks are ignored since they're
+ * collapsed in history). Returns the tool name, or null if not groupable.
  */
-function getPureToolName(msg: AssistantMessageType): string | null {
+function getGroupableToolName(msg: AssistantMessageType): string | null {
 	let toolName: string | null = null;
 	for (const chunk of msg.content) {
 		if (chunk.type === "text" && chunk.text.trim()) return null;
-		if (chunk.type === "thinking" && (chunk as any).thinking?.trim()) return null;
+		// Thinking blocks are always collapsed in history — don't let them break groups
 		if (chunk.type === "toolCall") {
 			if (toolName === null) toolName = chunk.name;
 			else if (chunk.name !== toolName) return null; // mixed tool types
@@ -89,7 +90,7 @@ export class MessageList extends LitElement {
 
 			if (msg.role === "assistant") {
 				const amsg = msg as AssistantMessageType;
-				const toolName = getPureToolName(amsg);
+				const toolName = getGroupableToolName(amsg);
 
 				// Try to build a cross-message group of pure tool-only assistant messages
 				if (toolName && GROUPABLE_TOOLS.has(toolName) && !this.isStreaming) {
@@ -104,7 +105,7 @@ export class MessageList extends LitElement {
 							continue;
 						}
 						if (m.role !== "assistant") break;
-						const name = getPureToolName(m as AssistantMessageType);
+						const name = getGroupableToolName(m as AssistantMessageType);
 						if (name !== toolName) break;
 						groupCalls.push(...getToolCalls(m as AssistantMessageType));
 						j++;
