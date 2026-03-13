@@ -27,7 +27,7 @@ export class RemoteAgent {
 	constructor() {
 		this._state = {
 			systemPrompt: "",
-			model: getModel("anthropic", "claude-sonnet-4-5-20250929"),
+			model: getModel("anthropic", "claude-opus-4-6"),
 			thinkingLevel: "off",
 			tools: [],
 			messages: [] as any[],
@@ -226,6 +226,16 @@ export class RemoteAgent {
 
 	appendMessage(msg: any): void {
 		this._state.messages = [...this._state.messages, msg];
+	}
+
+	setTitle(title: string): void {
+		this._title = title;
+		this.send({ type: "set_title", title });
+		this.onTitleChange?.(title);
+	}
+
+	generateTitle(): void {
+		this.send({ type: "generate_title" });
 	}
 
 	clearSteeringQueue(): void {}

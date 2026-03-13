@@ -135,7 +135,7 @@ export class SessionManager {
 		return true;
 	}
 
-	private async autoGenerateTitle(session: SessionInfo): Promise<void> {
+	async autoGenerateTitle(session: SessionInfo): Promise<void> {
 		try {
 			const msgsResp = await session.rpcClient.getMessages();
 			if (!msgsResp.success) return;

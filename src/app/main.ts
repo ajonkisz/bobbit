@@ -16,7 +16,7 @@ import {
 } from "../ui/index.js";
 import { Select, type SelectOption } from "@mariozechner/mini-lit/dist/Select.js";
 import { html, render } from "lit";
-import { ArrowLeft, Brain, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users } from "lucide";
+import { ArrowLeft, Brain, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users, WandSparkles } from "lucide";
 import QRCode from "qrcode";
 import "./app.css";
 import { RemoteAgent } from "./remote-agent.js";
@@ -780,6 +780,149 @@ function statusDot(status: string) {
 	return html`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>`;
 }
 
+/** Show a rename dialog for a session */
+function showRenameDialog(sessionId: string, currentTitle: string): void {
+	const container = document.createElement("div");
+	document.body.appendChild(container);
+
+	let titleValue = currentTitle;
+	let generating = false;
+	let titleChangeUnsub: (() => void) | null = null;
+
+	const cleanup = () => {
+		titleChangeUnsub?.();
+		titleChangeUnsub = null;
+		render(html``, container);
+		container.remove();
+	};
+
+	const doRename = () => {
+		const trimmed = titleValue.trim();
+		if (!trimmed || trimmed === currentTitle) {
+			cleanup();
+			return;
+		}
+		// If this is the active session, use the RemoteAgent to rename (updates server + broadcasts)
+		if (remoteAgent && activeSessionId() === sessionId) {
+			remoteAgent.setTitle(trimmed);
+		} else {
+			// For non-active sessions, call the REST API to set title
+			gatewayFetch(`/api/sessions/${sessionId}/title`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ title: trimmed }),
+			}).then(() => refreshSessions());
+		}
+		cleanup();
+	};
+
+	const doGenerate = () => {
+		if (!remoteAgent || activeSessionId() !== sessionId) return;
+		generating = true;
+		renderDialog();
+
+		// Listen for the title change event (one-shot)
+		titleChangeUnsub?.();
+		const prevOnTitle = remoteAgent.onTitleChange;
+		remoteAgent.onTitleChange = (newTitle: string) => {
+			// Restore original callback
+			if (remoteAgent) remoteAgent.onTitleChange = prevOnTitle;
+			titleChangeUnsub = null;
+			titleValue = newTitle;
+			generating = false;
+			renderDialog();
+			// Also fire the original so sidebar updates
+			prevOnTitle?.(newTitle);
+		};
+		titleChangeUnsub = () => {
+			if (remoteAgent) remoteAgent.onTitleChange = prevOnTitle;
+		};
+
+		// Add a timeout so the spinner doesn't spin forever
+		setTimeout(() => {
+			if (generating) {
+				generating = false;
+				titleChangeUnsub?.();
+				titleChangeUnsub = null;
+				renderDialog();
+			}
+		}, 15_000);
+
+		remoteAgent.generateTitle();
+	};
+
+	const renderDialog = () => {
+		render(
+			Dialog({
+				isOpen: true,
+				onClose: cleanup,
+				width: "min(420px, 92vw)",
+				height: "auto",
+				backdropClassName: "bg-black/50 backdrop-blur-sm",
+				children: html`
+					${DialogContent({
+						children: html`
+							${DialogHeader({ title: "Rename Session" })}
+							<div class="mt-4 flex flex-col gap-3">
+								<div class="flex items-center gap-2">
+									<div class="flex-1">
+										${Input({
+											value: titleValue,
+											placeholder: "Session title…",
+											onInput: (e: Event) => {
+												titleValue = (e.target as HTMLInputElement).value;
+											},
+											onKeyDown: (e: KeyboardEvent) => {
+												if (e.key === "Enter") doRename();
+												if (e.key === "Escape") cleanup();
+											},
+										})}
+									</div>
+									${activeSessionId() === sessionId && remoteAgent
+										? html`<button
+												class="shrink-0 p-2 rounded-md border border-border hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+												@click=${doGenerate}
+												?disabled=${generating}
+												title="Auto-generate title from chat history"
+											>
+												${generating
+													? html`<svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+															<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+														</svg>`
+													: icon(WandSparkles, "sm")}
+											</button>`
+										: ""}
+								</div>
+							</div>
+						`,
+					})}
+					${DialogFooter({
+						className: "px-6 pb-4",
+						children: html`
+							<div class="flex gap-2 justify-end">
+								${Button({ variant: "ghost", onClick: cleanup, children: "Cancel" })}
+								${Button({ onClick: doRename, children: "Rename" })}
+							</div>
+						`,
+					})}
+				`,
+			}),
+			container,
+		);
+
+		// Focus the input after render
+		requestAnimationFrame(() => {
+			const input = container.querySelector("input");
+			if (input) {
+				input.focus();
+				input.select();
+			}
+		});
+	};
+
+	renderDialog();
+}
+
 /** Compact session row for sidebar */
 function renderSidebarSession(session: GatewaySession) {
 	const active = activeSessionId() === session.id;
@@ -803,7 +946,17 @@ function renderSidebarSession(session: GatewaySession) {
 				</div>
 			</div>
 			<button
-				class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity shrink-0"
+				class="sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-opacity shrink-0"
+				@click=${(e: Event) => {
+					e.stopPropagation();
+					showRenameDialog(session.id, displayTitle);
+				}}
+				title="Rename session"
+			>
+				${icon(Pencil, "xs")}
+			</button>
+			<button
+				class="sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity shrink-0"
 				@click=${(e: Event) => {
 					e.stopPropagation();
 					terminateSession(session.id);
@@ -836,16 +989,28 @@ function renderSessionCard(session: GatewaySession) {
 					<span class="font-mono text-[10px] opacity-60" title=${session.id}>${session.id.slice(0, 8)}…</span>
 				</div>
 			</div>
-			<button
-				class="opacity-0 group-hover:opacity-100 p-2 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
-				@click=${(e: Event) => {
-					e.stopPropagation();
-					terminateSession(session.id);
-				}}
-				title="Terminate session"
-			>
-				${icon(Trash2, "sm")}
-			</button>
+			<div class="flex flex-col gap-1 shrink-0">
+				<button
+					class="p-2 rounded-md hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
+					@click=${(e: Event) => {
+						e.stopPropagation();
+						showRenameDialog(session.id, session.title);
+					}}
+					title="Rename session"
+				>
+					${icon(Pencil, "sm")}
+				</button>
+				<button
+					class="p-2 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
+					@click=${(e: Event) => {
+						e.stopPropagation();
+						terminateSession(session.id);
+					}}
+					title="Terminate session"
+				>
+					${icon(Trash2, "sm")}
+				</button>
+			</div>
 		</div>
 	`;
 }

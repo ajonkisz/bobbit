@@ -10,7 +10,7 @@ import { getAppStorage } from "../storage/app-storage.js";
 import "./StreamingMessageContainer.js";
 import type { Agent, AgentEvent } from "@mariozechner/pi-agent-core";
 import type { Attachment } from "../utils/attachment-utils.js";
-import { formatUsage } from "../utils/format.js";
+import { formatTokenCount, formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
 import { createStreamFn } from "../utils/proxy-utils.js";
 import type { UserMessageWithAttachments } from "./Messages.js";
@@ -332,12 +332,43 @@ export class AgentInterface extends LitElement {
 		const hasTotals = totals.input || totals.output || totals.cacheRead || totals.cacheWrite;
 		const totalsText = hasTotals ? formatUsage(totals) : "";
 
+		// Compute context usage from the last assistant message's usage
+		let contextHtml = html``;
+		const model = state.model;
+		if (model?.contextWindow) {
+			// Find last assistant message with usage (skip aborted/error)
+			let lastUsage: Usage | undefined;
+			for (let i = state.messages.length - 1; i >= 0; i--) {
+				const msg = state.messages[i] as any;
+				if (msg.role === "assistant" && msg.usage && msg.stopReason !== "aborted" && msg.stopReason !== "error") {
+					lastUsage = msg.usage;
+					break;
+				}
+			}
+
+			if (lastUsage) {
+				const contextTokens = lastUsage.totalTokens || (lastUsage.input + lastUsage.output + lastUsage.cacheRead + lastUsage.cacheWrite);
+				const contextWindow = model.contextWindow;
+				const pct = Math.min(100, Math.round((contextTokens / contextWindow) * 100));
+				const barColor = pct >= 90 ? "var(--destructive, #ef4444)" : pct >= 75 ? "var(--warning, #f59e0b)" : "var(--primary, #3b82f6)";
+				contextHtml = html`
+					<span class="flex items-center gap-1.5" title="Context: ${formatTokenCount(contextTokens)} / ${formatTokenCount(contextWindow)} tokens (${pct}%)">
+						<span style="display:inline-flex;align-items:center;width:48px;height:6px;background:var(--muted,#27272a);border-radius:3px;overflow:hidden">
+							<span style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s"></span>
+						</span>
+						<span>${pct}%</span>
+					</span>
+				`;
+			}
+		}
+
 		return html`
 			<div class="text-xs text-muted-foreground flex justify-between items-center h-5">
 				<div class="flex items-center gap-1">
 					${this.showThemeToggle ? html`<theme-toggle></theme-toggle>` : html``}
 				</div>
 				<div class="flex ml-auto items-center gap-3">
+					${contextHtml}
 					${
 						totalsText
 							? this.onCostClick

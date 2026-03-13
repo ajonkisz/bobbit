@@ -147,6 +147,11 @@ export function handleWebSocketConnection(
 				case "set_title":
 					sessionManager.setTitle(sessionId, msg.title);
 					break;
+				case "generate_title":
+					sessionManager.autoGenerateTitle(session).catch((err) => {
+						send(ws, { type: "error", message: `Title generation failed: ${err}`, code: "TITLE_GEN_ERROR" });
+					});
+					break;
 				case "ping":
 					send(ws, { type: "pong" });
 					break;

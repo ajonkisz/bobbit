@@ -1,69 +1,98 @@
 /**
  * Generates a short session title from conversation messages
- * using a lightweight Anthropic API call.
+ * using a lightweight Anthropic API call via Claude Haiku.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const TITLE_MODEL = "claude-haiku-4-5-20250929";
+const TITLE_MODEL = "claude-haiku-4-5-20251001";
 const API_URL = "https://api.anthropic.com/v1/messages";
 
-function getAccessToken(): string | null {
+interface AuthCredentials {
+	type: string;
+	access: string;
+	refresh?: string;
+	expires?: number;
+}
+
+function loadAuth(): AuthCredentials | null {
 	const authPath = join(homedir(), ".pi", "agent", "auth.json");
-	if (!existsSync(authPath)) return null;
+	if (!existsSync(authPath)) {
+		console.error("[title-gen] Auth file not found:", authPath);
+		return null;
+	}
 
 	try {
 		const data = JSON.parse(readFileSync(authPath, "utf-8"));
 		const cred = data.anthropic;
-		if (!cred || cred.type !== "oauth" || !cred.access) return null;
-		return cred.access;
-	} catch {
+		if (!cred) {
+			console.error("[title-gen] No 'anthropic' key in auth.json");
+			return null;
+		}
+
+		// Support both OAuth and API key auth
+		if (cred.type === "oauth" && cred.access) {
+			return cred;
+		}
+		if (cred.type === "api-key" && cred.key) {
+			return { type: "api-key", access: cred.key };
+		}
+
+		console.error("[title-gen] Unrecognised auth type or missing credentials:", cred.type);
+		return null;
+	} catch (err) {
+		console.error("[title-gen] Failed to read auth.json:", err);
 		return null;
 	}
 }
 
 /**
  * Extract text from agent messages for title generation.
- * Returns the first user message and first assistant response.
+ * Gathers the first few user and assistant messages.
  */
 function extractConversationPreview(messages: any[]): string {
-	let userText = "";
-	let assistantText = "";
+	const parts: string[] = [];
+	let userCount = 0;
+	let assistantCount = 0;
+	const maxEach = 2;
 
 	for (const msg of messages) {
-		if (!userText && (msg.role === "user" || msg.role === "user-with-attachments")) {
-			if (typeof msg.content === "string") {
-				userText = msg.content;
-			} else if (Array.isArray(msg.content)) {
-				userText = msg.content
-					.filter((c: any) => c.type === "text")
-					.map((c: any) => c.text || "")
-					.join(" ");
-			}
+		if (userCount >= maxEach && assistantCount >= maxEach) break;
+
+		const role = msg.role;
+		const isUser = role === "user" || role === "user-with-attachments";
+		const isAssistant = role === "assistant";
+
+		if (!isUser && !isAssistant) continue;
+		if (isUser && userCount >= maxEach) continue;
+		if (isAssistant && assistantCount >= maxEach) continue;
+
+		let text = "";
+		if (typeof msg.content === "string") {
+			text = msg.content;
+		} else if (Array.isArray(msg.content)) {
+			text = msg.content
+				.filter((c: any) => c.type === "text")
+				.map((c: any) => c.text || "")
+				.join(" ");
 		}
 
-		if (!assistantText && msg.role === "assistant") {
-			if (typeof msg.content === "string") {
-				assistantText = msg.content;
-			} else if (Array.isArray(msg.content)) {
-				assistantText = msg.content
-					.filter((c: any) => c.type === "text")
-					.map((c: any) => c.text || "")
-					.join(" ");
-			}
-		}
+		if (!text.trim()) continue;
 
-		if (userText && assistantText) break;
+		// Truncate individual messages
+		const maxLen = 400;
+		if (text.length > maxLen) text = text.slice(0, maxLen) + "…";
+
+		const label = isUser ? "User" : "Assistant";
+		parts.push(`${label}: ${text}`);
+
+		if (isUser) userCount++;
+		if (isAssistant) assistantCount++;
 	}
 
-	// Truncate to keep the API call small
-	const maxLen = 500;
-	if (userText.length > maxLen) userText = userText.slice(0, maxLen) + "…";
-	if (assistantText.length > maxLen) assistantText = assistantText.slice(0, maxLen) + "…";
-
-	return `User: ${userText}\n\nAssistant: ${assistantText}`;
+	return parts.join("\n\n");
 }
 
 /**
@@ -71,45 +100,53 @@ function extractConversationPreview(messages: any[]): string {
  * Returns null if generation fails.
  */
 export async function generateSessionTitle(messages: any[]): Promise<string | null> {
-	const token = getAccessToken();
-	if (!token) {
-		console.error("[title-gen] No OAuth access token available");
+	const auth = loadAuth();
+	if (!auth) return null;
+
+	const preview = extractConversationPreview(messages);
+	if (!preview.trim()) {
+		console.error("[title-gen] No conversation content to summarise");
 		return null;
 	}
 
-	const preview = extractConversationPreview(messages);
-	if (!preview.trim() || preview === "User: \n\nAssistant: ") {
-		return null;
+	// Build headers based on auth type
+	const headers: Record<string, string> = {
+		"Content-Type": "application/json",
+		"anthropic-version": "2023-06-01",
+	};
+
+	if (auth.type === "oauth") {
+		headers["Authorization"] = `Bearer ${auth.access}`;
+		headers["anthropic-beta"] = "claude-code-20250219,oauth-2025-04-20";
+	} else {
+		headers["x-api-key"] = auth.access;
 	}
+
+	const systemText = auth.type === "oauth"
+		? "You are Claude Code, Anthropic's official CLI for Claude. Your ONLY job right now: read the conversation below and output a short title (3-7 words). Output ONLY the title text. No quotes, no markdown, no explanation, no preamble."
+		: "Read the conversation below and output a short title (3-7 words). Output ONLY the title text. No quotes, no markdown, no explanation, no preamble.";
+
+	const body = {
+		model: TITLE_MODEL,
+		max_tokens: 30,
+		system: auth.type === "oauth"
+			? [{ type: "text", text: systemText }]
+			: systemText,
+		messages: [
+			{
+				role: "user",
+				content: `Generate a short title for this conversation:\n\n---\n${preview}\n---\n\nTitle:`,
+			},
+		],
+	};
+
+	console.log(`[title-gen] Requesting title via ${TITLE_MODEL}…`);
 
 	try {
 		const response = await fetch(API_URL, {
 			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				// OAuth tokens use Bearer auth, not x-api-key
-				"Authorization": `Bearer ${token}`,
-				"anthropic-version": "2023-06-01",
-				// Required beta headers for OAuth access
-				"anthropic-beta": "claude-code-20250219,oauth-2025-04-20",
-			},
-			body: JSON.stringify({
-				model: TITLE_MODEL,
-				max_tokens: 30,
-				// OAuth tokens require Claude Code identity in system prompt
-				system: [
-					{
-						type: "text",
-						text: "You are Claude Code, Anthropic's official CLI for Claude. Generate a very short title (3-7 words, no quotes) summarizing the conversation you are shown.",
-					},
-				],
-				messages: [
-					{
-						role: "user",
-						content: preview,
-					},
-				],
-			}),
+			headers,
+			body: JSON.stringify(body),
 		});
 
 		if (!response.ok) {
@@ -118,7 +155,7 @@ export async function generateSessionTitle(messages: any[]): Promise<string | nu
 			return null;
 		}
 
-		const data = await response.json() as {
+		const data = (await response.json()) as {
 			content: Array<{ type: string; text?: string }>;
 		};
 
@@ -130,10 +167,15 @@ export async function generateSessionTitle(messages: any[]): Promise<string | nu
 
 		if (!text) return null;
 
-		// Clean up: remove surrounding quotes if present, limit length
-		let title = text.replace(/^["'"']+|["'"']+$/g, "").trim();
+		// Clean up: remove surrounding quotes, markdown headers, limit length
+		let title = text
+			.replace(/^#+\s*/, "")           // strip markdown headers
+			.replace(/^["'"']+|["'"']+$/g, "") // strip quotes
+			.replace(/\n.*/s, "")              // only first line
+			.trim();
 		if (title.length > 60) title = title.slice(0, 57) + "…";
 
+		console.log(`[title-gen] Generated title: "${title}"`);
 		return title || null;
 	} catch (err) {
 		console.error("[title-gen] Failed:", err);

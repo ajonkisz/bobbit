@@ -10,6 +10,7 @@ export type ClientMessage =
 	| { type: "get_state" }
 	| { type: "get_messages" }
 	| { type: "set_title"; title: string }
+	| { type: "generate_title" }
 	| { type: "ping" };
 
 /** Server → Client messages over WebSocket */

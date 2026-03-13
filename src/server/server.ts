@@ -187,6 +187,25 @@ async function handleApiRoute(
 		}
 	}
 
+	// PUT /api/sessions/:id/title — rename a session
+	const titleMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/title$/);
+	if (titleMatch && req.method === "PUT") {
+		const id = titleMatch[1];
+		const body = await readBody(req);
+		const title = body?.title;
+		if (!title || typeof title !== "string") {
+			json({ error: "Missing title" }, 400);
+			return;
+		}
+		const ok = sessionManager.setTitle(id, title);
+		if (!ok) {
+			json({ error: "Session not found" }, 404);
+			return;
+		}
+		json({ ok: true });
+		return;
+	}
+
 	// GET /api/connection-info — LAN addresses for multi-device access
 	if (url.pathname === "/api/connection-info" && req.method === "GET") {
 		const interfaces = await import("node:os").then((os) => os.networkInterfaces());
