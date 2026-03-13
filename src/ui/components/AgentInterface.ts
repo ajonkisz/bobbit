@@ -153,9 +153,15 @@ export class AgentInterface extends LitElement {
 		this._unsubscribeSession = this.session.subscribe(async (ev: AgentEvent) => {
 			switch (ev.type) {
 				case "message_start":
-				case "turn_start":
 				case "turn_end":
 				case "agent_start":
+					this.requestUpdate();
+					break;
+				case "turn_start":
+					// Clear steered messages — the agent has picked them up
+					if (this._queuedMessages.some((m) => m.steered)) {
+						this._queuedMessages = this._queuedMessages.filter((m) => !m.steered);
+					}
 					this.requestUpdate();
 					break;
 				case "message_end":
