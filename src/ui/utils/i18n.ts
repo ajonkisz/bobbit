@@ -206,6 +206,21 @@ declare module "@mariozechner/mini-lit" {
 		Disconnected: string;
 		"API key required": string;
 		"API key required — set up in Settings > Providers": string;
+		// Coding tool renderers
+		Reading: string;
+		"Reading file...": string;
+		Writing: string;
+		"Writing file...": string;
+		Editing: string;
+		"Editing file...": string;
+		Listing: string;
+		"Listing directory...": string;
+		Finding: string;
+		"Finding files...": string;
+		in: string;
+		"Searching for": string;
+		"Searching...": string;
+		Preparing: string;
 	}
 }
 
@@ -430,6 +445,21 @@ export const translations = {
 		Disconnected: "Disconnected",
 		"API key required": "API key required",
 		"API key required — set up in Settings > Providers": "API key required — set up in Settings > Providers",
+		// Coding tool renderers
+		Reading: "Reading",
+		"Reading file...": "Reading file...",
+		Writing: "Writing",
+		"Writing file...": "Writing file...",
+		Editing: "Editing",
+		"Editing file...": "Editing file...",
+		Listing: "Listing",
+		"Listing directory...": "Listing directory...",
+		Finding: "Finding",
+		"Finding files...": "Finding files...",
+		in: "in",
+		"Searching for": "Searching for",
+		"Searching...": "Searching...",
+		Preparing: "Preparing",
 	},
 };
 
