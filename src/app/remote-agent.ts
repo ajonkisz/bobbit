@@ -549,10 +549,16 @@ export class RemoteAgent {
 				break;
 
 			case "compaction_start":
+			case "auto_compaction_start":
 				// Don't set isStreaming — compaction uses its own blob animation
 				this._isCompacting = true;
 				// Add a placeholder message so compaction is visible in chat history
 				this._addCompactingPlaceholder();
+				// Normalize to compaction_start for UI subscribers
+				if (event.type === "auto_compaction_start") {
+					this.emit({ type: "compaction_start" } as any);
+					return; // skip the default emit at the end
+				}
 				break;
 
 			// The agent subprocess may send error responses with id:undefined
@@ -565,11 +571,13 @@ export class RemoteAgent {
 				}
 				break;
 
-			case "compaction_end": {
+			case "compaction_end":
+			case "auto_compaction_end": {
 				this._isCompacting = false;
 				// Replace the placeholder with the final result message
 				const filtered = this._state.messages.filter((m: any) => m.id !== "compacting_placeholder");
-				if (event.success) {
+				const success = event.type === "compaction_end" ? event.success : !event.aborted;
+				if (success) {
 					this._state.messages = [...filtered, {
 						role: "assistant",
 						content: [{ type: "text", text: "Context compacted." }],
@@ -577,12 +585,18 @@ export class RemoteAgent {
 						id: `compact_done_${Date.now()}`,
 					} as any];
 				} else {
+					const errorMsg = event.error || (event.aborted ? "Compaction aborted" : "Unknown error");
 					this._state.messages = [...filtered, {
 						role: "assistant",
-						content: [{ type: "text", text: `Compaction failed: ${event.error || "Unknown error"}` }],
+						content: [{ type: "text", text: `Compaction failed: ${errorMsg}` }],
 						timestamp: Date.now(),
 						id: `compact_err_${Date.now()}`,
 					} as any];
+				}
+				// Normalize to compaction_end for UI subscribers
+				if (event.type === "auto_compaction_end") {
+					this.emit({ type: "compaction_end", success } as any);
+					return; // skip the default emit at the end
 				}
 				// State and messages refresh will arrive from the server
 				break;

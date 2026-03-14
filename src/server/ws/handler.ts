@@ -149,7 +149,9 @@ export function handleWebSocketConnection(
 					session.isCompacting = true;
 					broadcast(session.clients, { type: "event", data: { type: "compaction_start" } });
 					try {
+						console.log(`[ws-handler] Starting manual compact for session ${sessionId}`);
 						await session.rpcClient.compact(120_000);
+						console.log(`[ws-handler] Compact RPC resolved for session ${sessionId}`);
 						session.isCompacting = false;
 						// Refresh messages after compaction
 						const msgs = await session.rpcClient.getMessages();
@@ -163,6 +165,7 @@ export function handleWebSocketConnection(
 						}
 						broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: true } });
 					} catch (err: any) {
+						console.error(`[ws-handler] Compact failed for session ${sessionId}:`, err.message);
 						session.isCompacting = false;
 						broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: false, error: err.message } });
 					}

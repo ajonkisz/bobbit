@@ -192,6 +192,14 @@ export class SessionManager {
 					titleGenerated = true;
 					this.autoGenerateTitle(session);
 				}
+			} else if (event.type === "auto_compaction_start") {
+				session.isCompacting = true;
+			} else if (event.type === "auto_compaction_end") {
+				session.isCompacting = false;
+				// Refresh messages and state for clients after auto-compaction
+				if (!event.aborted) {
+					this.refreshAfterCompaction(session);
+				}
 			}
 
 			eventBuffer.push(event);
@@ -214,6 +222,22 @@ export class SessionManager {
 	}
 
 	/** Query the agent for its session file and save metadata to disk */
+	/** After compaction, refresh messages and state for all connected clients. */
+	private async refreshAfterCompaction(session: SessionInfo): Promise<void> {
+		try {
+			const msgs = await session.rpcClient.getMessages();
+			if (msgs.success) {
+				broadcast(session.clients, { type: "messages", data: msgs.data });
+			}
+			const st = await session.rpcClient.getState();
+			if (st.success) {
+				broadcast(session.clients, { type: "state", data: st.data });
+			}
+		} catch (err) {
+			console.error(`[session-manager] Failed to refresh after compaction for ${session.id}:`, err);
+		}
+	}
+
 	private async persistSessionMetadata(session: SessionInfo): Promise<void> {
 		const stateResp = await session.rpcClient.getState();
 		if (!stateResp.success || !stateResp.data?.sessionFile) {
