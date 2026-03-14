@@ -406,9 +406,9 @@ export class AgentInterface extends LitElement {
 
 				<!-- Streaming message container - manages its own updates -->
 				<streaming-message-container
-					class="${state.isStreaming ? "" : "hidden"}"
 					.tools=${state.tools}
 					.isStreaming=${state.isStreaming}
+					.hasMessages=${state.messages.length > 0}
 					.pendingToolCalls=${state.pendingToolCalls}
 					.toolResultsById=${toolResultsById}
 					.onCostClick=${this.onCostClick}

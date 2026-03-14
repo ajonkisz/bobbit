@@ -9,9 +9,63 @@
 /* biome-ignore lint/correctness/noInvalidPositionAtImportRule: fuck you */
 @import "tailwindcss";
 
-/* Dark charcoal background — lets pixel outlines pop */
+/* ── Bobbit palette overrides ──
+   Warm the neutrals with a hint of green-yellow (hue ~140) so the
+   achromatic mini-lit theme feels cohesive with Bobbit's green.
+   User-message orange shifts toward amber/gold to complement green. */
+
+/* Light mode — subtle warm-green tint */
+:root {
+	--background: oklch(0.99 0.004 140);
+	--foreground: oklch(0.16 0.01 140);
+	--card: oklch(0.99 0.004 140);
+	--card-foreground: oklch(0.16 0.01 140);
+	--secondary: oklch(0.96 0.008 140);
+	--secondary-foreground: oklch(0.22 0.01 140);
+	--muted: oklch(0.96 0.008 140);
+	--muted-foreground: oklch(0.50 0.01 140);
+	--accent: oklch(0.96 0.012 140);
+	--accent-foreground: oklch(0.42 0.08 145);
+	--border: oklch(0.91 0.008 140);
+	--input: oklch(0.91 0.008 140);
+	--ring: oklch(0.55 0.06 145);
+	--primary: oklch(0.42 0.08 145);
+	--primary-foreground: oklch(0.98 0.005 140);
+	--sidebar: oklch(0.975 0.006 140);
+	--sidebar-foreground: oklch(0.16 0.01 140);
+	--sidebar-primary: oklch(0.42 0.08 145);
+	--sidebar-primary-foreground: oklch(0.98 0.005 140);
+	--sidebar-accent: oklch(0.96 0.01 140);
+	--sidebar-accent-foreground: oklch(0.22 0.01 140);
+	--sidebar-border: oklch(0.91 0.008 140);
+}
+
+/* Dark mode — warm charcoal with green undertone */
 .dark {
-	--background: oklch(0.21 0.005 250);
+	--background: oklch(0.21 0.008 145);
+	--foreground: oklch(0.96 0.008 140);
+	--card: oklch(0.24 0.01 145);
+	--card-foreground: oklch(0.96 0.008 140);
+	--popover: oklch(0.27 0.01 145);
+	--popover-foreground: oklch(0.96 0.008 140);
+	--secondary: oklch(0.27 0.012 145);
+	--secondary-foreground: oklch(0.96 0.008 140);
+	--muted: oklch(0.27 0.012 145);
+	--muted-foreground: oklch(0.65 0.012 140);
+	--accent: oklch(0.32 0.015 145);
+	--accent-foreground: oklch(0.78 0.08 130);
+	--border: oklch(0.30 0.012 145);
+	--input: oklch(0.34 0.012 145);
+	--ring: oklch(0.50 0.06 145);
+	--primary: oklch(0.72 0.12 140);
+	--primary-foreground: oklch(0.18 0.01 145);
+	--sidebar: oklch(0.23 0.01 145);
+	--sidebar-foreground: oklch(0.96 0.008 140);
+	--sidebar-primary: oklch(0.72 0.12 140);
+	--sidebar-primary-foreground: oklch(0.18 0.01 145);
+	--sidebar-accent: oklch(0.27 0.012 145);
+	--sidebar-accent-foreground: oklch(0.96 0.008 140);
+	--sidebar-border: oklch(0.30 0.012 145);
 }
 
 body {
@@ -633,12 +687,12 @@ body {
 	to { opacity: 1; }
 }
 
-/* User message with fancy pill styling */
+/* User message with warm amber pill styling — complements Bobbit's green */
 .user-message-container {
 	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
-	background: linear-gradient(135deg, rgba(217, 79, 0, 0.12), rgba(255, 107, 0, 0.12), rgba(212, 165, 0, 0.12));
-	border: 1px solid rgba(255, 107, 0, 0.25);
+	background: linear-gradient(135deg, rgba(180, 120, 20, 0.10), rgba(200, 155, 30, 0.10), rgba(170, 140, 40, 0.08));
+	border: 1px solid rgba(190, 140, 30, 0.22);
 	backdrop-filter: blur(10px);
 	max-width: 100%;
 }

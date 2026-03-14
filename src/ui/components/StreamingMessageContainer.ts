@@ -6,6 +6,7 @@ import { property, state } from "lit/decorators.js";
 export class StreamingMessageContainer extends LitElement {
 	@property({ type: Array }) tools: AgentTool[] = [];
 	@property({ type: Boolean }) isStreaming = false;
+	@property({ type: Boolean }) hasMessages = false;
 	@property({ type: Object }) pendingToolCalls?: Set<string>;
 	@property({ type: Object }) toolResultsById?: Map<string, ToolResultMessage>;
 	@property({ attribute: false }) onCostClick?: () => void;
@@ -44,8 +45,12 @@ export class StreamingMessageContainer extends LitElement {
 				this._blobState = 'exiting';
 				setTimeout(() => {
 					this._blobState = 'idle';
-				}, this._exitVariant === 'exit-roll' ? 900 : 700); // match animation durations
+				}, this._exitVariant === 'exit-roll' ? 900 : 700);
 			}
+		}
+		// If there are messages but blob is still hidden, show as idle
+		if (changed.has("hasMessages") && this._blobState === 'hidden' && this.hasMessages) {
+			this._blobState = 'idle';
 		}
 	}
 
