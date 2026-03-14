@@ -131,7 +131,23 @@ export function handleWebSocketConnection(
 					await session.rpcClient.setModel(msg.provider, msg.modelId);
 					break;
 				case "compact":
-					await session.rpcClient.compact();
+					send(ws, { type: "event", data: { type: "compaction_start" } });
+					try {
+						await session.rpcClient.compact(120_000);
+						// Refresh messages after compaction
+						const msgs = await session.rpcClient.getMessages();
+						if (msgs.success) {
+							send(ws, { type: "messages", data: msgs.data });
+						}
+						// Refresh state (updated context tokens)
+						const st = await session.rpcClient.getState();
+						if (st.success) {
+							send(ws, { type: "state", data: st.data });
+						}
+						send(ws, { type: "event", data: { type: "compaction_end", success: true } });
+					} catch (err: any) {
+						send(ws, { type: "event", data: { type: "compaction_end", success: false, error: err.message } });
+					}
 					break;
 				case "get_state": {
 					const stateResp = await session.rpcClient.getState();
