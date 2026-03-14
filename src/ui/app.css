@@ -83,52 +83,105 @@ body {
 	display: flex;
 	align-items: end;
 	position: relative;
-	padding: 4px 0 0 0;
-	margin-bottom: -16px;
+	padding: 0;
+	margin-bottom: -24px;
 	overflow: visible;
 }
 
-/* Pixel shadow under the blob — shrinks when he's airborne */
+/* Pixelated shadow — same coordinate system as sprite, pinned to ground */
 .bobbit-blob__shadow {
-	position: absolute;
-	bottom: 2px;
-	left: 50%;
-	width: 5px;
+	width: 1px;
 	height: 1px;
-	transform-origin: center;
-	transform: translateX(-50%) scale(3.5);
-	background: rgba(0, 0, 0, 0.12);
+	overflow: visible;
+	position: absolute;
+	/* Match sprite positioning exactly */
+	transform-origin: 5px 8px;
+	transform: scale(3.5);
+	margin: 8px 18px 28px 18px;
 	image-rendering: pixelated;
+	/* Shadow sits at y=9, right below the sprite (which ends at y=8) */
+	/* Wide row: 7px centered under the 10px body */
+	box-shadow:
+		2px 9px 0 rgba(0,0,0,0.08),
+		3px 9px 0 rgba(0,0,0,0.15),
+		4px 9px 0 rgba(0,0,0,0.22),
+		5px 9px 0 rgba(0,0,0,0.25),
+		6px 9px 0 rgba(0,0,0,0.22),
+		7px 9px 0 rgba(0,0,0,0.15),
+		8px 9px 0 rgba(0,0,0,0.08);
 	animation: blob-shadow 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
 @keyframes blob-shadow {
-	0% { transform: translateX(-50%) scale(3.5) scaleX(1); opacity: 0.12; }
-	8% { transform: translateX(-50%) scale(3.5) scaleX(1.1); opacity: 0.14; }
-	18% { transform: translateX(-50%) scale(3.5) scaleX(0.7); opacity: 0.06; }
-	30% { transform: translateX(-50%) scale(3.5) scaleX(0.5); opacity: 0.04; }
-	38% { transform: translateX(-50%) scale(3.5) scaleX(0.55); opacity: 0.04; }
-	48% { transform: translateX(-50%) scale(3.5) scaleX(0.7); opacity: 0.06; }
-	55% { transform: translateX(-50%) scale(3.5) scaleX(1.15); opacity: 0.14; }
-	65% { transform: translateX(-50%) scale(3.5) scaleX(0.85); opacity: 0.09; }
-	73% { transform: translateX(-50%) scale(3.5) scaleX(1.05); opacity: 0.12; }
-	85% { transform: translateX(-50%) scale(3.5) scaleX(1); opacity: 0.11; }
-	100% { transform: translateX(-50%) scale(3.5) scaleX(1); opacity: 0.12; }
+	/* On ground — full width shadow */
+	0% { box-shadow:
+		2px 9px 0 rgba(0,0,0,0.08), 3px 9px 0 rgba(0,0,0,0.15), 4px 9px 0 rgba(0,0,0,0.22),
+		5px 9px 0 rgba(0,0,0,0.25), 6px 9px 0 rgba(0,0,0,0.22), 7px 9px 0 rgba(0,0,0,0.15),
+		8px 9px 0 rgba(0,0,0,0.08);
+	}
+	/* Squat — slightly wider */
+	8% { box-shadow:
+		1px 9px 0 rgba(0,0,0,0.06), 2px 9px 0 rgba(0,0,0,0.12), 3px 9px 0 rgba(0,0,0,0.18),
+		4px 9px 0 rgba(0,0,0,0.22), 5px 9px 0 rgba(0,0,0,0.25), 6px 9px 0 rgba(0,0,0,0.22),
+		7px 9px 0 rgba(0,0,0,0.18), 8px 9px 0 rgba(0,0,0,0.12), 9px 9px 0 rgba(0,0,0,0.06);
+	}
+	/* Rising — shrinks, adds depth row */
+	18% { box-shadow:
+		3px 9px 0 rgba(0,0,0,0.06), 4px 9px 0 rgba(0,0,0,0.10), 5px 9px 0 rgba(0,0,0,0.12),
+		6px 9px 0 rgba(0,0,0,0.10), 7px 9px 0 rgba(0,0,0,0.06),
+		4px 10px 0 rgba(0,0,0,0.04), 5px 10px 0 rgba(0,0,0,0.06), 6px 10px 0 rgba(0,0,0,0.04);
+	}
+	/* Peak — smallest, two rows of depth */
+	30% { box-shadow:
+		4px 9px 0 rgba(0,0,0,0.05), 5px 9px 0 rgba(0,0,0,0.08), 6px 9px 0 rgba(0,0,0,0.05),
+		4px 10px 0 rgba(0,0,0,0.03), 5px 10px 0 rgba(0,0,0,0.05), 6px 10px 0 rgba(0,0,0,0.03);
+	}
+	/* Hanging */
+	38% { box-shadow:
+		4px 9px 0 rgba(0,0,0,0.05), 5px 9px 0 rgba(0,0,0,0.08), 6px 9px 0 rgba(0,0,0,0.05),
+		4px 10px 0 rgba(0,0,0,0.03), 5px 10px 0 rgba(0,0,0,0.05), 6px 10px 0 rgba(0,0,0,0.03);
+	}
+	/* Falling — growing back */
+	48% { box-shadow:
+		3px 9px 0 rgba(0,0,0,0.06), 4px 9px 0 rgba(0,0,0,0.10), 5px 9px 0 rgba(0,0,0,0.12),
+		6px 9px 0 rgba(0,0,0,0.10), 7px 9px 0 rgba(0,0,0,0.06),
+		4px 10px 0 rgba(0,0,0,0.04), 5px 10px 0 rgba(0,0,0,0.06), 6px 10px 0 rgba(0,0,0,0.04);
+	}
+	/* Land — full width again */
+	55% { box-shadow:
+		1px 9px 0 rgba(0,0,0,0.06), 2px 9px 0 rgba(0,0,0,0.12), 3px 9px 0 rgba(0,0,0,0.18),
+		4px 9px 0 rgba(0,0,0,0.22), 5px 9px 0 rgba(0,0,0,0.28), 6px 9px 0 rgba(0,0,0,0.22),
+		7px 9px 0 rgba(0,0,0,0.18), 8px 9px 0 rgba(0,0,0,0.12), 9px 9px 0 rgba(0,0,0,0.06);
+	}
+	/* Settle bounce */
+	65% { box-shadow:
+		3px 9px 0 rgba(0,0,0,0.08), 4px 9px 0 rgba(0,0,0,0.15), 5px 9px 0 rgba(0,0,0,0.18),
+		6px 9px 0 rgba(0,0,0,0.15), 7px 9px 0 rgba(0,0,0,0.08);
+	}
+	/* Back to rest */
+	73% { box-shadow:
+		2px 9px 0 rgba(0,0,0,0.08), 3px 9px 0 rgba(0,0,0,0.15), 4px 9px 0 rgba(0,0,0,0.22),
+		5px 9px 0 rgba(0,0,0,0.25), 6px 9px 0 rgba(0,0,0,0.22), 7px 9px 0 rgba(0,0,0,0.15),
+		8px 9px 0 rgba(0,0,0,0.08);
+	}
+	100% { box-shadow:
+		2px 9px 0 rgba(0,0,0,0.08), 3px 9px 0 rgba(0,0,0,0.15), 4px 9px 0 rgba(0,0,0,0.22),
+		5px 9px 0 rgba(0,0,0,0.25), 6px 9px 0 rgba(0,0,0,0.22), 7px 9px 0 rgba(0,0,0,0.15),
+		8px 9px 0 rgba(0,0,0,0.08);
+	}
 }
 
-/* Idle shadow — static, offset left to match idle position */
+/* Idle shadow — offset left to match idle position */
 .bobbit-blob--idle .bobbit-blob__shadow {
 	animation: none !important;
-	transform: translateX(calc(-50% - 35px)) scale(3.5);
-	opacity: 0.10;
+	transform: scale(3.5) translateX(-10px);
 }
 
-/* Hide shadow during transitions */
+/* Shadow during transitions — static, no bounce animation */
 .bobbit-blob--enter .bobbit-blob__shadow,
 .bobbit-blob--enter-roll .bobbit-blob__shadow,
 .bobbit-blob--exit .bobbit-blob__shadow,
 .bobbit-blob--exit-roll .bobbit-blob__shadow {
-	opacity: 0 !important;
 	animation: none !important;
 }
 
@@ -138,7 +191,7 @@ body {
 	overflow: visible;
 	transform-origin: 5px 8px; /* center of 10×9 grid */
 	transform: scale(3.5);
-	margin: 8px 18px 14px 18px;
+	margin: 8px 18px 28px 18px;
 	animation:
 		blob-bounce 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite,
 		blob-shimmer 8s ease-in-out infinite;
@@ -402,20 +455,12 @@ body {
 	}
 }
 
-/* Entry + Exit + Idle states — no busy effects */
+/* Entry + Exit + Idle states — no blink overlay */
 .bobbit-blob--enter .bobbit-blob__sprite::before,
-.bobbit-blob--enter .bobbit-blob__sprite::after,
 .bobbit-blob--enter-roll .bobbit-blob__sprite::before,
-.bobbit-blob--enter-roll .bobbit-blob__sprite::after,
 .bobbit-blob--exit .bobbit-blob__sprite::before,
-.bobbit-blob--exit .bobbit-blob__sprite::after,
 .bobbit-blob--exit-roll .bobbit-blob__sprite::before,
-.bobbit-blob--exit-roll .bobbit-blob__sprite::after,
 .bobbit-blob--idle .bobbit-blob__sprite::before {
-	animation: none !important;
-	opacity: 0 !important;
-}
-.bobbit-blob--idle .bobbit-blob__sprite::after {
 	animation: none !important;
 	opacity: 0 !important;
 }
@@ -487,68 +532,45 @@ body {
 }
 
 /* Slow sine-wave light ripple across the sprite surface */
-.bobbit-blob__sprite::after {
-	content: '';
-	position: absolute;
-	/* Cover the full sprite grid (9×8) */
-	top: 0;
-	left: 0;
-	width: 10px;
-	height: 9px;
-	background: repeating-linear-gradient(
-		110deg,
-		transparent 0px,
-		transparent 2px,
-		rgba(100, 220, 255, 0.1) 2.5px,
-		transparent 3px,
-		transparent 5px,
-		rgba(120, 240, 255, 0.07) 5.5px,
-		transparent 6px
-	);
-	background-size: 8px 8px;
-	mix-blend-mode: overlay;
-	animation: blob-wave 12s linear infinite;
-	pointer-events: none;
-}
+/* Wave overlay removed — blue shimmer handled by blob-shimmer filter */
 
-@keyframes blob-wave {
-	0% { background-position: 0px 0px; }
-	100% { background-position: 24px 8px; }
-}
-
-/* Reptilian shimmer — pearlescent green-to-turquoise edge shift */
+/* Reptilian shimmer — pearlescent green-to-blue skin shift */
 @keyframes blob-shimmer {
 	0%, 100% {
 		filter: hue-rotate(0deg) brightness(1) saturate(1);
 		opacity: 0.92;
 	}
-	12% {
-		filter: hue-rotate(25deg) brightness(1.12) saturate(1.2);
-		opacity: 0.88;
-	}
-	25% {
-		filter: hue-rotate(45deg) brightness(1.18) saturate(1.3);
-		opacity: 0.85;
-	}
-	38% {
-		filter: hue-rotate(30deg) brightness(1.1) saturate(1.15);
+	10% {
+		filter: hue-rotate(15deg) brightness(1.08) saturate(1.1);
 		opacity: 0.9;
 	}
-	50% {
-		filter: hue-rotate(0deg) brightness(1.05) saturate(1);
-		opacity: 0.93;
-	}
-	62% {
-		filter: hue-rotate(-8deg) brightness(1) saturate(1.1);
-		opacity: 0.9;
-	}
-	75% {
-		filter: hue-rotate(35deg) brightness(1.15) saturate(1.25);
+	22% {
+		filter: hue-rotate(55deg) brightness(1.15) saturate(1.3);
 		opacity: 0.86;
 	}
+	32% {
+		filter: hue-rotate(75deg) brightness(1.2) saturate(1.35);
+		opacity: 0.84;
+	}
+	42% {
+		filter: hue-rotate(45deg) brightness(1.12) saturate(1.2);
+		opacity: 0.88;
+	}
+	52% {
+		filter: hue-rotate(5deg) brightness(1.02) saturate(1.05);
+		opacity: 0.93;
+	}
+	65% {
+		filter: hue-rotate(-10deg) brightness(1) saturate(1.1);
+		opacity: 0.9;
+	}
+	78% {
+		filter: hue-rotate(60deg) brightness(1.18) saturate(1.3);
+		opacity: 0.85;
+	}
 	88% {
-		filter: hue-rotate(15deg) brightness(1.08) saturate(1.1);
-		opacity: 0.91;
+		filter: hue-rotate(30deg) brightness(1.1) saturate(1.15);
+		opacity: 0.9;
 	}
 }
 

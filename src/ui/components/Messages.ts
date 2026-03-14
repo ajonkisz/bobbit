@@ -208,7 +208,7 @@ export class AssistantMessage extends LitElement {
 				${orderedParts.length ? html` <div class="px-4 flex flex-col gap-3">${orderedParts}</div> ` : ""}
 				${
 					this.message.usage && this.isStreaming
-						? html` <div class="px-4 mt-2 text-xs text-muted-foreground">${formatUsage(this.message.usage)}</div> `
+						? html` <div class="px-4 mt-2 text-xs text-muted-foreground text-right">${formatUsage(this.message.usage)}</div> `
 						: ""
 				}
 				${

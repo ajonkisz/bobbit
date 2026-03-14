@@ -395,6 +395,7 @@ export class AgentInterface extends LitElement {
 					.toolResultsById=${toolResultsById}
 					.onCostClick=${this.onCostClick}
 				></streaming-message-container>
+
 			</div>
 		`;
 	}
@@ -493,7 +494,7 @@ export class AgentInterface extends LitElement {
 				</div>
 
 				<!-- Input Area -->
-				<div class="shrink-0 pt-3">
+				<div class="shrink-0 pt-1 pb-4">
 					<div class="max-w-5xl mx-auto px-2">
 						<message-editor
 							.isStreaming=${state.isStreaming}
