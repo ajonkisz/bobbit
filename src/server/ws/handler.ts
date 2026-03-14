@@ -6,6 +6,15 @@ import type { RateLimiter } from "../auth/rate-limit.js";
 import { validateToken } from "../auth/token.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
 
+function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
+	const data = JSON.stringify(msg);
+	for (const client of clients) {
+		if (client.readyState === 1) {
+			client.send(data);
+		}
+	}
+}
+
 function send(ws: WebSocket, msg: ServerMessage): void {
 	if (ws.readyState === 1) {
 		ws.send(JSON.stringify(msg));
@@ -100,6 +109,11 @@ export function handleWebSocketConnection(
 
 			send(ws, { type: "session_status", status: session.status });
 			send(ws, { type: "session_title", sessionId, title: session.title });
+
+			// If compaction is in progress, notify the joining client
+			if (session.isCompacting) {
+				send(ws, { type: "event", data: { type: "compaction_start" } });
+			}
 			return;
 		}
 
@@ -131,22 +145,25 @@ export function handleWebSocketConnection(
 					await session.rpcClient.setModel(msg.provider, msg.modelId);
 					break;
 				case "compact":
-					send(ws, { type: "event", data: { type: "compaction_start" } });
+					session.isCompacting = true;
+					broadcast(session.clients, { type: "event", data: { type: "compaction_start" } });
 					try {
 						await session.rpcClient.compact(120_000);
+						session.isCompacting = false;
 						// Refresh messages after compaction
 						const msgs = await session.rpcClient.getMessages();
 						if (msgs.success) {
-							send(ws, { type: "messages", data: msgs.data });
+							broadcast(session.clients, { type: "messages", data: msgs.data });
 						}
 						// Refresh state (updated context tokens)
 						const st = await session.rpcClient.getState();
 						if (st.success) {
-							send(ws, { type: "state", data: st.data });
+							broadcast(session.clients, { type: "state", data: st.data });
 						}
-						send(ws, { type: "event", data: { type: "compaction_end", success: true } });
+						broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: true } });
 					} catch (err: any) {
-						send(ws, { type: "event", data: { type: "compaction_end", success: false, error: err.message } });
+						session.isCompacting = false;
+						broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: false, error: err.message } });
 					}
 					break;
 				case "get_state": {

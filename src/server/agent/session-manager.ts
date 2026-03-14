@@ -20,6 +20,7 @@ export interface SessionInfo {
 	rpcClient: RpcBridge;
 	eventBuffer: EventBuffer;
 	unsubscribe: () => void;
+	isCompacting: boolean;
 }
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
@@ -96,6 +97,7 @@ export class SessionManager {
 			rpcClient,
 			eventBuffer,
 			unsubscribe: () => {},
+			isCompacting: false,
 		};
 
 		let titleGenerated = ps.title !== "New session";
@@ -168,6 +170,7 @@ export class SessionManager {
 			rpcClient,
 			eventBuffer,
 			unsubscribe: () => {},
+			isCompacting: false,
 		};
 
 		let titleGenerated = false;

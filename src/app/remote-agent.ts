@@ -528,6 +528,13 @@ export class RemoteAgent {
 
 			case "compaction_start":
 				// Don't set isStreaming — compaction uses its own blob animation
+				// Add a placeholder message so compaction is visible in chat history
+				this._state.messages = [...this._state.messages.filter((m: any) => m.id !== "compacting_placeholder"), {
+					role: "assistant",
+					content: [{ type: "text", text: "Compacting context…" }],
+					timestamp: Date.now(),
+					id: "compacting_placeholder",
+				} as any];
 				break;
 
 			// The agent subprocess may send error responses with id:undefined
@@ -541,15 +548,17 @@ export class RemoteAgent {
 				break;
 
 			case "compaction_end": {
+				// Replace the placeholder with the final result message
+				const filtered = this._state.messages.filter((m: any) => m.id !== "compacting_placeholder");
 				if (event.success) {
-					this._state.messages = [...this._state.messages, {
+					this._state.messages = [...filtered, {
 						role: "assistant",
 						content: [{ type: "text", text: "Context compacted." }],
 						timestamp: Date.now(),
 						id: `compact_done_${Date.now()}`,
 					} as any];
 				} else {
-					this._state.messages = [...this._state.messages, {
+					this._state.messages = [...filtered, {
 						role: "assistant",
 						content: [{ type: "text", text: `Compaction failed: ${event.error || "Unknown error"}` }],
 						timestamp: Date.now(),
