@@ -847,16 +847,32 @@ function formatSessionAge(timestamp: number): string {
 	return `${days}d ago`;
 }
 
-function statusDot(status: string) {
-	const colors: Record<string, string> = {
-		idle: "#22c55e",
-		streaming: "#3b82f6",
-		starting: "#eab308",
-		terminated: "#ef4444",
+/**
+ * Tiny static Bobbit pixel-art icon used as a session status indicator.
+ * Same 10×9 pixel grid as the streaming blob, but scaled down and colored
+ * per session status. No animation, no blinking — just a little Bobbit.
+ */
+function statusBobbit(status: string) {
+	const palettes: Record<string, { main: string; light: string; dark: string; eye: string }> = {
+		idle:       { main: "#22c55e", light: "#6ee7a0", dark: "#16a34a", eye: "#052e16" },
+		streaming:  { main: "#3b82f6", light: "#93bbfd", dark: "#2563eb", eye: "#0a1929" },
+		starting:   { main: "#eab308", light: "#fde047", dark: "#ca8a04", eye: "#2d2006" },
+		terminated: { main: "#ef4444", light: "#fca5a5", dark: "#dc2626", eye: "#2c0b0e" },
 	};
-	const color = colors[status] || "#6b7280";
-	const cls = status === "streaming" ? "status-dot-streaming" : "";
-	return html`<span class="${cls}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>`;
+	const p = palettes[status] || { main: "#6b7280", light: "#9ca3af", dark: "#4b5563", eye: "#1f2937" };
+	// 10×9 pixel bobbit, same shape as the streaming sprite
+	const shadow = `
+		3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,
+		2px 1px 0 #000,3px 1px 0 ${p.main},4px 1px 0 ${p.main},5px 1px 0 ${p.main},6px 1px 0 ${p.light},7px 1px 0 ${p.light},8px 1px 0 #000,
+		1px 2px 0 #000,2px 2px 0 ${p.main},3px 2px 0 ${p.main},4px 2px 0 ${p.main},5px 2px 0 ${p.main},6px 2px 0 ${p.main},7px 2px 0 ${p.light},8px 2px 0 ${p.main},9px 2px 0 #000,
+		0px 3px 0 #000,1px 3px 0 ${p.main},2px 3px 0 ${p.main},3px 3px 0 ${p.main},4px 3px 0 ${p.main},5px 3px 0 ${p.main},6px 3px 0 ${p.main},7px 3px 0 ${p.main},8px 3px 0 ${p.main},9px 3px 0 #000,
+		0px 4px 0 #000,1px 4px 0 ${p.main},2px 4px 0 ${p.main},3px 4px 0 ${p.eye},4px 4px 0 ${p.main},5px 4px 0 ${p.main},6px 4px 0 ${p.eye},7px 4px 0 ${p.main},8px 4px 0 ${p.main},9px 4px 0 #000,
+		0px 5px 0 #000,1px 5px 0 ${p.main},2px 5px 0 ${p.main},3px 5px 0 ${p.eye},4px 5px 0 ${p.main},5px 5px 0 ${p.main},6px 5px 0 ${p.eye},7px 5px 0 ${p.main},8px 5px 0 ${p.main},9px 5px 0 #000,
+		0px 6px 0 #000,1px 6px 0 ${p.dark},2px 6px 0 ${p.main},3px 6px 0 ${p.main},4px 6px 0 ${p.main},5px 6px 0 ${p.main},6px 6px 0 ${p.main},7px 6px 0 ${p.main},8px 6px 0 ${p.main},9px 6px 0 #000,
+		1px 7px 0 #000,2px 7px 0 ${p.dark},3px 7px 0 ${p.main},4px 7px 0 ${p.main},5px 7px 0 ${p.main},6px 7px 0 ${p.main},7px 7px 0 ${p.main},8px 7px 0 #000,
+		2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000
+	`;
+	return html`<span style="display:inline-block;width:1px;height:1px;overflow:visible;image-rendering:pixelated;transform:scale(1.6);transform-origin:5px 4px;margin:4px 8px 6px 4px;box-shadow:${shadow};flex-shrink:0"></span>`;
 }
 
 /** Show a rename dialog for a session */
@@ -1019,7 +1035,7 @@ function renderSidebarSession(session: GatewaySession) {
 				if (!active) connectToSession(session.id, true);
 			}}
 		>
-			${statusDot(session.status)}
+			${statusBobbit(session.status)}
 			<div class="flex-1 min-w-0">
 				<div class="truncate text-xs" title=${displayTitle}>
 					${displayTitle}
@@ -1065,7 +1081,7 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 		>
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2 mb-1">
-					${statusDot(session.status)}
+					${statusBobbit(session.status)}
 					<span class="text-sm font-medium text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
@@ -1245,7 +1261,7 @@ const renderApp = () => {
 			return html`
 				<div class="flex items-center gap-1 px-2">
 					${backBtn}
-					<span class="text-sm font-medium text-foreground truncate max-w-[160px]" title=${sessionTitle}>${sessionTitle}</span>
+					<span class="text-sm font-medium text-foreground truncate max-w-[320px]" title=${sessionTitle}>${sessionTitle}</span>
 					<span class="text-muted-foreground text-xs mx-1">·</span>
 					${model ? Button({
 						variant: "ghost",
