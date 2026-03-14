@@ -67,6 +67,7 @@ interface GatewaySession {
 	createdAt: number;
 	lastActivity: number;
 	clientCount: number;
+	isCompacting?: boolean;
 }
 let gatewaySessions: GatewaySession[] = [];
 let sessionsLoading = false;
@@ -852,8 +853,9 @@ function formatSessionAge(timestamp: number): string {
  * Same 10×9 pixel grid as the streaming blob, but scaled down and colored
  * per session status. No animation, no blinking — just a little Bobbit.
  */
-function statusBobbit(status: string) {
+function statusBobbit(status: string, isCompacting = false) {
 	// Streaming (busy) sessions get the canonical Bobbit green + shimmer.
+	// Compacting sessions also get canonical green.
 	// Idle sessions get a muted/desaturated green. Other states keep distinct colors.
 	const canonical = { main: "#8ec63f", light: "#b5d98a", dark: "#6b9930", eye: "#1a3010" };
 	const muted     = { main: "#8aaa6e", light: "#a8c094", dark: "#6e8c5a", eye: "#2a3a22" };
@@ -863,8 +865,8 @@ function statusBobbit(status: string) {
 		starting:   { main: "#eab308", light: "#fde047", dark: "#ca8a04", eye: "#2d2006" },
 		terminated: { main: "#ef4444", light: "#fca5a5", dark: "#dc2626", eye: "#2c0b0e" },
 	};
-	const p = palettes[status] || { main: "#6b7280", light: "#9ca3af", dark: "#4b5563", eye: "#1f2937" };
-	const isBusy = status === "streaming";
+	const p = isCompacting ? canonical : (palettes[status] || { main: "#6b7280", light: "#9ca3af", dark: "#4b5563", eye: "#1f2937" });
+	const isBusy = status === "streaming" || isCompacting;
 	// 10×9 pixel bobbit, same shape as the streaming sprite
 	const shadow = `
 		3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,
@@ -881,7 +883,10 @@ function statusBobbit(status: string) {
 	// Outer span is sized to contain the scaled artwork so it participates
 	// in flex layout correctly. Inner 1×1 element is scaled from top-left.
 	const shimmer = isBusy ? "animation:blob-shimmer 8s ease-in-out infinite;" : "";
-	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(1.6);transform-origin:0 0;box-shadow:${shadow};${shimmer}"></span></span>`;
+	const spriteTransform = isCompacting
+		? "transform:scale(1.6) scaleX(1.25) scaleY(0.7);transform-origin:0 0;"
+		: "transform:scale(1.6);transform-origin:0 0;";
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;${spriteTransform}box-shadow:${shadow};${shimmer}"></span></span>`;
 }
 
 /** Show a rename dialog for a session */
@@ -1045,10 +1050,10 @@ function renderSidebarSession(session: GatewaySession) {
 			}}
 		>
 			<div class="shrink-0 flex items-center justify-center w-6 self-center">
-				${statusBobbit(session.status)}
+				${statusBobbit(session.status, session.isCompacting)}
 			</div>
 			<div class="flex-1 min-w-0">
-				<div class="truncate text-xs ${session.status === "streaming" || session.status === "busy" ? "font-semibold" : "font-normal"}" title=${displayTitle}>
+				<div class="truncate text-xs ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"}" title=${displayTitle}>
 					${displayTitle}
 				</div>
 				<div class="text-[10px] opacity-60 font-mono truncate leading-tight" title=${session.cwd}>
@@ -1094,8 +1099,8 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 		>
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2 mb-1">
-					${statusBobbit(session.status)}
-					<span class="text-sm ${session.status === "streaming" || session.status === "busy" ? "font-semibold" : "font-normal"} text-foreground">${session.title}</span>
+					${statusBobbit(session.status, session.isCompacting)}
+					<span class="text-sm ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"} text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
 				</div>

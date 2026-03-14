@@ -243,6 +243,7 @@ export class SessionManager {
 		createdAt: number;
 		lastActivity: number;
 		clientCount: number;
+		isCompacting: boolean;
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -252,6 +253,7 @@ export class SessionManager {
 			createdAt: s.createdAt,
 			lastActivity: s.lastActivity,
 			clientCount: s.clients.size,
+			isCompacting: s.isCompacting,
 		}));
 	}
 

@@ -314,7 +314,7 @@ export class RemoteAgent {
 
 	setModel(model: any): void {
 		this._state.model = model;
-		this.send({ type: "set_model", model: model.id });
+		this.send({ type: "set_model", provider: model.provider, modelId: model.id });
 	}
 
 	setThinkingLevel(level: any): void {
@@ -367,6 +367,10 @@ export class RemoteAgent {
 			case "state":
 				if (msg.data?.isStreaming !== undefined) {
 					this._state.isStreaming = msg.data.isStreaming;
+				}
+				// Adopt server model if we don't have one yet (e.g. no localStorage entry)
+				if (msg.data?.model && !this._state.model) {
+					this._state.model = msg.data.model;
 				}
 				break;
 
