@@ -236,6 +236,15 @@ export class AgentInterface extends LitElement {
 		if (input.trim().toLowerCase() === "/compact") {
 			if ("compact" in session && typeof (session as any).compact === "function") {
 				this._messageEditor.value = "";
+				this._messageEditor.attachments = [];
+				// Show the command as a user message in chat
+				const userMsg = {
+					role: "user" as const,
+					content: "/compact",
+					timestamp: Date.now(),
+				};
+				session.state.messages = [...session.state.messages, userMsg];
+				this.requestUpdate();
 				(session as any).compact();
 			}
 			return;

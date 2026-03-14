@@ -525,6 +525,42 @@ export class RemoteAgent {
 					this._state.pendingToolCalls.delete(event.toolCallId);
 				}
 				break;
+
+			case "compaction_start":
+				this._state.isStreaming = true;
+				// Add a status message to chat
+				this._state.messages = [...this._state.messages, {
+					role: "assistant",
+					content: [{ type: "text", text: "Compacting context..." }],
+					timestamp: Date.now(),
+					id: `compact_${Date.now()}`,
+					_isCompacting: true,
+				} as any];
+				break;
+
+			case "compaction_end": {
+				this._state.isStreaming = false;
+				// Remove the "compacting" placeholder
+				this._state.messages = this._state.messages.filter((m: any) => !m._isCompacting);
+				if (event.success) {
+					// Add a success message
+					this._state.messages = [...this._state.messages, {
+						role: "assistant",
+						content: [{ type: "text", text: "Context compacted successfully." }],
+						timestamp: Date.now(),
+						id: `compact_done_${Date.now()}`,
+					} as any];
+				} else {
+					this._state.messages = [...this._state.messages, {
+						role: "assistant",
+						content: [{ type: "text", text: `Compaction failed: ${event.error || "Unknown error"}` }],
+						timestamp: Date.now(),
+						id: `compact_err_${Date.now()}`,
+					} as any];
+				}
+				// State and messages refresh will arrive from the server
+				break;
+			}
 		}
 
 		// Forward event to UI subscribers
