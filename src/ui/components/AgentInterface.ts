@@ -231,6 +231,15 @@ export class AgentInterface extends LitElement {
 		if (!input.trim() && (!attachments || attachments.length === 0)) return;
 		const session = this.session;
 		if (!session) throw new Error("No session set on AgentInterface");
+
+		// Handle /compact slash command
+		if (input.trim().toLowerCase() === "/compact") {
+			if ("compact" in session && typeof (session as any).compact === "function") {
+				this._messageEditor.value = "";
+				(session as any).compact();
+			}
+			return;
+		}
 		if (!session.state.model) throw new Error("No model set on AgentInterface");
 
 		const isStreaming = session.state.isStreaming;

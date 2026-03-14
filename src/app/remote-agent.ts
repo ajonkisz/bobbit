@@ -278,6 +278,10 @@ export class RemoteAgent {
 		this.send({ type: "abort" });
 	}
 
+	compact(): void {
+		this.send({ type: "compact" });
+	}
+
 	requestMessages(): void {
 		this.send({ type: "get_messages" });
 	}
