@@ -17,6 +17,7 @@ export class StreamingMessageContainer extends LitElement {
 	private _entryVariant: 'enter' | 'enter-roll' = 'enter';
 	private _compactEntryTimer: ReturnType<typeof setTimeout> | null = null;
 	private _compactSafetyTimer: ReturnType<typeof setTimeout> | null = null;
+	private _compactStartedAt: number = 0;
 	private _pendingMessage: AgentMessage | null = null;
 	private _updateScheduled = false;
 	private _immediateUpdate = false;
@@ -74,6 +75,7 @@ export class StreamingMessageContainer extends LitElement {
 
 	/** Start the compaction squash animation */
 	public startCompacting() {
+		this._compactStartedAt = Date.now();
 		// If idle, enter first then compact; otherwise go straight to compacting
 		if (this._blobState === 'idle') {
 			this._entryVariant = Math.random() < 0.5 ? 'enter' : 'enter-roll';
@@ -95,8 +97,24 @@ export class StreamingMessageContainer extends LitElement {
 		}, 120_000);
 	}
 
+	/** Minimum time (ms) the compaction animation should play before ending.
+	 *  Covers entry animation + visible squash time. */
+	private static COMPACT_MIN_DURATION = 2000;
+
 	/** End the compaction animation — pop back to size then go idle */
 	public endCompacting() {
+		// Ensure the animation plays for a minimum duration so the user
+		// sees the squash even if the server responds instantly (e.g. error).
+		const elapsed = Date.now() - (this._compactStartedAt ?? 0);
+		const remaining = StreamingMessageContainer.COMPACT_MIN_DURATION - elapsed;
+		if (remaining > 0 && this._blobState !== 'idle') {
+			setTimeout(() => this._doEndCompacting(), remaining);
+			return;
+		}
+		this._doEndCompacting();
+	}
+
+	private _doEndCompacting() {
 		// Cancel any pending timers
 		if (this._compactEntryTimer) {
 			clearTimeout(this._compactEntryTimer);

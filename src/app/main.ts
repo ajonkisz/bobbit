@@ -853,13 +853,16 @@ function formatSessionAge(timestamp: number): string {
  * per session status. No animation, no blinking — just a little Bobbit.
  */
 function statusBobbit(status: string) {
+	// Active sessions (idle/streaming) use the canonical Bobbit green + shimmer
+	const canonical = { main: "#8ec63f", light: "#b5d98a", dark: "#6b9930", eye: "#1a3010" };
 	const palettes: Record<string, { main: string; light: string; dark: string; eye: string }> = {
-		idle:       { main: "#22c55e", light: "#6ee7a0", dark: "#16a34a", eye: "#052e16" },
-		streaming:  { main: "#3b82f6", light: "#93bbfd", dark: "#2563eb", eye: "#0a1929" },
+		idle:       canonical,
+		streaming:  canonical,
 		starting:   { main: "#eab308", light: "#fde047", dark: "#ca8a04", eye: "#2d2006" },
 		terminated: { main: "#ef4444", light: "#fca5a5", dark: "#dc2626", eye: "#2c0b0e" },
 	};
 	const p = palettes[status] || { main: "#6b7280", light: "#9ca3af", dark: "#4b5563", eye: "#1f2937" };
+	const isActive = status === "idle" || status === "streaming";
 	// 10×9 pixel bobbit, same shape as the streaming sprite
 	const shadow = `
 		3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,
@@ -875,7 +878,8 @@ function statusBobbit(status: string) {
 	// Sprite pixels span x 0–9, y 0–8 (10×9). At scale 1.6 → 16×14.4px.
 	// Outer span is sized to contain the scaled artwork so it participates
 	// in flex layout correctly. Inner 1×1 element is scaled from top-left.
-	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(1.6);transform-origin:0 0;box-shadow:${shadow}"></span></span>`;
+	const shimmer = isActive ? "animation:blob-shimmer 8s ease-in-out infinite;" : "";
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(1.6);transform-origin:0 0;box-shadow:${shadow};${shimmer}"></span></span>`;
 }
 
 /** Show a rename dialog for a session */
