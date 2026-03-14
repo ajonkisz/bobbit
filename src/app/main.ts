@@ -1048,7 +1048,7 @@ function renderSidebarSession(session: GatewaySession) {
 				${statusBobbit(session.status)}
 			</div>
 			<div class="flex-1 min-w-0">
-				<div class="truncate text-xs ${session.status === "streaming" || session.status === "busy" ? "font-semibold" : "font-medium"}" title=${displayTitle}>
+				<div class="truncate text-xs ${session.status === "streaming" || session.status === "busy" ? "font-semibold" : "font-normal"}" title=${displayTitle}>
 					${displayTitle}
 				</div>
 				<div class="text-[10px] opacity-60 font-mono truncate leading-tight" title=${session.cwd}>
@@ -1095,7 +1095,7 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2 mb-1">
 					${statusBobbit(session.status)}
-					<span class="text-sm font-medium text-foreground">${session.title}</span>
+					<span class="text-sm ${session.status === "streaming" || session.status === "busy" ? "font-semibold" : "font-normal"} text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
 				</div>
