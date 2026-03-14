@@ -719,9 +719,6 @@ body {
 }
 
 .bobbit-blob--compact-shake .bobbit-blob__shadow {
-	animation: none !important;
-}
-.bobbit-blob--compact-shake .bobbit-blob__shadow::after {
 	display: none !important;
 }
 
@@ -758,12 +755,10 @@ body {
 		blob-compact-squash 3s ease-in-out infinite !important;
 }
 
-/* Shadow widens as blob squashes */
+/* Hide shadow during squash — the sprite's scaleX/scaleY changes make
+   the shadow's right edge slide diagonally since it can't track the
+   sprite's non-uniform transform. The squash reads fine without it. */
 .bobbit-blob--compacting .bobbit-blob__shadow {
-	animation:
-		blob-compact-shadow 3s ease-in-out infinite !important;
-}
-.bobbit-blob--compacting .bobbit-blob__shadow::after {
 	display: none !important;
 }
 
@@ -851,9 +846,6 @@ body {
 }
 
 .bobbit-blob--compact-pop .bobbit-blob__shadow {
-	animation: none !important;
-}
-.bobbit-blob--compact-pop .bobbit-blob__shadow::after {
 	display: none !important;
 }
 
