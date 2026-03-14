@@ -174,7 +174,7 @@ body {
 /* Idle shadow — offset left to match idle position */
 .bobbit-blob--idle .bobbit-blob__shadow {
 	animation: none !important;
-	transform: scale(3.5) translateX(-10px);
+	transform: scale(3.5) translateX(-7px);
 }
 
 /* Shadow during transitions — static, no bounce animation */
@@ -342,19 +342,19 @@ body {
 		transform: scale(3.5) translateX(0) translateY(1px) scaleX(1.3) scaleY(0.6) rotate(0deg);
 	}
 	35% {
-		transform: scale(3.5) translateX(-2px) translateY(1px) scaleX(1.25) scaleY(0.65) rotate(-6deg);
+		transform: scale(3.5) translateX(-1.5px) translateY(1px) scaleX(1.25) scaleY(0.65) rotate(-6deg);
 	}
 	50% {
-		transform: scale(3.5) translateX(-5px) translateY(1px) scaleX(1.2) scaleY(0.7) rotate(4deg);
+		transform: scale(3.5) translateX(-3.5px) translateY(1px) scaleX(1.2) scaleY(0.7) rotate(4deg);
 	}
 	65% {
-		transform: scale(3.5) translateX(-8px) translateY(-2px) scaleX(0.9) scaleY(1.1) rotate(-2deg);
+		transform: scale(3.5) translateX(-5.5px) translateY(-2px) scaleX(0.9) scaleY(1.1) rotate(-2deg);
 	}
 	80% {
-		transform: scale(3.5) translateX(-10px) translateY(0) scaleX(1.1) scaleY(0.9) rotate(1deg);
+		transform: scale(3.5) translateX(-7px) translateY(0) scaleX(1.1) scaleY(0.9) rotate(1deg);
 	}
 	100% {
-		transform: scale(3.5) translateX(-10px) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+		transform: scale(3.5) translateX(-7px) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
 	}
 }
 
@@ -368,23 +368,23 @@ body {
 	}
 	/* Launch up and start spinning */
 	30% {
-		transform: scale(3.5) translateX(-3px) translateY(-5px) scaleX(0.9) scaleY(1.1) rotate(-120deg);
+		transform: scale(3.5) translateX(-2px) translateY(-5px) scaleX(0.9) scaleY(1.1) rotate(-120deg);
 	}
 	/* Peak of arc — mid roll */
 	50% {
-		transform: scale(3.5) translateX(-6px) translateY(-7px) scaleX(1) scaleY(1) rotate(-250deg);
+		transform: scale(3.5) translateX(-4px) translateY(-7px) scaleX(1) scaleY(1) rotate(-250deg);
 	}
 	/* Coming down, finishing roll */
 	70% {
-		transform: scale(3.5) translateX(-9px) translateY(-3px) scaleX(1) scaleY(1) rotate(-340deg);
+		transform: scale(3.5) translateX(-6px) translateY(-3px) scaleX(1) scaleY(1) rotate(-340deg);
 	}
 	/* Land with squash */
 	85% {
-		transform: scale(3.5) translateX(-10px) translateY(1px) scaleX(1.15) scaleY(0.85) rotate(-360deg);
+		transform: scale(3.5) translateX(-7px) translateY(1px) scaleX(1.15) scaleY(0.85) rotate(-360deg);
 	}
 	/* Settle */
 	100% {
-		transform: scale(3.5) translateX(-10px) translateY(0) scaleX(1) scaleY(1) rotate(-360deg);
+		transform: scale(3.5) translateX(-7px) translateY(0) scaleX(1) scaleY(1) rotate(-360deg);
 	}
 }
 
@@ -402,11 +402,11 @@ body {
 
 @keyframes blob-enter {
 	0% {
-		transform: scale(3.5) translateX(-10px) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+		transform: scale(3.5) translateX(-7px) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
 	}
 	/* Squat before hop */
 	15% {
-		transform: scale(3.5) translateX(-10px) translateY(1px) scaleX(1.25) scaleY(0.65) rotate(0deg);
+		transform: scale(3.5) translateX(-7px) translateY(1px) scaleX(1.25) scaleY(0.65) rotate(0deg);
 	}
 	/* Launch right */
 	35% {
@@ -427,11 +427,11 @@ body {
 
 @keyframes blob-enter-roll {
 	0% {
-		transform: scale(3.5) translateX(-10px) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
+		transform: scale(3.5) translateX(-7px) translateY(0) scaleX(1) scaleY(1) rotate(0deg);
 	}
 	/* Squat */
 	12% {
-		transform: scale(3.5) translateX(-10px) translateY(1px) scaleX(1.2) scaleY(0.7) rotate(0deg);
+		transform: scale(3.5) translateX(-7px) translateY(1px) scaleX(1.2) scaleY(0.7) rotate(0deg);
 	}
 	/* Launch up spinning */
 	30% {
@@ -467,46 +467,46 @@ body {
 
 /* Idle state — sitting still, offset left, eyes looking around */
 .bobbit-blob--idle .bobbit-blob__sprite {
-	transform: scale(3.5) translateX(-10px);
+	transform: scale(3.5) translateX(-7px);
 	animation: blob-idle-eyes 10s steps(1) infinite !important;
 }
 
 /* Idle eye cycle: center → look at user → blink → look up-right at chat history → center → look right → blink → center */
 @keyframes blob-idle-eyes {
 	/* 0% — Center eyes */
-	0% { transform: scale(3.5) translateX(-10px); box-shadow:
+	0% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #1a3010, 4px 4px 0 #8ec63f, 5px 4px 0 #8ec63f, 6px 4px 0 #1a3010, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #1a3010, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #1a3010, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 	/* 10% — Look left (at user) */
-	10% { transform: scale(3.5) translateX(-10px); box-shadow:
+	10% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #1a3010, 3px 4px 0 #8ec63f, 4px 4px 0 #8ec63f, 5px 4px 0 #1a3010, 6px 4px 0 #8ec63f, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #1a3010, 3px 5px 0 #8ec63f, 4px 5px 0 #8ec63f, 5px 5px 0 #1a3010, 6px 5px 0 #8ec63f, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 	/* 25% — Blink */
-	25% { transform: scale(3.5) translateX(-10px); box-shadow:
+	25% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #8ec63f, 4px 4px 0 #8ec63f, 5px 4px 0 #8ec63f, 6px 4px 0 #8ec63f, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #1a3010, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #1a3010, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 	/* 28% — Look up-right (at chat history) */
-	28% { transform: scale(3.5) translateX(-10px); box-shadow:
+	28% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #1a3010, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #1a3010, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #8ec63f, 4px 4px 0 #1a3010, 5px 4px 0 #8ec63f, 6px 4px 0 #8ec63f, 7px 4px 0 #1a3010, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #8ec63f, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #8ec63f, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 	/* 48% — Center eyes */
-	48% { transform: scale(3.5) translateX(-10px); box-shadow:
+	48% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #1a3010, 4px 4px 0 #8ec63f, 5px 4px 0 #8ec63f, 6px 4px 0 #1a3010, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #1a3010, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #1a3010, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 	/* 58% — Look right (at chat area) */
-	58% { transform: scale(3.5) translateX(-10px); box-shadow:
+	58% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #8ec63f, 4px 4px 0 #1a3010, 5px 4px 0 #8ec63f, 6px 4px 0 #8ec63f, 7px 4px 0 #1a3010, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #8ec63f, 4px 5px 0 #1a3010, 5px 5px 0 #8ec63f, 6px 5px 0 #8ec63f, 7px 5px 0 #1a3010, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 	/* 72% — Blink */
-	72% { transform: scale(3.5) translateX(-10px); box-shadow:
+	72% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #8ec63f, 4px 4px 0 #8ec63f, 5px 4px 0 #8ec63f, 6px 4px 0 #8ec63f, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #1a3010, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #1a3010, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 	/* 75% — Look up-right again (at chat history) */
-	75% { transform: scale(3.5) translateX(-10px); box-shadow:
+	75% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #1a3010, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #1a3010, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #8ec63f, 4px 4px 0 #1a3010, 5px 4px 0 #8ec63f, 6px 4px 0 #8ec63f, 7px 4px 0 #1a3010, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #8ec63f, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #8ec63f, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 	/* 90% — Back to center */
-	90% { transform: scale(3.5) translateX(-10px); box-shadow:
+	90% { transform: scale(3.5) translateX(-7px); box-shadow:
 		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000, 2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #b5d98a, 7px 1px 0 #b5d98a, 8px 1px 0 #000, 1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #b5d98a, 8px 2px 0 #8ec63f, 9px 2px 0 #000, 0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000, 0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #1a3010, 4px 4px 0 #8ec63f, 5px 4px 0 #8ec63f, 6px 4px 0 #1a3010, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000, 0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #1a3010, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #1a3010, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000, 0px 6px 0 #000, 1px 6px 0 #6b9930, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000, 1px 7px 0 #000, 2px 7px 0 #6b9930, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000, 2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000;
 	}
 }
