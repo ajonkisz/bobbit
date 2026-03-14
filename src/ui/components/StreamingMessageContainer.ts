@@ -12,7 +12,7 @@ export class StreamingMessageContainer extends LitElement {
 	@property({ attribute: false }) onCostClick?: () => void;
 
 	@state() private _message: AgentMessage | null = null;
-	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' = 'hidden';
+	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' | 'compacting' | 'compact-pop' = 'hidden';
 	private _exitVariant: 'exit' | 'exit-roll' = 'exit';
 	private _entryVariant: 'enter' | 'enter-roll' = 'enter';
 	private _pendingMessage: AgentMessage | null = null;
@@ -62,7 +62,35 @@ export class StreamingMessageContainer extends LitElement {
 		if (this._blobState === 'entering') return `bobbit-blob bobbit-blob--${this._entryVariant}`;
 		if (this._blobState === 'exiting') return `bobbit-blob bobbit-blob--${this._exitVariant}`;
 		if (this._blobState === 'idle') return 'bobbit-blob bobbit-blob--idle';
+		if (this._blobState === 'compacting') return 'bobbit-blob bobbit-blob--compacting';
+		if (this._blobState === 'compact-pop') return 'bobbit-blob bobbit-blob--compact-pop';
 		return 'bobbit-blob';
+	}
+
+	/** Start the compaction squash animation */
+	public startCompacting() {
+		// If idle, enter first then compact; otherwise go straight to compacting
+		if (this._blobState === 'idle') {
+			this._entryVariant = Math.random() < 0.5 ? 'enter' : 'enter-roll';
+			this._blobState = 'entering';
+			setTimeout(() => {
+				this._blobState = 'compacting';
+			}, this._entryVariant === 'enter-roll' ? 900 : 700);
+		} else {
+			this._blobState = 'compacting';
+		}
+	}
+
+	/** End the compaction animation — pop back to size then go idle */
+	public endCompacting() {
+		this._blobState = 'compact-pop';
+		setTimeout(() => {
+			this._exitVariant = Math.random() < 0.5 ? 'exit' : 'exit-roll';
+			this._blobState = 'exiting';
+			setTimeout(() => {
+				this._blobState = 'idle';
+			}, this._exitVariant === 'exit-roll' ? 900 : 700);
+		}, 600); // pop duration
 	}
 
 	// Public method to update the message with batching for performance

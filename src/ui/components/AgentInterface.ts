@@ -151,6 +151,17 @@ export class AgentInterface extends LitElement {
 		}
 
 		this._unsubscribeSession = this.session.subscribe(async (ev: AgentEvent) => {
+			// Handle custom events not in AgentEvent union
+			if ((ev as any).type === "compaction_start") {
+				if (this._streamingContainer) this._streamingContainer.startCompacting();
+				this.requestUpdate();
+				return;
+			}
+			if ((ev as any).type === "compaction_end") {
+				if (this._streamingContainer) this._streamingContainer.endCompacting();
+				this.requestUpdate();
+				return;
+			}
 			switch (ev.type) {
 				case "message_start":
 				case "turn_end":
