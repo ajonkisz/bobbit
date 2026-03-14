@@ -153,11 +153,13 @@ export class AgentInterface extends LitElement {
 		this._unsubscribeSession = this.session.subscribe(async (ev: AgentEvent) => {
 			// Handle custom events not in AgentEvent union
 			if ((ev as any).type === "compaction_start") {
+				console.log("[AgentInterface] compaction_start received, _streamingContainer:", !!this._streamingContainer);
 				if (this._streamingContainer) this._streamingContainer.startCompacting();
 				this.requestUpdate();
 				return;
 			}
 			if ((ev as any).type === "compaction_end") {
+				console.log("[AgentInterface] compaction_end received, _streamingContainer:", !!this._streamingContainer);
 				if (this._streamingContainer) this._streamingContainer.endCompacting();
 				this.requestUpdate();
 				return;
@@ -256,6 +258,14 @@ export class AgentInterface extends LitElement {
 				};
 				session.state.messages = [...session.state.messages, userMsg];
 				this.requestUpdate();
+
+				// Drive the blob compaction animation from the client side.
+				// We start the squash animation immediately, then listen for
+				// the server's compaction_end event (or messages refresh) to
+				// pop back and show the result.
+				if (this._streamingContainer) {
+					this._streamingContainer.startCompacting();
+				}
 				(session as any).compact();
 			}
 			return;
@@ -523,7 +533,7 @@ export class AgentInterface extends LitElement {
 				</div>
 
 				<!-- Input Area -->
-				<div class="shrink-0 pt-1 pb-4">
+				<div class="shrink-0 pt-0 pb-4">
 					<div class="max-w-5xl mx-auto px-2">
 						<message-editor
 							.isStreaming=${state.isStreaming}

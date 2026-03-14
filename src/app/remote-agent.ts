@@ -530,6 +530,16 @@ export class RemoteAgent {
 				// Don't set isStreaming — compaction uses its own blob animation
 				break;
 
+			// The agent subprocess may send error responses with id:undefined
+			// (upstream bug). These arrive as events rather than RPC responses.
+			// Treat compact-related errors as compaction_end so the UI recovers.
+			case "response":
+				if (!event.success && event.error) {
+					// Synthesize a compaction_end event so the blob animation ends
+					this.emit({ type: "compaction_end", success: false, error: event.error });
+				}
+				break;
+
 			case "compaction_end": {
 				if (event.success) {
 					this._state.messages = [...this._state.messages, {

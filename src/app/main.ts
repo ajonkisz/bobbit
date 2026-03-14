@@ -872,7 +872,10 @@ function statusBobbit(status: string) {
 		1px 7px 0 #000,2px 7px 0 ${p.dark},3px 7px 0 ${p.main},4px 7px 0 ${p.main},5px 7px 0 ${p.main},6px 7px 0 ${p.main},7px 7px 0 ${p.main},8px 7px 0 #000,
 		2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000
 	`;
-	return html`<span style="display:inline-block;width:1px;height:1px;overflow:visible;image-rendering:pixelated;transform:scale(1.6);transform-origin:5px 4px;margin:4px 4px 6px 4px;box-shadow:${shadow};flex-shrink:0"></span>`;
+	// Sprite pixels span x 0–9, y 0–8 (10×9). At scale 1.6 → 16×14.4px.
+	// Outer span is sized to contain the scaled artwork so it participates
+	// in flex layout correctly. Inner 1×1 element is scaled from top-left.
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(1.6);transform-origin:0 0;box-shadow:${shadow}"></span></span>`;
 }
 
 /** Show a rename dialog for a session */

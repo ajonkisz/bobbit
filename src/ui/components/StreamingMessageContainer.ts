@@ -15,6 +15,8 @@ export class StreamingMessageContainer extends LitElement {
 	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' | 'compacting' | 'compact-pop' = 'hidden';
 	private _exitVariant: 'exit' | 'exit-roll' = 'exit';
 	private _entryVariant: 'enter' | 'enter-roll' = 'enter';
+	private _compactEntryTimer: ReturnType<typeof setTimeout> | null = null;
+	private _compactSafetyTimer: ReturnType<typeof setTimeout> | null = null;
 	private _pendingMessage: AgentMessage | null = null;
 	private _updateScheduled = false;
 	private _immediateUpdate = false;
@@ -30,7 +32,10 @@ export class StreamingMessageContainer extends LitElement {
 
 	override updated(changed: Map<string, unknown>) {
 		if (changed.has("isStreaming")) {
-			if (this.isStreaming && this._blobState === 'idle') {
+			// Don't let agent_start/agent_end events override the compaction animation
+			if (this._blobState === 'compacting' || this._blobState === 'compact-pop' || this._compactEntryTimer) {
+				// no-op — compaction owns the blob state until endCompacting() finishes
+			} else if (this.isStreaming && this._blobState === 'idle') {
 				// Coming from idle — play entry animation
 				this._entryVariant = Math.random() < 0.5 ? 'enter' : 'enter-roll';
 				this._blobState = 'entering';
@@ -73,16 +78,34 @@ export class StreamingMessageContainer extends LitElement {
 		if (this._blobState === 'idle') {
 			this._entryVariant = Math.random() < 0.5 ? 'enter' : 'enter-roll';
 			this._blobState = 'entering';
-			setTimeout(() => {
+			this._compactEntryTimer = setTimeout(() => {
+				this._compactEntryTimer = null;
 				this._blobState = 'compacting';
 			}, this._entryVariant === 'enter-roll' ? 900 : 700);
 		} else {
 			this._blobState = 'compacting';
 		}
+		// Safety timeout: if endCompacting() is never called (server error,
+		// timeout, etc.), pop back after 2 minutes so the blob doesn't stay
+		// squashed forever.
+		if (this._compactSafetyTimer) clearTimeout(this._compactSafetyTimer);
+		this._compactSafetyTimer = setTimeout(() => {
+			this._compactSafetyTimer = null;
+			if (this._blobState === 'compacting') this.endCompacting();
+		}, 120_000);
 	}
 
 	/** End the compaction animation — pop back to size then go idle */
 	public endCompacting() {
+		// Cancel any pending timers
+		if (this._compactEntryTimer) {
+			clearTimeout(this._compactEntryTimer);
+			this._compactEntryTimer = null;
+		}
+		if (this._compactSafetyTimer) {
+			clearTimeout(this._compactSafetyTimer);
+			this._compactSafetyTimer = null;
+		}
 		this._blobState = 'compact-pop';
 		setTimeout(() => {
 			this._exitVariant = Math.random() < 0.5 ? 'exit' : 'exit-roll';
