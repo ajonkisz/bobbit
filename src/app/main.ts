@@ -872,7 +872,7 @@ function statusBobbit(status: string) {
 		1px 7px 0 #000,2px 7px 0 ${p.dark},3px 7px 0 ${p.main},4px 7px 0 ${p.main},5px 7px 0 ${p.main},6px 7px 0 ${p.main},7px 7px 0 ${p.main},8px 7px 0 #000,
 		2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000
 	`;
-	return html`<span style="display:inline-block;width:1px;height:1px;overflow:visible;image-rendering:pixelated;transform:scale(1.6);transform-origin:5px 4px;margin:4px 8px 6px 4px;box-shadow:${shadow};flex-shrink:0"></span>`;
+	return html`<span style="display:inline-block;width:1px;height:1px;overflow:visible;image-rendering:pixelated;transform:scale(1.6);transform-origin:5px 4px;margin:4px 4px 6px 4px;box-shadow:${shadow};flex-shrink:0"></span>`;
 }
 
 /** Show a rename dialog for a session */
@@ -1029,44 +1029,48 @@ function renderSidebarSession(session: GatewaySession) {
 	const displayTitle = active && remoteAgent ? remoteAgent.title : session.title;
 	return html`
 		<div
-			class="group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm
+			class="group flex items-start gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors text-sm
 				${active ? "bg-secondary text-foreground sidebar-session-active" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
 			@click=${() => {
 				if (!active) connectToSession(session.id, true);
 			}}
 		>
-			${statusBobbit(session.status)}
+			<div class="shrink-0 flex items-center justify-center w-6 self-center">
+				${statusBobbit(session.status)}
+			</div>
 			<div class="flex-1 min-w-0">
-				<div class="truncate text-xs" title=${displayTitle}>
+				<div class="truncate text-xs font-medium" title=${displayTitle}>
 					${displayTitle}
 				</div>
-				<div class="text-[10px] opacity-60 font-mono break-all leading-tight" title=${session.cwd}>
-					${session.cwd}
+				<div class="text-[10px] opacity-60 font-mono truncate leading-tight" title=${session.cwd}>
+					${shortenPath(session.cwd)}
 				</div>
 				<div class="text-[10px] opacity-60 mt-0.5">
 					${formatSessionAge(session.lastActivity)}
 				</div>
 			</div>
-			<button
-				class="sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-opacity shrink-0"
-				@click=${(e: Event) => {
-					e.stopPropagation();
-					showRenameDialog(session.id, displayTitle);
-				}}
-				title="Rename session"
-			>
-				${icon(Pencil, "xs")}
-			</button>
-			<button
-				class="sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity shrink-0"
-				@click=${(e: Event) => {
-					e.stopPropagation();
-					terminateSession(session.id);
-				}}
-				title="Terminate session"
-			>
-				${icon(Trash2, "xs")}
-			</button>
+			<div class="sm:opacity-0 sm:group-hover:opacity-100 flex flex-col gap-0.5 shrink-0 transition-opacity">
+				<button
+					class="p-1 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
+					@click=${(e: Event) => {
+						e.stopPropagation();
+						showRenameDialog(session.id, displayTitle);
+					}}
+					title="Rename session"
+				>
+					${icon(Pencil, "xs")}
+				</button>
+				<button
+					class="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+					@click=${(e: Event) => {
+						e.stopPropagation();
+						terminateSession(session.id);
+					}}
+					title="Terminate session"
+				>
+					${icon(Trash2, "xs")}
+				</button>
+			</div>
 		</div>
 	`;
 }
