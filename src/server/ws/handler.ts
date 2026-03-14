@@ -88,6 +88,12 @@ export function handleWebSocketConnection(
 
 			send(ws, { type: "auth_ok" });
 
+			// Notify about compaction immediately (before any awaits) so the
+			// client sets _isCompacting before a racing get_messages response.
+			if (session.isCompacting) {
+				send(ws, { type: "event", data: { type: "compaction_start" } });
+			}
+
 			// Send current agent state
 			try {
 				const stateResponse = await session.rpcClient.getState();
@@ -109,11 +115,6 @@ export function handleWebSocketConnection(
 
 			send(ws, { type: "session_status", status: session.status });
 			send(ws, { type: "session_title", sessionId, title: session.title });
-
-			// If compaction is in progress, notify the joining client
-			if (session.isCompacting) {
-				send(ws, { type: "event", data: { type: "compaction_start" } });
-			}
 			return;
 		}
 

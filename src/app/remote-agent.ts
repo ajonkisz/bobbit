@@ -21,6 +21,9 @@ export class RemoteAgent {
 	// user message so thumbnails render in the message list.
 	private _pendingAttachments: any[] | null = null;
 
+	// Compaction tracking — persists across message refreshes
+	private _isCompacting = false;
+
 	// Auto-reconnect state
 	private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	private _reconnectAttempt = 0;
@@ -282,6 +285,16 @@ export class RemoteAgent {
 		this.send({ type: "compact" });
 	}
 
+	/** Add or re-add the "Compacting context…" placeholder to the message list. */
+	private _addCompactingPlaceholder(): void {
+		this._state.messages = [...this._state.messages.filter((m: any) => m.id !== "compacting_placeholder"), {
+			role: "assistant",
+			content: [{ type: "text", text: "Compacting context…" }],
+			timestamp: Date.now(),
+			id: "compacting_placeholder",
+		} as any];
+	}
+
 	requestMessages(): void {
 		this.send({ type: "get_messages" });
 	}
@@ -381,6 +394,10 @@ export class RemoteAgent {
 					// Emit message_end for each message so AgentInterface re-renders
 					for (const m of this._state.messages) {
 						this.emit({ type: "message_end", message: m });
+					}
+					// Re-add compacting placeholder if compaction is still in progress
+					if (this._isCompacting) {
+						this._addCompactingPlaceholder();
 					}
 				}
 				break;
@@ -532,13 +549,9 @@ export class RemoteAgent {
 
 			case "compaction_start":
 				// Don't set isStreaming — compaction uses its own blob animation
+				this._isCompacting = true;
 				// Add a placeholder message so compaction is visible in chat history
-				this._state.messages = [...this._state.messages.filter((m: any) => m.id !== "compacting_placeholder"), {
-					role: "assistant",
-					content: [{ type: "text", text: "Compacting context…" }],
-					timestamp: Date.now(),
-					id: "compacting_placeholder",
-				} as any];
+				this._addCompactingPlaceholder();
 				break;
 
 			// The agent subprocess may send error responses with id:undefined
@@ -552,6 +565,7 @@ export class RemoteAgent {
 				break;
 
 			case "compaction_end": {
+				this._isCompacting = false;
 				// Replace the placeholder with the final result message
 				const filtered = this._state.messages.filter((m: any) => m.id !== "compacting_placeholder");
 				if (event.success) {
