@@ -712,10 +712,21 @@ body {
 
 /* ===== Compaction animation — hydraulic press squash ===== */
 
-/* Build-up shake before compaction — vibrating anticipation */
+/* Build-up shake before compaction — vibrating anticipation.
+   Uniform body color (no highlights/shadows) to prevent diagonal sweep. */
 .bobbit-blob--compact-shake .bobbit-blob__sprite {
 	animation:
 		blob-compact-shake 0.8s ease-in-out forwards !important;
+	box-shadow:
+		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000,
+		2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #8ec63f, 7px 1px 0 #8ec63f, 8px 1px 0 #000,
+		1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #8ec63f, 8px 2px 0 #8ec63f, 9px 2px 0 #000,
+		0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000,
+		0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #1a3010, 4px 4px 0 #8ec63f, 5px 4px 0 #8ec63f, 6px 4px 0 #1a3010, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000,
+		0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #1a3010, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #1a3010, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000,
+		0px 6px 0 #000, 1px 6px 0 #8ec63f, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000,
+		1px 7px 0 #000, 2px 7px 0 #8ec63f, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000,
+		2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000 !important;
 }
 
 .bobbit-blob--compact-shake .bobbit-blob__shadow {
@@ -749,10 +760,22 @@ body {
 	100% { transform: scale(3.5) translateX(0) scaleX(0.9) scaleY(1.15) translateY(-1px); }
 }
 
-/* Compacting state — progressive squash, looping */
+/* Compacting state — progressive squash, looping.
+   Uniform body color (no highlights/shadows) eliminates diagonal sweep
+   artifact caused by the highlight band during non-uniform scaling. */
 .bobbit-blob--compacting .bobbit-blob__sprite {
 	animation:
 		blob-compact-squash 3s ease-in-out infinite !important;
+	box-shadow:
+		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000,
+		2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #8ec63f, 7px 1px 0 #8ec63f, 8px 1px 0 #000,
+		1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #8ec63f, 8px 2px 0 #8ec63f, 9px 2px 0 #000,
+		0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000,
+		0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #1a3010, 4px 4px 0 #8ec63f, 5px 4px 0 #8ec63f, 6px 4px 0 #1a3010, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000,
+		0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #1a3010, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #1a3010, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000,
+		0px 6px 0 #000, 1px 6px 0 #8ec63f, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000,
+		1px 7px 0 #000, 2px 7px 0 #8ec63f, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000,
+		2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000 !important;
 }
 
 /* Shadow widens as blob squashes */
@@ -838,10 +861,20 @@ body {
 	}
 }
 
-/* Pop back after compaction finishes */
+/* Pop back after compaction finishes — uniform color during expand too */
 .bobbit-blob--compact-pop .bobbit-blob__sprite {
 	animation:
 		blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	box-shadow:
+		3px 0px 0 #000, 4px 0px 0 #000, 5px 0px 0 #000, 6px 0px 0 #000, 7px 0px 0 #000,
+		2px 1px 0 #000, 3px 1px 0 #8ec63f, 4px 1px 0 #8ec63f, 5px 1px 0 #8ec63f, 6px 1px 0 #8ec63f, 7px 1px 0 #8ec63f, 8px 1px 0 #000,
+		1px 2px 0 #000, 2px 2px 0 #8ec63f, 3px 2px 0 #8ec63f, 4px 2px 0 #8ec63f, 5px 2px 0 #8ec63f, 6px 2px 0 #8ec63f, 7px 2px 0 #8ec63f, 8px 2px 0 #8ec63f, 9px 2px 0 #000,
+		0px 3px 0 #000, 1px 3px 0 #8ec63f, 2px 3px 0 #8ec63f, 3px 3px 0 #8ec63f, 4px 3px 0 #8ec63f, 5px 3px 0 #8ec63f, 6px 3px 0 #8ec63f, 7px 3px 0 #8ec63f, 8px 3px 0 #8ec63f, 9px 3px 0 #000,
+		0px 4px 0 #000, 1px 4px 0 #8ec63f, 2px 4px 0 #8ec63f, 3px 4px 0 #1a3010, 4px 4px 0 #8ec63f, 5px 4px 0 #8ec63f, 6px 4px 0 #1a3010, 7px 4px 0 #8ec63f, 8px 4px 0 #8ec63f, 9px 4px 0 #000,
+		0px 5px 0 #000, 1px 5px 0 #8ec63f, 2px 5px 0 #8ec63f, 3px 5px 0 #1a3010, 4px 5px 0 #8ec63f, 5px 5px 0 #8ec63f, 6px 5px 0 #1a3010, 7px 5px 0 #8ec63f, 8px 5px 0 #8ec63f, 9px 5px 0 #000,
+		0px 6px 0 #000, 1px 6px 0 #8ec63f, 2px 6px 0 #8ec63f, 3px 6px 0 #8ec63f, 4px 6px 0 #8ec63f, 5px 6px 0 #8ec63f, 6px 6px 0 #8ec63f, 7px 6px 0 #8ec63f, 8px 6px 0 #8ec63f, 9px 6px 0 #000,
+		1px 7px 0 #000, 2px 7px 0 #8ec63f, 3px 7px 0 #8ec63f, 4px 7px 0 #8ec63f, 5px 7px 0 #8ec63f, 6px 7px 0 #8ec63f, 7px 7px 0 #8ec63f, 8px 7px 0 #000,
+		2px 8px 0 #000, 3px 8px 0 #000, 4px 8px 0 #000, 5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000 !important;
 }
 
 .bobbit-blob--compact-pop .bobbit-blob__shadow {
