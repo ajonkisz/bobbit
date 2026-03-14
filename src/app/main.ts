@@ -1108,20 +1108,8 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 
 function renderSidebar() {
 	return html`
-		<div class="w-[240px] shrink-0 h-full border-r border-border flex flex-col bg-background">
-			<!-- Header -->
-			<div class="px-3 py-2 flex items-center justify-between border-b border-border shrink-0">
-				<span class="text-sm font-semibold text-foreground">Sessions</span>
-				<button
-					class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-					@click=${createAndConnectSession}
-					title="New session"
-				>
-					${icon(Plus, "sm")}
-				</button>
-			</div>
-
-			<!-- Session list -->
+		<div class="w-[240px] shrink-0 h-full flex flex-col" style="background: var(--sidebar);">
+			<!-- Session list — starts immediately, no separate header -->
 			<div class="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5">
 				${sessionsLoading
 					? html`<div class="text-center py-6 text-muted-foreground text-xs">Loading…</div>`
@@ -1292,12 +1280,13 @@ const renderApp = () => {
 			`;
 		}
 
-		// Not connected to a session — show title on mobile only (desktop has sidebar)
+		// Not connected to a session
 		if (!desktop) {
 			return html`<div class="flex items-center gap-2 px-4 py-1">
 				<span class="text-base font-semibold text-foreground">Bobbit</span>
 			</div>`;
 		}
+		// Desktop: no session active — title is already in the unified bar
 		return html`<div></div>`;
 	};
 
@@ -1385,16 +1374,32 @@ const renderApp = () => {
 	};
 
 	if (desktop) {
-		// Desktop layout: sidebar | header+main — tear down mobile scroll tracking
+		// Desktop layout: unified top bar spanning full width, then sidebar | main below
 		teardownMobileScrollTracking();
 		render(html`
-			<div class="w-full h-screen flex bg-background text-foreground overflow-hidden">
-				${renderSidebar()}
-				<div class="flex-1 flex flex-col min-w-0">
-					<div class="flex items-center justify-between border-b border-border shrink-0">
+			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
+				<!-- Unified top bar -->
+				<div class="flex items-center border-b border-border shrink-0">
+					<!-- Left zone: app title + new session (above sidebar width) -->
+					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5" style="background: var(--sidebar);">
+						<span class="text-base font-semibold text-foreground">Bobbit</span>
+						<button
+							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+							@click=${createAndConnectSession}
+							title="New session"
+						>
+							${icon(Plus, "sm")}
+						</button>
+					</div>
+					<!-- Center zone: session controls -->
+					<div class="flex-1 flex items-center justify-between min-w-0">
 						${headerLeft()}
 						${headerRight()}
 					</div>
+				</div>
+				<!-- Content area: sidebar + main -->
+				<div class="flex-1 flex min-h-0">
+					${renderSidebar()}
 					<div id="app-main" class="flex-1 min-h-0 flex flex-col">${mainArea()}</div>
 				</div>
 			</div>
