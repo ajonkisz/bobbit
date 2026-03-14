@@ -724,10 +724,19 @@ body {
 		blob-compact-shadow 3s ease-in-out infinite !important;
 }
 
-/* No blink overlay during compaction */
+/* Squished eye expression during compaction — eyes half-closed from the top,
+   giving a cute "being pressed" squint. Overlays the top eye pixel (row 4)
+   with body color so only the bottom pixel (row 5) remains visible. */
 .bobbit-blob--compacting .bobbit-blob__sprite::before {
+	content: "";
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	box-shadow:
+		3px 4px 0 #8ec63f,  /* cover left eye top pixel */
+		6px 4px 0 #8ec63f;  /* cover right eye top pixel */
+	opacity: 1 !important;
 	animation: none !important;
-	opacity: 0 !important;
 }
 
 @keyframes blob-compact-squash {
@@ -741,30 +750,30 @@ body {
 	}
 	/* First press — moderate squash */
 	20% {
-		transform: scale(3.5) scaleX(1.2) scaleY(0.7) translateY(2px);
+		transform: scale(3.5) scaleX(1.15) scaleY(0.75) translateY(2px);
 	}
 	/* Partial recovery — but not full */
 	30% {
-		transform: scale(3.5) scaleX(1.05) scaleY(0.85) translateY(1px);
+		transform: scale(3.5) scaleX(1.05) scaleY(0.88) translateY(1px);
 	}
-	/* Second press — flatter */
+	/* Second press — squashier */
 	42% {
-		transform: scale(3.5) scaleX(1.35) scaleY(0.5) translateY(3px);
+		transform: scale(3.5) scaleX(1.25) scaleY(0.6) translateY(2px);
 	}
 	/* Tiny recovery */
 	52% {
-		transform: scale(3.5) scaleX(1.15) scaleY(0.65) translateY(2px);
+		transform: scale(3.5) scaleX(1.12) scaleY(0.72) translateY(1px);
 	}
-	/* Third press — pancake! */
+	/* Third press — good squash but still recognizable */
 	65% {
-		transform: scale(3.5) scaleX(1.5) scaleY(0.3) translateY(5px);
+		transform: scale(3.5) scaleX(1.35) scaleY(0.5) translateY(3px);
 	}
 	/* Hold at maximum squash with a wobble */
 	75% {
-		transform: scale(3.5) scaleX(1.55) scaleY(0.28) translateY(5px);
+		transform: scale(3.5) scaleX(1.38) scaleY(0.48) translateY(3px);
 	}
 	82% {
-		transform: scale(3.5) scaleX(1.45) scaleY(0.32) translateY(5px);
+		transform: scale(3.5) scaleX(1.32) scaleY(0.52) translateY(3px);
 	}
 	/* Slowly ease back up for loop */
 	92% {
@@ -788,13 +797,12 @@ body {
 		6px 9px 0 rgba(0,0,0,0.22), 7px 9px 0 rgba(0,0,0,0.18), 8px 9px 0 rgba(0,0,0,0.12),
 		9px 9px 0 rgba(0,0,0,0.08), 10px 9px 0 rgba(0,0,0,0.04);
 	}
-	/* Maximum width at full squash */
+	/* Wider shadow at squash (proportional to less extreme squash) */
 	65%, 82% { box-shadow:
-		-1px 9px 0 rgba(0,0,0,0.03), 0px 9px 0 rgba(0,0,0,0.06), 1px 9px 0 rgba(0,0,0,0.10),
-		2px 9px 0 rgba(0,0,0,0.14), 3px 9px 0 rgba(0,0,0,0.18), 4px 9px 0 rgba(0,0,0,0.22),
-		5px 9px 0 rgba(0,0,0,0.25), 6px 9px 0 rgba(0,0,0,0.22), 7px 9px 0 rgba(0,0,0,0.18),
-		8px 9px 0 rgba(0,0,0,0.14), 9px 9px 0 rgba(0,0,0,0.10), 10px 9px 0 rgba(0,0,0,0.06),
-		11px 9px 0 rgba(0,0,0,0.03);
+		0px 9px 0 rgba(0,0,0,0.05), 1px 9px 0 rgba(0,0,0,0.10), 2px 9px 0 rgba(0,0,0,0.15),
+		3px 9px 0 rgba(0,0,0,0.20), 4px 9px 0 rgba(0,0,0,0.23), 5px 9px 0 rgba(0,0,0,0.25),
+		6px 9px 0 rgba(0,0,0,0.23), 7px 9px 0 rgba(0,0,0,0.20), 8px 9px 0 rgba(0,0,0,0.15),
+		9px 9px 0 rgba(0,0,0,0.10), 10px 9px 0 rgba(0,0,0,0.05);
 	}
 	100% { box-shadow:
 		2px 9px 0 rgba(0,0,0,0.08), 3px 9px 0 rgba(0,0,0,0.15), 4px 9px 0 rgba(0,0,0,0.22),
@@ -821,7 +829,7 @@ body {
 @keyframes blob-compact-pop {
 	/* Start from squashed */
 	0% {
-		transform: scale(3.5) scaleX(1.5) scaleY(0.3) translateY(5px);
+		transform: scale(3.5) scaleX(1.35) scaleY(0.5) translateY(3px);
 	}
 	/* Overshoot — spring tall */
 	40% {
