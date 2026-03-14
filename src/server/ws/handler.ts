@@ -129,6 +129,7 @@ export function handleWebSocketConnection(
 			switch (msg.type) {
 				case "prompt":
 					console.log(`[ws-handler] Prompt received: text="${msg.text?.substring(0, 50)}...", images=${msg.images?.length ?? 0}`);
+					sessionManager.tryGenerateTitleFromPrompt(sessionId, msg.text);
 					await session.rpcClient.prompt(msg.text, msg.images);
 					break;
 				case "steer":
@@ -153,13 +154,15 @@ export function handleWebSocketConnection(
 					(async () => {
 						try {
 							console.log(`[ws-handler] Starting manual compact for session ${sessionId}`);
-							await session.rpcClient.compact(120_000);
+							const compactResult = await session.rpcClient.compact(120_000);
 							console.log(`[ws-handler] Compact RPC resolved for session ${sessionId}`);
 							session.isCompacting = false;
 							// Send compaction_end BEFORE refreshing messages/state so
 							// the client clears _isCompacting first and won't re-add
 							// the placeholder when processing the refreshed messages.
-							broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: true } });
+							// Include tokensBefore so the UI can show how much was saved.
+							const tokensBefore = compactResult?.data?.tokensBefore ?? null;
+							broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: true, tokensBefore } });
 							// Refresh messages and state (updated context tokens)
 							await sessionManager.refreshAfterCompaction(session);
 						} catch (err: any) {

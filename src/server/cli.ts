@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadOrCreateToken, readToken } from "./auth/token.js";
+import { ensureTlsCert } from "./auth/tls.js";
 import { createGateway } from "./server.js";
 
 interface CliArgs {
@@ -14,6 +15,7 @@ interface CliArgs {
 	newToken: boolean;
 	showToken: boolean;
 	noUi: boolean;
+	tls: boolean;
 	staticDir?: string;
 	agentCliPath?: string;
 }
@@ -41,6 +43,7 @@ function parseArgs(argv: string[]): CliArgs {
 		newToken: false,
 		showToken: false,
 		noUi: false,
+		tls: true,  // on by default
 	};
 
 	for (let i = 0; i < argv.length; i++) {
@@ -68,6 +71,12 @@ function parseArgs(argv: string[]): CliArgs {
 				break;
 			case "--no-ui":
 				result.noUi = true;
+				break;
+			case "--tls":
+				result.tls = true;
+				break;
+			case "--no-tls":
+				result.tls = false;
 				break;
 		}
 	}
@@ -124,6 +133,9 @@ async function main() {
 		console.log(`  System prompt: ${systemPromptPath}`);
 	}
 
+	// TLS setup — auto-generate self-signed cert if needed
+	const tls = args.tls ? ensureTlsCert(args.host) : undefined;
+
 	const gateway = createGateway({
 		host: args.host,
 		port: args.port,
@@ -132,6 +144,7 @@ async function main() {
 		staticDir: args.staticDir,
 		agentCliPath: args.agentCliPath,
 		systemPromptPath,
+		tls,
 	});
 
 	await gateway.start();
@@ -148,7 +161,8 @@ async function main() {
 		}
 	}
 
-	const baseUrl = `http://${args.host}:${args.port}`;
+	const proto = args.tls ? "https" : "http";
+	const baseUrl = `${proto}://${args.host}:${args.port}`;
 	const fullUrl = `${baseUrl}/?token=${encodeURIComponent(authToken)}`;
 
 	console.log(`\nPi Gateway v0.1.0`);

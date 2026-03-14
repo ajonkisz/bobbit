@@ -3,6 +3,11 @@ import "./javascript-repl.js"; // Auto-registers the renderer
 import "./extract-document.js"; // Auto-registers the renderer
 import { getToolRenderer, registerToolRenderer } from "./renderer-registry.js";
 import { BashRenderer } from "./renderers/BashRenderer.js";
+import { BrowserClickRenderer } from "./renderers/BrowserClickRenderer.js";
+import { BrowserEvalRenderer } from "./renderers/BrowserEvalRenderer.js";
+import { BrowserNavigateRenderer } from "./renderers/BrowserNavigateRenderer.js";
+import { BrowserTypeRenderer } from "./renderers/BrowserTypeRenderer.js";
+import { BrowserWaitRenderer } from "./renderers/BrowserWaitRenderer.js";
 import { DefaultRenderer } from "./renderers/DefaultRenderer.js";
 import { EditRenderer } from "./renderers/EditRenderer.js";
 import { FindRenderer } from "./renderers/FindRenderer.js";
@@ -10,6 +15,8 @@ import { GrepRenderer } from "./renderers/GrepRenderer.js";
 import { LsRenderer } from "./renderers/LsRenderer.js";
 import { ReadRenderer } from "./renderers/ReadRenderer.js";
 import { ScreenshotRenderer } from "./renderers/ScreenshotRenderer.js";
+import { WebFetchRenderer } from "./renderers/WebFetchRenderer.js";
+import { WebSearchRenderer } from "./renderers/WebSearchRenderer.js";
 import { WriteRenderer } from "./renderers/WriteRenderer.js";
 import type { ToolRenderResult } from "./types.js";
 
@@ -22,6 +29,13 @@ registerToolRenderer("ls", new LsRenderer());
 registerToolRenderer("find", new FindRenderer());
 registerToolRenderer("grep", new GrepRenderer());
 registerToolRenderer("browser_screenshot", new ScreenshotRenderer());
+registerToolRenderer("browser_navigate", new BrowserNavigateRenderer());
+registerToolRenderer("browser_click", new BrowserClickRenderer());
+registerToolRenderer("browser_type", new BrowserTypeRenderer());
+registerToolRenderer("browser_eval", new BrowserEvalRenderer());
+registerToolRenderer("browser_wait", new BrowserWaitRenderer());
+registerToolRenderer("web_search", new WebSearchRenderer());
+registerToolRenderer("web_fetch", new WebFetchRenderer());
 
 const defaultRenderer = new DefaultRenderer();
 

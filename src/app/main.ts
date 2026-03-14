@@ -72,6 +72,8 @@ interface GatewaySession {
 let gatewaySessions: GatewaySession[] = [];
 let sessionsLoading = false;
 let sessionsError = "";
+let creatingSession = false;
+let connectingSessionId: string | null = null;
 let sessionPollTimer: ReturnType<typeof setInterval> | null = null;
 
 const SIDEBAR_BREAKPOINT = 768;
@@ -517,98 +519,225 @@ async function refreshSessions(): Promise<void> {
 	}
 }
 
+/** Show a transient error toast for connection/creation failures */
+function showConnectionError(title: string, message: string): void {
+	const container = document.createElement("div");
+	document.body.appendChild(container);
+
+	const cleanup = () => {
+		render(html``, container);
+		container.remove();
+	};
+
+	render(
+		Dialog({
+			isOpen: true,
+			onClose: cleanup,
+			width: "min(400px, 92vw)",
+			height: "auto",
+			backdropClassName: "bg-black/50 backdrop-blur-sm",
+			children: html`
+				${DialogContent({
+					children: html`
+						${DialogHeader({ title })}
+						<p class="text-sm text-destructive mt-2">${message}</p>
+					`,
+				})}
+				${DialogFooter({
+					className: "px-6 pb-4",
+					children: html`
+						<div class="flex gap-2 justify-end">
+							${Button({ variant: "default", onClick: cleanup, children: "OK" })}
+						</div>
+					`,
+				})}
+			`,
+		}),
+		container,
+	);
+}
+
 /** Phase 2: Connect to a specific session (existing or newly created) */
 async function connectToSession(sessionId: string, isExisting: boolean): Promise<void> {
-	const url = localStorage.getItem(GW_URL_KEY)!;
-	const token = localStorage.getItem(GW_TOKEN_KEY)!;
+	// Guard against concurrent connection attempts — if we're already
+	// connecting to ANY session, bail out. This prevents parallel WebSocket
+	// races when the user taps quickly on mobile.
+	if (connectingSessionId) return;
 
-	const remote = new RemoteAgent();
-	await remote.connect(url, token, sessionId);
-
-	// Restore saved model for this session (if any)
-	const savedModel = loadSessionModel(sessionId);
-	if (savedModel) {
-		const { getModel } = await import("@mariozechner/pi-ai");
-		try {
-			const model = getModel(savedModel.provider as any, savedModel.modelId);
-			remote.setModel(model);
-		} catch {
-			// Model no longer available — ignore, use server default
-		}
-	}
-
-	// Intercept setModel to persist the choice per session and re-render header
-	const originalSetModel = remote.setModel.bind(remote);
-	remote.setModel = (model: any) => {
-		originalSetModel(model);
-		if (model?.provider && model?.id) {
-			saveSessionModel(sessionId, model.provider, model.id);
-		}
-		renderApp();
-	};
-
-	// Re-render when the session title is updated (e.g. AI-generated summary)
-	remote.onTitleChange = (newTitle: string) => {
-		// Optimistically update local sidebar data so title isn't lost if user
-		// navigates away before the next refreshSessions() REST call completes.
-		updateLocalSessionTitle(sessionId, newTitle);
-		renderApp();
-		// Also refresh the sidebar from server for full consistency
-		refreshSessions();
-	};
-
-	// Update sidebar status dot in real-time when agent starts/stops streaming
-	remote.onStatusChange = (status: string) => {
-		updateLocalSessionStatus(sessionId, status);
-		renderApp();
-	};
-
-	// Track WebSocket connection status for reconnect banner
-	remote.onConnectionStatusChange = (status: ConnectionStatus) => {
-		connectionStatus = status;
-		renderApp();
-	};
-	connectionStatus = "connected";
-
-	remoteAgent = remote;
-	appView = "authenticated";
-	localStorage.setItem(GW_SESSION_KEY, sessionId);
-	setHashRoute("session", sessionId);
-
-	const modelProvider = remote.state.model?.provider || "anthropic";
-	await storage.providerKeys.set(modelProvider, "gateway-managed");
-
-	// Create a fresh ChatPanel each time so old messages don't linger
-	chatPanel = new ChatPanel();
-	await chatPanel.setAgent(remote as any, {
-		onApiKeyRequired: async () => true,
-	});
-
-	// Model and thinking selectors are in the header bar, not the message editor
-	if (chatPanel.agentInterface) {
-		chatPanel.agentInterface.enableModelSelector = false;
-		chatPanel.agentInterface.enableThinkingSelector = false;
-	}
-
-	if (isExisting) {
-		remote.requestMessages();
-	}
-
+	connectingSessionId = sessionId;
 	renderApp();
-	// Refresh sidebar session list so active session appears highlighted
-	refreshSessions();
+
+	try {
+		const url = localStorage.getItem(GW_URL_KEY)!;
+		const token = localStorage.getItem(GW_TOKEN_KEY)!;
+
+		const remote = new RemoteAgent();
+		await remote.connect(url, token, sessionId);
+
+		// Restore saved model for this session (if any)
+		const savedModel = loadSessionModel(sessionId);
+		if (savedModel) {
+			const { getModel } = await import("@mariozechner/pi-ai");
+			try {
+				const model = getModel(savedModel.provider as any, savedModel.modelId);
+				remote.setModel(model);
+			} catch {
+				// Model no longer available — ignore, use server default
+			}
+		}
+
+		// Intercept setModel to persist the choice per session and re-render header
+		const originalSetModel = remote.setModel.bind(remote);
+		remote.setModel = (model: any) => {
+			originalSetModel(model);
+			if (model?.provider && model?.id) {
+				saveSessionModel(sessionId, model.provider, model.id);
+			}
+			renderApp();
+		};
+
+		// Re-render when the session title is updated (e.g. AI-generated summary)
+		remote.onTitleChange = (newTitle: string) => {
+			// Optimistically update local sidebar data so title isn't lost if user
+			// navigates away before the next refreshSessions() REST call completes.
+			updateLocalSessionTitle(sessionId, newTitle);
+			renderApp();
+			// Also refresh the sidebar from server for full consistency
+			refreshSessions();
+		};
+
+		// Update sidebar status dot in real-time when agent starts/stops streaming
+		remote.onStatusChange = (status: string) => {
+			updateLocalSessionStatus(sessionId, status);
+			renderApp();
+		};
+
+		// Track WebSocket connection status for reconnect banner
+		remote.onConnectionStatusChange = (status: ConnectionStatus) => {
+			connectionStatus = status;
+			renderApp();
+		};
+		connectionStatus = "connected";
+
+		remoteAgent = remote;
+		appView = "authenticated";
+		localStorage.setItem(GW_SESSION_KEY, sessionId);
+		setHashRoute("session", sessionId);
+
+		const modelProvider = remote.state.model?.provider || "anthropic";
+		await storage.providerKeys.set(modelProvider, "gateway-managed");
+
+		// Create a fresh ChatPanel each time so old messages don't linger
+		chatPanel = new ChatPanel();
+		await chatPanel.setAgent(remote as any, {
+			onApiKeyRequired: async () => true,
+		});
+
+		// Model and thinking selectors are in the header bar, not the message editor
+		if (chatPanel.agentInterface) {
+			chatPanel.agentInterface.enableModelSelector = false;
+			chatPanel.agentInterface.enableThinkingSelector = false;
+		}
+
+		if (isExisting) {
+			remote.requestMessages();
+		}
+
+		// Focus the message input after rendering
+		requestAnimationFrame(() => {
+			const textarea = document.querySelector("message-editor")?.querySelector("textarea");
+			if (textarea) textarea.focus();
+		});
+
+		// Refresh sidebar session list so active session appears highlighted
+		refreshSessions();
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		showConnectionError("Connection Failed", `Could not connect to session: ${msg}`);
+	} finally {
+		connectingSessionId = null;
+		renderApp();
+	}
 }
 
 /** Create a brand-new session on the gateway, then connect to it */
 async function createAndConnectSession(): Promise<void> {
-	const res = await gatewayFetch("/api/sessions", { method: "POST" });
-	if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
-	const { id } = await res.json();
-	await connectToSession(id, false);
+	if (creatingSession) return;
+	creatingSession = true;
+	renderApp();
+	try {
+		const res = await gatewayFetch("/api/sessions", { method: "POST" });
+		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
+		const { id } = await res.json();
+		await connectToSession(id, false);
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		showConnectionError("Failed to create session", msg);
+	} finally {
+		creatingSession = false;
+		renderApp();
+	}
+}
+
+/** Show a confirmation dialog. Returns a promise that resolves true if confirmed. */
+function confirmAction(title: string, message: string, confirmLabel = "Confirm", destructive = false): Promise<boolean> {
+	return new Promise((resolve) => {
+		const container = document.createElement("div");
+		document.body.appendChild(container);
+
+		const cleanup = (result: boolean) => {
+			render(html``, container);
+			container.remove();
+			resolve(result);
+		};
+
+		render(
+			Dialog({
+				isOpen: true,
+				onClose: () => cleanup(false),
+				width: "min(400px, 92vw)",
+				height: "auto",
+				backdropClassName: "bg-black/50 backdrop-blur-sm",
+				children: html`
+					${DialogContent({
+						children: html`
+							${DialogHeader({ title })}
+							<p class="text-sm text-muted-foreground mt-2">${message}</p>
+						`,
+					})}
+					${DialogFooter({
+						className: "px-6 pb-4",
+						children: html`
+							<div class="flex gap-2 justify-end">
+								${Button({ variant: "ghost", onClick: () => cleanup(false), children: "Cancel" })}
+								${Button({
+									variant: destructive ? "destructive" as any : "default",
+									onClick: () => cleanup(true),
+									children: confirmLabel,
+									className: destructive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : "",
+								})}
+							</div>
+						`,
+					})}
+				`,
+			}),
+			container,
+		);
+	});
 }
 
 /** Terminate a session on the gateway */
 async function terminateSession(sessionId: string): Promise<void> {
+	const session = gatewaySessions.find((s) => s.id === sessionId);
+	const sessionTitle = session?.title || "this session";
+	const confirmed = await confirmAction(
+		"Terminate Session",
+		`Are you sure you want to terminate "${sessionTitle}"? This will end the agent process and cannot be undone.`,
+		"Terminate",
+		true,
+	);
+	if (!confirmed) return;
+
 	// If terminating the active session, disconnect first
 	if (activeSessionId() === sessionId) {
 		remoteAgent?.disconnect();
@@ -1039,18 +1168,21 @@ function showRenameDialog(sessionId: string, currentTitle: string): void {
 /** Compact session row for sidebar */
 function renderSidebarSession(session: GatewaySession) {
 	const active = activeSessionId() === session.id;
+	const connecting = connectingSessionId === session.id;
 	// Use live title from RemoteAgent if this is the active session
 	const displayTitle = active && remoteAgent ? remoteAgent.title : session.title;
 	return html`
 		<div
 			class="group flex items-start gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors text-sm
-				${active ? "bg-secondary text-foreground sidebar-session-active" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
+				${active ? "bg-secondary text-foreground sidebar-session-active" : connecting ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
 			@click=${() => {
-				if (!active) connectToSession(session.id, true);
+				if (!active && !connecting) connectToSession(session.id, true);
 			}}
 		>
 			<div class="shrink-0 flex items-center justify-center w-6 self-center">
-				${statusBobbit(session.status, session.isCompacting)}
+				${connecting
+					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+					: statusBobbit(session.status, session.isCompacting)}
 			</div>
 			<div class="flex-1 min-w-0">
 				<div class="truncate text-xs ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"}" title=${displayTitle}>
@@ -1091,15 +1223,18 @@ function renderSidebarSession(session: GatewaySession) {
 
 /** Full-size session card for mobile landing page */
 function renderSessionCard(session: GatewaySession, index = 0) {
+	const connecting = connectingSessionId === session.id;
 	return html`
 		<div
-			class="group session-card-enter flex items-center gap-4 p-4 rounded-lg border border-border hover:border-foreground/20 hover:bg-secondary/50 cursor-pointer transition-all"
+			class="group session-card-enter flex items-center gap-4 p-4 rounded-lg border ${connecting ? "border-primary/40 bg-secondary/30" : "border-border hover:border-foreground/20 hover:bg-secondary/50"} cursor-pointer transition-all"
 			style="animation-delay: ${index * 50}ms"
-			@click=${() => connectToSession(session.id, true)}
+			@click=${() => { if (!connecting) connectToSession(session.id, true); }}
 		>
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2 mb-1">
-					${statusBobbit(session.status, session.isCompacting)}
+					${connecting
+						? html`<svg class="animate-spin shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+						: statusBobbit(session.status, session.isCompacting)}
 					<span class="text-sm ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"} text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
@@ -1180,8 +1315,11 @@ function renderMobileLanding() {
 					${Button({
 						variant: "default",
 						size: "sm",
+						disabled: creatingSession,
 						onClick: createAndConnectSession,
-						children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Session</span>`,
+						children: creatingSession
+							? html`<span class="inline-flex items-center gap-1.5"><svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Creating…</span>`
+							: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Session</span>`,
 					})}
 				</div>
 
@@ -1198,8 +1336,11 @@ function renderMobileLanding() {
 									<p class="text-sm text-muted-foreground mb-4">No active sessions</p>
 									${Button({
 										variant: "default",
+										disabled: creatingSession,
 										onClick: createAndConnectSession,
-										children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} Start a Session</span>`,
+										children: creatingSession
+											? html`<span class="inline-flex items-center gap-1.5"><svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Creating…</span>`
+											: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} Start a Session</span>`,
 									})}
 								</div>`
 							: html`<div class="flex flex-col gap-2">
@@ -1398,8 +1539,11 @@ const renderApp = () => {
 					${Button({
 						variant: "default",
 						size: "sm",
+						disabled: creatingSession,
 						onClick: createAndConnectSession,
-						children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Session</span>`,
+						children: creatingSession
+							? html`<span class="inline-flex items-center gap-1.5"><svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Creating…</span>`
+							: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Session</span>`,
 					})}
 				</div>
 			`;
@@ -1418,11 +1562,14 @@ const renderApp = () => {
 					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5" style="background: var(--sidebar);">
 						<span class="text-base font-semibold text-foreground">Bobbit</span>
 						<button
-							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${creatingSession ? "opacity-50 pointer-events-none" : ""}"
 							@click=${createAndConnectSession}
 							title="New session"
+							?disabled=${creatingSession}
 						>
-							${icon(Plus, "sm")}
+							${creatingSession
+								? html`<svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+								: icon(Plus, "sm")}
 						</button>
 					</div>
 					<!-- Center zone: session controls -->

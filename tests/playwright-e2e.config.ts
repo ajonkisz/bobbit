@@ -12,7 +12,7 @@ const projectRoot = path.resolve(import.meta.dirname, "..");
  */
 export default defineConfig({
 	testDir: ".",
-	testMatch: ["session-rename.spec.ts", "image-attachment.spec.ts"],
+	testMatch: ["session-rename.spec.ts", "image-attachment.spec.ts", "compaction.spec.ts"],
 	timeout: 180_000,
 	expect: { timeout: 30_000 },
 	retries: 0,

@@ -21,6 +21,7 @@ export interface SessionInfo {
 	eventBuffer: EventBuffer;
 	unsubscribe: () => void;
 	isCompacting: boolean;
+	titleGenerated: boolean;
 }
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
@@ -61,9 +62,9 @@ export class SessionManager {
 		console.log(`[session-manager] Restoring ${persisted.length} session(s)...`);
 
 		for (const ps of persisted) {
-			// Skip if agent session file no longer exists
+			// Skip if agent session file no longer exists — truly unrecoverable
 			if (!fs.existsSync(ps.agentSessionFile)) {
-				console.log(`[session-manager] Skipping ${ps.id} — agent session file missing: ${ps.agentSessionFile}`);
+				console.log(`[session-manager] Removing ${ps.id} — agent session file missing: ${ps.agentSessionFile}`);
 				this.store.remove(ps.id);
 				continue;
 			}
@@ -72,8 +73,25 @@ export class SessionManager {
 				await this.restoreSession(ps);
 				console.log(`[session-manager] Restored: "${ps.title}" (${ps.id})`);
 			} catch (err) {
-				console.error(`[session-manager] Failed to restore ${ps.id}:`, err);
-				this.store.remove(ps.id);
+				// Keep session in the store — the .jsonl file is still on disk.
+				// It will be retried on the next server restart.
+				console.error(`[session-manager] Failed to restore "${ps.title}" (${ps.id}), will retry next restart:`, err);
+
+				// Add a dormant entry so the UI can still list it
+				this.sessions.set(ps.id, {
+					id: ps.id,
+					title: ps.title,
+					cwd: ps.cwd,
+					status: "terminated",
+					createdAt: ps.createdAt,
+					lastActivity: ps.lastActivity,
+					clients: new Set(),
+					rpcClient: new RpcBridge({ cwd: ps.cwd }), // placeholder, not started
+					eventBuffer: new EventBuffer(),
+					unsubscribe: () => {},
+					isCompacting: false,
+					titleGenerated: true,
+				});
 			}
 		}
 	}
@@ -98,9 +116,8 @@ export class SessionManager {
 			eventBuffer,
 			unsubscribe: () => {},
 			isCompacting: false,
+			titleGenerated: ps.title !== "New session",
 		};
-
-		let titleGenerated = ps.title !== "New session";
 
 		const unsub = rpcClient.onEvent((event: any) => {
 			session.lastActivity = Date.now();
@@ -112,11 +129,6 @@ export class SessionManager {
 			} else if (event.type === "agent_end") {
 				session.status = "idle";
 				broadcast(session.clients, { type: "session_status", status: "idle" });
-
-				if (!titleGenerated) {
-					titleGenerated = true;
-					this.autoGenerateTitle(session);
-				}
 			}
 
 			eventBuffer.push(event);
@@ -171,9 +183,8 @@ export class SessionManager {
 			eventBuffer,
 			unsubscribe: () => {},
 			isCompacting: false,
+			titleGenerated: false,
 		};
-
-		let titleGenerated = false;
 
 		// Subscribe to agent events — broadcast to all connected clients
 		const unsub = rpcClient.onEvent((event: any) => {
@@ -186,12 +197,6 @@ export class SessionManager {
 			} else if (event.type === "agent_end") {
 				session.status = "idle";
 				broadcast(session.clients, { type: "session_status", status: "idle" });
-
-				// Auto-generate title after the first agent turn completes
-				if (!titleGenerated) {
-					titleGenerated = true;
-					this.autoGenerateTitle(session);
-				}
 			} else if (event.type === "auto_compaction_start") {
 				session.isCompacting = true;
 			} else if (event.type === "auto_compaction_end") {
@@ -290,6 +295,31 @@ export class SessionManager {
 		return true;
 	}
 
+	/**
+	 * Generate a title for a session on the first user prompt.
+	 * Called immediately when the user sends a message, not after the agent replies.
+	 */
+	tryGenerateTitleFromPrompt(sessionId: string, userText: string): void {
+		const session = this.sessions.get(sessionId);
+		if (!session || session.titleGenerated) return;
+		session.titleGenerated = true;
+
+		// Fire-and-forget
+		this.autoGenerateTitleFromText(session, userText).catch((err) => {
+			console.error(`[session ${session.id}] Title generation failed:`, err);
+		});
+	}
+
+	private async autoGenerateTitleFromText(session: SessionInfo, userText: string): Promise<void> {
+		const messages = [{ role: "user", content: userText }];
+		const title = await generateSessionTitle(messages);
+		if (title) {
+			session.title = title;
+			this.store.update(session.id, { title });
+			broadcast(session.clients, { type: "session_title", sessionId: session.id, title });
+		}
+	}
+
 	async autoGenerateTitle(session: SessionInfo): Promise<void> {
 		try {
 			const msgsResp = await session.rpcClient.getMessages();
@@ -330,6 +360,26 @@ export class SessionManager {
 	addClient(sessionId: string, ws: WebSocket): boolean {
 		const session = this.sessions.get(sessionId);
 		if (!session) return false;
+
+		// If session is dormant (failed restore), try to revive it
+		if (session.status === "terminated") {
+			const ps = this.store.get(sessionId);
+			if (ps && fs.existsSync(ps.agentSessionFile)) {
+				console.log(`[session-manager] Client connected to dormant session "${session.title}" — attempting restore`);
+				this.restoreSession(ps)
+					.then(() => {
+						console.log(`[session-manager] Revived dormant session: "${session.title}" (${sessionId})`);
+						// restoreSession replaces the map entry — add client to the new one
+						const revived = this.sessions.get(sessionId);
+						if (revived) revived.clients.add(ws);
+					})
+					.catch((err) => {
+						console.error(`[session-manager] Failed to revive session ${sessionId}:`, err);
+					});
+				return true; // optimistically accept the client
+			}
+		}
+
 		session.clients.add(ws);
 		return true;
 	}

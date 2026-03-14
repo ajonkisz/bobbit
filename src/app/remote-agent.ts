@@ -21,8 +21,24 @@ export class RemoteAgent {
 	// user message so thumbnails render in the message list.
 	private _pendingAttachments: any[] | null = null;
 
-	// Compaction tracking — persists across message refreshes
+	// Compaction tracking — persists across message refreshes.
+	// Exposed on state so the UI can queue messages during compact.
 	private _isCompacting = false;
+
+	// After compaction, usage from the last assistant message is stale (reflects
+	// pre-compaction context size).  Set to true on compaction_end, cleared when
+	// a new assistant message with usage arrives.  The UI checks this to avoid
+	// showing a misleading context percentage.
+	private _usageStaleAfterCompaction = false;
+
+	// Synthetic messages added around compaction (/compact user msg + result).
+	// Kept separately so they survive the server's post-compaction messages refresh.
+	private _compactionSyntheticMessages: any[] = [];
+
+	// Task timing — track when the agent started working so we can
+	// notify the user if a long task finishes while the tab is hidden.
+	private _taskStartTime: number | null = null;
+	private static readonly LONG_TASK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 	// Auto-reconnect state
 	private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -51,6 +67,7 @@ export class RemoteAgent {
 			tools: [],
 			messages: [] as any[],
 			isStreaming: false,
+			isCompacting: false,
 			streamMessage: null as any,
 			pendingToolCalls: new Set<string>(),
 			error: undefined as string | undefined,
@@ -87,6 +104,8 @@ export class RemoteAgent {
 
 	// ── Connection ────────────────────────────────────────────────────
 
+	private static readonly CONNECT_TIMEOUT_MS = 15_000;
+
 	async connect(gatewayUrl: string, token: string, sessionId: string): Promise<void> {
 		this._gatewayUrl = gatewayUrl;
 		this._authToken = token;
@@ -94,7 +113,124 @@ export class RemoteAgent {
 		this._intentionalDisconnect = false;
 		this._reconnectAttempt = 0;
 
-		await this._connectWs(true);
+		// Best-effort permission request (may be ignored without a user gesture).
+		RemoteAgent._requestNotificationPermission();
+
+		// Race the WebSocket connect against a timeout so we don't hang
+		// forever on degraded mobile networks.
+		const timeout = new Promise<never>((_, reject) => {
+			setTimeout(() => reject(new Error("Connection timed out")), RemoteAgent.CONNECT_TIMEOUT_MS);
+		});
+
+		try {
+			await Promise.race([this._connectWs(true), timeout]);
+		} catch (err) {
+			// If timed out, clean up the pending WebSocket
+			this._intentionalDisconnect = true;
+			this.ws?.close();
+			this.ws = null;
+			throw err;
+		}
+	}
+
+	private static _notificationPermissionRequested = false;
+
+	/** Request browser notification permission (once per page load, requires user gesture). */
+	private static _requestNotificationPermission(): void {
+		if (RemoteAgent._notificationPermissionRequested) return;
+		if (typeof Notification === "undefined" || Notification.permission !== "default") return;
+		Notification.requestPermission().then(() => {
+			if (Notification.permission !== "default") {
+				RemoteAgent._notificationPermissionRequested = true;
+			}
+		}).catch(() => {});
+	}
+
+	// Title-flash state for long-task notifications
+	private _titleFlashTimer: ReturnType<typeof setInterval> | null = null;
+	private _originalTitle: string | null = null;
+
+	/**
+	 * Notify the user that a long-running task finished while the tab is
+	 * hidden. Uses two mechanisms that work over plain HTTP:
+	 *   1. Flashing the document title (stops when the tab regains focus)
+	 *   2. A short notification beep via the Web Audio API
+	 * Falls back to the Notification API when available (secure contexts).
+	 */
+	private _notifyTaskComplete(elapsedMs: number): void {
+		// Only notify when the tab is hidden — the user can already see
+		// the idle state if they're looking at the page.
+		if (document.visibilityState === "visible") return;
+
+		const mins = Math.round(elapsedMs / 60_000);
+
+		// ── Notification API (works on HTTPS / localhost) ────────────
+		if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+			const title = this._title || "Bobbit";
+			const body = `Task completed after ${mins} minute${mins === 1 ? "" : "s"}. Awaiting your input.`;
+			const n = new Notification(title, { body, tag: `bobbit-done-${this._sessionId}` });
+			n.onclick = () => { window.focus(); n.close(); };
+		}
+
+		// ── Title flash (works everywhere) ───────────────────────────
+		this._startTitleFlash(`✅ Done (${mins}m) — ${this._title || "Bobbit"}`);
+
+		// ── Audio beep via Web Audio API ─────────────────────────────
+		RemoteAgent._playNotificationBeep();
+	}
+
+	private _startTitleFlash(alertText: string): void {
+		// Don't stack multiple flashes
+		if (this._titleFlashTimer) return;
+		this._originalTitle = document.title;
+		let showAlert = true;
+		this._titleFlashTimer = setInterval(() => {
+			document.title = showAlert ? alertText : (this._originalTitle || "Bobbit");
+			showAlert = !showAlert;
+		}, 1000);
+
+		// Stop flashing when the user returns to the tab
+		const stop = () => {
+			if (this._titleFlashTimer) {
+				clearInterval(this._titleFlashTimer);
+				this._titleFlashTimer = null;
+			}
+			if (this._originalTitle !== null) {
+				document.title = this._originalTitle;
+				this._originalTitle = null;
+			}
+			document.removeEventListener("visibilitychange", onVisible);
+		};
+		const onVisible = () => {
+			if (document.visibilityState === "visible") stop();
+		};
+		document.addEventListener("visibilitychange", onVisible);
+	}
+
+	/** Play a short two-tone beep using the Web Audio API (no file needed). */
+	private static _playNotificationBeep(): void {
+		try {
+			const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+			const now = ctx.currentTime;
+
+			// Two short tones: 880 Hz then 1046 Hz
+			for (const [freq, start] of [[880, 0], [1046, 0.15]] as const) {
+				const osc = ctx.createOscillator();
+				const gain = ctx.createGain();
+				osc.type = "sine";
+				osc.frequency.value = freq;
+				gain.gain.setValueAtTime(0.15, now + start);
+				gain.gain.exponentialRampToValueAtTime(0.001, now + start + 0.12);
+				osc.connect(gain).connect(ctx.destination);
+				osc.start(now + start);
+				osc.stop(now + start + 0.12);
+			}
+
+			// Close the context after the beep finishes
+			setTimeout(() => ctx.close().catch(() => {}), 500);
+		} catch {
+			// Web Audio not available — silently skip
+		}
 	}
 
 	/**
@@ -254,8 +390,16 @@ export class RemoteAgent {
 			}
 		}
 
+		// Request notification permission on first prompt (has user gesture).
+		RemoteAgent._requestNotificationPermission();
+
 		// Stash attachments so we can enrich the echoed user message
 		this._pendingAttachments = attachments || null;
+
+		// Clear compaction synthetic messages — they were only needed to survive
+		// the post-compaction refresh; a new prompt starts a fresh turn.
+		this._compactionSyntheticMessages = [];
+		this._usageStaleAfterCompaction = false;
 
 		// Don't add the user message locally — the server will echo it back
 		// as message_start/message_end events, keeping a single source of truth.
@@ -392,6 +536,11 @@ export class RemoteAgent {
 				const msgs = Array.isArray(msg.data) ? msg.data : msg.data?.messages;
 				if (Array.isArray(msgs)) {
 					this._state.messages = msgs.map(enrichUserMessage);
+					// Re-append synthetic compaction messages (/compact + result)
+					// so they survive the server's post-compaction refresh.
+					if (this._compactionSyntheticMessages.length > 0) {
+						this._state.messages = [...this._state.messages, ...this._compactionSyntheticMessages];
+					}
 					// Emit message_end for each message so AgentInterface re-renders
 					for (const m of this._state.messages) {
 						this.emit({ type: "message_end", message: m });
@@ -460,14 +609,25 @@ export class RemoteAgent {
 			case "agent_start":
 				this._state.isStreaming = true;
 				this._state.error = undefined;
+				this._taskStartTime = Date.now();
 				break;
 
-			case "agent_end":
+			case "agent_end": {
 				this.flushDeferredMessage();
 				this._state.isStreaming = false;
 				this._state.streamMessage = null;
 				this._state.pendingToolCalls = new Set();
+
+				// Notify the user if the task ran longer than 5 minutes
+				if (this._taskStartTime) {
+					const elapsed = Date.now() - this._taskStartTime;
+					if (elapsed >= RemoteAgent.LONG_TASK_THRESHOLD_MS) {
+						this._notifyTaskComplete(elapsed);
+					}
+					this._taskStartTime = null;
+				}
 				break;
+			}
 
 			case "message_start":
 				// Don't add messages here — wait for message_end which
@@ -574,25 +734,35 @@ export class RemoteAgent {
 			case "compaction_end":
 			case "auto_compaction_end": {
 				this._isCompacting = false;
+				this._usageStaleAfterCompaction = true;
 				// Replace the placeholder with the final result message
 				const filtered = this._state.messages.filter((m: any) => m.id !== "compacting_placeholder");
 				const success = event.type === "compaction_end" ? event.success : !event.aborted;
-				if (success) {
-					this._state.messages = [...filtered, {
-						role: "assistant",
-						content: [{ type: "text", text: "Context compacted." }],
+				const tokensBefore = (event as any).tokensBefore;
+				let resultText = "Context compacted.";
+				if (tokensBefore) {
+					const fmt = tokensBefore < 1000 ? `${tokensBefore}` : tokensBefore < 1_000_000 ? `${(tokensBefore / 1000).toFixed(1)}k` : `${(tokensBefore / 1_000_000).toFixed(1)}M`;
+					resultText = `Context compacted from ${fmt} tokens.`;
+				}
+				const resultMsg = success
+					? {
+						role: "assistant" as const,
+						content: [{ type: "text", text: resultText }],
 						timestamp: Date.now(),
 						id: `compact_done_${Date.now()}`,
-					} as any];
-				} else {
-					const errorMsg = event.error || (event.aborted ? "Compaction aborted" : "Unknown error");
-					this._state.messages = [...filtered, {
-						role: "assistant",
-						content: [{ type: "text", text: `Compaction failed: ${errorMsg}` }],
+					}
+					: {
+						role: "assistant" as const,
+						content: [{ type: "text", text: `Compaction failed: ${(event as any).error || ((event as any).aborted ? "Compaction aborted" : "Unknown error")}` }],
 						timestamp: Date.now(),
 						id: `compact_err_${Date.now()}`,
-					} as any];
-				}
+					};
+				this._state.messages = [...filtered, resultMsg as any];
+				// Store the result message so it survives the server's messages refresh
+				this._compactionSyntheticMessages = [
+					...this._compactionSyntheticMessages.filter((m: any) => m.role === "user"),
+					resultMsg,
+				];
 				// Normalize to compaction_end for UI subscribers
 				if (event.type === "auto_compaction_end") {
 					this.emit({ type: "compaction_end", success } as any);

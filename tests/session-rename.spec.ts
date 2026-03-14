@@ -65,7 +65,7 @@ async function waitForAgentIdle(page: Page, timeout = 120_000) {
 		},
 		{ timeout },
 	);
-	// Small extra pause for title generation (fires async after agent_end)
+	// Small extra pause for UI to settle
 	await page.waitForTimeout(1_000);
 }
 
@@ -109,7 +109,7 @@ test.describe("Session rename", () => {
 		token = readGatewayToken();
 	});
 
-	test("auto-renames session after first message about weather", async ({ page }) => {
+	test("auto-renames session immediately after first user message (before agent reply)", async ({ page }) => {
 		await openApp(page, token);
 		await createNewSession(page);
 
@@ -119,13 +119,19 @@ test.describe("Session rename", () => {
 
 		// Send a weather-related message
 		await sendMessage(page, "What is the weather like in London today?");
-		await waitForAgentIdle(page);
 
-		// The server auto-generates a title after the first agent turn.
-		// Wait for it to propagate to the sidebar.
+		// Title generation fires on the user prompt, NOT on agent_end.
+		// It should update before the agent finishes responding.
 		const newTitle = await waitForTitleChange(page, "New session", 30_000);
-
 		console.log(`Auto-generated title: "${newTitle}"`);
+
+		// Verify the agent is still streaming (title arrived before reply finished)
+		const textarea = page.locator("message-editor textarea");
+		const isDisabled = await textarea.isDisabled();
+		console.log(`Agent still streaming when title arrived: ${isDisabled}`);
+		// Note: Haiku title generation is fast, so the agent may or may not still
+		// be streaming. We log it but don't assert — the important thing is that
+		// the title changed without needing to wait for agent_end.
 
 		// The title should relate to weather / London
 		const lower = newTitle.toLowerCase();
@@ -136,6 +142,9 @@ test.describe("Session rename", () => {
 			lower.includes("climate") ||
 			lower.includes("temperature");
 		expect(weatherRelated).toBe(true);
+
+		// Wait for agent to finish so the session is clean for teardown
+		await waitForAgentIdle(page);
 	});
 
 	test("manual rename via magic wand regenerates title from full history", async ({ page }) => {
@@ -218,12 +227,11 @@ test.describe("Session rename", () => {
 		await openApp(page, token);
 		await createNewSession(page);
 
-		// 1) Send a message so the auto-title generation fires on agent_end
+		// 1) Send a message — auto-title fires immediately on the user prompt
 		await sendMessage(page, "Tell me about TypeScript generics");
 		await waitForAgentIdle(page);
 
-		// 2) IMMEDIATELY rename — don't wait for auto-title to complete.
-		//    The auto-title Haiku API call is in-flight right now.
+		// 2) Rename manually — the auto-title may have already completed.
 		const activeRow = page.locator(".bg-secondary").first();
 		await activeRow.hover();
 		await activeRow.locator('button[title="Rename session"]').click();

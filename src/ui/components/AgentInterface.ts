@@ -191,6 +191,15 @@ export class AgentInterface extends LitElement {
 		// Restore any queued messages from a previous page load
 		this._restoreQueuedMessages();
 
+		// If the session is already compacting (e.g. page refresh mid-compaction),
+		// start the animation once the DOM is ready — we missed the compaction_start event.
+		if ((this.session as any)._isCompacting) {
+			this.updateComplete.then(() => {
+				if (this._streamingContainer) this._streamingContainer.startCompacting();
+				this.requestUpdate();
+			});
+		}
+
 		this._unsubscribeSession = this.session.subscribe(async (ev: AgentEvent) => {
 			// Handle custom events not in AgentEvent union
 			if ((ev as any).type === "compaction_start") {
@@ -300,8 +309,13 @@ export class AgentInterface extends LitElement {
 					role: "user" as const,
 					content: "/compact",
 					timestamp: Date.now(),
+					id: `compact_cmd_${Date.now()}`,
 				};
 				session.state.messages = [...session.state.messages, userMsg];
+				// Store as synthetic so it survives the server's messages refresh
+				if ((session as any)._compactionSyntheticMessages) {
+					(session as any)._compactionSyntheticMessages = [userMsg];
+				}
 				this.requestUpdate();
 
 				// Drive the blob compaction animation from the client side.
@@ -521,30 +535,46 @@ export class AgentInterface extends LitElement {
 		// Compute context usage from the last assistant message's usage
 		let contextHtml = html``;
 		const model = state.model;
+		// After compaction, the last assistant message's usage reflects the old
+		// (pre-compaction) context size.  Show "?" until the next real LLM
+		// response provides fresh usage data (matches the TUI behaviour).
+		const usageStale = (this.session as any)?._usageStaleAfterCompaction === true;
 		if (model?.contextWindow) {
-			// Find last assistant message with usage (skip aborted/error)
-			let lastUsage: Usage | undefined;
-			for (let i = state.messages.length - 1; i >= 0; i--) {
-				const msg = state.messages[i] as any;
-				if (msg.role === "assistant" && msg.usage && msg.stopReason !== "aborted" && msg.stopReason !== "error") {
-					lastUsage = msg.usage;
-					break;
-				}
-			}
-
-			if (lastUsage) {
-				const contextTokens = lastUsage.totalTokens || (lastUsage.input + lastUsage.output + lastUsage.cacheRead + lastUsage.cacheWrite);
-				const contextWindow = model.contextWindow;
-				const pct = Math.min(100, Math.round((contextTokens / contextWindow) * 100));
-				const barColor = pct >= 90 ? "var(--destructive, #ef4444)" : pct >= 75 ? "var(--warning, #f59e0b)" : "var(--primary, #3b82f6)";
+			if (usageStale) {
+				// Show an empty bar with "?" — exact token count unknown until next response
 				contextHtml = html`
-					<span class="flex items-center gap-1.5" title="Context: ${formatTokenCount(contextTokens)} / ${formatTokenCount(contextWindow)} tokens (${pct}%)">
+					<span class="flex items-center gap-1.5" title="Context usage unknown until next response">
 						<span style="display:inline-flex;align-items:center;width:48px;height:6px;background:var(--muted,#27272a);border-radius:3px;overflow:hidden">
-							<span style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s"></span>
+							<span style="width:0%;height:100%;background:var(--primary,#3b82f6);border-radius:3px;transition:width 0.3s"></span>
 						</span>
-						<span>${pct}%</span>
+						<span>—</span>
 					</span>
 				`;
+			} else {
+				// Find last assistant message with usage (skip aborted/error)
+				let lastUsage: Usage | undefined;
+				for (let i = state.messages.length - 1; i >= 0; i--) {
+					const msg = state.messages[i] as any;
+					if (msg.role === "assistant" && msg.usage && msg.stopReason !== "aborted" && msg.stopReason !== "error") {
+						lastUsage = msg.usage;
+						break;
+					}
+				}
+
+				if (lastUsage) {
+					const contextTokens = lastUsage.totalTokens || (lastUsage.input + lastUsage.output + lastUsage.cacheRead + lastUsage.cacheWrite);
+					const contextWindow = model.contextWindow;
+					const pct = Math.min(100, Math.round((contextTokens / contextWindow) * 100));
+					const barColor = pct >= 90 ? "var(--destructive, #ef4444)" : pct >= 75 ? "var(--warning, #f59e0b)" : "var(--primary, #3b82f6)";
+					contextHtml = html`
+						<span class="flex items-center gap-1.5" title="Context: ${formatTokenCount(contextTokens)} / ${formatTokenCount(contextWindow)} tokens (${pct}%)">
+							<span style="display:inline-flex;align-items:center;width:48px;height:6px;background:var(--muted,#27272a);border-radius:3px;overflow:hidden">
+								<span style="width:${pct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s"></span>
+							</span>
+							<span>${pct}%</span>
+						</span>
+					`;
+				}
 			}
 		}
 

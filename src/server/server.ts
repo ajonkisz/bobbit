@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import http from "node:http";
+import https from "node:https";
 import path from "node:path";
 import { WebSocketServer } from "ws";
 import { SessionManager } from "./agent/session-manager.js";
@@ -7,6 +8,11 @@ import { RateLimiter } from "./auth/rate-limit.js";
 import { validateToken } from "./auth/token.js";
 import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
+
+export interface TlsConfig {
+	cert: string;  // path to PEM certificate
+	key: string;   // path to PEM private key
+}
 
 export interface GatewayConfig {
 	host: string;
@@ -16,6 +22,7 @@ export interface GatewayConfig {
 	staticDir?: string;
 	agentCliPath?: string;
 	systemPromptPath?: string;
+	tls?: TlsConfig;
 }
 
 export function createGateway(config: GatewayConfig) {
@@ -26,7 +33,7 @@ export function createGateway(config: GatewayConfig) {
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
 
-	const server = http.createServer(async (req, res) => {
+	const requestHandler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
 		const url = new URL(req.url || "/", `http://${req.headers.host}`);
 
 		// API routes
@@ -73,7 +80,17 @@ export function createGateway(config: GatewayConfig) {
 
 		res.writeHead(404);
 		res.end("Not found");
-	});
+	};
+
+	const server: http.Server | https.Server = config.tls
+		? https.createServer(
+			{
+				cert: fs.readFileSync(config.tls.cert),
+				key: fs.readFileSync(config.tls.key),
+			},
+			requestHandler,
+		)
+		: http.createServer(requestHandler);
 
 	// WebSocket server (noServer mode — we handle upgrade manually)
 	const wss = new WebSocketServer({ noServer: true });
