@@ -146,29 +146,30 @@ export function handleWebSocketConnection(
 					await session.rpcClient.setModel(msg.provider, msg.modelId);
 					break;
 				case "compact":
+					// Fire-and-forget: don't block the WS message loop.
+					// The async IIFE handles the full lifecycle.
 					session.isCompacting = true;
 					broadcast(session.clients, { type: "event", data: { type: "compaction_start" } });
-					try {
-						console.log(`[ws-handler] Starting manual compact for session ${sessionId}`);
-						await session.rpcClient.compact(120_000);
-						console.log(`[ws-handler] Compact RPC resolved for session ${sessionId}`);
-						session.isCompacting = false;
-						// Refresh messages after compaction
-						const msgs = await session.rpcClient.getMessages();
-						if (msgs.success) {
-							broadcast(session.clients, { type: "messages", data: msgs.data });
+					(async () => {
+						try {
+							console.log(`[ws-handler] Starting manual compact for session ${sessionId}`);
+							await session.rpcClient.compact(120_000);
+							console.log(`[ws-handler] Compact RPC resolved for session ${sessionId}`);
+							session.isCompacting = false;
+							// Send compaction_end BEFORE refreshing messages/state so
+							// the client clears _isCompacting first and won't re-add
+							// the placeholder when processing the refreshed messages.
+							broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: true } });
+							// Refresh messages and state (updated context tokens)
+							await sessionManager.refreshAfterCompaction(session);
+						} catch (err: any) {
+							console.error(`[ws-handler] Compact failed for session ${sessionId}:`, err.message);
+							session.isCompacting = false;
+							broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: false, error: err.message } });
 						}
-						// Refresh state (updated context tokens)
-						const st = await session.rpcClient.getState();
-						if (st.success) {
-							broadcast(session.clients, { type: "state", data: st.data });
-						}
-						broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: true } });
-					} catch (err: any) {
-						console.error(`[ws-handler] Compact failed for session ${sessionId}:`, err.message);
-						session.isCompacting = false;
-						broadcast(session.clients, { type: "event", data: { type: "compaction_end", success: false, error: err.message } });
-					}
+					})().catch((err) => {
+						console.error(`[ws-handler] Unexpected compact error for session ${sessionId}:`, err);
+					});
 					break;
 				case "get_state": {
 					const stateResp = await session.rpcClient.getState();

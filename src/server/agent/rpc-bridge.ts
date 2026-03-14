@@ -175,11 +175,14 @@ export class RpcBridge {
 			// Debug: log events to file
 			try {
 				const debugPath = path.join(homedir(), ".pi", "rpc-debug.log");
-				appendFileSync(debugPath, `EVENT: type=${parsed.type}, id=${parsed.id}, msg_role=${parsed.message?.role}\n`);
+				appendFileSync(debugPath, `EVENT: type=${parsed.type}, id=${parsed.id}, msg_role=${parsed.message?.role}, success=${parsed.success}\n`);
 				if (parsed.type === "message_end" && parsed.message?.role === "user") {
 					const content = parsed.message.content;
 					const types = Array.isArray(content) ? content.map((c: any) => c.type) : [typeof content];
 					appendFileSync(debugPath, `  User msg content types: ${JSON.stringify(types)}\n`);
+				}
+				if (parsed.type?.includes("compaction") || parsed.type?.includes("compact")) {
+					appendFileSync(debugPath, `  Compact detail: ${JSON.stringify(parsed).substring(0, 500)}\n`);
 				}
 			} catch(e) {
 				process.stderr.write(`Debug log error: ${e}\n`);

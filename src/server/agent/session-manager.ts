@@ -223,7 +223,7 @@ export class SessionManager {
 
 	/** Query the agent for its session file and save metadata to disk */
 	/** After compaction, refresh messages and state for all connected clients. */
-	private async refreshAfterCompaction(session: SessionInfo): Promise<void> {
+	async refreshAfterCompaction(session: SessionInfo): Promise<void> {
 		try {
 			const msgs = await session.rpcClient.getMessages();
 			if (msgs.success) {
