@@ -381,10 +381,11 @@ export class RemoteAgent {
 				if (msg.data?.isStreaming !== undefined) {
 					this._state.isStreaming = msg.data.isStreaming;
 				}
-				// Adopt server model if we don't have one yet (e.g. no localStorage entry)
-				if (msg.data?.model && !this._state.model) {
+				// Always update model from server state (keeps context window accurate after compaction)
+				if (msg.data?.model) {
 					this._state.model = msg.data.model;
 				}
+				this.emit({ type: "state_update", data: msg.data });
 				break;
 
 			case "messages": {

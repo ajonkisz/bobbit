@@ -162,6 +162,11 @@ export class AgentInterface extends LitElement {
 				this.requestUpdate();
 				return;
 			}
+			if ((ev as any).type === "state_update") {
+				// Server state refresh (e.g. after compaction) — re-render stats
+				this.requestUpdate();
+				return;
+			}
 			switch (ev.type) {
 				case "message_start":
 				case "turn_end":
