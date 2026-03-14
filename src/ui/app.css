@@ -712,6 +712,43 @@ body {
 
 /* ===== Compaction animation — hydraulic press squash ===== */
 
+/* Build-up shake before compaction — vibrating anticipation */
+.bobbit-blob--compact-shake .bobbit-blob__sprite {
+	animation:
+		blob-compact-shake 0.8s ease-in-out forwards !important;
+}
+
+.bobbit-blob--compact-shake .bobbit-blob__shadow {
+	animation: none !important;
+}
+
+/* No blink/overlays during shake */
+.bobbit-blob--compact-shake .bobbit-blob__sprite::before {
+	display: none !important;
+}
+
+@keyframes blob-compact-shake {
+	/* Start normal, then increasingly frantic vibration */
+	0%   { transform: scale(3.5) translateX(0); }
+	8%   { transform: scale(3.5) translateX(-0.3px); }
+	16%  { transform: scale(3.5) translateX(0.3px); }
+	22%  { transform: scale(3.5) translateX(-0.5px) scaleY(1.03); }
+	28%  { transform: scale(3.5) translateX(0.5px) scaleY(0.97); }
+	34%  { transform: scale(3.5) translateX(-0.7px) scaleY(1.05); }
+	40%  { transform: scale(3.5) translateX(0.7px) scaleY(0.95); }
+	46%  { transform: scale(3.5) translateX(-0.8px) scaleY(1.06); }
+	52%  { transform: scale(3.5) translateX(0.9px) scaleY(0.94); }
+	58%  { transform: scale(3.5) translateX(-1px) scaleY(1.08); }
+	64%  { transform: scale(3.5) translateX(1px) scaleY(0.92); }
+	70%  { transform: scale(3.5) translateX(-1.1px) scaleY(1.1); }
+	76%  { transform: scale(3.5) translateX(1.1px) scaleY(0.9); }
+	82%  { transform: scale(3.5) translateX(-1.2px) scaleY(1.12); }
+	88%  { transform: scale(3.5) translateX(1.2px) scaleY(0.88); }
+	/* Final crouch — anticipation before the squash hits */
+	95%  { transform: scale(3.5) translateX(0) scaleX(0.9) scaleY(1.15) translateY(-1px); }
+	100% { transform: scale(3.5) translateX(0) scaleX(0.9) scaleY(1.15) translateY(-1px); }
+}
+
 /* Compacting state — progressive squash, looping */
 .bobbit-blob--compacting .bobbit-blob__sprite {
 	animation:
@@ -724,29 +761,19 @@ body {
 		blob-compact-shadow 3s ease-in-out infinite !important;
 }
 
-/* Squished eye expression during compaction — eyes half-closed from the top,
-   giving a cute "being pressed" squint. Overlays the top eye pixel (row 4)
-   with body color so only the bottom pixel (row 5) remains visible. */
+/* No overlays during compaction */
 .bobbit-blob--compacting .bobbit-blob__sprite::before {
-	content: "";
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	box-shadow:
-		3px 4px 0 #8ec63f,  /* cover left eye top pixel */
-		6px 4px 0 #8ec63f;  /* cover right eye top pixel */
-	opacity: 1 !important;
-	animation: none !important;
+	display: none !important;
 }
 
 @keyframes blob-compact-squash {
-	/* Normal */
+	/* Start from crouched position (where shake ends) */
 	0% {
-		transform: scale(3.5) scaleX(1) scaleY(1) translateY(0);
+		transform: scale(3.5) scaleX(0.9) scaleY(1.15) translateY(-1px);
 	}
-	/* Slight anticipation — stretch up */
+	/* SLAM down — first big squash */
 	8% {
-		transform: scale(3.5) scaleX(0.92) scaleY(1.12) translateY(-1px);
+		transform: scale(3.5) scaleX(1.2) scaleY(0.7) translateY(2px);
 	}
 	/* First press — moderate squash */
 	20% {

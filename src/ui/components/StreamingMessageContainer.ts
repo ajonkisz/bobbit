@@ -12,7 +12,7 @@ export class StreamingMessageContainer extends LitElement {
 	@property({ attribute: false }) onCostClick?: () => void;
 
 	@state() private _message: AgentMessage | null = null;
-	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' | 'compacting' | 'compact-pop' = 'hidden';
+	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' | 'compact-shake' | 'compacting' | 'compact-pop' = 'hidden';
 	private _exitVariant: 'exit' | 'exit-roll' = 'exit';
 	private _entryVariant: 'enter' | 'enter-roll' = 'enter';
 	private _compactEntryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -34,7 +34,7 @@ export class StreamingMessageContainer extends LitElement {
 	override updated(changed: Map<string, unknown>) {
 		if (changed.has("isStreaming")) {
 			// Don't let agent_start/agent_end events override the compaction animation
-			if (this._blobState === 'compacting' || this._blobState === 'compact-pop' || this._compactEntryTimer) {
+			if (this._blobState === 'compact-shake' || this._blobState === 'compacting' || this._blobState === 'compact-pop' || this._compactEntryTimer) {
 				// no-op — compaction owns the blob state until endCompacting() finishes
 			} else if (this.isStreaming && this._blobState === 'idle') {
 				// Coming from idle — play entry animation
@@ -68,24 +68,34 @@ export class StreamingMessageContainer extends LitElement {
 		if (this._blobState === 'entering') return `bobbit-blob bobbit-blob--${this._entryVariant}`;
 		if (this._blobState === 'exiting') return `bobbit-blob bobbit-blob--${this._exitVariant}`;
 		if (this._blobState === 'idle') return 'bobbit-blob bobbit-blob--idle';
+		if (this._blobState === 'compact-shake') return 'bobbit-blob bobbit-blob--compact-shake';
 		if (this._blobState === 'compacting') return 'bobbit-blob bobbit-blob--compacting';
 		if (this._blobState === 'compact-pop') return 'bobbit-blob bobbit-blob--compact-pop';
 		return 'bobbit-blob';
 	}
 
+	private _compactShakeTimer: ReturnType<typeof setTimeout> | null = null;
+
 	/** Start the compaction squash animation */
 	public startCompacting() {
 		this._compactStartedAt = Date.now();
-		// If idle, enter first then compact; otherwise go straight to compacting
+		// If idle, enter first then shake then compact; if active, shake then compact
+		const startShake = () => {
+			this._blobState = 'compact-shake';
+			this._compactShakeTimer = setTimeout(() => {
+				this._compactShakeTimer = null;
+				this._blobState = 'compacting';
+			}, 800); // matches blob-compact-shake duration
+		};
 		if (this._blobState === 'idle') {
 			this._entryVariant = Math.random() < 0.5 ? 'enter' : 'enter-roll';
 			this._blobState = 'entering';
 			this._compactEntryTimer = setTimeout(() => {
 				this._compactEntryTimer = null;
-				this._blobState = 'compacting';
+				startShake();
 			}, this._entryVariant === 'enter-roll' ? 900 : 700);
 		} else {
-			this._blobState = 'compacting';
+			startShake();
 		}
 		// Safety timeout: if endCompacting() is never called (server error,
 		// timeout, etc.), pop back after 2 minutes so the blob doesn't stay
@@ -94,12 +104,12 @@ export class StreamingMessageContainer extends LitElement {
 		this._compactSafetyTimer = setTimeout(() => {
 			this._compactSafetyTimer = null;
 			if (this._blobState === 'compacting') this.endCompacting();
-		}, 120_000);
+		}, 600_000);
 	}
 
 	/** Minimum time (ms) the compaction animation should play before ending.
 	 *  Covers entry animation + visible squash time. */
-	private static COMPACT_MIN_DURATION = 2000;
+	private static COMPACT_MIN_DURATION = 3500;
 
 	/** End the compaction animation — pop back to size then go idle */
 	public endCompacting() {
@@ -119,6 +129,10 @@ export class StreamingMessageContainer extends LitElement {
 		if (this._compactEntryTimer) {
 			clearTimeout(this._compactEntryTimer);
 			this._compactEntryTimer = null;
+		}
+		if (this._compactShakeTimer) {
+			clearTimeout(this._compactShakeTimer);
+			this._compactShakeTimer = null;
 		}
 		if (this._compactSafetyTimer) {
 			clearTimeout(this._compactSafetyTimer);
