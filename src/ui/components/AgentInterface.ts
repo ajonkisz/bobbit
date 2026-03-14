@@ -10,7 +10,7 @@ import { getAppStorage } from "../storage/app-storage.js";
 import "./StreamingMessageContainer.js";
 import type { Agent, AgentEvent } from "@mariozechner/pi-agent-core";
 import type { Attachment } from "../utils/attachment-utils.js";
-import { formatTokenCount, formatUsage } from "../utils/format.js";
+import { formatCost, formatTokenCount } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
 import { createStreamFn } from "../utils/proxy-utils.js";
 import type { UserMessageWithAttachments } from "./Messages.js";
@@ -470,8 +470,7 @@ export class AgentInterface extends LitElement {
 				} satisfies Usage,
 			);
 
-		const hasTotals = totals.input || totals.output || totals.cacheRead || totals.cacheWrite;
-		const totalsText = hasTotals ? formatUsage(totals) : "";
+		const costText = totals.cost?.total ? formatCost(totals.cost.total) : "";
 
 		// Compute context usage from the last assistant message's usage
 		let contextHtml = html``;
@@ -511,10 +510,10 @@ export class AgentInterface extends LitElement {
 				<div class="flex ml-auto items-center gap-3">
 					${contextHtml}
 					${
-						totalsText
+						costText
 							? this.onCostClick
-								? html`<span class="cursor-pointer hover:text-foreground transition-colors" @click=${this.onCostClick}>${totalsText}</span>`
-								: html`<span>${totalsText}</span>`
+								? html`<span class="cursor-pointer hover:text-foreground transition-colors" @click=${this.onCostClick}>${costText}</span>`
+								: html`<span>${costText}</span>`
 							: ""
 					}
 				</div>
