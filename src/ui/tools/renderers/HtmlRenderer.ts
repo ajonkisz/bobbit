@@ -73,7 +73,7 @@ export class HtmlRenderer implements ToolRenderer<HtmlWriteParams, any> {
 					<div class="mt-3 rounded-lg border border-border overflow-hidden">
 						<iframe
 							${ref(iframeRef)}
-							sandbox="allow-same-origin"
+							sandbox="allow-scripts allow-same-origin"
 							.srcdoc=${htmlContent}
 							@load=${resizeIframe}
 							style="width: 100%; height: 300px; border: none; background: white;"

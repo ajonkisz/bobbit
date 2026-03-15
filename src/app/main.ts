@@ -15,7 +15,7 @@ import {
 	setAppStorage,
 } from "../ui/index.js";
 import { Select, type SelectOption } from "@mariozechner/mini-lit/dist/Select.js";
-import { html, render } from "lit";
+import { html, render, svg } from "lit";
 import { ArrowLeft, Brain, Crosshair, PanelLeftClose, PanelLeftOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users, WandSparkles } from "lucide";
 import QRCode from "qrcode";
 import "@mariozechner/mini-lit/dist/MarkdownBlock.js";
@@ -71,6 +71,7 @@ interface GatewaySession {
 	isCompacting?: boolean;
 	goalId?: string;
 	goalAssistant?: boolean;
+	colorIndex?: number;
 }
 
 type GoalState = "todo" | "in-progress" | "complete" | "shelved";
@@ -554,6 +555,14 @@ async function refreshSessions(): Promise<void> {
 		const sessionsData = await sessionsRes.json();
 		gatewaySessions = sessionsData.sessions || [];
 
+		// Hydrate color map from server data, then assign colors to any new sessions
+		for (const s of gatewaySessions) {
+			if (s.colorIndex !== undefined && !sessionColorMap.has(s.id)) {
+				sessionColorMap.set(s.id, s.colorIndex);
+			}
+			sessionHueRotation(s.id); // assigns if not yet mapped
+		}
+
 		if (goalsRes.ok) {
 			const goalsData = await goalsRes.json();
 			goals = goalsData.goals || [];
@@ -767,6 +776,9 @@ async function connectToSession(sessionId: string, isExisting: boolean, options?
 		remoteAgent = remote;
 		appView = "authenticated";
 		localStorage.setItem(GW_SESSION_KEY, sessionId);
+
+		// Set session color for the streaming bobbit blob
+		document.documentElement.style.setProperty("--bobbit-hue-rotate", `${sessionHueRotation(sessionId)}deg`);
 		setHashRoute("session", sessionId);
 
 		const modelProvider = remote.state.model?.provider || "anthropic";
@@ -1425,23 +1437,97 @@ function formatSessionAge(timestamp: number): string {
 }
 
 /**
+ * Aurora Borealis palette — 20 curated hue-rotate offsets from canonical green (90°).
+ * Flows from greens → teals → blues → purples → pinks and back.
+ */
+const BOBBIT_HUE_ROTATIONS = [
+	0, 25, 50, 75, 100, 125, 150, 175, 200, 225,
+	-135, -110, -85, -60, -35, -10, 15, 40, 65, 250,
+];
+
+/** Map of session ID → assigned palette index, loaded from server */
+const sessionColorMap = new Map<string, number>();
+
+/** Track which palette indices are in use so new sessions get the next unused one */
+function nextAvailableColorIndex(): number {
+	const used = new Set(sessionColorMap.values());
+	for (let i = 0; i < BOBBIT_HUE_ROTATIONS.length; i++) {
+		if (!used.has(i)) return i;
+	}
+	return sessionColorMap.size % BOBBIT_HUE_ROTATIONS.length;
+}
+
+/** Persist a session property update to the server via PATCH */
+function patchSession(sessionId: string, updates: Record<string, unknown>): void {
+	gatewayFetch(`/api/sessions/${sessionId}`, {
+		method: "PATCH",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(updates),
+	}).catch(() => { /* best-effort */ });
+}
+
+/**
+ * Get the hue-rotate offset for a session. Assigns colors from the Aurora
+ * Borealis palette, persisted on the server for cross-device coherency.
+ */
+function sessionHueRotation(sessionId: string): number {
+	let idx = sessionColorMap.get(sessionId);
+	if (idx === undefined) {
+		idx = nextAvailableColorIndex();
+		sessionColorMap.set(sessionId, idx);
+		patchSession(sessionId, { colorIndex: idx });
+	}
+	return BOBBIT_HUE_ROTATIONS[idx];
+}
+
+/** Change a session's color to a specific palette index */
+function setSessionColor(sessionId: string, paletteIndex: number): void {
+	sessionColorMap.set(sessionId, paletteIndex);
+	patchSession(sessionId, { colorIndex: paletteIndex });
+	if (activeSessionId() === sessionId) {
+		document.documentElement.style.setProperty("--bobbit-hue-rotate", `${BOBBIT_HUE_ROTATIONS[paletteIndex]}deg`);
+	}
+	renderApp();
+}
+
+/**
+ * Generate a 3-letter uppercase acronym from a session title.
+ * Takes first letters of the first 3 significant words.
+ * Falls back to first 3 chars of the title if fewer words.
+ */
+function sessionAcronym(title: string): string {
+	const stopWords = new Set(["the", "a", "an", "and", "or", "in", "on", "to", "of", "for", "with", "is", "it"]);
+	const words = title.split(/[\s\-_/]+/).filter((w) => w.length > 0 && !stopWords.has(w.toLowerCase()));
+	if (words.length >= 3) return (words[0][0] + words[1][0] + words[2][0]).toUpperCase();
+	if (words.length === 2) return (words[0][0] + words[1][0] + (words[1][1] || "")).toUpperCase();
+	if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+	return title.slice(0, 3).toUpperCase();
+}
+
+/**
  * Tiny static Bobbit pixel-art icon used as a session status indicator.
  * Same 10×9 pixel grid as the streaming blob, but scaled down and colored
  * per session status. No animation, no blinking — just a little Bobbit.
+ *
+ * When a sessionId is provided, the bobbit uses a unique color derived from it.
+ * Otherwise falls back to the canonical green.
  */
-function statusBobbit(status: string, isCompacting = false) {
-	// Streaming (busy) sessions get the canonical Bobbit green + shimmer.
-	// Compacting sessions also get canonical green.
-	// Idle sessions get a muted/desaturated green. Other states keep distinct colors.
+function statusBobbit(status: string, isCompacting = false, sessionId?: string) {
+	// Hue rotation offset from canonical green
+	const hueRotate = sessionId ? sessionHueRotation(sessionId) : 0;
+
+	// Always use canonical green/muted palettes as the base — hue-rotate shifts them
 	const canonical = { main: "#8ec63f", light: "#b5d98a", dark: "#6b9930", eye: "#1a3010" };
 	const muted     = { main: "#8aaa6e", light: "#a8c094", dark: "#6e8c5a", eye: "#2a3a22" };
-	const palettes: Record<string, { main: string; light: string; dark: string; eye: string }> = {
-		idle:       muted,
-		streaming:  canonical,
-		starting:   { main: "#eab308", light: "#fde047", dark: "#ca8a04", eye: "#2d2006" },
-		terminated: { main: "#ef4444", light: "#fca5a5", dark: "#dc2626", eye: "#2c0b0e" },
-	};
-	const p = isCompacting ? canonical : (palettes[status] || { main: "#6b7280", light: "#9ca3af", dark: "#4b5563", eye: "#1f2937" });
+	let p: { main: string; light: string; dark: string; eye: string };
+	if (status === "starting") {
+		p = { main: "#eab308", light: "#fde047", dark: "#ca8a04", eye: "#2d2006" };
+	} else if (status === "terminated") {
+		p = { main: "#ef4444", light: "#fca5a5", dark: "#dc2626", eye: "#2c0b0e" };
+	} else {
+		p = (status === "idle" && !isCompacting) ? muted : canonical;
+	}
+
 	const isBusy = status === "streaming" || isCompacting;
 	// 10×9 pixel bobbit, same shape as the streaming sprite
 	const shadow = `
@@ -1458,11 +1544,16 @@ function statusBobbit(status: string, isCompacting = false) {
 	// Sprite pixels span x 0–9, y 0–8 (10×9). At scale 1.6 → 16×14.4px.
 	// Outer span is sized to contain the scaled artwork so it participates
 	// in flex layout correctly. Inner 1×1 element is scaled from top-left.
-	const shimmer = isBusy ? "animation:blob-shimmer 8s ease-in-out infinite;" : "";
+	// hue-rotate on the outer span shifts the base green to the session color,
+	// matching how the chat blob applies the same rotation via CSS.
+	// Sync shimmer phase to a global clock so all bobbits (sidebar + chat) shimmer together
+	const shimmerDelay = -(Date.now() % 8000);
+	const shimmer = isBusy ? `animation:blob-shimmer 8s ease-in-out infinite;animation-delay:${shimmerDelay}ms;` : "";
+	const hueFilter = (hueRotate && status !== "starting" && status !== "terminated") ? `filter:hue-rotate(${hueRotate}deg);` : "";
 	const spriteTransform = isCompacting
 		? "transform:scale(1.6) scaleX(1.25) scaleY(0.7);transform-origin:0 0;"
 		: "transform:scale(1.6);transform-origin:0 0;";
-	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;${spriteTransform}box-shadow:${shadow};${shimmer}"></span></span>`;
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${hueFilter}"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;${spriteTransform}box-shadow:${shadow};${shimmer}"></span></span>`;
 }
 
 /** Show a rename dialog for a session */
@@ -1495,12 +1586,9 @@ function showRenameDialog(sessionId: string, currentTitle: string): void {
 		if (remoteAgent && activeSessionId() === sessionId) {
 			remoteAgent.setTitle(trimmed);
 		} else {
-			// For non-active sessions, call the REST API to set title
-			gatewayFetch(`/api/sessions/${sessionId}/title`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ title: trimmed }),
-			}).then(() => refreshSessions());
+			// For non-active sessions, use PATCH to set title
+			patchSession(sessionId, { title: trimmed });
+			refreshSessions();
 		}
 		cleanup();
 	};
@@ -1582,6 +1670,25 @@ function showRenameDialog(sessionId: string, currentTitle: string): void {
 											</button>`
 										: ""}
 								</div>
+								<!-- Bobbit color picker -->
+								<div>
+									<div class="text-xs text-muted-foreground mb-1.5">Colour</div>
+									<div class="flex flex-wrap gap-1.5">
+										${BOBBIT_HUE_ROTATIONS.map((rot, i) => {
+											const isSelected = (sessionColorMap.get(sessionId) ?? -1) === i;
+											return html`
+												<button
+													class="w-6 h-6 rounded-md border-2 transition-all flex items-center justify-center ${isSelected ? "border-foreground scale-110" : "border-transparent hover:border-muted-foreground/50"}"
+													style="position:relative;overflow:hidden;"
+													title="Colour ${i + 1}"
+													@click=${() => { setSessionColor(sessionId, i); renderDialog(); }}
+												>
+													<span style="position:absolute;left:1px;top:1px;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(2.2);transform-origin:0 0;filter:hue-rotate(${rot}deg);box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
+												</button>
+											`;
+										})}
+									</div>
+								</div>
 							</div>
 						`,
 					})}
@@ -1629,7 +1736,7 @@ function renderSidebarSession(session: GatewaySession) {
 			<div class="shrink-0 flex items-center justify-center w-6 self-center">
 				${connecting
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-					: statusBobbit(session.status, session.isCompacting)}
+					: statusBobbit(session.status, session.isCompacting, session.id)}
 			</div>
 			<div class="flex-1 min-w-0">
 				<div class="truncate text-xs ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"}" title=${displayTitle}>
@@ -1681,7 +1788,7 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 				<div class="flex items-center gap-2 mb-1">
 					${connecting
 						? html`<svg class="animate-spin shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-						: statusBobbit(session.status, session.isCompacting)}
+						: statusBobbit(session.status, session.isCompacting, session.id)}
 					<span class="text-sm ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"} text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
@@ -1722,14 +1829,52 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 // SIDEBAR (desktop only, when authenticated)
 // ============================================================================
 
-function goalStateIcon(state: GoalState) {
-	const icons: Record<GoalState, string> = {
-		"todo": "○",
-		"in-progress": "◐",
-		"complete": "●",
-		"shelved": "◌",
-	};
-	return icons[state] || "○";
+/**
+ * Reticle icon for goal state — matches the Crosshair (lucide) shape:
+ * circle at r=10 with four lines extending outward from the circle edge.
+ * Color indicates state:
+ * - todo: all grey
+ * - in-progress: clockwise fill from 12→8 (240°) in blue, rest grey
+ * - complete: all green
+ * - shelved: all grey, dimmed
+ */
+function goalStateIcon(state: GoalState, size = 14) {
+	const C = 2 * Math.PI * 10; // circumference ≈ 62.83
+	const blue = "#3b82f6";
+	const green = "#22c55e";
+
+	const grey = "#6b7280";
+
+	let circleContent: ReturnType<typeof svg>;
+	if (state === "complete") {
+		circleContent = svg`<circle cx="12" cy="12" r="10" fill="none" stroke="${green}" stroke-width="2"/>`;
+	} else if (state === "in-progress") {
+		const progress = (240 / 360) * C;
+		circleContent = svg`
+			<circle cx="12" cy="12" r="10" fill="none" stroke="${grey}" stroke-width="2" opacity="0.4"/>
+			<circle cx="12" cy="12" r="10" fill="none" stroke="${blue}" stroke-width="2"
+				stroke-dasharray="${progress} ${C}"
+				stroke-dashoffset="0"
+				transform="rotate(-90 12 12)"/>
+		`;
+	} else {
+		const opacity = state === "shelved" ? "0.3" : "0.5";
+		circleContent = svg`<circle cx="12" cy="12" r="10" fill="none" stroke="${grey}" stroke-width="2" opacity="${opacity}"/>`;
+	}
+
+	const lineColor = state === "complete" ? green : state === "in-progress" ? blue : grey;
+	const lineOpacity = state === "shelved" ? "0.3" : state === "todo" ? "0.5" : "1";
+
+	// Lines extend from outside the circle inward (22→18, 6→2) — same as lucide Crosshair
+	return html`
+		<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" style="display:inline-block;vertical-align:middle;flex-shrink:0;">
+			${circleContent}
+			${svg`<line x1="22" x2="18" y1="12" y2="12" stroke="${lineColor}" stroke-width="2" stroke-linecap="round" opacity="${lineOpacity}"/>`}
+			${svg`<line x1="6" x2="2" y1="12" y2="12" stroke="${lineColor}" stroke-width="2" stroke-linecap="round" opacity="${lineOpacity}"/>`}
+			${svg`<line x1="12" x2="12" y1="6" y2="2" stroke="${lineColor}" stroke-width="2" stroke-linecap="round" opacity="${lineOpacity}"/>`}
+			${svg`<line x1="12" x2="12" y1="22" y2="18" stroke="${lineColor}" stroke-width="2" stroke-linecap="round" opacity="${lineOpacity}"/>`}
+		</svg>
+	`;
 }
 
 function renderSidebarGoal(goal: Goal) {
@@ -1744,7 +1889,7 @@ function renderSidebarGoal(goal: Goal) {
 			<div class="group flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-secondary/50 transition-colors"
 				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); renderApp(); }}>
 				<span class="text-[10px] text-muted-foreground w-3 shrink-0 text-center select-none">${isExpanded ? "▾" : "▸"}</span>
-				<span class="shrink-0 text-xs ${GOAL_STATE_COLORS[goal.state]}" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state)}</span>
+				<span class="shrink-0" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state, 14)}</span>
 				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}"
 					title=${goal.title}>${goal.title}</span>
 				<span class="text-[10px] text-muted-foreground tabular-nums">${goalSessions.length}</span>
@@ -1800,43 +1945,43 @@ function renderSidebar() {
 	if (sidebarCollapsed) {
 		const allSessions = gatewaySessions;
 		const ungrouped = allSessions.filter((s) => !s.goalId);
-		const stateOrder: Record<GoalState, number> = { "in-progress": 0, "todo": 1, "complete": 2, "shelved": 3 };
-		const sortedGoalsCollapsed = [...goals].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
+
+		const renderCollapsedSession = (s: GatewaySession) => {
+			const active = activeSessionId() === s.id;
+			const displayTitle = active && remoteAgent ? remoteAgent.title : s.title;
+			return html`
+				<button
+					class="flex items-center gap-1 py-1 px-1 rounded-md transition-colors w-full ${active ? "bg-secondary" : "hover:bg-secondary/50"}"
+					title=${displayTitle}
+					@click=${() => { if (!active) connectToSession(s.id, true); }}
+				>
+					${statusBobbit(s.status, s.isCompacting, s.id)}
+					<span class="text-[8px] font-bold tracking-wide ${active ? "text-foreground" : "text-muted-foreground"}" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(displayTitle)}</span>
+				</button>
+			`;
+		};
 
 		return html`
-			<div class="w-10 shrink-0 h-full flex flex-col items-center" style="background: var(--sidebar);">
-				<div class="flex-1 overflow-y-auto flex flex-col items-center gap-0.5 py-2">
-					${sortedGoalsCollapsed.map((goal) => {
+			<div class="w-14 shrink-0 h-full flex flex-col items-center" style="background: var(--sidebar);">
+				<div class="flex-1 overflow-y-auto flex flex-col items-center gap-0.5 py-2 px-0.5">
+					${sortedGoals.map((goal, i) => {
 						const goalSessions = allSessions.filter((s) => s.goalId === goal.id);
+						const expanded = expandedGoals.has(goal.id);
 						return html`
-							<div class="flex flex-col items-center gap-0.5">
-								<span class="text-[10px] ${GOAL_STATE_COLORS[goal.state]} cursor-default" title=${goal.title}>${goalStateIcon(goal.state)}</span>
-								${goalSessions.map((s) => {
-									const active = activeSessionId() === s.id;
-									const displayTitle = active && remoteAgent ? remoteAgent.title : s.title;
-									return html`
-										<button
-											class="p-1 rounded-md transition-colors ${active ? "bg-secondary" : "hover:bg-secondary/50"}"
-											title=${displayTitle}
-											@click=${() => { if (!active) connectToSession(s.id, true); }}
-										>${statusBobbit(s.status, s.isCompacting)}</button>
-									`;
-								})}
-							</div>
-						`;
-					})}
-					${ungrouped.length > 0 && sortedGoalsCollapsed.length > 0 ? html`<div class="w-5 border-t border-border/50 my-1"></div>` : ""}
-					${ungrouped.map((s) => {
-						const active = activeSessionId() === s.id;
-						const displayTitle = active && remoteAgent ? remoteAgent.title : s.title;
-						return html`
+							${i > 0 ? html`<div class="w-7 border-t border-border/50 my-1.5"></div>` : ""}
 							<button
-								class="p-1 rounded-md transition-colors ${active ? "bg-secondary" : "hover:bg-secondary/50"}"
-								title=${displayTitle}
-								@click=${() => { if (!active) connectToSession(s.id, true); }}
-							>${statusBobbit(s.status, s.isCompacting)}</button>
+								class="flex items-center py-0.5 w-full rounded-md hover:bg-secondary/50 transition-colors" style="gap:0.225rem;"
+								title=${goal.title}
+								@click=${(e: Event) => { e.stopPropagation(); if (expandedGoals.has(goal.id)) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); renderApp(); }}
+							>
+								<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${expanded ? "▾" : "▸"}</span>
+								<span class="text-[10px] font-extrabold tracking-wider text-muted-foreground" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(goal.title)}</span>
+							</button>
+							${expanded ? goalSessions.map(renderCollapsedSession) : ""}
 						`;
 					})}
+					${ungrouped.length > 0 && sortedGoals.length > 0 ? html`<div class="w-7 border-t border-border/50 my-1.5"></div>` : ""}
+					${ungrouped.map(renderCollapsedSession)}
 				</div>
 				<button
 					class="p-2 mb-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
@@ -1861,7 +2006,10 @@ function renderSidebar() {
 							</div>`
 						: html`
 							<!-- Goals -->
-							${sortedGoals.map(renderSidebarGoal)}
+							${sortedGoals.map((goal, i) => html`
+								${i > 0 ? html`<div class="border-t border-border/50 my-1"></div>` : ""}
+								${renderSidebarGoal(goal)}
+							`)}
 
 							<!-- Ungrouped sessions -->
 							${ungroupedSessions.length > 0 && sortedGoals.length > 0 ? html`
@@ -1912,7 +2060,7 @@ function renderMobileGoalCard(goal: Goal) {
 		<div class="rounded-lg border border-border p-4 ${goal.state === "shelved" ? "opacity-60" : ""}">
 			<div class="flex items-center justify-between mb-2">
 				<div class="flex items-center gap-2">
-					<span class="text-sm ${GOAL_STATE_COLORS[goal.state]}">${goalStateIcon(goal.state)}</span>
+					<span class="shrink-0">${goalStateIcon(goal.state, 16)}</span>
 					<span class="text-sm font-medium text-foreground">${goal.title}</span>
 				</div>
 				<div class="flex items-center gap-1">
@@ -2028,6 +2176,9 @@ function renderMobileLanding() {
 const renderApp = () => {
 	const app = document.getElementById("app");
 	if (!app) return;
+
+	// Sync shimmer phase for chat blob — aligns with sidebar bobbits that compute the same value
+	document.documentElement.style.setProperty("--bobbit-shimmer-delay", `${-(Date.now() % 8000)}ms`);
 
 	// ── Disconnected state ──────────────────────────────────────────
 	if (appView === "disconnected") {
@@ -2440,7 +2591,7 @@ const renderApp = () => {
 				<div class="flex items-center border-b border-border shrink-0">
 					<!-- Left zone: app title + new goal/session (above sidebar width) -->
 					${sidebarCollapsed ? html`
-					<div class="w-10 shrink-0 flex items-center justify-center py-1.5" style="background: var(--sidebar);">
+					<div class="w-14 shrink-0 flex items-center justify-center py-1.5" style="background: var(--sidebar);">
 						<button
 							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
 							@click=${toggleSidebar}

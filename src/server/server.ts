@@ -3,6 +3,7 @@ import http from "node:http";
 import https from "node:https";
 import path from "node:path";
 import { WebSocketServer } from "ws";
+import { ColorStore } from "./agent/color-store.js";
 import { SessionManager } from "./agent/session-manager.js";
 import { RateLimiter } from "./auth/rate-limit.js";
 import { validateToken } from "./auth/token.js";
@@ -31,6 +32,7 @@ export function createGateway(config: GatewayConfig) {
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
 	});
+	const colorStore = new ColorStore();
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
 
@@ -69,7 +71,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore);
 			return;
 		}
 
@@ -141,6 +143,7 @@ async function handleApiRoute(
 	res: http.ServerResponse,
 	sessionManager: SessionManager,
 	config: GatewayConfig,
+	colorStore: ColorStore,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -155,7 +158,11 @@ async function handleApiRoute(
 
 	// GET /api/sessions
 	if (url.pathname === "/api/sessions" && req.method === "GET") {
-		json({ sessions: sessionManager.listSessions() });
+		const sessions = sessionManager.listSessions().map((s) => ({
+			...s,
+			colorIndex: colorStore.get(s.id),
+		}));
+		json({ sessions });
 		return;
 	}
 
@@ -284,7 +291,34 @@ async function handleApiRoute(
 		}
 	}
 
-	// PUT /api/sessions/:id/title — rename a session
+	// PATCH /api/sessions/:id — update session properties (title, colorIndex, etc.)
+	const patchMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)$/);
+	if (patchMatch && req.method === "PATCH") {
+		const id = patchMatch[1];
+		const body = await readBody(req);
+		if (!body || typeof body !== "object") {
+			json({ error: "Invalid body" }, 400);
+			return;
+		}
+
+		if (typeof body.title === "string") {
+			const ok = sessionManager.setTitle(id, body.title);
+			if (!ok) { json({ error: "Session not found" }, 404); return; }
+		}
+
+		if (typeof body.colorIndex === "number") {
+			if (body.colorIndex < 0 || body.colorIndex > 19) {
+				json({ error: "colorIndex must be 0-19" }, 400);
+				return;
+			}
+			colorStore.set(id, body.colorIndex);
+		}
+
+		json({ ok: true });
+		return;
+	}
+
+	// PUT /api/sessions/:id/title — legacy rename endpoint
 	const titleMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/title$/);
 	if (titleMatch && req.method === "PUT") {
 		const id = titleMatch[1];
