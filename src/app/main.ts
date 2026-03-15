@@ -16,7 +16,7 @@ import {
 } from "../ui/index.js";
 import { Select, type SelectOption } from "@mariozechner/mini-lit/dist/Select.js";
 import { html, render, svg } from "lit";
-import { ArrowLeft, Brain, Crosshair, PanelLeftClose, PanelLeftOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users, WandSparkles } from "lucide";
+import { ArrowLeft, Brain, Crosshair, PanelLeftClose, PanelLeftOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, WandSparkles } from "lucide";
 import QRCode from "qrcode";
 import "@mariozechner/mini-lit/dist/MarkdownBlock.js";
 import "./app.css";
@@ -98,8 +98,8 @@ let sessionPollTimer: ReturnType<typeof setInterval> | null = null;
 let expandedGoals: Set<string> = new Set();
 /** Whether ungrouped sessions are expanded */
 let ungroupedExpanded = true;
-/** Whether the sidebar is collapsed */
-let sidebarCollapsed = false;
+/** Whether the sidebar is collapsed (persisted to localStorage) */
+let sidebarCollapsed = localStorage.getItem("bobbit-sidebar-collapsed") === "true";
 /** Active goal proposal from a goal-assistant session */
 let activeGoalProposal: { title: string; spec: string; cwd?: string } | null = null;
 
@@ -233,6 +233,25 @@ function ensureMobileScrollTracking(): void {
 const GW_URL_KEY = "gateway.url";
 const GW_TOKEN_KEY = "gateway.token";
 const GW_SESSION_KEY = "gateway.sessionId";
+const DRAFT_PREFIX = "bobbit-draft-";
+
+/** Save a draft prompt for a session (debounced) */
+let _draftTimer: ReturnType<typeof setTimeout> | null = null;
+function saveDraft(sessionId: string, text: string): void {
+	if (_draftTimer) clearTimeout(_draftTimer);
+	_draftTimer = setTimeout(() => {
+		if (text.trim()) {
+			localStorage.setItem(DRAFT_PREFIX + sessionId, text);
+		} else {
+			localStorage.removeItem(DRAFT_PREFIX + sessionId);
+		}
+	}, 100);
+}
+
+/** Load and clear a draft prompt for a session */
+function loadDraft(sessionId: string): string {
+	return localStorage.getItem(DRAFT_PREFIX + sessionId) || "";
+}
 
 // ============================================================================
 // URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected)
@@ -734,6 +753,14 @@ async function connectToSession(sessionId: string, isExisting: boolean, options?
 			renderApp();
 		};
 
+		// Clear draft when a prompt is sent
+		const originalPrompt = remote.prompt.bind(remote);
+		remote.prompt = (...args: Parameters<typeof remote.prompt>) => {
+			localStorage.removeItem(DRAFT_PREFIX + sessionId);
+			if (_draftTimer) { clearTimeout(_draftTimer); _draftTimer = null; }
+			return originalPrompt(...args);
+		};
+
 		// Re-render when the session title is updated (e.g. AI-generated summary)
 		remote.onTitleChange = (newTitle: string) => {
 			// Optimistically update local sidebar data so title isn't lost if user
@@ -822,10 +849,21 @@ async function connectToSession(sessionId: string, isExisting: boolean, options?
 			remote.prompt("Start the goal creation session.");
 		}
 
-		// Focus the message input after rendering
+		// Restore draft and set up auto-save, then focus input
 		requestAnimationFrame(() => {
-			const textarea = document.querySelector("message-editor")?.querySelector("textarea");
-			if (textarea) textarea.focus();
+			const editor = document.querySelector("message-editor") as any;
+			if (editor) {
+				const draft = loadDraft(sessionId);
+				if (draft) editor.value = draft;
+				// Save draft on every keystroke
+				const origOnInput = editor.onInput;
+				editor.onInput = (val: string) => {
+					origOnInput?.(val);
+					saveDraft(sessionId, val);
+				};
+				const textarea = editor.querySelector("textarea");
+				if (textarea) textarea.focus();
+			}
 		});
 
 		// Refresh sidebar session list so active session appears highlighted
@@ -1417,6 +1455,46 @@ function showGoalEditDialog(existingGoal: Goal): void {
 // RENDER HELPERS
 // ============================================================================
 
+// ── Rich sidebar tooltip ───────────────────────────────────────────
+let _tooltipEl: HTMLDivElement | null = null;
+let _tooltipTimer: ReturnType<typeof setTimeout> | null = null;
+
+function getTooltipEl(): HTMLDivElement {
+	if (!_tooltipEl) {
+		_tooltipEl = document.createElement("div");
+		_tooltipEl.className = "sidebar-tooltip";
+		document.body.appendChild(_tooltipEl);
+	}
+	return _tooltipEl;
+}
+
+function showSessionTooltip(e: MouseEvent, session: GatewaySession, displayTitle: string): void {
+	if (_tooltipTimer) clearTimeout(_tooltipTimer);
+	const el = getTooltipEl();
+	el.innerHTML = `
+		<div class="tt-title">${escapeHtml(displayTitle)}</div>
+		<div class="tt-cwd">${escapeHtml(session.cwd)}</div>
+		<div class="tt-meta">${escapeHtml(formatSessionAge(session.lastActivity))}</div>
+	`;
+	// Position to the right of the hovered element
+	const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+	el.style.left = `${rect.right + 8}px`;
+	el.style.top = `${rect.top + rect.height / 2}px`;
+	el.style.transform = "translateY(-50%)";
+	el.classList.add("visible");
+}
+
+function hideSessionTooltip(): void {
+	if (_tooltipTimer) clearTimeout(_tooltipTimer);
+	_tooltipTimer = setTimeout(() => {
+		getTooltipEl().classList.remove("visible");
+	}, 80);
+}
+
+function escapeHtml(s: string): string {
+	return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 /** Show the last 3 segments of a path, e.g. "Users/joe/project" */
 function shortenPath(fullPath: string): string {
 	const parts = fullPath.split(/[/\\]/).filter(Boolean);
@@ -1719,54 +1797,50 @@ function showRenameDialog(sessionId: string, currentTitle: string): void {
 	renderDialog();
 }
 
+/** Session row padding — shared between collapsed and expanded */
+const SESSION_ROW_PY = "py-0.5";
+
 /** Compact session row for sidebar */
 function renderSidebarSession(session: GatewaySession) {
 	const active = activeSessionId() === session.id;
 	const connecting = connectingSessionId === session.id;
-	// Use live title from RemoteAgent if this is the active session
 	const displayTitle = active && remoteAgent ? remoteAgent.title : session.title;
 	return html`
 		<div
-			class="group flex items-start gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors text-sm
+			class="group relative flex items-center gap-1 px-1 ${SESSION_ROW_PY} rounded-md cursor-pointer transition-colors text-sm
 				${active ? "bg-secondary text-foreground sidebar-session-active" : connecting ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
+			@mouseenter=${(e: MouseEvent) => showSessionTooltip(e, session, displayTitle)}
+			@mouseleave=${hideSessionTooltip}
 			@click=${() => {
 				if (!active && !connecting) connectToSession(session.id, true);
 			}}
 		>
-			<div class="shrink-0 flex items-center justify-center w-6 self-center">
+			<div class="shrink-0 flex items-center justify-center">
 				${connecting
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id)}
 			</div>
-			<div class="flex-1 min-w-0">
-				<div class="truncate text-xs ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"}" title=${displayTitle}>
-					${displayTitle}
-				</div>
-				<div class="text-[10px] opacity-60 font-mono truncate leading-tight" title=${session.cwd}>
-					${shortenPath(session.cwd)}
-				</div>
-				<div class="text-[10px] opacity-60 mt-0.5">
-					${formatSessionAge(session.lastActivity)}
-				</div>
+			<div class="flex-1 min-w-0 truncate text-xs ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"}">
+				${displayTitle}
 			</div>
-			<div class="sm:opacity-0 sm:group-hover:opacity-100 flex flex-col gap-0.5 shrink-0 transition-opacity">
+			<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 rounded-r-md" style="background:linear-gradient(to right, transparent, var(--sidebar) 30%);">
 				<button
-					class="p-1 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
+					class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
 					@click=${(e: Event) => {
 						e.stopPropagation();
 						showRenameDialog(session.id, displayTitle);
 					}}
-					title="Rename session"
+					title="Rename"
 				>
 					${icon(Pencil, "xs")}
 				</button>
 				<button
-					class="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+					class="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
 					@click=${(e: Event) => {
 						e.stopPropagation();
 						terminateSession(session.id);
 					}}
-					title="Terminate session"
+					title="Terminate"
 				>
 					${icon(Trash2, "xs")}
 				</button>
@@ -1794,8 +1868,7 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
 				</div>
 				<div class="text-xs text-muted-foreground font-mono truncate" title=${session.cwd}>${session.cwd}</div>
-				<div class="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-					<span class="inline-flex items-center gap-1">${icon(Users, "xs")} ${session.clientCount} connected</span>
+				<div class="mt-1.5 text-xs text-muted-foreground">
 					<span class="font-mono text-[10px] opacity-60" title=${session.id}>${session.id.slice(0, 8)}…</span>
 				</div>
 			</div>
@@ -1884,20 +1957,18 @@ function renderSidebarGoal(goal: Goal) {
 	const isCreatingHere = creatingSessionForGoalId === goal.id;
 
 	return html`
-		<div class="mt-1">
+		<div>
 			<!-- Goal header -->
-			<div class="group flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-secondary/50 transition-colors"
+			<div class="group relative flex items-center gap-1 px-1 py-0.5 rounded-md cursor-pointer hover:bg-secondary/50 transition-colors"
 				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); renderApp(); }}>
-				<span class="text-[10px] text-muted-foreground w-3 shrink-0 text-center select-none">${isExpanded ? "▾" : "▸"}</span>
-				<span class="shrink-0" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state, 14)}</span>
-				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}"
-					title=${goal.title}>${goal.title}</span>
-				<span class="text-[10px] text-muted-foreground tabular-nums">${goalSessions.length}</span>
-				<!-- Goal actions (visible on hover) -->
-				<div class="sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-0 shrink-0 transition-opacity">
+				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
+				<span class="shrink-0" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state, 12)}</span>
+				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}">${goal.title}</span>
+				<!-- Goal actions (overlay on hover) -->
+				<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 rounded-r-md" style="background:linear-gradient(to right, transparent, var(--sidebar) 30%);">
 					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
 						@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(goal.id); }}
-						title="New session in this goal">
+						title="New session">
 						${icon(Plus, "xs")}
 					</button>
 					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
@@ -1914,14 +1985,14 @@ function renderSidebarGoal(goal: Goal) {
 			</div>
 			<!-- Goal sessions (if expanded) -->
 			${isExpanded ? html`
-				<div class="ml-3 flex flex-col gap-0.5">
+				<div class="ml-2 flex flex-col gap-0">
 					${goalSessions.length === 0 && !isCreatingHere
-						? html`<div class="px-2 py-1.5 text-[10px] text-muted-foreground">
+						? html`<div class="px-1 py-1 text-[10px] text-muted-foreground">
 								No sessions —
 								<button class="text-primary hover:underline" @click=${() => createAndConnectSession(goal.id)}>start one</button>
 							</div>`
 						: goalSessions.map(renderSidebarSession)}
-					${isCreatingHere ? html`<div class="px-2 py-1.5 text-[10px] text-muted-foreground flex items-center gap-1">
+					${isCreatingHere ? html`<div class="px-1 py-1 text-[10px] text-muted-foreground flex items-center gap-1">
 						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
 						Creating…
 					</div>` : ""}
@@ -1933,6 +2004,7 @@ function renderSidebarGoal(goal: Goal) {
 
 function toggleSidebar() {
 	sidebarCollapsed = !sidebarCollapsed;
+	localStorage.setItem("bobbit-sidebar-collapsed", String(sidebarCollapsed));
 	renderApp();
 }
 
@@ -1951,8 +2023,9 @@ function renderSidebar() {
 			const displayTitle = active && remoteAgent ? remoteAgent.title : s.title;
 			return html`
 				<button
-					class="flex items-center gap-1 py-1 px-1 rounded-md transition-colors w-full ${active ? "bg-secondary" : "hover:bg-secondary/50"}"
-					title=${displayTitle}
+					class="flex items-center gap-1 ${SESSION_ROW_PY} px-1 rounded-md transition-colors w-full ${active ? "bg-secondary" : "hover:bg-secondary/50"}"
+					@mouseenter=${(e: MouseEvent) => showSessionTooltip(e, s, displayTitle)}
+					@mouseleave=${hideSessionTooltip}
 					@click=${() => { if (!active) connectToSession(s.id, true); }}
 				>
 					${statusBobbit(s.status, s.isCompacting, s.id)}
@@ -1996,7 +2069,7 @@ function renderSidebar() {
 
 	return html`
 		<div class="w-[240px] shrink-0 h-full flex flex-col" style="background: var(--sidebar);">
-			<div class="flex-1 overflow-y-auto p-2 flex flex-col gap-0">
+			<div class="flex-1 overflow-y-auto flex flex-col gap-0.5 py-2 px-1">
 				${sessionsLoading
 					? html`<div class="text-center py-6 text-muted-foreground text-xs">Loading…</div>`
 					: sessionsError
@@ -2007,21 +2080,21 @@ function renderSidebar() {
 						: html`
 							<!-- Goals -->
 							${sortedGoals.map((goal, i) => html`
-								${i > 0 ? html`<div class="border-t border-border/50 my-1"></div>` : ""}
+								${i > 0 ? html`<div class="border-t border-border/50 my-1.5 mx-1"></div>` : ""}
 								${renderSidebarGoal(goal)}
 							`)}
 
 							<!-- Ungrouped sessions -->
 							${ungroupedSessions.length > 0 && sortedGoals.length > 0 ? html`
-								<div class="mt-2 pt-1.5 border-t border-border/50">
-									<div class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
+								<div class="border-t border-border/50 my-1.5 mx-1"></div>
+								<div>
+									<div class="flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
 										@click=${() => { ungroupedExpanded = !ungroupedExpanded; renderApp(); }}>
-										<span class="text-[10px] text-muted-foreground w-3 shrink-0 text-center select-none">${ungroupedExpanded ? "▾" : "▸"}</span>
+										<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
 										<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
-										<span class="text-[10px] text-muted-foreground tabular-nums">${ungroupedSessions.length}</span>
 									</div>
 									${ungroupedExpanded ? html`
-										<div class="flex flex-col gap-0.5">
+										<div class="ml-2 flex flex-col gap-0">
 											${ungroupedSessions.map(renderSidebarSession)}
 										</div>
 									` : ""}
