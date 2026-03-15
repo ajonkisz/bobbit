@@ -267,22 +267,23 @@ export class MessageEditor extends LitElement {
 		this.preSpeechText = this.value;
 
 		recognition.onresult = (event: SpeechRecognitionEvent) => {
-			// Mobile browsers return cumulative transcripts in each result
-			// (each later final contains all earlier text). Desktop browsers
-			// return segmented transcripts (each final is a separate phrase).
-			// Detect which mode by checking if the last non-empty final
-			// starts with the previous non-empty final's text.
+			// Only display finalized results — interim results are volatile
+			// and cause flickering on desktop. Mobile finalizes word-by-word
+			// so this still feels responsive there.
+			//
+			// Mobile browsers return cumulative transcripts (each later final
+			// contains all earlier text). Desktop returns segments. Detect by
+			// checking if the last non-empty final starts with the previous one.
 			const nonEmptyFinals: string[] = [];
-			let interimText = "";
 			for (let i = 0; i < event.results.length; i++) {
 				const result = event.results[i];
 				if (result.isFinal) {
 					const t = result[0].transcript;
 					if (t) nonEmptyFinals.push(t);
-				} else {
-					interimText = result[0].transcript;
 				}
 			}
+
+			if (nonEmptyFinals.length === 0) return;
 
 			const isCumulative =
 				nonEmptyFinals.length >= 2 &&
@@ -293,10 +294,10 @@ export class MessageEditor extends LitElement {
 			let fullText: string;
 			if (isCumulative) {
 				// Mobile: last final already has everything
-				fullText = nonEmptyFinals[nonEmptyFinals.length - 1] + interimText;
+				fullText = nonEmptyFinals[nonEmptyFinals.length - 1];
 			} else {
 				// Desktop: concatenate all segments
-				fullText = nonEmptyFinals.join("") + interimText;
+				fullText = nonEmptyFinals.join("");
 			}
 
 			const separator = this.preSpeechText && !this.preSpeechText.endsWith(" ") ? " " : "";

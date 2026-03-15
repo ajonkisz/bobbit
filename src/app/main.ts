@@ -94,10 +94,18 @@ let creatingSession = false;
 let creatingSessionForGoalId: string | null = null;
 let connectingSessionId: string | null = null;
 let sessionPollTimer: ReturnType<typeof setInterval> | null = null;
-/** Track which goals are expanded in the sidebar */
-let expandedGoals: Set<string> = new Set();
-/** Whether ungrouped sessions are expanded */
-let ungroupedExpanded = true;
+/** Track which goals are expanded in the sidebar (persisted to localStorage) */
+const EXPANDED_GOALS_KEY = "bobbit-expanded-goals";
+const UNGROUPED_EXPANDED_KEY = "bobbit-ungrouped-expanded";
+let expandedGoals: Set<string> = new Set(JSON.parse(localStorage.getItem(EXPANDED_GOALS_KEY) || "[]"));
+let ungroupedExpanded = localStorage.getItem(UNGROUPED_EXPANDED_KEY) !== "false";
+
+function saveExpandedGoals() {
+	localStorage.setItem(EXPANDED_GOALS_KEY, JSON.stringify([...expandedGoals]));
+}
+function saveUngroupedExpanded() {
+	localStorage.setItem(UNGROUPED_EXPANDED_KEY, String(ungroupedExpanded));
+}
 /** Whether the sidebar is collapsed (persisted to localStorage) */
 let sidebarCollapsed = localStorage.getItem("bobbit-sidebar-collapsed") === "true";
 /** Active goal proposal from a goal-assistant session */
@@ -620,6 +628,7 @@ async function createGoal(title: string, cwd: string, spec = ""): Promise<Goal |
 		const goal = await res.json();
 		await refreshSessions();
 		expandedGoals.add(goal.id);
+		saveExpandedGoals();
 		return goal;
 	} catch (err) {
 		showConnectionError("Failed to create goal", err instanceof Error ? err.message : String(err));
@@ -658,6 +667,7 @@ async function deleteGoal(id: string): Promise<void> {
 	try {
 		await gatewayFetch(`/api/goals/${id}`, { method: "DELETE" });
 		expandedGoals.delete(id);
+		saveExpandedGoals();
 		await refreshSessions();
 	} catch (err) {
 		showConnectionError("Failed to delete goal", err instanceof Error ? err.message : String(err));
@@ -1970,7 +1980,7 @@ function renderSidebarGoal(goal: Goal) {
 		<div class="flex flex-col gap-0.5">
 			<!-- Goal header -->
 			<div class="group relative flex items-center gap-1 px-1 py-0.5 rounded-md cursor-pointer hover:bg-secondary/50 transition-colors"
-				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); renderApp(); }}>
+				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); saveExpandedGoals(); renderApp(); }}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
 				<span class="shrink-0" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state, 12)}</span>
 				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}" style="line-height:12px;transform:translateY(-1px)">${goal.title}</span>
@@ -2055,7 +2065,7 @@ function renderSidebar() {
 							<button
 								class="flex items-center py-0.5 w-full rounded-md hover:bg-secondary/50 transition-colors" style="gap:0.225rem;"
 								title=${goal.title}
-								@click=${(e: Event) => { e.stopPropagation(); if (expandedGoals.has(goal.id)) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); renderApp(); }}
+								@click=${(e: Event) => { e.stopPropagation(); if (expandedGoals.has(goal.id)) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); saveExpandedGoals(); renderApp(); }}
 							>
 								<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${expanded ? "▾" : "▸"}</span>
 								<span class="text-[10px] font-extrabold tracking-wider text-muted-foreground" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(goal.title)}</span>
@@ -2068,7 +2078,7 @@ function renderSidebar() {
 						<button
 							class="flex items-center py-0.5 w-full rounded-md hover:bg-secondary/50 transition-colors" style="gap:0.225rem;"
 							title="Ungrouped sessions"
-							@click=${() => { ungroupedExpanded = !ungroupedExpanded; renderApp(); }}
+							@click=${() => { ungroupedExpanded = !ungroupedExpanded; saveUngroupedExpanded(); renderApp(); }}
 						>
 							<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
 							<span class="text-[10px] font-extrabold tracking-wider text-muted-foreground" style="font-family: ui-monospace, monospace; line-height: 1;">SES</span>
@@ -2109,7 +2119,7 @@ function renderSidebar() {
 								<div class="border-t border-border/50 my-1.5 mx-1"></div>
 								<div class="flex flex-col gap-0.5">
 									<div class="flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
-										@click=${() => { ungroupedExpanded = !ungroupedExpanded; renderApp(); }}>
+										@click=${() => { ungroupedExpanded = !ungroupedExpanded; saveUngroupedExpanded(); renderApp(); }}>
 										<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
 										<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
 									</div>

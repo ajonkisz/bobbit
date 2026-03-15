@@ -50,6 +50,7 @@ declare module "@mariozechner/mini-lit" {
 		"Failed to display text content": string;
 		"API keys are required to use AI models. Get your keys from the provider's website.": string;
 		console: string;
+		diff: string;
 		"Copy output": string;
 		"Copied!": string;
 		"Error:": string;
@@ -280,6 +281,7 @@ export const translations = {
 		"API keys are required to use AI models. Get your keys from the provider's website.":
 			"API keys are required to use AI models. Get your keys from the provider's website.",
 		console: "console",
+		diff: "diff",
 		"Copy output": "Copy output",
 		"Copied!": "Copied!",
 		"Error:": "Error:",

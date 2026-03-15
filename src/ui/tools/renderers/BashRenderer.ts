@@ -3,6 +3,7 @@ import { html } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
 import { SquareTerminal } from "lucide";
 import { i18n } from "../../utils/i18n.js";
+import { isGitDiff } from "../../components/DiffBlock.js";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
 import { renderInlineImages } from "./image-utils.js";
@@ -58,6 +59,7 @@ export class BashRenderer implements ToolRenderer<BashParams, undefined> {
 			const combined = output ? `> ${params.command}\n\n${output}` : `> ${params.command}`;
 			const images = renderInlineImages(result.content);
 			const hasImages = result.content?.some((c: any) => c.type === "image");
+			const isDiff = !result.isError && isGitDiff(output);
 
 			const contentRef = createRef<HTMLDivElement>();
 			const chevronRef = createRef<HTMLSpanElement>();
@@ -66,7 +68,10 @@ export class BashRenderer implements ToolRenderer<BashParams, undefined> {
 					<div>
 						${renderCollapsibleHeader(state, SquareTerminal, headerText, contentRef, chevronRef, hasImages || false)}
 						<div ${ref(contentRef)} class="${hasImages ? "max-h-[2000px] mt-3" : "max-h-0"} overflow-hidden transition-all duration-300">
-							<console-block .content=${combined} .variant=${result.isError ? "error" : "default"}></console-block>
+							${isDiff
+								? html`<diff-block .content=${output}></diff-block>`
+								: html`<console-block .content=${combined} .variant=${result.isError ? "error" : "default"}></console-block>`
+							}
 							${images}
 						</div>
 					</div>

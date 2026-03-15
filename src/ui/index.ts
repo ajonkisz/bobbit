@@ -7,6 +7,7 @@ export { ChatPanel } from "./ChatPanel.js";
 export { AgentInterface } from "./components/AgentInterface.js";
 export { AttachmentTile } from "./components/AttachmentTile.js";
 export { ConsoleBlock } from "./components/ConsoleBlock.js";
+export { DiffBlock, isGitDiff } from "./components/DiffBlock.js";
 export { ErrorMessage } from "./components/ErrorMessage.js";
 export { CustomProviderCard } from "./components/CustomProviderCard.js";
 export { ExpandableSection } from "./components/ExpandableSection.js";
