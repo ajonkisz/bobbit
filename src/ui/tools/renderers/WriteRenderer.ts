@@ -5,6 +5,7 @@ import { FileCode2 } from "lucide";
 import { i18n } from "../../utils/i18n.js";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
+import { HtmlRenderer } from "./HtmlRenderer.js";
 import { SvgRenderer } from "./SvgRenderer.js";
 
 interface WriteParams {
@@ -13,12 +14,19 @@ interface WriteParams {
 }
 
 const svgRenderer = new SvgRenderer();
+const htmlRenderer = new HtmlRenderer();
 
 export class WriteRenderer implements ToolRenderer<WriteParams, any> {
 	render(params: WriteParams | undefined, result: ToolResultMessage<any> | undefined, isStreaming?: boolean): ToolRenderResult {
 		// Delegate .svg files to the SVG renderer for inline preview
 		if (params?.path?.toLowerCase().endsWith(".svg")) {
 			return svgRenderer.render(params, result, isStreaming);
+		}
+
+		// Delegate .html/.htm files to the HTML renderer for inline preview
+		const lowerPath = params?.path?.toLowerCase() || "";
+		if (lowerPath.endsWith(".html") || lowerPath.endsWith(".htm")) {
+			return htmlRenderer.render(params, result, isStreaming);
 		}
 
 		const state = result ? (result.isError ? "error" : "complete") : isStreaming ? "inprogress" : "complete";
