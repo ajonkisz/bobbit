@@ -2321,36 +2321,52 @@ const renderApp = () => {
 			const backBtn = !desktop ? Button({
 				variant: "ghost",
 				size: "sm",
-				children: html`<span class="inline-flex items-center gap-1">${icon(ArrowLeft, "sm")} <span class="text-xs">Sessions</span></span>`,
+				children: html`<span class="inline-flex items-center gap-1.5">${icon(ArrowLeft, "sm")} <span class="text-xs">All Sessions</span></span>`,
 				onClick: backToSessions,
 				title: "Back to session list",
+				className: "h-10 pl-3 pr-3",
 			}) : "";
 
 			const sessionTitle = remoteAgent.title || "New session";
 
 			const sid = activeSessionId();
+			const editDeleteBtns = sid ? html`
+				<div class="flex items-center shrink-0">
+					${Button({
+						variant: "ghost",
+						size: "sm",
+						onClick: () => showRenameDialog(sid, sessionTitle),
+						children: icon(Pencil, "xs"),
+						className: "h-7 w-7 text-muted-foreground",
+						title: "Rename session",
+					})}
+					${Button({
+						variant: "ghost",
+						size: "sm",
+						onClick: () => terminateSession(sid),
+						children: icon(Trash2, "xs"),
+						className: "h-7 w-7 text-muted-foreground hover:text-destructive",
+						title: "Terminate session",
+					})}
+				</div>
+			` : "";
+
+			if (!desktop) {
+				// Mobile: back left, title centered, edit/delete right
+				return html`
+					<div class="flex items-center w-full pr-2 relative" style="min-height:40px;">
+						<div class="shrink-0">${backBtn}</div>
+						<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+							<span class="text-sm font-medium text-foreground truncate px-16" title=${sessionTitle}>${sessionTitle}</span>
+						</div>
+						<div class="ml-auto shrink-0">${editDeleteBtns}</div>
+					</div>
+				`;
+			}
 			return html`
-				<div class="flex items-center gap-1 px-2">
-					${backBtn}
-					<span class="text-sm font-medium text-foreground truncate max-w-[320px]" title=${sessionTitle}>${sessionTitle}</span>
-					${sid ? html`
-						${Button({
-							variant: "ghost",
-							size: "sm",
-							onClick: () => showRenameDialog(sid, sessionTitle),
-							children: icon(Pencil, "xs"),
-							className: "h-7 w-7 text-muted-foreground",
-							title: "Rename session",
-						})}
-						${Button({
-							variant: "ghost",
-							size: "sm",
-							onClick: () => terminateSession(sid),
-							children: icon(Trash2, "xs"),
-							className: "h-7 w-7 text-muted-foreground hover:text-destructive",
-							title: "Terminate session",
-						})}
-					` : ""}
+				<div class="flex items-center gap-2 px-3">
+					<span class="text-sm font-medium text-foreground truncate max-w-[320px] py-2" title=${sessionTitle}>${sessionTitle}</span>
+					${editDeleteBtns}
 				</div>
 			`;
 		}
@@ -2387,7 +2403,10 @@ const renderApp = () => {
 				</div>
 			`;
 		}
-		// Mobile
+		// Mobile: no right buttons when in a session
+		if (connected && remoteAgent) {
+			return html``;
+		}
 		return html`
 			<div class="flex items-center gap-1 px-2">
 				${Button({
