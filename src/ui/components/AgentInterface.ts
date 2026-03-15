@@ -616,7 +616,7 @@ export class AgentInterface extends LitElement {
 					${icon(Sparkles, "sm")}
 					<span class="ml-1.5">${state.model.id}</span>
 				`,
-				className: "h-6 text-xs truncate rounded-none",
+				className: "h-6 text-xs truncate",
 			})
 			: "";
 
@@ -655,7 +655,7 @@ export class AgentInterface extends LitElement {
 				</div>
 
 				<!-- Input Area -->
-				<div class="shrink-0 pt-0 pb-4">
+				<div class="shrink-0 pt-0 pb-1">
 					<div class="max-w-5xl mx-auto px-2">
 						<message-editor
 							.isStreaming=${state.isStreaming}
