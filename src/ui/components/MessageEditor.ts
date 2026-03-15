@@ -413,7 +413,7 @@ export class MessageEditor extends LitElement {
 			size: "icon",
 			onClick: this.handleSend,
 			disabled: !hasContent || this.processingFiles,
-			children: html`<div style="transform: rotate(-45deg)">${icon(Send, "sm")}</div>`,
+			children: icon(Send, "sm"),
 			className: "h-8 w-8 shrink-0",
 		});
 
