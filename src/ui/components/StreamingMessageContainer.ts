@@ -6,13 +6,13 @@ import { property, state } from "lit/decorators.js";
 export class StreamingMessageContainer extends LitElement {
 	@property({ type: Array }) tools: AgentTool[] = [];
 	@property({ type: Boolean }) isStreaming = false;
-	@property({ type: Boolean }) hasMessages = false;
+
 	@property({ type: Object }) pendingToolCalls?: Set<string>;
 	@property({ type: Object }) toolResultsById?: Map<string, ToolResultMessage>;
 	@property({ attribute: false }) onCostClick?: () => void;
 
 	@state() private _message: AgentMessage | null = null;
-	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' | 'compact-shake' | 'compacting' | 'compact-pop' = 'hidden';
+	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' | 'compact-shake' | 'compacting' | 'compact-pop' = 'idle';
 	private _exitVariant: 'exit' | 'exit-roll' = 'exit';
 	private _entryVariant: 'enter' | 'enter-roll' = 'enter';
 	private _compactEntryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -54,10 +54,7 @@ export class StreamingMessageContainer extends LitElement {
 				}, this._exitVariant === 'exit-roll' ? 900 : 700);
 			}
 		}
-		// If there are messages but blob is still hidden, show as idle
-		if (changed.has("hasMessages") && this._blobState === 'hidden' && this.hasMessages) {
-			this._blobState = 'idle';
-		}
+
 	}
 
 	private get _blobVisible() {

@@ -11,7 +11,16 @@ export type ClientMessage =
 	| { type: "get_messages" }
 	| { type: "set_title"; title: string }
 	| { type: "generate_title" }
-	| { type: "ping" };
+	| { type: "ping" }
+	| { type: "start_workflow"; workflowId: string }
+	| { type: "workflow_advance" }
+	| { type: "workflow_reset"; phaseId: string; context?: string }
+	| { type: "workflow_collect_artifact"; name: string; content: string; mimeType?: string }
+	| { type: "workflow_set_context"; key: string; value: string }
+	| { type: "workflow_complete" }
+	| { type: "workflow_fail"; reason?: string }
+	| { type: "workflow_cancel" }
+	| { type: "workflow_status" };
 
 /** Server → Client messages over WebSocket */
 export type ServerMessage =
@@ -25,4 +34,8 @@ export type ServerMessage =
 	| { type: "error"; message: string; code: string }
 	| { type: "session_status"; status: string }
 	| { type: "session_title"; sessionId: string; title: string }
-	| { type: "pong" };
+	| { type: "pong" }
+	| { type: "workflow_state"; data: unknown }
+	| { type: "workflow_phase_changed"; data: unknown }
+	| { type: "workflow_completed"; data: unknown }
+	| { type: "workflow_report"; reportUrl: string };

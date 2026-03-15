@@ -3,8 +3,11 @@ import fs from "node:fs";
 import type { WebSocket } from "ws";
 import type { ServerMessage } from "../ws/protocol.js";
 import { EventBuffer } from "./event-buffer.js";
+import { GoalManager } from "./goal-manager.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
+import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
+import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 
 export type SessionStatus = "starting" | "idle" | "streaming" | "terminated";
@@ -22,6 +25,9 @@ export interface SessionInfo {
 	unsubscribe: () => void;
 	isCompacting: boolean;
 	titleGenerated: boolean;
+	goalId?: string;
+	/** True if this is a goal-creation assistant session */
+	goalAssistant?: boolean;
 }
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
@@ -45,10 +51,12 @@ export class SessionManager {
 	private agentCliPath?: string;
 	private systemPromptPath?: string;
 	private store = new SessionStore();
+	goalManager: GoalManager;
 
 	constructor(options?: SessionManagerOptions) {
 		this.agentCliPath = options?.agentCliPath;
 		this.systemPromptPath = options?.systemPromptPath;
+		this.goalManager = new GoalManager();
 	}
 
 	/**
@@ -91,6 +99,7 @@ export class SessionManager {
 					unsubscribe: () => {},
 					isCompacting: false,
 					titleGenerated: true,
+					goalId: ps.goalId,
 				});
 			}
 		}
@@ -99,7 +108,17 @@ export class SessionManager {
 	private async restoreSession(ps: PersistedSession): Promise<void> {
 		const bridgeOptions: RpcBridgeOptions = { cwd: ps.cwd };
 		if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
-		if (this.systemPromptPath) bridgeOptions.systemPromptPath = this.systemPromptPath;
+
+		// Re-assemble system prompt (global + AGENTS.md + goal spec)
+		const goal = ps.goalId ? this.goalManager.getGoal(ps.goalId) : undefined;
+		const promptPath = assembleSystemPrompt(ps.id, {
+			baseSystemPromptPath: this.systemPromptPath,
+			cwd: ps.cwd,
+			goalTitle: goal?.title,
+			goalState: goal?.state,
+			goalSpec: goal?.spec,
+		});
+		if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 
 		const rpcClient = new RpcBridge(bridgeOptions);
 		const eventBuffer = new EventBuffer();
@@ -117,6 +136,7 @@ export class SessionManager {
 			unsubscribe: () => {},
 			isCompacting: false,
 			titleGenerated: ps.title !== "New session",
+			goalId: ps.goalId,
 		};
 
 		const unsub = rpcClient.onEvent((event: any) => {
@@ -153,7 +173,7 @@ export class SessionManager {
 		this.sessions.set(ps.id, session);
 	}
 
-	async createSession(cwd: string, agentArgs?: string[]): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -163,8 +183,28 @@ export class SessionManager {
 		if (this.agentCliPath) {
 			bridgeOptions.cliPath = this.agentCliPath;
 		}
-		if (this.systemPromptPath) {
-			bridgeOptions.systemPromptPath = this.systemPromptPath;
+
+		if (goalAssistant) {
+			// Goal assistant sessions get a special system prompt
+			const promptPath = assembleSystemPrompt(id, {
+				baseSystemPromptPath: undefined,
+				cwd,
+				goalSpec: GOAL_ASSISTANT_PROMPT,
+				goalTitle: "Goal Creation Assistant",
+				goalState: "active",
+			});
+			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		} else {
+			// Normal sessions: global base + AGENTS.md from cwd + goal spec
+			const goal = goalId ? this.goalManager.getGoal(goalId) : undefined;
+			const promptPath = assembleSystemPrompt(id, {
+				baseSystemPromptPath: this.systemPromptPath,
+				cwd,
+				goalTitle: goal?.title,
+				goalState: goal?.state,
+				goalSpec: goal?.spec,
+			});
+			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
 
 		const rpcClient = new RpcBridge(bridgeOptions);
@@ -173,7 +213,7 @@ export class SessionManager {
 		const now = Date.now();
 		const session: SessionInfo = {
 			id,
-			title: "New session",
+			title: goalAssistant ? "Goal Assistant" : "New session",
 			cwd,
 			status: "starting",
 			createdAt: now,
@@ -183,7 +223,9 @@ export class SessionManager {
 			eventBuffer,
 			unsubscribe: () => {},
 			isCompacting: false,
-			titleGenerated: false,
+			titleGenerated: goalAssistant ? true : false,
+			goalId,
+			goalAssistant,
 		};
 
 		// Subscribe to agent events — broadcast to all connected clients
@@ -257,6 +299,7 @@ export class SessionManager {
 			agentSessionFile: stateResp.data.sessionFile,
 			createdAt: session.createdAt,
 			lastActivity: session.lastActivity,
+			goalId: session.goalId,
 		});
 	}
 
@@ -273,6 +316,8 @@ export class SessionManager {
 		lastActivity: number;
 		clientCount: number;
 		isCompacting: boolean;
+		goalId?: string;
+		goalAssistant?: boolean;
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -283,6 +328,8 @@ export class SessionManager {
 			lastActivity: s.lastActivity,
 			clientCount: s.clients.size,
 			isCompacting: s.isCompacting,
+			goalId: s.goalId,
+			goalAssistant: s.goalAssistant,
 		}));
 	}
 
@@ -354,6 +401,7 @@ export class SessionManager {
 
 		this.sessions.delete(id);
 		this.store.remove(id);
+		cleanupSessionPrompt(id);
 		return true;
 	}
 

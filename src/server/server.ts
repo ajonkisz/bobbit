@@ -8,6 +8,7 @@ import { RateLimiter } from "./auth/rate-limit.js";
 import { validateToken } from "./auth/token.js";
 import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
+import { listWorkflows, readArtifact, listArtifactFiles, WorkflowRunner } from "./workflows/index.js";
 
 export interface TlsConfig {
 	cert: string;  // path to PEM certificate
@@ -161,16 +162,93 @@ async function handleApiRoute(
 	// POST /api/sessions
 	if (url.pathname === "/api/sessions" && req.method === "POST") {
 		const body = await readBody(req);
-		const cwd = body?.cwd || config.defaultCwd;
+		const goalId = body?.goalId;
+		const goalAssistant = body?.goalAssistant === true;
+
+		// If creating under a goal, use the goal's cwd as default
+		let cwd = body?.cwd || config.defaultCwd;
+		if (goalId) {
+			const goal = sessionManager.goalManager.getGoal(goalId);
+			if (goal) {
+				cwd = body?.cwd || goal.cwd;
+				// Auto-transition goal to in-progress when first session starts
+				if (goal.state === "todo") {
+					sessionManager.goalManager.updateGoal(goalId, { state: "in-progress" });
+				}
+			}
+		}
+
 		const args = body?.args;
 
 		try {
-			const session = await sessionManager.createSession(cwd, args);
-			json({ id: session.id, cwd: session.cwd, status: session.status }, 201);
+			const session = await sessionManager.createSession(cwd, args, goalId, goalAssistant);
+			json({
+				id: session.id,
+				cwd: session.cwd,
+				status: session.status,
+				goalId: session.goalId,
+				goalAssistant: session.goalAssistant,
+			}, 201);
 		} catch (err) {
 			json({ error: String(err) }, 500);
 		}
 		return;
+	}
+
+	// ── Goal endpoints ─────────────────────────────────────────────
+
+	// GET /api/goals
+	if (url.pathname === "/api/goals" && req.method === "GET") {
+		json({ goals: sessionManager.goalManager.listGoals() });
+		return;
+	}
+
+	// POST /api/goals
+	if (url.pathname === "/api/goals" && req.method === "POST") {
+		const body = await readBody(req);
+		const title = body?.title;
+		const cwd = body?.cwd || config.defaultCwd;
+		const spec = body?.spec || "";
+		if (!title || typeof title !== "string") {
+			json({ error: "Missing title" }, 400);
+			return;
+		}
+		const goal = sessionManager.goalManager.createGoal(title, cwd, spec);
+		json(goal, 201);
+		return;
+	}
+
+	// Routes with goal :id parameter
+	const goalMatch = url.pathname.match(/^\/api\/goals\/([^/]+)$/);
+	if (goalMatch) {
+		const id = goalMatch[1];
+
+		if (req.method === "GET") {
+			const goal = sessionManager.goalManager.getGoal(id);
+			if (!goal) { json({ error: "Goal not found" }, 404); return; }
+			json(goal);
+			return;
+		}
+
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			const ok = sessionManager.goalManager.updateGoal(id, {
+				title: body.title,
+				cwd: body.cwd,
+				state: body.state,
+				spec: body.spec,
+			});
+			if (!ok) { json({ error: "Goal not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
+
+		if (req.method === "DELETE") {
+			sessionManager.goalManager.deleteGoal(id);
+			json({ ok: true });
+			return;
+		}
 	}
 
 	// Routes with :id parameter
@@ -271,6 +349,65 @@ async function handleApiRoute(
 		} catch (err) {
 			json({ error: String(err) }, 500);
 		}
+		return;
+	}
+
+	// GET /api/workflows — list available workflow definitions
+	if (url.pathname === "/api/workflows" && req.method === "GET") {
+		json({ workflows: listWorkflows().map((w) => ({ id: w.id, name: w.name, description: w.description, phaseCount: w.phases.length })) });
+		return;
+	}
+
+	// GET /api/sessions/:id/workflow — get workflow state for a session
+	const workflowStateMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow$/);
+	if (workflowStateMatch && req.method === "GET") {
+		const id = workflowStateMatch[1];
+		const session = sessionManager.getSession(id);
+		const runner = (session as any)?._workflowRunner as InstanceType<typeof WorkflowRunner> | undefined
+			?? WorkflowRunner.restore(id);
+		if (!runner) {
+			json({ error: "No workflow for this session" }, 404);
+			return;
+		}
+		json(runner.getState());
+		return;
+	}
+
+	// GET /api/sessions/:id/workflow/report — serve the HTML report
+	const workflowReportMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/report$/);
+	if (workflowReportMatch && req.method === "GET") {
+		const id = workflowReportMatch[1];
+		const html = readArtifact(id, "report.html");
+		if (!html) {
+			json({ error: "Report not found" }, 404);
+			return;
+		}
+		res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+		res.end(html);
+		return;
+	}
+
+	// GET /api/sessions/:id/workflow/artifacts — list artifacts
+	const artifactListMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/artifacts$/);
+	if (artifactListMatch && req.method === "GET") {
+		const id = artifactListMatch[1];
+		json({ artifacts: listArtifactFiles(id) });
+		return;
+	}
+
+	// GET /api/sessions/:id/workflow/artifacts/:filename — serve an artifact
+	const artifactMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/artifacts\/([^/]+)$/);
+	if (artifactMatch && req.method === "GET") {
+		const [, id, filename] = artifactMatch;
+		const content = readArtifact(id, decodeURIComponent(filename));
+		if (!content) {
+			json({ error: "Artifact not found" }, 404);
+			return;
+		}
+		const ext = filename.split(".").pop()?.toLowerCase() || "";
+		const mimeType = MIME_TYPES[`.${ext}`] || "application/octet-stream";
+		res.writeHead(200, { "Content-Type": mimeType });
+		res.end(content);
 		return;
 	}
 

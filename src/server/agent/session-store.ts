@@ -11,6 +11,8 @@ export interface PersistedSession {
 	agentSessionFile: string;
 	createdAt: number;
 	lastActivity: number;
+	/** Optional goal this session belongs to */
+	goalId?: string;
 }
 
 const STORE_DIR = path.join(os.homedir(), ".pi");
@@ -75,7 +77,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);

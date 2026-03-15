@@ -16,8 +16,9 @@ import {
 } from "../ui/index.js";
 import { Select, type SelectOption } from "@mariozechner/mini-lit/dist/Select.js";
 import { html, render } from "lit";
-import { ArrowLeft, Brain, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users, WandSparkles } from "lucide";
+import { ArrowLeft, Brain, Crosshair, PanelLeftClose, PanelLeftOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users, WandSparkles } from "lucide";
 import QRCode from "qrcode";
+import "@mariozechner/mini-lit/dist/MarkdownBlock.js";
 import "./app.css";
 import { RemoteAgent, type ConnectionStatus } from "./remote-agent.js";
 
@@ -68,13 +69,56 @@ interface GatewaySession {
 	lastActivity: number;
 	clientCount: number;
 	isCompacting?: boolean;
+	goalId?: string;
+	goalAssistant?: boolean;
 }
+
+type GoalState = "todo" | "in-progress" | "complete" | "shelved";
+
+interface Goal {
+	id: string;
+	title: string;
+	cwd: string;
+	state: GoalState;
+	spec: string;
+	createdAt: number;
+	updatedAt: number;
+}
+
 let gatewaySessions: GatewaySession[] = [];
+let goals: Goal[] = [];
 let sessionsLoading = false;
 let sessionsError = "";
 let creatingSession = false;
+let creatingSessionForGoalId: string | null = null;
 let connectingSessionId: string | null = null;
 let sessionPollTimer: ReturnType<typeof setInterval> | null = null;
+/** Track which goals are expanded in the sidebar */
+let expandedGoals: Set<string> = new Set();
+/** Whether ungrouped sessions are expanded */
+let ungroupedExpanded = true;
+/** Whether the sidebar is collapsed */
+let sidebarCollapsed = false;
+/** Active goal proposal from a goal-assistant session */
+let activeGoalProposal: { title: string; spec: string; cwd?: string } | null = null;
+
+// ── Goal assistant split-screen state ─────────────────────────────
+/** Whether the currently connected session is a goal assistant */
+let isGoalAssistantSession = false;
+/** Mobile tab for goal assistant view */
+let goalAssistantTab: "chat" | "preview" = "chat";
+/** Editable preview state — persists user edits across proposal updates */
+let previewTitle = "";
+let previewCwd = "";
+let previewSpec = "";
+/** Track which fields the user has manually edited since the last proposal */
+let previewTitleEdited = false;
+let previewCwdEdited = false;
+let previewSpecEdited = false;
+/** Whether we've received at least one proposal */
+let hasReceivedProposal = false;
+/** Whether the preview spec is in edit mode (vs rendered markdown) */
+let previewSpecEditMode = false;
 
 const SIDEBAR_BREAKPOINT = 768;
 let windowWidth = window.innerWidth;
@@ -502,10 +546,25 @@ async function refreshSessions(): Promise<void> {
 	}
 
 	try {
-		const res = await gatewayFetch("/api/sessions");
-		if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`);
-		const data = await res.json();
-		gatewaySessions = data.sessions || [];
+		const [sessionsRes, goalsRes] = await Promise.all([
+			gatewayFetch("/api/sessions"),
+			gatewayFetch("/api/goals"),
+		]);
+		if (!sessionsRes.ok) throw new Error(`Failed to fetch sessions: ${sessionsRes.status}`);
+		const sessionsData = await sessionsRes.json();
+		gatewaySessions = sessionsData.sessions || [];
+
+		if (goalsRes.ok) {
+			const goalsData = await goalsRes.json();
+			goals = goalsData.goals || [];
+			// Auto-expand goals that have active sessions
+			for (const g of goals) {
+				if (gatewaySessions.some((s) => s.goalId === g.id)) {
+					expandedGoals.add(g.id);
+				}
+			}
+		}
+
 		sessionsError = "";
 	} catch (err) {
 		// On background poll failure, keep existing data instead of clearing
@@ -516,6 +575,64 @@ async function refreshSessions(): Promise<void> {
 	} finally {
 		sessionsLoading = false;
 		renderApp();
+	}
+}
+
+// ============================================================================
+// GOAL API HELPERS
+// ============================================================================
+
+async function createGoal(title: string, cwd: string, spec = ""): Promise<Goal | null> {
+	try {
+		const res = await gatewayFetch("/api/goals", {
+			method: "POST",
+			body: JSON.stringify({ title, cwd, spec }),
+		});
+		if (!res.ok) throw new Error(`Failed to create goal: ${res.status}`);
+		const goal = await res.json();
+		await refreshSessions();
+		expandedGoals.add(goal.id);
+		return goal;
+	} catch (err) {
+		showConnectionError("Failed to create goal", err instanceof Error ? err.message : String(err));
+		return null;
+	}
+}
+
+async function updateGoal(id: string, updates: Partial<Pick<Goal, "title" | "cwd" | "state" | "spec">>): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(updates),
+		});
+		if (!res.ok) throw new Error(`Failed to update goal: ${res.status}`);
+		await refreshSessions();
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to update goal", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
+
+async function deleteGoal(id: string): Promise<void> {
+	const goal = goals.find((g) => g.id === id);
+	const goalTitle = goal?.title || "this goal";
+	const sessionsUnderGoal = gatewaySessions.filter((s) => s.goalId === id);
+
+	let message = `Are you sure you want to delete "${goalTitle}"?`;
+	if (sessionsUnderGoal.length > 0) {
+		message += ` Its ${sessionsUnderGoal.length} session(s) will become ungrouped.`;
+	}
+
+	const confirmed = await confirmAction("Delete Goal", message, "Delete", true);
+	if (!confirmed) return;
+
+	try {
+		await gatewayFetch(`/api/goals/${id}`, { method: "DELETE" });
+		expandedGoals.delete(id);
+		await refreshSessions();
+	} catch (err) {
+		showConnectionError("Failed to delete goal", err instanceof Error ? err.message : String(err));
 	}
 }
 
@@ -558,13 +675,25 @@ function showConnectionError(title: string, message: string): void {
 }
 
 /** Phase 2: Connect to a specific session (existing or newly created) */
-async function connectToSession(sessionId: string, isExisting: boolean): Promise<void> {
+async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean }): Promise<void> {
 	// Guard against concurrent connection attempts — if we're already
 	// connecting to ANY session, bail out. This prevents parallel WebSocket
 	// races when the user taps quickly on mobile.
 	if (connectingSessionId) return;
 
 	connectingSessionId = sessionId;
+
+	// Disconnect previous session before connecting to the new one.
+	// Without this, the old RemoteAgent's WebSocket stays open and its
+	// callbacks (onConnectionStatusChange, auto-reconnect) can interfere
+	// with global state — causing the UI to flash a reconnect banner or
+	// even swap back to the old session.
+	if (remoteAgent) {
+		remoteAgent.disconnect();
+		remoteAgent = null;
+		connectionStatus = "disconnected";
+	}
+
 	renderApp();
 
 	try {
@@ -617,6 +746,22 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 			connectionStatus = status;
 			renderApp();
 		};
+
+		// Detect goal proposals from goal-assistant sessions
+		remote.onGoalProposal = (proposal) => {
+			activeGoalProposal = proposal;
+			// Update preview fields, respecting user edits
+			if (!previewTitleEdited) previewTitle = proposal.title;
+			if (!previewCwdEdited) previewCwd = proposal.cwd || "";
+			if (!previewSpecEdited) previewSpec = proposal.spec;
+			hasReceivedProposal = true;
+			// Auto-switch to preview tab on first proposal (mobile)
+			if (goalAssistantTab === "chat" && !isDesktop()) {
+				goalAssistantTab = "preview";
+			}
+			renderApp();
+		};
+
 		connectionStatus = "connected";
 
 		remoteAgent = remote;
@@ -643,6 +788,28 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 			remote.requestMessages();
 		}
 
+		// Track goal assistant state — check options first, then fall back to server data
+		const sessionData = gatewaySessions.find((s) => s.id === sessionId);
+		isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
+
+		// Reset preview state when entering a goal assistant session
+		if (isGoalAssistantSession) {
+			goalAssistantTab = "chat";
+			previewTitle = "";
+			previewCwd = "";
+			previewSpec = "";
+			previewTitleEdited = false;
+			previewCwdEdited = false;
+			previewSpecEdited = false;
+			hasReceivedProposal = false;
+			previewSpecEditMode = false;
+		}
+
+		// Auto-prompt goal assistant sessions so the agent greets the user immediately
+		if (options?.isGoalAssistant && !isExisting) {
+			remote.prompt("Start the goal creation session.");
+		}
+
 		// Focus the message input after rendering
 		requestAnimationFrame(() => {
 			const textarea = document.querySelector("message-editor")?.querySelector("textarea");
@@ -661,12 +828,18 @@ async function connectToSession(sessionId: string, isExisting: boolean): Promise
 }
 
 /** Create a brand-new session on the gateway, then connect to it */
-async function createAndConnectSession(): Promise<void> {
+async function createAndConnectSession(goalId?: string): Promise<void> {
 	if (creatingSession) return;
 	creatingSession = true;
+	creatingSessionForGoalId = goalId || null;
 	renderApp();
 	try {
-		const res = await gatewayFetch("/api/sessions", { method: "POST" });
+		const body: any = {};
+		if (goalId) body.goalId = goalId;
+		const res = await gatewayFetch("/api/sessions", {
+			method: "POST",
+			body: JSON.stringify(body),
+		});
 		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
 		const { id } = await res.json();
 		await connectToSession(id, false);
@@ -675,6 +848,7 @@ async function createAndConnectSession(): Promise<void> {
 		showConnectionError("Failed to create session", msg);
 	} finally {
 		creatingSession = false;
+		creatingSessionForGoalId = null;
 		renderApp();
 	}
 }
@@ -761,6 +935,8 @@ function backToSessions(): void {
 	remoteAgent?.disconnect();
 	remoteAgent = null;
 	connectionStatus = "disconnected";
+	activeGoalProposal = null;
+	isGoalAssistantSession = false;
 	localStorage.removeItem(GW_SESSION_KEY);
 	appView = "authenticated";
 	mobileHeaderVisible = true;
@@ -775,6 +951,7 @@ function disconnectGateway(): void {
 	remoteAgent?.disconnect();
 	remoteAgent = null;
 	connectionStatus = "disconnected";
+	isGoalAssistantSession = false;
 	appView = "disconnected";
 	localStorage.removeItem(GW_SESSION_KEY);
 	teardownMobileScrollTracking();
@@ -952,6 +1129,276 @@ async function showQrCodeDialog(): Promise<void> {
 		}),
 		container,
 	);
+}
+
+// ============================================================================
+// GOAL DIALOGS
+// ============================================================================
+
+const GOAL_STATE_LABELS: Record<GoalState, string> = {
+	"todo": "To Do",
+	"in-progress": "In Progress",
+	"complete": "Complete",
+	"shelved": "Shelved",
+};
+
+const GOAL_STATE_COLORS: Record<GoalState, string> = {
+	"todo": "text-muted-foreground",
+	"in-progress": "text-yellow-600 dark:text-yellow-400",
+	"complete": "text-green-600 dark:text-green-400",
+	"shelved": "text-muted-foreground opacity-60",
+};
+
+/** Show the goal dialog — AI-assisted for new goals, form for editing existing ones */
+function showGoalDialog(existingGoal?: Goal): void {
+	if (existingGoal) {
+		showGoalEditDialog(existingGoal);
+	} else {
+		createGoalAssistantSession();
+	}
+}
+
+/** Create a goal assistant session and connect to it using the normal chat UI */
+async function createGoalAssistantSession(): Promise<void> {
+	if (creatingSession) return;
+	creatingSession = true;
+	renderApp();
+	try {
+		const res = await gatewayFetch("/api/sessions", {
+			method: "POST",
+			body: JSON.stringify({ goalAssistant: true }),
+		});
+		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
+		const { id } = await res.json();
+		await connectToSession(id, false, { isGoalAssistant: true });
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		showConnectionError("Failed to create goal assistant", msg);
+	} finally {
+		creatingSession = false;
+		renderApp();
+	}
+}
+
+/** Open the edit dialog pre-filled with a proposal, then create the goal on save */
+function showGoalEditDialogFromProposal(proposal: { title: string; spec: string; cwd?: string }): void {
+	const container = document.createElement("div");
+	document.body.appendChild(container);
+
+	let titleValue = proposal.title;
+	let cwdValue = proposal.cwd || "";
+	let specValue = proposal.spec;
+	let saving = false;
+
+	const cleanup = () => {
+		render(html``, container);
+		container.remove();
+	};
+
+	const doSave = async () => {
+		const trimmedTitle = titleValue.trim();
+		if (!trimmedTitle) return;
+		saving = true;
+		renderProposalDialog();
+
+		const sessionId = activeSessionId();
+		await createGoal(trimmedTitle, cwdValue.trim(), specValue);
+		activeGoalProposal = null;
+		// Terminate the assistant session
+		if (sessionId) {
+			await terminateSession(sessionId);
+		}
+		saving = false;
+		cleanup();
+	};
+
+	const renderProposalDialog = () => {
+		render(
+			Dialog({
+				isOpen: true,
+				onClose: cleanup,
+				width: "min(540px, 92vw)",
+				height: "auto",
+				backdropClassName: "bg-black/50 backdrop-blur-sm",
+				children: html`
+					${DialogContent({
+						children: html`
+							${DialogHeader({ title: "Create Goal from Proposal" })}
+							<div class="mt-4 flex flex-col gap-4">
+								<div>
+									<label class="text-xs text-muted-foreground mb-1 block">Title</label>
+									${Input({
+										type: "text",
+										value: titleValue,
+										onInput: (e: Event) => { titleValue = (e.target as HTMLInputElement).value; renderProposalDialog(); },
+									})}
+								</div>
+								<div>
+									<label class="text-xs text-muted-foreground mb-1 block">Working Directory</label>
+									${Input({
+										type: "text",
+										placeholder: "(server default)",
+										value: cwdValue,
+										onInput: (e: Event) => { cwdValue = (e.target as HTMLInputElement).value; },
+									})}
+								</div>
+								<div>
+									<label class="text-xs text-muted-foreground mb-1 block">Goal Spec (Markdown)</label>
+									<textarea
+										class="w-full min-h-[160px] max-h-[300px] p-3 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+										.value=${specValue}
+										@input=${(e: Event) => { specValue = (e.target as HTMLTextAreaElement).value; }}
+									></textarea>
+								</div>
+							</div>
+						`,
+					})}
+					${DialogFooter({
+						className: "px-6 pb-4",
+						children: html`
+							<div class="flex gap-2 justify-end">
+								${Button({ variant: "ghost", onClick: cleanup, children: "Cancel" })}
+								${Button({
+									variant: "default",
+									onClick: doSave,
+									disabled: !titleValue.trim() || saving,
+									children: saving ? "Creating…" : "Create Goal",
+								})}
+							</div>
+						`,
+					})}
+				`,
+			}),
+			container,
+		);
+	};
+
+	renderProposalDialog();
+}
+
+/** Form-based dialog for editing an existing goal */
+function showGoalEditDialog(existingGoal: Goal): void {
+	const container = document.createElement("div");
+	document.body.appendChild(container);
+
+	let titleValue = existingGoal.title;
+	let cwdValue = existingGoal.cwd;
+	let specValue = existingGoal.spec;
+	let stateValue: GoalState = existingGoal.state;
+	let saving = false;
+
+	const cleanup = () => {
+		render(html``, container);
+		container.remove();
+	};
+
+	const doSave = async () => {
+		const trimmedTitle = titleValue.trim();
+		if (!trimmedTitle) return;
+		saving = true;
+		renderDialog();
+
+		await updateGoal(existingGoal.id, {
+			title: trimmedTitle,
+			cwd: cwdValue.trim() || undefined,
+			state: stateValue,
+			spec: specValue,
+		});
+		saving = false;
+		cleanup();
+	};
+
+	const renderDialog = () => {
+		const stateOptions = (["todo", "in-progress", "complete", "shelved"] as GoalState[]).map(
+			(s) => ({ value: s, label: GOAL_STATE_LABELS[s] }),
+		);
+
+		render(
+			Dialog({
+				isOpen: true,
+				onClose: cleanup,
+				width: "min(540px, 92vw)",
+				height: "auto",
+				backdropClassName: "bg-black/50 backdrop-blur-sm",
+				children: html`
+					${DialogContent({
+						children: html`
+							${DialogHeader({ title: "Edit Goal" })}
+							<div class="mt-4 flex flex-col gap-4">
+								<div>
+									<label class="text-xs text-muted-foreground mb-1 block">Title</label>
+									${Input({
+										type: "text",
+										value: titleValue,
+										onInput: (e: Event) => { titleValue = (e.target as HTMLInputElement).value; renderDialog(); },
+										onKeyDown: (e: KeyboardEvent) => {
+											if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSave(); }
+											if (e.key === "Escape") cleanup();
+										},
+									})}
+								</div>
+								<div>
+									<label class="text-xs text-muted-foreground mb-1 block">Working Directory</label>
+									${Input({
+										type: "text",
+										placeholder: "/path/to/project",
+										value: cwdValue,
+										onInput: (e: Event) => { cwdValue = (e.target as HTMLInputElement).value; },
+									})}
+								</div>
+								<div>
+									<label class="text-xs text-muted-foreground mb-1 block">State</label>
+									<div class="flex gap-1.5">
+										${stateOptions.map((opt) => html`
+											<button
+												class="px-3 py-1.5 text-xs rounded-md border transition-colors
+													${stateValue === opt.value
+														? "border-primary bg-primary/10 text-primary font-medium"
+														: "border-border text-muted-foreground hover:bg-secondary"}"
+												@click=${() => { stateValue = opt.value as GoalState; renderDialog(); }}
+											>${opt.label}</button>
+										`)}
+									</div>
+								</div>
+								<div>
+									<label class="text-xs text-muted-foreground mb-1 block">Goal Spec (Markdown)</label>
+									<textarea
+										class="w-full min-h-[120px] max-h-[300px] p-3 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+										placeholder="Describe the goal, acceptance criteria, constraints..."
+										.value=${specValue}
+										@input=${(e: Event) => { specValue = (e.target as HTMLTextAreaElement).value; }}
+									></textarea>
+									<p class="text-[10px] text-muted-foreground mt-1">Injected into the context window of all sessions under this goal.</p>
+								</div>
+							</div>
+						`,
+					})}
+					${DialogFooter({
+						className: "px-6 pb-4",
+						children: html`
+							<div class="flex gap-2 justify-end">
+								${Button({ variant: "ghost", onClick: cleanup, children: "Cancel" })}
+								${Button({
+									variant: "default",
+									onClick: doSave,
+									disabled: !titleValue.trim() || saving,
+									children: saving ? "Saving…" : "Save",
+								})}
+							</div>
+						`,
+					})}
+				`,
+			}),
+			container,
+		);
+
+		requestAnimationFrame(() => {
+			const input = container.querySelector("input");
+			if (input) { input.focus(); input.select(); }
+		});
+	};
+
+	renderDialog();
 }
 
 // ============================================================================
@@ -1275,11 +1722,136 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 // SIDEBAR (desktop only, when authenticated)
 // ============================================================================
 
+function goalStateIcon(state: GoalState) {
+	const icons: Record<GoalState, string> = {
+		"todo": "○",
+		"in-progress": "◐",
+		"complete": "●",
+		"shelved": "◌",
+	};
+	return icons[state] || "○";
+}
+
+function renderSidebarGoal(goal: Goal) {
+	const isExpanded = expandedGoals.has(goal.id);
+	const goalSessions = gatewaySessions.filter((s) => s.goalId === goal.id);
+	const hasActiveSessions = goalSessions.some((s) => s.status === "streaming");
+	const isCreatingHere = creatingSessionForGoalId === goal.id;
+
+	return html`
+		<div class="mt-1">
+			<!-- Goal header -->
+			<div class="group flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-secondary/50 transition-colors"
+				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); renderApp(); }}>
+				<span class="text-[10px] text-muted-foreground w-3 shrink-0 text-center select-none">${isExpanded ? "▾" : "▸"}</span>
+				<span class="shrink-0 text-xs ${GOAL_STATE_COLORS[goal.state]}" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state)}</span>
+				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}"
+					title=${goal.title}>${goal.title}</span>
+				<span class="text-[10px] text-muted-foreground tabular-nums">${goalSessions.length}</span>
+				<!-- Goal actions (visible on hover) -->
+				<div class="sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-0 shrink-0 transition-opacity">
+					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
+						@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(goal.id); }}
+						title="New session in this goal">
+						${icon(Plus, "xs")}
+					</button>
+					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
+						@click=${(e: Event) => { e.stopPropagation(); showGoalDialog(goal); }}
+						title="Edit goal">
+						${icon(Pencil, "xs")}
+					</button>
+					<button class="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+						@click=${(e: Event) => { e.stopPropagation(); deleteGoal(goal.id); }}
+						title="Delete goal">
+						${icon(Trash2, "xs")}
+					</button>
+				</div>
+			</div>
+			<!-- Goal sessions (if expanded) -->
+			${isExpanded ? html`
+				<div class="ml-3 flex flex-col gap-0.5">
+					${goalSessions.length === 0 && !isCreatingHere
+						? html`<div class="px-2 py-1.5 text-[10px] text-muted-foreground">
+								No sessions —
+								<button class="text-primary hover:underline" @click=${() => createAndConnectSession(goal.id)}>start one</button>
+							</div>`
+						: goalSessions.map(renderSidebarSession)}
+					${isCreatingHere ? html`<div class="px-2 py-1.5 text-[10px] text-muted-foreground flex items-center gap-1">
+						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+						Creating…
+					</div>` : ""}
+				</div>
+			` : ""}
+		</div>
+	`;
+}
+
+function toggleSidebar() {
+	sidebarCollapsed = !sidebarCollapsed;
+	renderApp();
+}
+
 function renderSidebar() {
+	const ungroupedSessions = gatewaySessions.filter((s) => !s.goalId);
+	// Sort goals: in-progress first, then todo, then complete/shelved
+	const stateOrder: Record<GoalState, number> = { "in-progress": 0, "todo": 1, "complete": 2, "shelved": 3 };
+	const sortedGoals = [...goals].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
+
+	if (sidebarCollapsed) {
+		const allSessions = gatewaySessions;
+		const ungrouped = allSessions.filter((s) => !s.goalId);
+		const stateOrder: Record<GoalState, number> = { "in-progress": 0, "todo": 1, "complete": 2, "shelved": 3 };
+		const sortedGoalsCollapsed = [...goals].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
+
+		return html`
+			<div class="w-10 shrink-0 h-full flex flex-col items-center" style="background: var(--sidebar);">
+				<div class="flex-1 overflow-y-auto flex flex-col items-center gap-0.5 py-2">
+					${sortedGoalsCollapsed.map((goal) => {
+						const goalSessions = allSessions.filter((s) => s.goalId === goal.id);
+						return html`
+							<div class="flex flex-col items-center gap-0.5">
+								<span class="text-[10px] ${GOAL_STATE_COLORS[goal.state]} cursor-default" title=${goal.title}>${goalStateIcon(goal.state)}</span>
+								${goalSessions.map((s) => {
+									const active = activeSessionId() === s.id;
+									const displayTitle = active && remoteAgent ? remoteAgent.title : s.title;
+									return html`
+										<button
+											class="p-1 rounded-md transition-colors ${active ? "bg-secondary" : "hover:bg-secondary/50"}"
+											title=${displayTitle}
+											@click=${() => { if (!active) connectToSession(s.id, true); }}
+										>${statusBobbit(s.status, s.isCompacting)}</button>
+									`;
+								})}
+							</div>
+						`;
+					})}
+					${ungrouped.length > 0 && sortedGoalsCollapsed.length > 0 ? html`<div class="w-5 border-t border-border/50 my-1"></div>` : ""}
+					${ungrouped.map((s) => {
+						const active = activeSessionId() === s.id;
+						const displayTitle = active && remoteAgent ? remoteAgent.title : s.title;
+						return html`
+							<button
+								class="p-1 rounded-md transition-colors ${active ? "bg-secondary" : "hover:bg-secondary/50"}"
+								title=${displayTitle}
+								@click=${() => { if (!active) connectToSession(s.id, true); }}
+							>${statusBobbit(s.status, s.isCompacting)}</button>
+						`;
+					})}
+				</div>
+				<button
+					class="p-2 mb-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+					@click=${toggleSidebar}
+					title="Expand sidebar (Ctrl+[)"
+				>
+					${icon(PanelLeftOpen, "sm")}
+				</button>
+			</div>
+		`;
+	}
+
 	return html`
 		<div class="w-[240px] shrink-0 h-full flex flex-col" style="background: var(--sidebar);">
-			<!-- Session list — starts immediately, no separate header -->
-			<div class="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5">
+			<div class="flex-1 overflow-y-auto p-2 flex flex-col gap-0">
 				${sessionsLoading
 					? html`<div class="text-center py-6 text-muted-foreground text-xs">Loading…</div>`
 					: sessionsError
@@ -1287,14 +1859,45 @@ function renderSidebar() {
 								<p class="text-xs text-red-500 mb-2">${sessionsError}</p>
 								<button class="text-xs text-muted-foreground hover:text-foreground underline" @click=${refreshSessions}>Retry</button>
 							</div>`
-						: gatewaySessions.length === 0
-							? html`<div class="text-center py-6">
-									<p class="text-xs text-muted-foreground mb-2">No sessions</p>
-									<button class="text-xs text-primary hover:underline" @click=${createAndConnectSession}>Create one</button>
-								</div>`
-							: gatewaySessions.map(renderSidebarSession)
+						: html`
+							<!-- Goals -->
+							${sortedGoals.map(renderSidebarGoal)}
+
+							<!-- Ungrouped sessions -->
+							${ungroupedSessions.length > 0 && sortedGoals.length > 0 ? html`
+								<div class="mt-2 pt-1.5 border-t border-border/50">
+									<div class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
+										@click=${() => { ungroupedExpanded = !ungroupedExpanded; renderApp(); }}>
+										<span class="text-[10px] text-muted-foreground w-3 shrink-0 text-center select-none">${ungroupedExpanded ? "▾" : "▸"}</span>
+										<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
+										<span class="text-[10px] text-muted-foreground tabular-nums">${ungroupedSessions.length}</span>
+									</div>
+									${ungroupedExpanded ? html`
+										<div class="flex flex-col gap-0.5">
+											${ungroupedSessions.map(renderSidebarSession)}
+										</div>
+									` : ""}
+								</div>
+							` : sortedGoals.length === 0 ? html`
+								<!-- No goals, just show sessions flat -->
+								${ungroupedSessions.length === 0
+									? html`<div class="text-center py-6">
+											<p class="text-xs text-muted-foreground mb-2">No sessions</p>
+											<button class="text-xs text-primary hover:underline" @click=${() => createAndConnectSession()}>Create one</button>
+										</div>`
+									: ungroupedSessions.map(renderSidebarSession)}
+							` : ""}
+						`
 				}
 			</div>
+			<button
+				class="flex items-center justify-end gap-1.5 px-3 py-2 w-full text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors border-t border-border/50"
+				@click=${toggleSidebar}
+				title="Collapse sidebar (Ctrl+[)"
+			>
+				<span>Collapse</span>
+				${icon(PanelLeftClose, "sm")}
+			</button>
 		</div>
 	`;
 }
@@ -1303,49 +1906,117 @@ function renderSidebar() {
 // MOBILE LANDING PAGE (small screens, when authenticated but no active session)
 // ============================================================================
 
+function renderMobileGoalCard(goal: Goal) {
+	const goalSessions = gatewaySessions.filter((s) => s.goalId === goal.id);
+	return html`
+		<div class="rounded-lg border border-border p-4 ${goal.state === "shelved" ? "opacity-60" : ""}">
+			<div class="flex items-center justify-between mb-2">
+				<div class="flex items-center gap-2">
+					<span class="text-sm ${GOAL_STATE_COLORS[goal.state]}">${goalStateIcon(goal.state)}</span>
+					<span class="text-sm font-medium text-foreground">${goal.title}</span>
+				</div>
+				<div class="flex items-center gap-1">
+					<button class="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+						@click=${() => showGoalDialog(goal)} title="Edit goal">
+						${icon(Pencil, "sm")}
+					</button>
+					<button class="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+						@click=${() => deleteGoal(goal.id)} title="Delete goal">
+						${icon(Trash2, "sm")}
+					</button>
+				</div>
+			</div>
+			<div class="text-xs text-muted-foreground font-mono truncate mb-2" title=${goal.cwd}>${goal.cwd}</div>
+			<div class="flex items-center justify-between">
+				<span class="text-xs px-2 py-0.5 rounded-full border border-border ${GOAL_STATE_COLORS[goal.state]}">${GOAL_STATE_LABELS[goal.state]}</span>
+				${Button({
+					variant: "ghost",
+					size: "sm",
+					onClick: () => createAndConnectSession(goal.id),
+					children: html`<span class="inline-flex items-center gap-1">${icon(Plus, "xs")} Session</span>`,
+				})}
+			</div>
+			${goalSessions.length > 0 ? html`
+				<div class="mt-3 flex flex-col gap-1.5">
+					${goalSessions.map((s, i) => renderSessionCard(s, i))}
+				</div>
+			` : ""}
+		</div>
+	`;
+}
+
 function renderMobileLanding() {
+	const ungroupedSessions = gatewaySessions.filter((s) => !s.goalId);
+	const stateOrder: Record<GoalState, number> = { "in-progress": 0, "todo": 1, "complete": 2, "shelved": 3 };
+	const sortedGoals = [...goals].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
+
 	return html`
 		<div class="flex-1 flex flex-col items-center overflow-y-auto">
 			<div class="w-full max-w-xl px-4 py-8 flex flex-col gap-6">
 				<div class="flex items-center justify-between">
 					<div>
-						<h2 class="text-lg font-semibold text-foreground">Sessions</h2>
-						<p class="text-sm text-muted-foreground mt-0.5">Connect to an existing session or start a new one</p>
+						<h2 class="text-lg font-semibold text-foreground">Goals & Sessions</h2>
+						<p class="text-sm text-muted-foreground mt-0.5">Organize work into goals, run sessions to make progress</p>
 					</div>
-					${Button({
-						variant: "default",
-						size: "sm",
-						disabled: creatingSession,
-						onClick: createAndConnectSession,
-						children: creatingSession
-							? html`<span class="inline-flex items-center gap-1.5"><svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Creating…</span>`
-							: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Session</span>`,
-					})}
+					<div class="flex items-center gap-1.5">
+						${Button({
+							variant: "ghost",
+							size: "sm",
+							onClick: () => showGoalDialog(),
+							children: html`<span class="inline-flex items-center gap-1.5">${icon(Crosshair, "sm")} Goal</span>`,
+						})}
+						${Button({
+							variant: "default",
+							size: "sm",
+							disabled: creatingSession,
+							onClick: () => createAndConnectSession(),
+							children: creatingSession && !creatingSessionForGoalId
+								? html`<span class="inline-flex items-center gap-1.5"><svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Creating…</span>`
+								: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} Session</span>`,
+						})}
+					</div>
 				</div>
 
 				${sessionsLoading
-					? html`<div class="text-center py-12 text-muted-foreground text-sm">Loading sessions…</div>`
+					? html`<div class="text-center py-12 text-muted-foreground text-sm">Loading…</div>`
 					: sessionsError
 						? html`<div class="text-center py-12">
 								<p class="text-sm text-red-500 mb-3">${sessionsError}</p>
 								${Button({ variant: "ghost", size: "sm", onClick: refreshSessions, children: "Retry" })}
 							</div>`
-						: gatewaySessions.length === 0
+						: goals.length === 0 && gatewaySessions.length === 0
 							? html`<div class="text-center py-12">
 									<div class="text-muted-foreground mb-3 empty-state-icon">${icon(Server, "lg")}</div>
-									<p class="text-sm text-muted-foreground mb-4">No active sessions</p>
-									${Button({
-										variant: "default",
-										disabled: creatingSession,
-										onClick: createAndConnectSession,
-										children: creatingSession
-											? html`<span class="inline-flex items-center gap-1.5"><svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Creating…</span>`
-											: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} Start a Session</span>`,
-									})}
+									<p class="text-sm text-muted-foreground mb-4">No goals or sessions yet</p>
+									<div class="flex items-center justify-center gap-2">
+										${Button({
+											variant: "default",
+											onClick: () => showGoalDialog(),
+											children: html`<span class="inline-flex items-center gap-1.5">${icon(Crosshair, "sm")} Create a Goal</span>`,
+										})}
+										${Button({
+											variant: "ghost",
+											disabled: creatingSession,
+											onClick: () => createAndConnectSession(),
+											children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} Quick Session</span>`,
+										})}
+									</div>
 								</div>`
-							: html`<div class="flex flex-col gap-2">
-									${gatewaySessions.map((s, i) => renderSessionCard(s, i))}
-								</div>`}
+							: html`
+								<!-- Goals -->
+								${sortedGoals.length > 0 ? html`
+									<div class="flex flex-col gap-3">
+										${sortedGoals.map(renderMobileGoalCard)}
+									</div>
+								` : ""}
+								<!-- Ungrouped sessions -->
+								${ungroupedSessions.length > 0 ? html`
+									${sortedGoals.length > 0 ? html`<h3 class="text-sm font-medium text-muted-foreground mt-2">Ungrouped Sessions</h3>` : ""}
+									<div class="flex flex-col gap-2">
+										${ungroupedSessions.map((s, i) => renderSessionCard(s, i))}
+									</div>
+								` : ""}
+							`}
 			</div>
 		</div>
 	`;
@@ -1527,8 +2198,217 @@ const renderApp = () => {
 		`;
 	};
 
+	const goalProposalBanner = () => {
+		// Don't show the banner in goal assistant sessions — they have the split-screen preview
+		if (isGoalAssistantSession) return "";
+		if (!activeGoalProposal || !connected) return "";
+		const p = activeGoalProposal;
+		return html`
+			<div class="shrink-0 border-b border-border bg-primary/5 px-4 py-3">
+				<div class="flex items-start gap-3">
+					<div class="flex-1 min-w-0">
+						<div class="flex items-center gap-2 mb-1">
+							<span class="text-xs font-medium text-primary uppercase tracking-wider">Goal Proposal</span>
+						</div>
+						<div class="text-sm font-medium text-foreground">${p.title}</div>
+						${p.cwd ? html`<div class="text-xs text-muted-foreground font-mono mt-0.5">${p.cwd}</div>` : ""}
+						<div class="text-xs text-muted-foreground mt-1 line-clamp-2">${p.spec.slice(0, 200)}${p.spec.length > 200 ? "…" : ""}</div>
+					</div>
+					<div class="flex items-center gap-1.5 shrink-0">
+						${Button({
+							variant: "ghost",
+							size: "sm",
+							onClick: () => {
+								// Open edit dialog pre-filled with the proposal, then terminate assistant session
+								showGoalEditDialogFromProposal(p);
+							},
+							children: html`<span class="inline-flex items-center gap-1">${icon(Pencil, "sm")} Edit</span>`,
+						})}
+						${Button({
+							variant: "default",
+							size: "sm",
+							onClick: async () => {
+								const sessionId = activeSessionId();
+								await createGoal(p.title, p.cwd || "", p.spec);
+								activeGoalProposal = null;
+								// Terminate the assistant session
+								if (sessionId) {
+									await terminateSession(sessionId);
+								}
+							},
+							children: html`<span class="inline-flex items-center gap-1">${icon(Crosshair, "sm")} Create Goal</span>`,
+						})}
+						${Button({
+							variant: "ghost",
+							size: "sm",
+							onClick: () => { activeGoalProposal = null; renderApp(); },
+							children: "Dismiss",
+						})}
+					</div>
+				</div>
+			</div>
+		`;
+	};
+
+	/** Goal preview panel — shown in split-screen (desktop) or as a tab (mobile) */
+	const goalPreviewPanel = () => {
+		const handleCreateGoal = async () => {
+			const trimmedTitle = previewTitle.trim();
+			if (!trimmedTitle) return;
+			const sessionId = activeSessionId();
+			// Disconnect and clean up before creating the goal
+			if (remoteAgent) {
+				remoteAgent.disconnect();
+				remoteAgent = null;
+				connectionStatus = "disconnected";
+			}
+			isGoalAssistantSession = false;
+			activeGoalProposal = null;
+			localStorage.removeItem(GW_SESSION_KEY);
+			setHashRoute("landing");
+			appView = "authenticated";
+
+			await createGoal(trimmedTitle, previewCwd.trim(), previewSpec);
+			// Silently terminate the assistant session (no confirmation dialog)
+			if (sessionId) {
+				await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+				clearSessionModel(sessionId);
+			}
+			await refreshSessions();
+			renderApp();
+		};
+
+		const handleCancel = () => {
+			backToSessions();
+		};
+
+		if (!hasReceivedProposal) {
+			return html`
+				<div class="goal-preview-panel flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center border-l border-border">
+					<div class="text-muted-foreground empty-state-icon">${icon(Crosshair, "lg")}</div>
+					<p class="text-sm text-muted-foreground max-w-[280px]">
+						Chat with the assistant to define your goal. The proposal will appear here as it takes shape.
+					</p>
+					<div class="mt-2">
+						${Button({ variant: "ghost", size: "sm", onClick: handleCancel, children: "Cancel" })}
+					</div>
+				</div>
+			`;
+		}
+
+		return html`
+			<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
+				<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+					<!-- Title -->
+					<div>
+						<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Title</label>
+						${Input({
+							type: "text",
+							value: previewTitle,
+							placeholder: "Goal title",
+							onInput: (e: Event) => {
+								previewTitle = (e.target as HTMLInputElement).value;
+								previewTitleEdited = true;
+							},
+						})}
+					</div>
+
+					<!-- Working Directory -->
+					<div>
+						<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Working Directory</label>
+						${Input({
+							type: "text",
+							value: previewCwd,
+							placeholder: "(server default)",
+							onInput: (e: Event) => {
+								previewCwd = (e.target as HTMLInputElement).value;
+								previewCwdEdited = true;
+							},
+						})}
+					</div>
+
+					<!-- Spec -->
+					<div class="flex-1 flex flex-col min-h-0">
+						<div class="flex items-center justify-between mb-1.5">
+							<label class="text-xs text-muted-foreground font-medium">Spec</label>
+							<button
+								class="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+								@click=${() => { previewSpecEditMode = !previewSpecEditMode; renderApp(); }}
+							>
+								${previewSpecEditMode ? "Preview" : "Edit"}
+							</button>
+						</div>
+						${previewSpecEditMode
+							? html`<textarea
+									class="flex-1 min-h-[200px] p-3 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+									.value=${previewSpec}
+									@input=${(e: Event) => {
+										previewSpec = (e.target as HTMLTextAreaElement).value;
+										previewSpecEdited = true;
+									}}
+								></textarea>`
+							: html`<div class="flex-1 min-h-[200px] p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm">
+									<markdown-block .content=${previewSpec || "_No spec content yet_"}></markdown-block>
+								</div>`
+						}
+					</div>
+				</div>
+
+				<!-- Action buttons -->
+				<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+					${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
+					${Button({
+						variant: "default",
+						onClick: handleCreateGoal,
+						disabled: !previewTitle.trim(),
+						children: html`<span class="inline-flex items-center gap-1.5">${icon(Crosshair, "sm")} Create Goal</span>`,
+					})}
+				</div>
+			</div>
+		`;
+	};
+
+	/** Goal assistant mobile tab bar */
+	const goalAssistantTabBar = () => {
+		return html`
+			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
+				<button
+					class="goal-tab-pill ${goalAssistantTab === "chat" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { goalAssistantTab = "chat"; renderApp(); }}
+				>Chat</button>
+				<button
+					class="goal-tab-pill ${goalAssistantTab === "preview" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { goalAssistantTab = "preview"; renderApp(); }}
+				>
+					Preview${hasReceivedProposal ? html` <span class="goal-tab-dot"></span>` : ""}
+				</button>
+			</div>
+		`;
+	};
+
 	const mainArea = () => {
-		if (connected) return html`${reconnectBanner()}${chatPanel}`;
+		if (connected && isGoalAssistantSession) {
+			// Goal assistant: split-screen (desktop) or tabbed (mobile)
+			if (desktop) {
+				return html`
+					${reconnectBanner()}
+					<div class="flex-1 flex min-h-0">
+						<div class="flex-1 min-w-0 flex flex-col">${chatPanel}</div>
+						${goalPreviewPanel()}
+					</div>
+				`;
+			}
+			// Mobile: tabbed view
+			return html`
+				${reconnectBanner()}
+				${goalAssistantTabBar()}
+				${goalAssistantTab === "chat"
+					? html`<div class="flex-1 min-h-0 flex flex-col">${chatPanel}</div>`
+					: html`<div class="flex-1 min-h-0 flex flex-col">${goalPreviewPanel()}</div>`
+				}
+			`;
+		}
+		if (connected) return html`${reconnectBanner()}${goalProposalBanner()}${chatPanel}`;
 
 		// No active session — empty state (desktop) or landing page (mobile)
 		if (desktop) {
@@ -1540,7 +2420,7 @@ const renderApp = () => {
 						variant: "default",
 						size: "sm",
 						disabled: creatingSession,
-						onClick: createAndConnectSession,
+						onClick: () => createAndConnectSession(),
 						children: creatingSession
 							? html`<span class="inline-flex items-center gap-1.5"><svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Creating…</span>`
 							: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Session</span>`,
@@ -1558,20 +2438,41 @@ const renderApp = () => {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
 				<!-- Unified top bar -->
 				<div class="flex items-center border-b border-border shrink-0">
-					<!-- Left zone: app title + new session (above sidebar width) -->
-					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5" style="background: var(--sidebar);">
-						<span class="text-base font-semibold text-foreground">Bobbit</span>
+					<!-- Left zone: app title + new goal/session (above sidebar width) -->
+					${sidebarCollapsed ? html`
+					<div class="w-10 shrink-0 flex items-center justify-center py-1.5" style="background: var(--sidebar);">
 						<button
-							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${creatingSession ? "opacity-50 pointer-events-none" : ""}"
-							@click=${createAndConnectSession}
-							title="New session"
-							?disabled=${creatingSession}
+							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+							@click=${toggleSidebar}
+							title="Expand sidebar (Ctrl+[)"
 						>
-							${creatingSession
-								? html`<svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-								: icon(Plus, "sm")}
+							${icon(PanelLeftOpen, "sm")}
 						</button>
 					</div>
+					` : html`
+					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5" style="background: var(--sidebar);">
+						<span class="text-base font-semibold text-foreground">Bobbit</span>
+						<div class="flex items-center gap-0.5">
+							<button
+								class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+								@click=${() => showGoalDialog()}
+								title="New goal"
+							>
+								${icon(Crosshair, "sm")}
+							</button>
+							<button
+								class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${creatingSession ? "opacity-50 pointer-events-none" : ""}"
+								@click=${() => createAndConnectSession()}
+								title="New session"
+								?disabled=${creatingSession}
+							>
+								${creatingSession && !creatingSessionForGoalId
+									? html`<svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+									: icon(Plus, "sm")}
+							</button>
+						</div>
+					</div>
+					`}
 					<!-- Center zone: session controls -->
 					<div class="flex-1 flex items-center justify-between min-w-0">
 						${headerLeft()}
@@ -1743,6 +2644,13 @@ async function initApp() {
 			if (textarea) {
 				textarea.focus();
 			}
+		}
+
+		// Ctrl+[ / Cmd+[ — Toggle sidebar
+		if (mod && e.key === "[") {
+			e.preventDefault();
+			sidebarCollapsed = !sidebarCollapsed;
+			renderApp();
 		}
 	});
 }

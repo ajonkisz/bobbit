@@ -73,6 +73,81 @@
 }
 
 /* ============================================================================
+ * GOAL ASSISTANT — split-screen preview panel & mobile tabs
+ * ============================================================================ */
+
+/* Preview panel takes 50% on desktop */
+@media (min-width: 768px) {
+	.goal-preview-panel {
+		flex: 0 0 50%;
+		max-width: 50%;
+	}
+}
+
+/* On mobile, remove the left border when shown as a tab */
+@media (max-width: 767px) {
+	.goal-preview-panel {
+		border-left: none !important;
+	}
+}
+
+/* Tab bar pills */
+.goal-tab-bar {
+	background: var(--color-background, hsl(var(--background)));
+}
+
+/* On mobile, push tab bar below the fixed header overlay */
+[data-mobile-header] .goal-tab-bar {
+	padding-top: 48px; /* ~44px header + 4px breathing room */
+}
+
+.goal-tab-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 14px;
+	font-size: 13px;
+	font-weight: 500;
+	border-radius: 9999px;
+	border: 1px solid var(--color-border, hsl(var(--border)));
+	color: var(--color-muted-foreground, hsl(var(--muted-foreground)));
+	background: transparent;
+	cursor: pointer;
+	transition: all 150ms ease;
+	line-height: 1.4;
+}
+
+.goal-tab-pill:hover {
+	background: var(--color-secondary, hsl(var(--secondary)));
+	color: var(--color-foreground, hsl(var(--foreground)));
+}
+
+.goal-tab-pill--active {
+	background: var(--color-primary, hsl(var(--primary)));
+	color: var(--color-primary-foreground, hsl(var(--primary-foreground)));
+	border-color: var(--color-primary, hsl(var(--primary)));
+}
+
+.goal-tab-pill--active:hover {
+	background: var(--color-primary, hsl(var(--primary)));
+	color: var(--color-primary-foreground, hsl(var(--primary-foreground)));
+	opacity: 0.9;
+}
+
+/* Notification dot on Preview tab */
+.goal-tab-dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--color-primary, hsl(var(--primary)));
+}
+
+.goal-tab-pill--active .goal-tab-dot {
+	background: var(--color-primary-foreground, hsl(var(--primary-foreground)));
+}
+
+/* ============================================================================
  * RECONNECT BANNER — slide-down entrance
  * ============================================================================ */
 .reconnect-banner {

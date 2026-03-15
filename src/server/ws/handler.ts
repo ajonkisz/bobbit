@@ -5,6 +5,7 @@ import type { SessionManager } from "../agent/session-manager.js";
 import type { RateLimiter } from "../auth/rate-limit.js";
 import { validateToken } from "../auth/token.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
+import { WorkflowRunner, getWorkflow, listWorkflows } from "../workflows/index.js";
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
 	const data = JSON.stringify(msg);
@@ -94,15 +95,15 @@ export function handleWebSocketConnection(
 				send(ws, { type: "event", data: { type: "compaction_start" } });
 			}
 
-			// Send current agent state
-			try {
-				const stateResponse = await session.rpcClient.getState();
+			// Send current agent state (don't block auth on this — fire async
+			// so the client gets auth_ok immediately and can start rendering).
+			session.rpcClient.getState().then((stateResponse) => {
 				if (stateResponse.success) {
 					send(ws, { type: "state", data: stateResponse.data });
 				}
-			} catch {
+			}).catch(() => {
 				// State not available yet — client will get events as they come
-			}
+			});
 
 			// Notify other clients that a new device connected
 			const joinMsg: ServerMessage = { type: "client_joined", clientId };
@@ -196,6 +197,89 @@ export function handleWebSocketConnection(
 						send(ws, { type: "error", message: `Title generation failed: ${err}`, code: "TITLE_GEN_ERROR" });
 					});
 					break;
+				case "start_workflow": {
+					const wf = getWorkflow(msg.workflowId);
+					if (!wf) {
+						send(ws, { type: "error", message: `Unknown workflow: ${msg.workflowId}`, code: "UNKNOWN_WORKFLOW" });
+						break;
+					}
+					const runner = new WorkflowRunner(msg.workflowId, sessionId, {
+						onChange: (state) => broadcast(session.clients, { type: "workflow_state", data: state }),
+					});
+					(session as any)._workflowRunner = runner;
+					send(ws, { type: "workflow_state", data: runner.getState() });
+					break;
+				}
+				case "workflow_status": {
+					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined
+						?? WorkflowRunner.restore(sessionId);
+					if (!wr) {
+						send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" });
+						break;
+					}
+					(session as any)._workflowRunner = wr;
+					send(ws, { type: "workflow_state", data: wr.getState() });
+					break;
+				}
+				case "workflow_advance": {
+					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+					wr.advancePhase();
+					const st = wr.getState();
+					if (st.status === "completed" && st.reportPath) {
+						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
+					}
+					break;
+				}
+				case "workflow_reset": {
+					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+					wr.resetToPhase(msg.phaseId, msg.context);
+					break;
+				}
+				case "workflow_collect_artifact": {
+					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+					wr.collectArtifact(msg.name, msg.content, msg.mimeType);
+					send(ws, { type: "workflow_state", data: wr.getState() });
+					break;
+				}
+				case "workflow_set_context": {
+					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+					wr.setContext(msg.key, msg.value);
+					send(ws, { type: "workflow_state", data: wr.getState() });
+					break;
+				}
+				case "workflow_complete": {
+					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+					wr.complete();
+					const st = wr.getState();
+					broadcast(session.clients, { type: "workflow_completed", data: st });
+					if (st.reportPath) {
+						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
+					}
+					break;
+				}
+				case "workflow_fail": {
+					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+					wr.fail(msg.reason);
+					const st = wr.getState();
+					broadcast(session.clients, { type: "workflow_completed", data: st });
+					if (st.reportPath) {
+						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
+					}
+					break;
+				}
+				case "workflow_cancel": {
+					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+					wr.cancel();
+					broadcast(session.clients, { type: "workflow_completed", data: wr.getState() });
+					break;
+				}
 				case "ping":
 					send(ws, { type: "pong" });
 					break;

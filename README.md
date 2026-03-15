@@ -41,6 +41,8 @@ npm run dev:harness    # same, but with auto-restart harness (recommended)
 
 Both the gateway (`:3001`) and Vite (`:5173`) auto-bind to the NordLynx mesh IP. Vite proxies `/api` and `/ws` to the gateway. UI changes hot-reload instantly.
 
+See [docs/dev-workflow.md](docs/dev-workflow.md) for the full development workflow, including when to restart the server and how agents should make changes.
+
 ### Dev server harness
 
 Use `npm run dev:harness` when developing Bobbit itself. The harness wraps the server process and watches a sentinel file (`~/.pi/gateway-restart`). When an agent finishes making server-side changes, it runs `npm run restart-server` to:
@@ -145,9 +147,29 @@ Sessions are the core abstraction. Each session is a running `pi-coding-agent` c
 - **Manual rename**: Sessions can be renamed via the UI (pencil icon) or the `PUT /api/sessions/:id/title` endpoint.
 - **Multi-device**: Multiple browser tabs/devices can connect to the same session. Events are broadcast to all clients.
 
-## Custom system prompt
+## System prompt
 
-Place a `config/system-prompt.md` file in the project root to customize agent behavior. The CLI auto-detects it and passes it to the agent subprocess via `--system-prompt`. This is useful for setting tone, output style, or project-specific instructions.
+Each agent session's system prompt is assembled from three layers, in order:
+
+1. **Global system prompt** — `config/system-prompt.md` in the Bobbit project root. Applies to all sessions. Good for tone, output style, or global rules.
+2. **AGENTS.md** — If the session's working directory contains an `AGENTS.md` file, its contents are included under a "Project Context" heading. This is the per-project context file — describe the codebase, conventions, and constraints here.
+3. **Goal spec** — If the session belongs to a goal, the goal's markdown spec is appended under a "Goal" heading with the goal title and status.
+
+### `@FILENAME.md` references
+
+`AGENTS.md` (and any file it references) supports inline file inclusion. A line containing only `@somefile.md` is replaced with the contents of that file, resolved relative to the referencing file's directory. References are resolved recursively. Circular references are detected and replaced with a comment.
+
+```markdown
+# My Project
+
+@docs/architecture.md
+@docs/conventions.md
+
+## Quick notes
+- Use TypeScript strict mode
+```
+
+This lets you split project context across multiple files while keeping a single entry point. Files that are *not* inlined via `@` are still available on disk for the agent to read with its tools when needed.
 
 ## QR code / multi-device access
 

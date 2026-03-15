@@ -492,7 +492,6 @@ export class AgentInterface extends LitElement {
 				<streaming-message-container
 					.tools=${state.tools}
 					.isStreaming=${state.isStreaming}
-					.hasMessages=${state.messages.length > 0}
 					.pendingToolCalls=${state.pendingToolCalls}
 					.toolResultsById=${toolResultsById}
 					.onCostClick=${this.onCostClick}

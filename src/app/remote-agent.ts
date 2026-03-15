@@ -57,6 +57,8 @@ export class RemoteAgent {
 	onStatusChange?: (status: string) => void;
 	/** Callback fired when connection status changes (connected/reconnecting/disconnected). */
 	onConnectionStatusChange?: (status: ConnectionStatus) => void;
+	/** Callback fired when a goal proposal is detected in an assistant message. */
+	onGoalProposal?: (proposal: { title: string; spec: string; cwd?: string }) => void;
 	private _title = "New session";
 
 	constructor() {
@@ -158,9 +160,8 @@ export class RemoteAgent {
 	 * Falls back to the Notification API when available (secure contexts).
 	 */
 	private _notifyTaskComplete(elapsedMs: number): void {
-		// Only notify when the tab is hidden — the user can already see
-		// the idle state if they're looking at the page.
-		if (document.visibilityState === "visible") return;
+		// TODO: restore visibility check after testing
+		// if (document.visibilityState === "visible") return;
 
 		const mins = Math.round(elapsedMs / 60_000);
 
@@ -595,6 +596,39 @@ export class RemoteAgent {
 	 * message_end of non-assistant clears it, agent_end clears it) so the
 	 * tool call never appears in both message-list and streaming-container.
 	 */
+	/** Check an assistant message for a <goal_proposal> block and fire the callback. */
+	private _checkForGoalProposal(message: any): void {
+		if (!this.onGoalProposal) return;
+
+		// Extract text content from the message
+		let text = "";
+		if (typeof message.content === "string") {
+			text = message.content;
+		} else if (Array.isArray(message.content)) {
+			text = message.content
+				.filter((c: any) => c.type === "text")
+				.map((c: any) => c.text || "")
+				.join("");
+		}
+		if (!text) return;
+
+		const match = text.match(/<goal_proposal>([\s\S]*?)<\/goal_proposal>/);
+		if (!match) return;
+
+		const block = match[1];
+		const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/);
+		const specMatch = block.match(/<spec>([\s\S]*?)<\/spec>/);
+		const cwdMatch = block.match(/<cwd>([\s\S]*?)<\/cwd>/);
+
+		if (!titleMatch || !specMatch) return;
+
+		this.onGoalProposal({
+			title: titleMatch[1].trim(),
+			spec: specMatch[1].trim(),
+			cwd: cwdMatch ? cwdMatch[1].trim() : undefined,
+		});
+	}
+
 	private flushDeferredMessage() {
 		if (this._deferredAssistantMessage) {
 			this._state.messages = [...this._state.messages, this._deferredAssistantMessage];
@@ -618,14 +652,10 @@ export class RemoteAgent {
 				this._state.streamMessage = null;
 				this._state.pendingToolCalls = new Set();
 
-				// Notify the user if the task ran longer than 5 minutes
-				if (this._taskStartTime) {
-					const elapsed = Date.now() - this._taskStartTime;
-					if (elapsed >= RemoteAgent.LONG_TASK_THRESHOLD_MS) {
-						this._notifyTaskComplete(elapsed);
-					}
-					this._taskStartTime = null;
-				}
+				// Notify the user that the task finished
+				const elapsed = this._taskStartTime ? Date.now() - this._taskStartTime : 0;
+				this._notifyTaskComplete(elapsed);
+				this._taskStartTime = null;
 				break;
 			}
 
@@ -649,6 +679,9 @@ export class RemoteAgent {
 			case "message_end":
 				if (event.message) {
 					if (event.message.role === "assistant") {
+						// Check for goal proposal in assistant message
+						this._checkForGoalProposal(event.message);
+
 						// Check whether this assistant message contains tool calls.
 						const hasToolCalls = Array.isArray(event.message.content) &&
 							event.message.content.some((c: any) => c.type === "toolCall");
