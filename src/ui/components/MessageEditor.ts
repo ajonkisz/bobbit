@@ -66,6 +66,7 @@ export class MessageEditor extends LitElement {
 	private speechSupported = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 	/** The textarea value before speech started — we append after this */
 	private preSpeechText = "";
+	private stopTimeout: ReturnType<typeof setTimeout> | null = null;
 
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -318,9 +319,22 @@ export class MessageEditor extends LitElement {
 		};
 
 		recognition.onend = () => {
-			// Clean up — recognition may end on its own (timeout, etc.)
-			this.isRecording = false;
-			this.speechRecognition = null;
+			// Mobile browsers aggressively end recognition after a pause.
+			// If the user hasn't explicitly stopped, restart automatically.
+			if (this.isRecording && this.speechRecognition === recognition) {
+				// Update preSpeechText to current value so we append from here
+				this.preSpeechText = this.value;
+				try {
+					recognition.start();
+				} catch {
+					// start() can throw if called too quickly
+					this.isRecording = false;
+					this.speechRecognition = null;
+				}
+			} else {
+				this.isRecording = false;
+				this.speechRecognition = null;
+			}
 		};
 
 		this.speechRecognition = recognition;
@@ -329,8 +343,17 @@ export class MessageEditor extends LitElement {
 	}
 
 	private stopSpeechRecognition() {
+		if (this.stopTimeout) {
+			clearTimeout(this.stopTimeout);
+			this.stopTimeout = null;
+		}
 		if (this.speechRecognition) {
-			this.speechRecognition.stop();
+			// Delay stop() to let the recognizer finalize the tail end of speech
+			const recognition = this.speechRecognition;
+			this.stopTimeout = setTimeout(() => {
+				recognition.stop();
+				this.stopTimeout = null;
+			}, 500);
 			this.speechRecognition = null;
 		}
 		this.isRecording = false;

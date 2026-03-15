@@ -21,6 +21,8 @@ import QRCode from "qrcode";
 import "@mariozechner/mini-lit/dist/MarkdownBlock.js";
 import "./app.css";
 import { RemoteAgent, type ConnectionStatus } from "./remote-agent.js";
+import "../ui/components/WorkflowStatusBar.js";
+import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 
 // ============================================================================
 // STORAGE (required by web-ui components)
@@ -2644,6 +2646,16 @@ const renderApp = () => {
 		`;
 	};
 
+	const workflowBar = (position: "desktop" | "mobile" = "desktop") => {
+		if (!remoteAgent) return html``;
+		const wfStatus = extractWorkflowStatus(remoteAgent.state.messages);
+		if (!wfStatus) return html``;
+		const borderClass = position === "desktop"
+			? "border-b border-border bg-card/80 backdrop-blur-sm"
+			: "border-t border-border";
+		return html`<div class="${borderClass}"><workflow-status-bar .status=${wfStatus}></workflow-status-bar></div>`;
+	};
+
 	const mainArea = () => {
 		if (connected && isGoalAssistantSession) {
 			// Goal assistant: split-screen (desktop) or tabbed (mobile)
@@ -2737,6 +2749,8 @@ const renderApp = () => {
 						${headerRight()}
 					</div>
 				</div>
+				<!-- Workflow status bar (desktop: static, between header and content) -->
+				${workflowBar()}
 				<!-- Content area: sidebar + main -->
 				<div class="flex-1 flex min-h-0">
 					${renderSidebar()}
@@ -2752,16 +2766,27 @@ const renderApp = () => {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden relative"
 				data-mobile-header>
 				<div id="app-header"
-					class="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border flex items-center justify-between"
+					class="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border flex flex-col"
 					style="transform: translateY(${mobileHeaderVisible ? "0" : "-100%"}); transition: transform 200ms ease, box-shadow 200ms ease; will-change: transform;">
-					${headerLeft()}
-					${headerRight()}
+					<div class="flex items-center justify-between">
+						${headerLeft()}
+						${headerRight()}
+					</div>
+					${workflowBar("mobile")}
 				</div>
 				<div id="app-main" class="flex-1 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>
 		`, app);
 		// Set up scroll tracking (idempotent — won't recreate if already active)
 		ensureMobileScrollTracking();
+		// Adjust mobile padding based on actual header height (includes workflow bar if present)
+		requestAnimationFrame(() => {
+			const headerEl = document.getElementById("app-header");
+			if (headerEl) {
+				const h = headerEl.offsetHeight;
+				document.documentElement.style.setProperty("--mobile-header-height", `${h + 16}px`);
+			}
+		});
 	} else {
 		// Mobile not connected: normal static header
 		render(html`

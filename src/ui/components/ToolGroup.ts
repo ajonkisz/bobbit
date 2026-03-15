@@ -6,6 +6,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import {
 	FileText,
 	FileCode2,
+	ListChecks,
 	SquareTerminal,
 	ChevronRight,
 	ChevronsUpDown,
@@ -23,6 +24,7 @@ const TOOL_ICONS: Record<string, any> = {
 	ls: ChevronRight,
 	find: FileText,
 	grep: FileText,
+	workflow: ListChecks,
 };
 
 /** Human-readable past-tense verb + noun per tool */
@@ -34,6 +36,7 @@ const TOOL_LABELS: Record<string, { verb: string; noun: string; nounPlural: stri
 	ls: { verb: "Listed", noun: "directory", nounPlural: "directories" },
 	find: { verb: "Searched", noun: "pattern", nounPlural: "patterns" },
 	grep: { verb: "Searched", noun: "pattern", nounPlural: "patterns" },
+	workflow: { verb: "Updated", noun: "workflow step", nounPlural: "workflow steps" },
 };
 
 /** Extract the most useful short label from a tool call's params */
@@ -50,6 +53,12 @@ function summarizeCall(toolName: string, args: Record<string, any>): string {
 			return args?.pattern ? `"${args.pattern}"` : "pattern";
 		case "find":
 			return args?.pattern || args?.path || "files";
+		case "workflow": {
+			const action = args?.action || "unknown";
+			if (action === "set_context" && args?.key) return `${args.key} = ${args.value || ""}`;
+			if (action === "collect_artifact" && args?.name) return `artifact: ${args.name}`;
+			return action;
+		}
 		default:
 			return args?.path || toolName;
 	}

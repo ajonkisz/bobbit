@@ -20,7 +20,10 @@ import type { AgentTool } from "@mariozechner/pi-agent-core";
 const MIN_GROUP_SIZE = 2;
 
 /** Tool names eligible for grouping */
-const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep"]);
+const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep", "workflow"]);
+
+/** Workflow actions that are minor metadata updates — safe to collapse into a group */
+const WORKFLOW_GROUPABLE_ACTIONS = new Set(["set_context", "collect_artifact"]);
 
 export type UserMessageWithAttachments = {
 	role: "user-with-attachments";
@@ -148,6 +151,8 @@ export class AssistantMessage extends LitElement {
 					const tc = c as ToolCall;
 					// Only group if same name as first
 					if (run.length > 0 && tc.name !== run[0].name) break;
+					// For workflow tool, only group metadata actions together
+					if (tc.name === "workflow" && !WORKFLOW_GROUPABLE_ACTIONS.has(tc.arguments?.action)) break;
 					const pending = this.pendingToolCalls?.has(tc.id) ?? false;
 					const result = this.toolResultsById?.get(tc.id);
 					if (pending && !result) break; // still in-flight — stop grouping here

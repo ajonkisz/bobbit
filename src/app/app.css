@@ -8,7 +8,7 @@
  * Uses !important to override Tailwind's p-4 utility.
  */
 [data-mobile-header] agent-interface .overflow-y-auto > .max-w-5xl {
-	padding-top: 60px !important; /* 44px header + 16px breathing room */
+	padding-top: var(--mobile-header-height, 60px) !important; /* header + breathing room */
 }
 
 /* ============================================================================
