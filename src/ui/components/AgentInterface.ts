@@ -41,9 +41,7 @@ export class AgentInterface extends LitElement {
 	@query("message-editor") private _messageEditor!: MessageEditor;
 	@query("streaming-message-container") private _streamingContainer!: StreamingMessageContainer;
 
-	private _autoScroll = true;
-	private _lastScrollTop = 0;
-	private _lastClientHeight = 0;
+	private _stickToBottom = true;
 	private _scrollContainer?: HTMLElement;
 	private _resizeObserver?: ResizeObserver;
 	private _unsubscribeSession?: () => void;
@@ -100,7 +98,7 @@ export class AgentInterface extends LitElement {
 	}
 
 	public setAutoScroll(enabled: boolean) {
-		this._autoScroll = enabled;
+		this._stickToBottom = enabled;
 	}
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -129,21 +127,21 @@ export class AgentInterface extends LitElement {
 		this._scrollContainer = this.querySelector(".overflow-y-auto") as HTMLElement;
 
 		if (this._scrollContainer) {
-			// Set up ResizeObserver to detect content changes
+			// When content changes size, scroll to bottom if we're already there.
+			// Uses isNearBottom() check — no keyboard/focus/viewport tracking needed.
 			this._resizeObserver = new ResizeObserver(() => {
-				if (this._autoScroll && this._scrollContainer) {
+				if (this._stickToBottom && this._scrollContainer) {
 					this._scrollContainer.scrollTop = this._scrollContainer.scrollHeight;
 				}
 			});
 
-			// Observe the content container inside the scroll container
 			const contentContainer = this._scrollContainer.querySelector(".max-w-5xl");
 			if (contentContainer) {
 				this._resizeObserver.observe(contentContainer);
 			}
 
-			// Set up scroll listener with better detection
-			this._scrollContainer.addEventListener("scroll", this._handleScroll);
+			// Track user scroll to decide stick-to-bottom state
+			this._scrollContainer.addEventListener("scroll", this._handleScroll, { passive: true });
 		}
 
 		// Subscribe to external session if provided
@@ -175,6 +173,9 @@ export class AgentInterface extends LitElement {
 			this._unsubscribeSession = undefined;
 		}
 		if (!this.session) return;
+
+		// Reset scroll state for new session
+		this._stickToBottom = true;
 
 		// Set default streamFn with proxy support if not already set
 		if (this.session.streamFn === streamSimple) {
@@ -272,30 +273,15 @@ export class AgentInterface extends LitElement {
 		});
 	}
 
-	private _handleScroll = (_ev: any) => {
+	/**
+	 * Simple stick-to-bottom: if the user is near the bottom, stay there.
+	 * If they've scrolled up, don't pull them back down.
+	 * No keyboard/focus/viewport tracking — just geometry.
+	 */
+	private _handleScroll = () => {
 		if (!this._scrollContainer) return;
-
-		const currentScrollTop = this._scrollContainer.scrollTop;
-		const scrollHeight = this._scrollContainer.scrollHeight;
-		const clientHeight = this._scrollContainer.clientHeight;
-		const distanceFromBottom = scrollHeight - currentScrollTop - clientHeight;
-
-		// Ignore relayout due to message editor getting pushed up by stats
-		if (clientHeight < this._lastClientHeight) {
-			this._lastClientHeight = clientHeight;
-			return;
-		}
-
-		// Only disable auto-scroll if user scrolled UP or is far from bottom
-		if (currentScrollTop !== 0 && currentScrollTop < this._lastScrollTop && distanceFromBottom > 50) {
-			this._autoScroll = false;
-		} else if (distanceFromBottom < 10) {
-			// Re-enable if very close to bottom
-			this._autoScroll = true;
-		}
-
-		this._lastScrollTop = currentScrollTop;
-		this._lastClientHeight = clientHeight;
+		const { scrollTop, scrollHeight, clientHeight } = this._scrollContainer;
+		this._stickToBottom = scrollHeight - scrollTop - clientHeight < 50;
 	};
 
 	public async sendMessage(input: string, attachments?: Attachment[]) {
@@ -366,7 +352,7 @@ export class AgentInterface extends LitElement {
 		// Only clear editor after we know we can send
 		this._messageEditor.value = "";
 		this._messageEditor.attachments = [];
-		this._autoScroll = true; // Enable auto-scroll when sending a message
+		this._stickToBottom = true; // Snap to bottom when sending a message
 
 		if (isStreaming) {
 			// Agent is busy — add to local queue, will be sent on agent_end

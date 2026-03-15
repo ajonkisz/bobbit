@@ -186,6 +186,7 @@ const STATUS_COLORS: Record<string, { bg: string; border: string; text: string; 
 @customElement("workflow-status-bar")
 export class WorkflowStatusBar extends LitElement {
 	@property({ attribute: false }) status: WorkflowStatus | null = null;
+	private _lastActivePhase: string | null = null;
 
 	createRenderRoot() {
 		return this;
@@ -193,8 +194,21 @@ export class WorkflowStatusBar extends LitElement {
 
 	override updated() {
 		const active = this.querySelector(".wf-node-active") as HTMLElement | null;
-		if (active) {
-			active.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+		if (!active) return;
+
+		// Only scroll when the active phase actually changes (not on every re-render)
+		const activeId = active.getAttribute("data-phase-id");
+		if (activeId === this._lastActivePhase) return;
+		this._lastActivePhase = activeId;
+
+		// Scroll only the horizontal pipeline container, not the whole page
+		const pipeline = active.closest(".overflow-x-auto");
+		if (pipeline) {
+			const containerRect = pipeline.getBoundingClientRect();
+			const activeRect = active.getBoundingClientRect();
+			const targetScroll = pipeline.scrollLeft + (activeRect.left - containerRect.left)
+				- (containerRect.width / 2) + (activeRect.width / 2);
+			pipeline.scrollTo({ left: targetScroll, behavior: "smooth" });
 		}
 	}
 
@@ -208,10 +222,12 @@ export class WorkflowStatusBar extends LitElement {
 			: "text-blue-600 dark:text-blue-400";
 
 		return html`
-			<div class="workflow-status-bar shrink-0">
+			<div class="workflow-status-bar shrink-0 py-1.5 md:py-2 flex flex-col gap-1 md:gap-2">
 				<!-- Header row: workflow name + overall status -->
-				<div class="flex items-center justify-between px-3 pt-2 pb-1">
-					<span class="text-xs font-medium text-foreground truncate">${workflowName}</span>
+				<div class="flex items-center justify-between px-3">
+					<span class="text-xs font-medium text-foreground truncate">
+						<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mr-1.5">Workflow:</span>${workflowName}
+					</span>
 					<div class="flex items-center gap-2">
 						${reportUrl ? html`
 							<a href="#" @click=${(e: Event) => { e.preventDefault(); this.openReport(); }}
@@ -224,7 +240,7 @@ export class WorkflowStatusBar extends LitElement {
 				</div>
 
 				<!-- Phase pipeline -->
-				<div class="px-3 pb-2 overflow-x-auto" style="-ms-overflow-style: none; scrollbar-width: none;">
+				<div class="px-3 overflow-x-auto" style="-ms-overflow-style: none; scrollbar-width: none;">
 					<div class="flex items-center gap-0 min-w-max">
 						${phases.map((phase, i) => html`
 							${i > 0 ? this.renderConnector(phases[i - 1].status, phase.status) : ""}
@@ -248,6 +264,7 @@ export class WorkflowStatusBar extends LitElement {
 				${colors.bg} ${colors.border} ${colors.text}
 				${isClickable ? "cursor-pointer hover:brightness-110" : ""}
 				${isScrollTarget ? "wf-node-active" : ""}"
+				data-phase-id=${phase.id}
 				@click=${isClickable ? () => this.openReport() : undefined}
 				title=${phase.name + (isClickable ? " (click to view report)" : "")}
 			>

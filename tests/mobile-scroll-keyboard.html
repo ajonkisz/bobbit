@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  
+  .app {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    background: #fff;
+  }
+
+  #app-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    background: #fff;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease;
+  }
+
+  .header-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+  }
+
+  .workflow-bar {
+    border-top: 1px solid #eee;
+    padding: 6px 12px;
+    font-size: 11px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+  }
+  .workflow-bar .phase {
+    white-space: nowrap;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+  }
+  .workflow-bar .phase.active {
+    background: #dbeafe;
+    border-color: #93c5fd;
+  }
+
+  #app-main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .agent-interface {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .messages-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .scroll-container {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .message {
+    padding: 16px;
+    margin: 8px;
+    background: #f0f0f0;
+    border-radius: 8px;
+  }
+
+  .input-area {
+    flex-shrink: 0;
+    padding: 8px;
+    border-top: 1px solid #ccc;
+  }
+
+  textarea {
+    width: 100%;
+    height: 40px;
+    resize: none;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="app-header">
+    <div class="header-nav">
+      <span>← Sessions</span>
+      <span>Model: Claude</span>
+    </div>
+    <div class="workflow-bar" id="workflow-bar">
+      <span class="phase" data-phase-id="p0">Create Worktree</span>
+      <span class="phase active" data-phase-id="p1">Compile</span>
+      <span class="phase" data-phase-id="p2">Run Tests</span>
+      <span class="phase" data-phase-id="p3">Clean Up</span>
+    </div>
+  </div>
+  <div id="app-main" style="padding-top: 80px">
+    <div class="agent-interface">
+      <div class="messages-wrapper">
+        <div class="scroll-container" id="scroll-container">
+          <div id="messages-content">
+          </div>
+        </div>
+        <div class="input-area">
+          <textarea id="chat-input" placeholder="Type a message..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const content = document.getElementById("messages-content");
+for (let i = 0; i < 50; i++) {
+  const div = document.createElement("div");
+  div.className = "message";
+  div.textContent = `Message ${i + 1}: Lorem ipsum dolor sit amet.`;
+  content.appendChild(div);
+}
+
+// ─── Simplified stick-to-bottom model (mirrors AgentInterface) ───
+
+const scrollContainer = document.getElementById("scroll-container");
+let stickToBottom = true;
+
+// Scroll to bottom initially
+scrollContainer.scrollTop = scrollContainer.scrollHeight;
+
+// ResizeObserver: scroll to bottom if sticking
+const resizeObserver = new ResizeObserver(() => {
+  if (stickToBottom) {
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }
+});
+resizeObserver.observe(content);
+
+// Scroll handler: near bottom = stick, scrolled up = unstick
+scrollContainer.addEventListener("scroll", () => {
+  const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+  stickToBottom = scrollHeight - scrollTop - clientHeight < 50;
+}, { passive: true });
+
+// ─── Workflow bar scroll (only horizontal, only on phase change) ───
+let lastActivePhase = null;
+
+window.__simulateWorkflowBarUpdate = () => {
+  const active = document.querySelector(".workflow-bar .phase.active");
+  if (!active) return;
+  const phaseId = active.getAttribute("data-phase-id");
+  if (phaseId === lastActivePhase) return;
+  lastActivePhase = phaseId;
+  const pipeline = active.closest(".workflow-bar");
+  if (pipeline) {
+    const containerRect = pipeline.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    const targetScroll = pipeline.scrollLeft + (activeRect.left - containerRect.left)
+      - (containerRect.width / 2) + (activeRect.width / 2);
+    pipeline.scrollTo({ left: targetScroll, behavior: "smooth" });
+  }
+};
+
+// ─── Test helpers ───
+
+window.__addMessage = (text) => {
+  const div = document.createElement("div");
+  div.className = "message";
+  div.textContent = text;
+  content.appendChild(div);
+};
+
+window.__getState = () => ({
+  stickToBottom,
+  scrollTop: scrollContainer.scrollTop,
+  scrollHeight: scrollContainer.scrollHeight,
+  clientHeight: scrollContainer.clientHeight,
+  distanceFromBottom: scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight,
+});
+
+window.__simulateKeyboardOpen = (keyboardHeight) => {
+  document.querySelector(".app").style.height = (window.innerHeight - keyboardHeight) + "px";
+};
+
+window.__simulateKeyboardClose = () => {
+  document.querySelector(".app").style.height = "100vh";
+};
+</script>
+</body>
+</html>

@@ -2057,7 +2057,7 @@ function renderSidebar() {
 		};
 
 		return html`
-			<div class="w-14 shrink-0 h-full flex flex-col items-center" style="background: var(--sidebar);">
+			<div class="w-14 shrink-0 h-full flex flex-col items-center sidebar-edge" style="background: var(--sidebar);">
 				<div class="flex-1 overflow-y-auto flex flex-col items-center gap-0.5 py-2 px-0.5">
 					${sortedGoals.map((goal, i) => {
 						const goalSessions = allSessions.filter((s) => s.goalId === goal.id);
@@ -2100,7 +2100,7 @@ function renderSidebar() {
 	}
 
 	return html`
-		<div class="w-[240px] shrink-0 h-full flex flex-col" style="background: var(--sidebar);">
+		<div class="w-[240px] shrink-0 h-full flex flex-col sidebar-edge" style="background: var(--sidebar);">
 			<div class="flex-1 overflow-y-auto flex flex-col gap-0.5 py-2 px-0.5">
 				${sessionsLoading
 					? html`<div class="text-center py-6 text-muted-foreground text-xs">Loading…</div>`
@@ -2750,11 +2750,13 @@ const renderApp = () => {
 					</div>
 				</div>
 				<!-- Workflow status bar (desktop: static, between header and content) -->
-				${workflowBar()}
 				<!-- Content area: sidebar + main -->
 				<div class="flex-1 flex min-h-0">
 					${renderSidebar()}
-					<div id="app-main" class="flex-1 min-h-0 flex flex-col">${mainArea()}</div>
+					<div id="app-main" class="flex-1 min-h-0 flex flex-col">
+						${workflowBar()}
+						${mainArea()}
+					</div>
 				</div>
 			</div>
 		`, app);
