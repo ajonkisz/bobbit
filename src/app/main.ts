@@ -817,11 +817,7 @@ async function connectToSession(sessionId: string, isExisting: boolean, options?
 			onApiKeyRequired: async () => true,
 		});
 
-		// Model and thinking selectors are in the header bar, not the message editor
-		if (chatPanel.agentInterface) {
-			chatPanel.agentInterface.enableModelSelector = false;
-			chatPanel.agentInterface.enableThinkingSelector = false;
-		}
+		// Model and thinking selectors are in the message editor's bottom bar
 
 		if (isExisting) {
 			remote.requestMessages();
@@ -1590,7 +1586,7 @@ function sessionAcronym(title: string): string {
  * When a sessionId is provided, the bobbit uses a unique color derived from it.
  * Otherwise falls back to the canonical green.
  */
-function statusBobbit(status: string, isCompacting = false, sessionId?: string, isActive = false) {
+function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false) {
 	// Hue rotation offset from canonical green
 	const hueRotate = sessionId ? sessionHueRotation(sessionId) : 0;
 
@@ -1606,8 +1602,8 @@ function statusBobbit(status: string, isCompacting = false, sessionId?: string, 
 
 	const isBusy = status === "streaming" || isCompacting;
 
-	// Base sprite — eyes filled with main color when active (eyes rendered as separate animated layer)
-	const eyeColor = isActive ? p.main : p.eye;
+	// Base sprite — eyes filled with main color when selected (eyes rendered as separate animated layer)
+	const eyeColor = isSelected ? p.main : p.eye;
 	const shadow = `
 		3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,
 		2px 1px 0 #000,3px 1px 0 ${p.main},4px 1px 0 ${p.main},5px 1px 0 ${p.main},6px 1px 0 ${p.light},7px 1px 0 ${p.light},8px 1px 0 #000,
@@ -1625,19 +1621,26 @@ function statusBobbit(status: string, isCompacting = false, sessionId?: string, 
 
 	const shimmerDelay = -(Date.now() % 8000);
 	const shimmer = isBusy ? `animation:blob-shimmer 8s ease-in-out infinite;animation-delay:${shimmerDelay}ms;` : "";
-	const hueFilter = (hueRotate && status !== "starting" && status !== "terminated") ? `filter:hue-rotate(${hueRotate}deg);` : "";
+	// Filters: hue-rotate for session color, slight desaturation for idle non-selected
+	const isIdle = status === "idle" && !isCompacting && !isSelected;
+	const filters: string[] = [];
+	if (hueRotate && status !== "starting" && status !== "terminated") filters.push(`hue-rotate(${hueRotate}deg)`);
+	if (isIdle) filters.push("saturate(0.55)");
+	const filterStyle = filters.length ? `filter:${filters.join(" ")};` : "";
+	// Bobbing animation for any busy bobbit (doing work), eye animation for selected only
+	const bobAnim = isBusy ? "animation:bobbit-bob 2.5s ease-in-out infinite;" : "";
 	const baseTransform = isCompacting
-		? "transform:scale(1.6) scaleX(1.25) scaleY(0.7);transform-origin:0 0;"
+		? "transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px);transform-origin:0 9px;"
 		: "transform:scale(1.6);transform-origin:0 0;";
-	const eyeAnim = isActive
-		? `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 0;`
+	const eyeAnim = isSelected
+		? `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 ${isCompacting ? "9px" : "0"};`
 		: baseTransform;
 
-	const eyeLayer = isActive
+	const eyeLayer = isSelected
 		? html`<span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
 		: "";
 
-	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${hueFilter}"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}</span>`;
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}</span>`;
 }
 
 /** Show a rename dialog for a session */
@@ -2325,40 +2328,29 @@ const renderApp = () => {
 
 			const sessionTitle = remoteAgent.title || "New session";
 
+			const sid = activeSessionId();
 			return html`
 				<div class="flex items-center gap-1 px-2">
 					${backBtn}
 					<span class="text-sm font-medium text-foreground truncate max-w-[320px]" title=${sessionTitle}>${sessionTitle}</span>
-					<span class="text-muted-foreground text-xs mx-1">·</span>
-					${model ? Button({
-						variant: "ghost",
-						size: "sm",
-						onClick: () => {
-							ModelSelector.open(model, (m) => remoteAgent?.setModel(m));
-						},
-						children: html`<span class="inline-flex items-center gap-1">${icon(Sparkles, "sm")} <span class="text-xs">${model.id}</span></span>`,
-						className: "h-8 text-xs truncate max-w-[200px]",
-						title: "Change model",
-					}) : ""}
-					${supportsThinking ? Select({
-						value: remoteAgent.state.thinkingLevel || "off",
-						placeholder: "Off",
-						options: [
-							{ value: "off", label: "Off", icon: icon(Brain, "sm") },
-							{ value: "minimal", label: "Minimal", icon: icon(Brain, "sm") },
-							{ value: "low", label: "Low", icon: icon(Brain, "sm") },
-							{ value: "medium", label: "Medium", icon: icon(Brain, "sm") },
-							{ value: "high", label: "High", icon: icon(Brain, "sm") },
-						] as SelectOption[],
-						onChange: (value: string) => {
-							remoteAgent?.setThinkingLevel(value as any);
-							renderApp();
-						},
-						width: "80px",
-						size: "sm",
-						variant: "ghost",
-						fitContent: true,
-					}) : ""}
+					${sid ? html`
+						${Button({
+							variant: "ghost",
+							size: "sm",
+							onClick: () => showRenameDialog(sid, sessionTitle),
+							children: icon(Pencil, "xs"),
+							className: "h-7 w-7 text-muted-foreground",
+							title: "Rename session",
+						})}
+						${Button({
+							variant: "ghost",
+							size: "sm",
+							onClick: () => terminateSession(sid),
+							children: icon(Trash2, "xs"),
+							className: "h-7 w-7 text-muted-foreground hover:text-destructive",
+							title: "Terminate session",
+						})}
+					` : ""}
 				</div>
 			`;
 		}

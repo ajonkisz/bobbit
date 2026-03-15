@@ -55,6 +55,14 @@
 }
 
 /* ============================================================================
+ * BOBBIT — bobbing animation for active sessions
+ * ============================================================================ */
+@keyframes bobbit-bob {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-1.5px); }
+}
+
+/* ============================================================================
  * BOBBIT — eye animation (blink + look around)
  * ============================================================================ */
 @keyframes bobbit-eyes {
@@ -66,12 +74,12 @@
 	90%, 100% { transform: scale(1.6); opacity: 1; }             /* center */
 }
 @keyframes bobbit-eyes-squash {
-	0%, 55%   { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 1; }
-	56%, 58%  { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 0; }
-	59%, 72%  { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 1; }
-	74%, 86%  { transform: scale(1.6) scaleX(1.25) scaleY(0.7) translateX(1px); opacity: 1; }
-	87%, 89%  { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 0; }
-	90%, 100% { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 1; }
+	0%, 55%   { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px); opacity: 1; transform-origin: 0 9px; }
+	56%, 58%  { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px); opacity: 0; transform-origin: 0 9px; }
+	59%, 72%  { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px); opacity: 1; transform-origin: 0 9px; }
+	74%, 86%  { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateX(1px) translateY(4.5px); opacity: 1; transform-origin: 0 9px; }
+	87%, 89%  { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px); opacity: 0; transform-origin: 0 9px; }
+	90%, 100% { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px); opacity: 1; transform-origin: 0 9px; }
 }
 
 /* ============================================================================

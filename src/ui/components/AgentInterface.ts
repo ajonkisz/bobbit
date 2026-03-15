@@ -1,6 +1,10 @@
+import { icon } from "@mariozechner/mini-lit";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
+import { Select, type SelectOption } from "@mariozechner/mini-lit/dist/Select.js";
 import { streamSimple, type ToolResultMessage, type Usage } from "@mariozechner/pi-ai";
 import { html, LitElement } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
+import { Brain, Sparkles } from "lucide";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
 import type { MessageEditor, QueuedMessage } from "./MessageEditor.js";
 import "./MessageEditor.js";
@@ -577,10 +581,51 @@ export class AgentInterface extends LitElement {
 			}
 		}
 
+		const session = this.session!;
+		const supportsThinking = (state.model as any)?.reasoning === true;
+
+		const thinkingSelect = supportsThinking && this.enableThinkingSelector
+			? Select({
+				value: state.thinkingLevel,
+				placeholder: i18n("Off"),
+				options: [
+					{ value: "off", label: i18n("Off"), icon: icon(Brain, "sm") },
+					{ value: "minimal", label: i18n("Minimal"), icon: icon(Brain, "sm") },
+					{ value: "low", label: i18n("Low"), icon: icon(Brain, "sm") },
+					{ value: "medium", label: i18n("Medium"), icon: icon(Brain, "sm") },
+					{ value: "high", label: i18n("High"), icon: icon(Brain, "sm") },
+				] as SelectOption[],
+				onChange: (value: string) => {
+					session.setThinkingLevel(value as any);
+				},
+				width: "80px",
+				size: "sm",
+				variant: "ghost",
+				fitContent: true,
+			})
+			: "";
+
+		const modelButton = this.enableModelSelector && state.model
+			? Button({
+				variant: "ghost",
+				size: "sm",
+				onClick: () => {
+					ModelSelector.open(state.model, (m) => session.setModel(m));
+				},
+				children: html`
+					${icon(Sparkles, "sm")}
+					<span class="ml-1.5">${state.model.id}</span>
+				`,
+				className: "h-6 text-xs truncate rounded-none",
+			})
+			: "";
+
 		return html`
-			<div class="text-xs text-muted-foreground flex justify-between items-center h-5">
-				<div class="flex items-center gap-1">
+			<div class="text-xs text-muted-foreground flex justify-between items-center mt-0.5">
+				<div class="flex items-center">
 					${this.showThemeToggle ? html`<theme-toggle></theme-toggle>` : html``}
+					${thinkingSelect}
+					${modelButton}
 				</div>
 				<div class="flex ml-auto items-center gap-3">
 					${contextHtml}

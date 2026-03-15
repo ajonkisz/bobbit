@@ -279,11 +279,6 @@ export class MessageEditor extends LitElement {
 			className: "h-8 w-8 shrink-0",
 		});
 
-		// Bottom bar with model selector and thinking selector (only if enabled)
-		const hasBottomBar =
-			(this.showModelSelector && this.currentModel) ||
-			(supportsThinking && this.showThinkingSelector);
-
 		return html`
 			<div
 				class="bg-card rounded-xl border shadow-sm relative ${this.isDragging ? "border-primary border-2 bg-primary/5" : "border-border"}"
@@ -373,57 +368,6 @@ export class MessageEditor extends LitElement {
 					style="display: none;"
 				/>
 
-				<!-- Optional bottom bar for model/thinking selectors -->
-				${hasBottomBar ? html`
-					<div class="px-2 pb-2 flex items-center gap-2">
-						${
-							supportsThinking && this.showThinkingSelector
-								? html`
-									${Select({
-										value: this.thinkingLevel,
-										placeholder: i18n("Off"),
-										options: [
-											{ value: "off", label: i18n("Off"), icon: icon(Brain, "sm") },
-											{ value: "minimal", label: i18n("Minimal"), icon: icon(Brain, "sm") },
-											{ value: "low", label: i18n("Low"), icon: icon(Brain, "sm") },
-											{ value: "medium", label: i18n("Medium"), icon: icon(Brain, "sm") },
-											{ value: "high", label: i18n("High"), icon: icon(Brain, "sm") },
-										] as SelectOption[],
-										onChange: (value: string) => {
-											this.onThinkingChange?.(value as "off" | "minimal" | "low" | "medium" | "high");
-										},
-										width: "80px",
-										size: "sm",
-										variant: "ghost",
-										fitContent: true,
-									})}
-								`
-								: ""
-						}
-						<div class="flex-1"></div>
-						${
-							this.showModelSelector && this.currentModel
-								? html`
-									${Button({
-										variant: "ghost",
-										size: "sm",
-										onClick: () => {
-											this.textareaRef.value?.focus();
-											requestAnimationFrame(() => {
-												this.onModelSelect?.();
-											});
-										},
-										children: html`
-											${icon(Sparkles, "sm")}
-											<span class="ml-1">${this.currentModel.id}</span>
-										`,
-										className: "h-8 text-xs truncate",
-									})}
-								`
-								: ""
-						}
-					</div>
-				` : ""}
 			</div>
 		`;
 	}
