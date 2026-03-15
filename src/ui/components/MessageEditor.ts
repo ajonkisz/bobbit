@@ -5,7 +5,7 @@ import type { Model } from "@mariozechner/pi-ai";
 import { html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createRef, ref } from "lit/directives/ref.js";
-import { Brain, Loader2, Paperclip, Send, Sparkles, Square, Zap, X } from "lucide";
+import { Brain, Loader2, Mic, MicOff, Paperclip, Send, Sparkles, Square, Zap, X } from "lucide";
 import { type Attachment, loadAttachment } from "../utils/attachment-utils.js";
 import { i18n } from "../utils/i18n.js";
 import "./AttachmentTile.js";
@@ -58,7 +58,15 @@ export class MessageEditor extends LitElement {
 
 	@state() processingFiles = false;
 	@state() isDragging = false;
+	@state() private isRecording = false;
 	private fileInputRef = createRef<HTMLInputElement>();
+
+	// Speech recognition
+	private speechRecognition: SpeechRecognition | null = null;
+	private speechSupported = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+	/** The textarea value before speech started — we append after this */
+	private preSpeechText = "";
+
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
 		return this;
@@ -236,6 +244,126 @@ export class MessageEditor extends LitElement {
 		this.processingFiles = false;
 	};
 
+	// -- Speech recognition --
+
+	private toggleSpeechRecognition = () => {
+		if (this.isRecording) {
+			this.stopSpeechRecognition();
+		} else {
+			this.startSpeechRecognition();
+		}
+	};
+
+	private startSpeechRecognition() {
+		if (!this.speechSupported) return;
+
+		const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+		const recognition = new SpeechRecognitionCtor();
+		recognition.continuous = true;
+		recognition.interimResults = true;
+		recognition.lang = navigator.language || "en-US";
+
+		// Snapshot the current textarea content so we append after it
+		this.preSpeechText = this.value;
+
+		recognition.onresult = (event: SpeechRecognitionEvent) => {
+			// Mobile browsers return cumulative transcripts in each result
+			// (each later final contains all earlier text). Desktop browsers
+			// return segmented transcripts (each final is a separate phrase).
+			// Detect which mode by checking if the last non-empty final
+			// starts with the previous non-empty final's text.
+			const nonEmptyFinals: string[] = [];
+			let interimText = "";
+			for (let i = 0; i < event.results.length; i++) {
+				const result = event.results[i];
+				if (result.isFinal) {
+					const t = result[0].transcript;
+					if (t) nonEmptyFinals.push(t);
+				} else {
+					interimText = result[0].transcript;
+				}
+			}
+
+			const isCumulative =
+				nonEmptyFinals.length >= 2 &&
+				nonEmptyFinals[nonEmptyFinals.length - 1].startsWith(
+					nonEmptyFinals[nonEmptyFinals.length - 2]
+				);
+
+			let fullText: string;
+			if (isCumulative) {
+				// Mobile: last final already has everything
+				fullText = nonEmptyFinals[nonEmptyFinals.length - 1] + interimText;
+			} else {
+				// Desktop: concatenate all segments
+				fullText = nonEmptyFinals.join("") + interimText;
+			}
+
+			const separator = this.preSpeechText && !this.preSpeechText.endsWith(" ") ? " " : "";
+			this.value = this.preSpeechText + separator + fullText;
+			this.onInput?.(this.value);
+
+			const textarea = this.textareaRef.value;
+			if (textarea) {
+				textarea.value = this.value;
+			}
+		};
+
+		recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+			console.warn("Speech recognition error:", event.error);
+			if (event.error !== "no-speech") {
+				this.stopSpeechRecognition();
+			}
+		};
+
+		recognition.onend = () => {
+			// Clean up — recognition may end on its own (timeout, etc.)
+			this.isRecording = false;
+			this.speechRecognition = null;
+		};
+
+		this.speechRecognition = recognition;
+		this.isRecording = true;
+		recognition.start();
+	}
+
+	private stopSpeechRecognition() {
+		if (this.speechRecognition) {
+			this.speechRecognition.stop();
+			this.speechRecognition = null;
+		}
+		this.isRecording = false;
+	}
+
+	private handleGlobalKeyDown = (e: KeyboardEvent) => {
+		// ASUS ProArt Copilot key sends Win+Shift+F23, which Windows intercepts.
+		// Use PowerToys to remap that shortcut to F13, then we catch it here.
+		if (e.key === "F13" && !e.repeat) {
+			e.preventDefault();
+			this.startSpeechRecognition();
+		}
+	};
+
+	private handleGlobalKeyUp = (e: KeyboardEvent) => {
+		if (e.key === "F13") {
+			e.preventDefault();
+			this.stopSpeechRecognition();
+		}
+	};
+
+	override connectedCallback() {
+		super.connectedCallback();
+		document.addEventListener("keydown", this.handleGlobalKeyDown);
+		document.addEventListener("keyup", this.handleGlobalKeyUp);
+	}
+
+	override disconnectedCallback() {
+		super.disconnectedCallback();
+		document.removeEventListener("keydown", this.handleGlobalKeyDown);
+		document.removeEventListener("keyup", this.handleGlobalKeyUp);
+		this.stopSpeechRecognition();
+	}
+
 	override firstUpdated() {
 		const textarea = this.textareaRef.value;
 		if (textarea) {
@@ -258,6 +386,16 @@ export class MessageEditor extends LitElement {
 						onClick: this.handleAttachmentClick,
 						children: icon(Paperclip, "sm"),
 					})
+			: "";
+
+		const micButton = this.speechSupported
+			? Button({
+					variant: "ghost",
+					size: "icon",
+					className: `h-8 w-8 shrink-0 ${this.isRecording ? "text-red-500 animate-pulse" : ""}`,
+					onClick: this.toggleSpeechRecognition,
+					children: icon(this.isRecording ? MicOff : Mic, "sm"),
+				})
 			: "";
 
 		const hasContent = this.value.trim() || this.attachments.length > 0;
@@ -341,8 +479,8 @@ export class MessageEditor extends LitElement {
 					</div>
 				` : ""}
 
-				<!-- Compact input row: [attach] [textarea] [send] -->
-				<div class="flex items-end gap-1 px-2 py-2">
+				<!-- Compact input row: [attach] [textarea] [mic] [send] -->
+				<div class="flex items-center gap-1 px-2 py-2">
 					${attachButton}
 					<textarea
 						class="flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none resize-none overflow-y-auto py-1 px-1"
@@ -355,7 +493,7 @@ export class MessageEditor extends LitElement {
 						@paste=${this.handlePaste}
 						${ref(this.textareaRef)}
 					></textarea>
-					${abortButton}${sendButton}
+					${micButton}${abortButton}${sendButton}
 				</div>
 
 				<!-- Hidden file input -->
