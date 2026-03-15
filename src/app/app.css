@@ -43,7 +43,7 @@
 }
 
 /* ============================================================================
- * SIDEBAR SESSION — active indicator bar
+ * SIDEBAR SESSION — active state
  * ============================================================================ */
 .sidebar-session-active {
 	position: relative;
@@ -51,18 +51,27 @@
 
 /* Action buttons overlay: use secondary bg when row is active */
 .sidebar-session-active .sidebar-actions {
-	background: linear-gradient(to right, transparent, var(--color-secondary, var(--secondary)) 30%) !important;
+	background: linear-gradient(to right, transparent 0%, var(--color-secondary, var(--secondary)) 50%) !important;
 }
 
-.sidebar-session-active::before {
-	content: "";
-	position: absolute;
-	left: 0;
-	top: 25%;
-	bottom: 25%;
-	width: 3px;
-	border-radius: 0 3px 3px 0;
-	background: var(--color-primary, oklch(0.55 0.12 145));
+/* ============================================================================
+ * BOBBIT — eye animation (blink + look around)
+ * ============================================================================ */
+@keyframes bobbit-eyes {
+	0%, 55%   { transform: scale(1.6); opacity: 1; }
+	56%, 58%  { transform: scale(1.6); opacity: 0; }             /* blink */
+	59%, 72%  { transform: scale(1.6); opacity: 1; }             /* center */
+	74%, 86%  { transform: scale(1.6) translateX(1px); opacity: 1; } /* look right */
+	87%, 89%  { transform: scale(1.6); opacity: 0; }             /* blink */
+	90%, 100% { transform: scale(1.6); opacity: 1; }             /* center */
+}
+@keyframes bobbit-eyes-squash {
+	0%, 55%   { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 1; }
+	56%, 58%  { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 0; }
+	59%, 72%  { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 1; }
+	74%, 86%  { transform: scale(1.6) scaleX(1.25) scaleY(0.7) translateX(1px); opacity: 1; }
+	87%, 89%  { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 0; }
+	90%, 100% { transform: scale(1.6) scaleX(1.25) scaleY(0.7); opacity: 1; }
 }
 
 /* ============================================================================

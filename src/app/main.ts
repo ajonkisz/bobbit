@@ -1590,48 +1590,54 @@ function sessionAcronym(title: string): string {
  * When a sessionId is provided, the bobbit uses a unique color derived from it.
  * Otherwise falls back to the canonical green.
  */
-function statusBobbit(status: string, isCompacting = false, sessionId?: string) {
+function statusBobbit(status: string, isCompacting = false, sessionId?: string, isActive = false) {
 	// Hue rotation offset from canonical green
 	const hueRotate = sessionId ? sessionHueRotation(sessionId) : 0;
 
-	// Always use canonical green/muted palettes as the base — hue-rotate shifts them
 	const canonical = { main: "#8ec63f", light: "#b5d98a", dark: "#6b9930", eye: "#1a3010" };
-	const muted     = { main: "#8aaa6e", light: "#a8c094", dark: "#6e8c5a", eye: "#2a3a22" };
-	let p: { main: string; light: string; dark: string; eye: string };
+	let p: typeof canonical;
 	if (status === "starting") {
 		p = { main: "#eab308", light: "#fde047", dark: "#ca8a04", eye: "#2d2006" };
 	} else if (status === "terminated") {
 		p = { main: "#ef4444", light: "#fca5a5", dark: "#dc2626", eye: "#2c0b0e" };
 	} else {
-		p = (status === "idle" && !isCompacting) ? muted : canonical;
+		p = canonical;
 	}
 
 	const isBusy = status === "streaming" || isCompacting;
-	// 10×9 pixel bobbit, same shape as the streaming sprite
+
+	// Base sprite — eyes filled with main color when active (eyes rendered as separate animated layer)
+	const eyeColor = isActive ? p.main : p.eye;
 	const shadow = `
 		3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,
 		2px 1px 0 #000,3px 1px 0 ${p.main},4px 1px 0 ${p.main},5px 1px 0 ${p.main},6px 1px 0 ${p.light},7px 1px 0 ${p.light},8px 1px 0 #000,
 		1px 2px 0 #000,2px 2px 0 ${p.main},3px 2px 0 ${p.main},4px 2px 0 ${p.main},5px 2px 0 ${p.main},6px 2px 0 ${p.main},7px 2px 0 ${p.light},8px 2px 0 ${p.main},9px 2px 0 #000,
 		0px 3px 0 #000,1px 3px 0 ${p.main},2px 3px 0 ${p.main},3px 3px 0 ${p.main},4px 3px 0 ${p.main},5px 3px 0 ${p.main},6px 3px 0 ${p.main},7px 3px 0 ${p.main},8px 3px 0 ${p.main},9px 3px 0 #000,
-		0px 4px 0 #000,1px 4px 0 ${p.main},2px 4px 0 ${p.main},3px 4px 0 ${p.eye},4px 4px 0 ${p.main},5px 4px 0 ${p.main},6px 4px 0 ${p.eye},7px 4px 0 ${p.main},8px 4px 0 ${p.main},9px 4px 0 #000,
-		0px 5px 0 #000,1px 5px 0 ${p.main},2px 5px 0 ${p.main},3px 5px 0 ${p.eye},4px 5px 0 ${p.main},5px 5px 0 ${p.main},6px 5px 0 ${p.eye},7px 5px 0 ${p.main},8px 5px 0 ${p.main},9px 5px 0 #000,
+		0px 4px 0 #000,1px 4px 0 ${p.main},2px 4px 0 ${p.main},3px 4px 0 ${eyeColor},4px 4px 0 ${p.main},5px 4px 0 ${p.main},6px 4px 0 ${eyeColor},7px 4px 0 ${p.main},8px 4px 0 ${p.main},9px 4px 0 #000,
+		0px 5px 0 #000,1px 5px 0 ${p.main},2px 5px 0 ${p.main},3px 5px 0 ${eyeColor},4px 5px 0 ${p.main},5px 5px 0 ${p.main},6px 5px 0 ${eyeColor},7px 5px 0 ${p.main},8px 5px 0 ${p.main},9px 5px 0 #000,
 		0px 6px 0 #000,1px 6px 0 ${p.dark},2px 6px 0 ${p.main},3px 6px 0 ${p.main},4px 6px 0 ${p.main},5px 6px 0 ${p.main},6px 6px 0 ${p.main},7px 6px 0 ${p.main},8px 6px 0 ${p.main},9px 6px 0 #000,
 		1px 7px 0 #000,2px 7px 0 ${p.dark},3px 7px 0 ${p.main},4px 7px 0 ${p.main},5px 7px 0 ${p.main},6px 7px 0 ${p.main},7px 7px 0 ${p.main},8px 7px 0 #000,
 		2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000
 	`;
-	// Sprite pixels span x 0–9, y 0–8 (10×9). At scale 1.6 → 16×14.4px.
-	// Outer span is sized to contain the scaled artwork so it participates
-	// in flex layout correctly. Inner 1×1 element is scaled from top-left.
-	// hue-rotate on the outer span shifts the base green to the session color,
-	// matching how the chat blob applies the same rotation via CSS.
-	// Sync shimmer phase to a global clock so all bobbits (sidebar + chat) shimmer together
+
+	// Eye overlay — only the 4 eye pixels, animated separately for active sessions
+	const eyeShadow = `3px 4px 0 ${p.eye},6px 4px 0 ${p.eye},3px 5px 0 ${p.eye},6px 5px 0 ${p.eye}`;
+
 	const shimmerDelay = -(Date.now() % 8000);
 	const shimmer = isBusy ? `animation:blob-shimmer 8s ease-in-out infinite;animation-delay:${shimmerDelay}ms;` : "";
 	const hueFilter = (hueRotate && status !== "starting" && status !== "terminated") ? `filter:hue-rotate(${hueRotate}deg);` : "";
-	const spriteTransform = isCompacting
+	const baseTransform = isCompacting
 		? "transform:scale(1.6) scaleX(1.25) scaleY(0.7);transform-origin:0 0;"
 		: "transform:scale(1.6);transform-origin:0 0;";
-	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${hueFilter}"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;${spriteTransform}box-shadow:${shadow};${shimmer}"></span></span>`;
+	const eyeAnim = isActive
+		? `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 0;`
+		: baseTransform;
+
+	const eyeLayer = isActive
+		? html`<span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
+		: "";
+
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${hueFilter}"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}</span>`;
 }
 
 /** Show a rename dialog for a session */
@@ -1807,7 +1813,7 @@ function renderSidebarSession(session: GatewaySession) {
 	const displayTitle = active && remoteAgent ? remoteAgent.title : session.title;
 	return html`
 		<div
-			class="group relative flex items-center gap-1 px-1 ${SESSION_ROW_PY} rounded-md cursor-pointer transition-colors text-sm
+			class="group relative flex items-center gap-1 pl-3 pr-1 ${SESSION_ROW_PY} rounded-md cursor-pointer transition-colors text-sm
 				${active ? "bg-secondary text-foreground sidebar-session-active" : connecting ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
 			@mouseenter=${(e: MouseEvent) => showSessionTooltip(e, session, displayTitle)}
 			@mouseleave=${hideSessionTooltip}
@@ -1818,12 +1824,12 @@ function renderSidebarSession(session: GatewaySession) {
 			<div class="shrink-0 flex items-center justify-center">
 				${connecting
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-					: statusBobbit(session.status, session.isCompacting, session.id)}
+					: statusBobbit(session.status, session.isCompacting, session.id, active)}
 			</div>
 			<div class="flex-1 min-w-0 truncate text-xs ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"}">
 				${displayTitle}
 			</div>
-			<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 rounded-r-md" style="background:linear-gradient(to right, transparent, var(--sidebar) 30%);">
+			<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
 				<button
 					class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
 					@click=${(e: Event) => {
@@ -1851,6 +1857,7 @@ function renderSidebarSession(session: GatewaySession) {
 
 /** Full-size session card for mobile landing page */
 function renderSessionCard(session: GatewaySession, index = 0) {
+	const active = activeSessionId() === session.id;
 	const connecting = connectingSessionId === session.id;
 	return html`
 		<div
@@ -1862,7 +1869,7 @@ function renderSessionCard(session: GatewaySession, index = 0) {
 				<div class="flex items-center gap-2 mb-1">
 					${connecting
 						? html`<svg class="animate-spin shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-						: statusBobbit(session.status, session.isCompacting, session.id)}
+						: statusBobbit(session.status, session.isCompacting, session.id, active)}
 					<span class="text-sm ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"} text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
@@ -1940,7 +1947,7 @@ function goalStateIcon(state: GoalState, size = 14) {
 
 	// Lines extend from outside the circle inward (22→18, 6→2) — same as lucide Crosshair
 	return html`
-		<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" style="display:inline-block;vertical-align:middle;flex-shrink:0;">
+		<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" style="display:block;flex-shrink:0;">
 			${circleContent}
 			${svg`<line x1="22" x2="18" y1="12" y2="12" stroke="${lineColor}" stroke-width="2" stroke-linecap="round" opacity="${lineOpacity}"/>`}
 			${svg`<line x1="6" x2="2" y1="12" y2="12" stroke="${lineColor}" stroke-width="2" stroke-linecap="round" opacity="${lineOpacity}"/>`}
@@ -1957,15 +1964,15 @@ function renderSidebarGoal(goal: Goal) {
 	const isCreatingHere = creatingSessionForGoalId === goal.id;
 
 	return html`
-		<div>
+		<div class="flex flex-col gap-0.5">
 			<!-- Goal header -->
 			<div class="group relative flex items-center gap-1 px-1 py-0.5 rounded-md cursor-pointer hover:bg-secondary/50 transition-colors"
 				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); renderApp(); }}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
 				<span class="shrink-0" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state, 12)}</span>
-				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}">${goal.title}</span>
+				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}" style="line-height:12px;transform:translateY(-1px)">${goal.title}</span>
 				<!-- Goal actions (overlay on hover) -->
-				<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 rounded-r-md" style="background:linear-gradient(to right, transparent, var(--sidebar) 30%);">
+				<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
 					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
 						@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(goal.id); }}
 						title="New session">
@@ -1985,14 +1992,14 @@ function renderSidebarGoal(goal: Goal) {
 			</div>
 			<!-- Goal sessions (if expanded) -->
 			${isExpanded ? html`
-				<div class="ml-2 flex flex-col gap-0">
+				<div class="flex flex-col gap-0.5">
 					${goalSessions.length === 0 && !isCreatingHere
-						? html`<div class="px-1 py-1 text-[10px] text-muted-foreground">
+						? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground">
 								No sessions —
 								<button class="text-primary hover:underline" @click=${() => createAndConnectSession(goal.id)}>start one</button>
 							</div>`
 						: goalSessions.map(renderSidebarSession)}
-					${isCreatingHere ? html`<div class="px-1 py-1 text-[10px] text-muted-foreground flex items-center gap-1">
+					${isCreatingHere ? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground flex items-center gap-1">
 						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
 						Creating…
 					</div>` : ""}
@@ -2028,7 +2035,7 @@ function renderSidebar() {
 					@mouseleave=${hideSessionTooltip}
 					@click=${() => { if (!active) connectToSession(s.id, true); }}
 				>
-					${statusBobbit(s.status, s.isCompacting, s.id)}
+					${statusBobbit(s.status, s.isCompacting, s.id, active)}
 					<span class="text-[8px] font-bold tracking-wide ${active ? "text-foreground" : "text-muted-foreground"}" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(displayTitle)}</span>
 				</button>
 			`;
@@ -2053,8 +2060,18 @@ function renderSidebar() {
 							${expanded ? goalSessions.map(renderCollapsedSession) : ""}
 						`;
 					})}
-					${ungrouped.length > 0 && sortedGoals.length > 0 ? html`<div class="w-7 border-t border-border/50 my-1.5"></div>` : ""}
-					${ungrouped.map(renderCollapsedSession)}
+					${ungrouped.length > 0 && sortedGoals.length > 0 ? html`
+						<div class="w-7 border-t border-border/50 my-1.5"></div>
+						<button
+							class="flex items-center py-0.5 w-full rounded-md hover:bg-secondary/50 transition-colors" style="gap:0.225rem;"
+							title="Ungrouped sessions"
+							@click=${() => { ungroupedExpanded = !ungroupedExpanded; renderApp(); }}
+						>
+							<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
+							<span class="text-[10px] font-extrabold tracking-wider text-muted-foreground" style="font-family: ui-monospace, monospace; line-height: 1;">SES</span>
+						</button>
+						${ungroupedExpanded ? ungrouped.map(renderCollapsedSession) : ""}
+					` : sortedGoals.length === 0 ? ungrouped.map(renderCollapsedSession) : ""}
 				</div>
 				<button
 					class="p-2 mb-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
@@ -2069,7 +2086,7 @@ function renderSidebar() {
 
 	return html`
 		<div class="w-[240px] shrink-0 h-full flex flex-col" style="background: var(--sidebar);">
-			<div class="flex-1 overflow-y-auto flex flex-col gap-0.5 py-2 px-1">
+			<div class="flex-1 overflow-y-auto flex flex-col gap-0.5 py-2 px-0.5">
 				${sessionsLoading
 					? html`<div class="text-center py-6 text-muted-foreground text-xs">Loading…</div>`
 					: sessionsError
@@ -2087,17 +2104,13 @@ function renderSidebar() {
 							<!-- Ungrouped sessions -->
 							${ungroupedSessions.length > 0 && sortedGoals.length > 0 ? html`
 								<div class="border-t border-border/50 my-1.5 mx-1"></div>
-								<div>
+								<div class="flex flex-col gap-0.5">
 									<div class="flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
 										@click=${() => { ungroupedExpanded = !ungroupedExpanded; renderApp(); }}>
 										<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
 										<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
 									</div>
-									${ungroupedExpanded ? html`
-										<div class="ml-2 flex flex-col gap-0">
-											${ungroupedSessions.map(renderSidebarSession)}
-										</div>
-									` : ""}
+									${ungroupedExpanded ? ungroupedSessions.map(renderSidebarSession) : ""}
 								</div>
 							` : sortedGoals.length === 0 ? html`
 								<!-- No goals, just show sessions flat -->
@@ -2106,7 +2119,7 @@ function renderSidebar() {
 											<p class="text-xs text-muted-foreground mb-2">No sessions</p>
 											<button class="text-xs text-primary hover:underline" @click=${() => createAndConnectSession()}>Create one</button>
 										</div>`
-									: ungroupedSessions.map(renderSidebarSession)}
+									: html`<div class="flex flex-col gap-0.5">${ungroupedSessions.map(renderSidebarSession)}</div>`}
 							` : ""}
 						`
 				}
@@ -2134,7 +2147,7 @@ function renderMobileGoalCard(goal: Goal) {
 			<div class="flex items-center justify-between mb-2">
 				<div class="flex items-center gap-2">
 					<span class="shrink-0">${goalStateIcon(goal.state, 16)}</span>
-					<span class="text-sm font-medium text-foreground">${goal.title}</span>
+					<span class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">${goal.title}</span>
 				</div>
 				<div class="flex items-center gap-1">
 					<button class="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
