@@ -4,6 +4,17 @@ import { createRef, ref } from "lit/directives/ref.js";
 import { ListChecks } from "lucide";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
+import {
+	type DelegateCardEntry,
+	formatDuration,
+	getAuthToken,
+	renderDelegateCardList,
+	renderStatusPills,
+} from "./delegate-cards.js";
+
+interface RunPhaseDetails {
+	delegates?: DelegateCardEntry[];
+}
 
 interface WorkflowParams {
 	action: string;
@@ -56,6 +67,7 @@ function getActionLabel(action: string): { streaming: string; complete: string }
 		status: { streaming: "Checking workflow status", complete: "Workflow status" },
 		advance: { streaming: "Advancing phase", complete: "Advanced phase" },
 		reset: { streaming: "Resetting phase", complete: "Reset phase" },
+		run_phase: { streaming: "Delegating to agents", complete: "Delegates completed" },
 		collect_artifact: { streaming: "Collecting artifact", complete: "Collected artifact" },
 		set_context: { streaming: "Setting context", complete: "Set context" },
 		complete: { streaming: "Completing workflow", complete: "Workflow completed" },
@@ -123,14 +135,7 @@ function errorPage(message: string): string {
 	</body></html>`;
 }
 
-/** Get the auth token from localStorage (where Bobbit stores it) */
-function getAuthToken(): string | null {
-	try {
-		return localStorage.getItem("gateway.token") || null;
-	} catch {
-		return null;
-	}
-}
+// getAuthToken imported from delegate-cards.ts
 
 export class WorkflowRenderer implements ToolRenderer<WorkflowParams, any> {
 	render(
@@ -201,6 +206,31 @@ export class WorkflowRenderer implements ToolRenderer<WorkflowParams, any> {
 							${renderCollapsibleHeader(state, ListChecks, startHeader, contentRef, chevronRef, false)}
 							<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
 								<div class="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">${output}</div>
+							</div>
+						</div>
+					`,
+					isCustom: false,
+				};
+			}
+
+			// For run_phase: show individual delegate cards with log links
+			if (action === "run_phase") {
+				const details = result.details as RunPhaseDetails | undefined;
+				const delegates = details?.delegates || [];
+				const allOk = delegates.length > 0 && delegates.every((d) => d.status === "completed");
+
+				const runPhaseHeader = delegates.length > 0
+					? html`Delegated: ${renderStatusPills(delegates)}
+					${allOk ? html`<span class="text-green-500 ml-1">All completed</span>` : ""}`
+					: html`${headerText}`;
+
+				const hasRunning = delegates.some((d) => d.status === "running");
+				return {
+					content: html`
+						<div>
+							${renderCollapsibleHeader(state, ListChecks, runPhaseHeader, contentRef, chevronRef, hasRunning)}
+							<div ${ref(contentRef)} class="${hasRunning ? "max-h-[2000px] mt-3" : "max-h-0"} overflow-hidden transition-all duration-300">
+								${renderDelegateCardList(delegates)}
 							</div>
 						</div>
 					`,
@@ -289,3 +319,5 @@ function formatSize(bytes: number): string {
 	if (bytes < 1024) return `${bytes} chars`;
 	return `${(bytes / 1024).toFixed(1)} KB`;
 }
+
+

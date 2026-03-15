@@ -145,9 +145,11 @@ export class SessionManager {
 
 			if (event.type === "agent_start") {
 				session.status = "streaming";
+				this.store.update(ps.id, { wasStreaming: true });
 				broadcast(session.clients, { type: "session_status", status: "streaming" });
 			} else if (event.type === "agent_end") {
 				session.status = "idle";
+				this.store.update(ps.id, { wasStreaming: false });
 				broadcast(session.clients, { type: "session_status", status: "idle" });
 			}
 
@@ -171,6 +173,19 @@ export class SessionManager {
 
 		session.status = "idle";
 		this.sessions.set(ps.id, session);
+
+		// If the agent was mid-turn when the server died, re-prompt it to continue
+		if (ps.wasStreaming) {
+			console.log(`[session-manager] Session "${ps.title}" (${ps.id}) was interrupted mid-turn — re-prompting to continue`);
+			this.store.update(ps.id, { wasStreaming: false });
+			rpcClient.prompt(
+				"[SYSTEM: The infrastructure server restarted while you were mid-turn. " +
+				"Your previous work has been preserved. Please continue where you left off. " +
+				"Do NOT start over — review your recent messages and resume from the exact point of interruption.]"
+			).catch((err: any) => {
+				console.error(`[session-manager] Failed to re-prompt interrupted session ${ps.id}:`, err);
+			});
+		}
 	}
 
 	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean): Promise<SessionInfo> {
@@ -235,9 +250,11 @@ export class SessionManager {
 
 			if (event.type === "agent_start") {
 				session.status = "streaming";
+				this.store.update(id, { wasStreaming: true });
 				broadcast(session.clients, { type: "session_status", status: "streaming" });
 			} else if (event.type === "agent_end") {
 				session.status = "idle";
+				this.store.update(id, { wasStreaming: false });
 				broadcast(session.clients, { type: "session_status", status: "idle" });
 			} else if (event.type === "auto_compaction_start") {
 				session.isCompacting = true;
@@ -516,9 +533,11 @@ export class SessionManager {
 
 				if (event.type === "agent_start") {
 					session.status = "streaming";
+					this.store.update(id, { wasStreaming: true });
 					broadcast(session.clients, { type: "session_status", status: "streaming" });
 				} else if (event.type === "agent_end") {
 					session.status = "idle";
+					this.store.update(id, { wasStreaming: false });
 					broadcast(session.clients, { type: "session_status", status: "idle" });
 				}
 
@@ -552,11 +571,19 @@ export class SessionManager {
 	}
 
 	async shutdown(): Promise<void> {
-		// Don't remove from store on shutdown — sessions should survive restart
+		// Don't remove from store on shutdown — sessions should survive restart.
+		// Persist the streaming state for each session so interrupted agents
+		// can be re-prompted on the next startup.
 		const ids = Array.from(this.sessions.keys());
 		for (const id of ids) {
 			const session = this.sessions.get(id);
 			if (!session) continue;
+
+			// Snapshot the current streaming state before we kill the process.
+			// This is authoritative — the in-memory status is always correct,
+			// and we write it here to handle the case where shutdown() races
+			// with a pending agent_end that hasn't flushed to disk yet.
+			this.store.update(id, { wasStreaming: session.status === "streaming" });
 
 			session.unsubscribe();
 			await session.rpcClient.stop();

@@ -4,6 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { html, LitElement, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
+	Bot,
 	FileText,
 	FileCode2,
 	ListChecks,
@@ -25,6 +26,7 @@ const TOOL_ICONS: Record<string, any> = {
 	find: FileText,
 	grep: FileText,
 	workflow: ListChecks,
+	delegate: Bot,
 };
 
 /** Human-readable past-tense verb + noun per tool */
@@ -37,6 +39,7 @@ const TOOL_LABELS: Record<string, { verb: string; noun: string; nounPlural: stri
 	find: { verb: "Searched", noun: "pattern", nounPlural: "patterns" },
 	grep: { verb: "Searched", noun: "pattern", nounPlural: "patterns" },
 	workflow: { verb: "Updated", noun: "workflow step", nounPlural: "workflow steps" },
+	delegate: { verb: "Delegated", noun: "task", nounPlural: "tasks" },
 };
 
 /** Extract the most useful short label from a tool call's params */
@@ -58,6 +61,10 @@ function summarizeCall(toolName: string, args: Record<string, any>): string {
 			if (action === "set_context" && args?.key) return `${args.key} = ${args.value || ""}`;
 			if (action === "collect_artifact" && args?.name) return `artifact: ${args.name}`;
 			return action;
+		}
+		case "delegate": {
+			const instr = args?.instructions || "";
+			return truncate(instr.split("\n")[0], 80);
 		}
 		default:
 			return args?.path || toolName;

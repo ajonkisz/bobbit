@@ -13,6 +13,8 @@ export interface PersistedSession {
 	lastActivity: number;
 	/** Optional goal this session belongs to */
 	goalId?: string;
+	/** Whether the agent was actively streaming when the server last knew about it */
+	wasStreaming?: boolean;
 }
 
 const STORE_DIR = path.join(os.homedir(), ".pi");
@@ -77,7 +79,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);

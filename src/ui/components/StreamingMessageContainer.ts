@@ -9,12 +9,14 @@ export class StreamingMessageContainer extends LitElement {
 
 	@property({ type: Object }) pendingToolCalls?: Set<string>;
 	@property({ type: Object }) toolResultsById?: Map<string, ToolResultMessage>;
+	@property({ type: Object }) toolPartialResults?: Record<string, any>;
 	@property({ attribute: false }) onCostClick?: () => void;
 
 	@state() private _message: AgentMessage | null = null;
 	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' | 'compact-shake' | 'compacting' | 'compact-pop' = 'idle';
 	private _exitVariant: 'exit' | 'exit-roll' = 'exit';
 	private _entryVariant: 'enter' | 'enter-roll' = 'enter';
+	private _entryTimer: ReturnType<typeof setTimeout> | null = null;
 	private _compactEntryTimer: ReturnType<typeof setTimeout> | null = null;
 	private _compactSafetyTimer: ReturnType<typeof setTimeout> | null = null;
 	private _compactStartedAt: number = 0;
@@ -40,13 +42,18 @@ export class StreamingMessageContainer extends LitElement {
 				// Coming from idle — play entry animation
 				this._entryVariant = Math.random() < 0.5 ? 'enter' : 'enter-roll';
 				this._blobState = 'entering';
-				setTimeout(() => {
+				this._entryTimer = setTimeout(() => {
+					this._entryTimer = null;
 					this._blobState = 'active';
 				}, this._entryVariant === 'enter-roll' ? 900 : 700);
 			} else if (this.isStreaming) {
 				this._blobState = 'active';
-			} else if (this._blobState === 'active') {
-				// Streaming stopped — randomly pick exit variant, then go idle
+			} else if (this._blobState === 'active' || this._blobState === 'entering') {
+				// Streaming stopped — cancel any pending entry timer and play exit
+				if (this._entryTimer) {
+					clearTimeout(this._entryTimer);
+					this._entryTimer = null;
+				}
 				this._exitVariant = Math.random() < 0.5 ? 'exit' : 'exit-roll';
 				this._blobState = 'exiting';
 				setTimeout(() => {
@@ -211,6 +218,7 @@ export class StreamingMessageContainer extends LitElement {
 						.isStreaming=${this.isStreaming}
 						.pendingToolCalls=${this.pendingToolCalls}
 						.toolResultsById=${this.toolResultsById}
+						.toolPartialResults=${this.toolPartialResults}
 						.hideToolCalls=${false}
 						.onCostClick=${this.onCostClick}
 					></assistant-message>

@@ -24,6 +24,9 @@ import { RemoteAgent, type ConnectionStatus } from "./remote-agent.js";
 import "../ui/components/WorkflowStatusBar.js";
 import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 
+// Expose for testing
+(window as any).__extractWorkflowStatus = extractWorkflowStatus;
+
 // ============================================================================
 // STORAGE (required by web-ui components)
 // ============================================================================
@@ -796,6 +799,9 @@ async function connectToSession(sessionId: string, isExisting: boolean, options?
 		};
 
 		// Detect goal proposals from goal-assistant sessions
+		// Re-render the workflow status bar when sub-agent progress updates arrive
+		remote.onWorkflowUpdate = () => renderApp();
+
 		remote.onGoalProposal = (proposal) => {
 			activeGoalProposal = proposal;
 			// Update preview fields, respecting user edits
@@ -2120,21 +2126,48 @@ function renderSidebar() {
 							${ungroupedSessions.length > 0 && sortedGoals.length > 0 ? html`
 								<div class="border-t border-border/50 my-1.5 mx-1"></div>
 								<div class="flex flex-col gap-0.5">
-									<div class="flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
-										@click=${() => { ungroupedExpanded = !ungroupedExpanded; saveUngroupedExpanded(); renderApp(); }}>
-										<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
-										<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
+									<div class="flex items-center gap-1 px-1 py-0.5">
+										<div class="flex-1 flex items-center gap-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
+											@click=${() => { ungroupedExpanded = !ungroupedExpanded; saveUngroupedExpanded(); renderApp(); }}>
+											<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
+											<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
+										</div>
+										<button
+											class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${creatingSession ? "opacity-50 pointer-events-none" : ""}"
+											@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(); }}
+											title="New session"
+											?disabled=${creatingSession}
+										>
+											${creatingSession && !creatingSessionForGoalId
+												? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+												: icon(Plus, "xs")}
+										</button>
 									</div>
 									${ungroupedExpanded ? ungroupedSessions.map(renderSidebarSession) : ""}
 								</div>
 							` : sortedGoals.length === 0 ? html`
 								<!-- No goals, just show sessions flat -->
-								${ungroupedSessions.length === 0
-									? html`<div class="text-center py-6">
-											<p class="text-xs text-muted-foreground mb-2">No sessions</p>
-											<button class="text-xs text-primary hover:underline" @click=${() => createAndConnectSession()}>Create one</button>
-										</div>`
-									: html`<div class="flex flex-col gap-0.5">${ungroupedSessions.map(renderSidebarSession)}</div>`}
+								<div class="flex flex-col gap-0.5">
+									<div class="flex items-center gap-1 px-1 py-0.5">
+										<span class="flex-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:13px;">Sessions</span>
+										<button
+											class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${creatingSession ? "opacity-50 pointer-events-none" : ""}"
+											@click=${() => createAndConnectSession()}
+											title="New session"
+											?disabled=${creatingSession}
+										>
+											${creatingSession && !creatingSessionForGoalId
+												? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+												: icon(Plus, "xs")}
+										</button>
+									</div>
+									${ungroupedSessions.length === 0
+										? html`<div class="text-center py-6">
+												<p class="text-xs text-muted-foreground mb-2">No sessions</p>
+												<button class="text-xs text-primary hover:underline" @click=${() => createAndConnectSession()}>Create one</button>
+											</div>`
+										: ungroupedSessions.map(renderSidebarSession)}
+								</div>
 							` : ""}
 						`
 				}
@@ -2648,7 +2681,12 @@ const renderApp = () => {
 
 	const workflowBar = (position: "desktop" | "mobile" = "desktop") => {
 		if (!remoteAgent) return html``;
-		const wfStatus = extractWorkflowStatus(remoteAgent.state.messages);
+		const wfStatus = extractWorkflowStatus(
+			remoteAgent.state.messages,
+			activeSessionId(),
+			remoteAgent.state.streamMessage,
+			remoteAgent.state.toolPartialResults,
+		);
 		if (!wfStatus) return html``;
 		const borderClass = position === "desktop"
 			? "border-b border-border bg-card/80 backdrop-blur-sm"
@@ -2729,16 +2767,6 @@ const renderApp = () => {
 								title="New goal"
 							>
 								${icon(Crosshair, "sm")}
-							</button>
-							<button
-								class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${creatingSession ? "opacity-50 pointer-events-none" : ""}"
-								@click=${() => createAndConnectSession()}
-								title="New session"
-								?disabled=${creatingSession}
-							>
-								${creatingSession && !creatingSessionForGoalId
-									? html`<svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-									: icon(Plus, "sm")}
 							</button>
 						</div>
 					</div>

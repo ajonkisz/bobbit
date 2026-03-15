@@ -42,6 +42,7 @@ export class AgentInterface extends LitElement {
 	@query("streaming-message-container") private _streamingContainer!: StreamingMessageContainer;
 
 	private _stickToBottom = true;
+	private _isAutoScrolling = false;
 	private _scrollContainer?: HTMLElement;
 	private _resizeObserver?: ResizeObserver;
 	private _unsubscribeSession?: () => void;
@@ -128,10 +129,18 @@ export class AgentInterface extends LitElement {
 
 		if (this._scrollContainer) {
 			// When content changes size, scroll to bottom if we're already there.
-			// Uses isNearBottom() check — no keyboard/focus/viewport tracking needed.
+			// Uses _stickToBottom flag — no keyboard/focus/viewport tracking needed.
+			// We set _isAutoScrolling to prevent the scroll event handler from
+			// misinterpreting the programmatic scroll as a user scroll-up (which
+			// can happen when content grows between the programmatic scroll and
+			// the resulting scroll event).
 			this._resizeObserver = new ResizeObserver(() => {
 				if (this._stickToBottom && this._scrollContainer) {
+					this._isAutoScrolling = true;
 					this._scrollContainer.scrollTop = this._scrollContainer.scrollHeight;
+					requestAnimationFrame(() => {
+						this._isAutoScrolling = false;
+					});
 				}
 			});
 
@@ -222,6 +231,16 @@ export class AgentInterface extends LitElement {
 				this.requestUpdate();
 				return;
 			}
+			if ((ev as any).type === "tool_execution_update") {
+				// Partial results from long-running tools (delegate, workflow run_phase)
+				// Force streaming container to re-render with updated delegate cards
+				this.requestUpdate();
+				if (this._streamingContainer) {
+					this._streamingContainer.toolPartialResults = (this.session?.state as any)?.toolPartialResults;
+					this._streamingContainer.requestUpdate();
+				}
+				return;
+			}
 			switch (ev.type) {
 				case "message_start":
 				case "turn_end":
@@ -273,13 +292,28 @@ export class AgentInterface extends LitElement {
 		});
 	}
 
+	private _scrollToBottom() {
+		this._isAutoScrolling = true;
+		if (this._scrollContainer) {
+			this._scrollContainer.scrollTop = this._scrollContainer.scrollHeight;
+		}
+		// Re-assert after next frame (layout may not have settled yet)
+		requestAnimationFrame(() => {
+			this._stickToBottom = true;
+			if (this._scrollContainer) {
+				this._scrollContainer.scrollTop = this._scrollContainer.scrollHeight;
+			}
+			this._isAutoScrolling = false;
+		});
+	}
+
 	/**
 	 * Simple stick-to-bottom: if the user is near the bottom, stay there.
 	 * If they've scrolled up, don't pull them back down.
 	 * No keyboard/focus/viewport tracking — just geometry.
 	 */
 	private _handleScroll = () => {
-		if (!this._scrollContainer) return;
+		if (!this._scrollContainer || this._isAutoScrolling) return;
 		const { scrollTop, scrollHeight, clientHeight } = this._scrollContainer;
 		this._stickToBottom = scrollHeight - scrollTop - clientHeight < 50;
 	};
@@ -352,7 +386,11 @@ export class AgentInterface extends LitElement {
 		// Only clear editor after we know we can send
 		this._messageEditor.value = "";
 		this._messageEditor.attachments = [];
-		this._stickToBottom = true; // Snap to bottom when sending a message
+		// Snap to bottom when sending a message.
+		// Set flag and scroll immediately, then re-assert after render
+		// (scroll events from layout changes can race and unset the flag).
+		this._stickToBottom = true;
+		this._scrollToBottom();
 
 		if (isStreaming) {
 			// Agent is busy — add to local queue, will be sent on agent_end
@@ -484,6 +522,7 @@ export class AgentInterface extends LitElement {
 					.isStreaming=${state.isStreaming}
 					.pendingToolCalls=${state.pendingToolCalls}
 					.toolResultsById=${toolResultsById}
+					.toolPartialResults=${(state as any).toolPartialResults}
 					.onCostClick=${this.onCostClick}
 				></streaming-message-container>
 

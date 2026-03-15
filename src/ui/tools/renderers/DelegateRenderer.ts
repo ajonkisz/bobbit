@@ -1,0 +1,155 @@
+import type { ToolResultMessage } from "@mariozechner/pi-ai";
+import { html } from "lit";
+import { createRef, ref } from "lit/directives/ref.js";
+import { Bot } from "lucide";
+import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
+import type { ToolRenderer, ToolRenderResult } from "../types.js";
+import {
+	type DelegateCardEntry,
+	formatDuration,
+	statusColor,
+	summarizeInstructions,
+	renderDelegateCard,
+	renderRunningCard,
+	renderStatusPills,
+	renderDelegateCardList,
+	renderLogLink,
+} from "./delegate-cards.js";
+
+interface DelegateParams {
+	instructions: string;
+	parallel?: Array<{ instructions: string; context?: Record<string, string> }>;
+	context?: Record<string, string>;
+	timeout_minutes?: number;
+}
+
+interface DelegateDetailsEntry {
+	id: string;
+	instructions: string;
+	status: string;
+	durationMs: number;
+}
+
+interface DelegateDetails {
+	delegates: DelegateDetailsEntry[];
+}
+
+function getTextOutput(result: ToolResultMessage<any> | undefined): string {
+	if (!result) return "";
+	return result.content?.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n") || "";
+}
+
+/** Convert DelegateDetailsEntry to shared DelegateCardEntry */
+function toCardEntry(d: DelegateDetailsEntry): DelegateCardEntry {
+	return { id: d.id, name: summarizeInstructions(d.instructions), status: d.status, durationMs: d.durationMs };
+}
+
+export class DelegateRenderer implements ToolRenderer<DelegateParams, DelegateDetails> {
+	render(
+		params: DelegateParams | undefined,
+		result: ToolResultMessage<DelegateDetails> | undefined,
+		isStreaming?: boolean,
+	): ToolRenderResult {
+		const state = result ? (result.isError ? "error" : "complete") : isStreaming ? "inprogress" : "complete";
+		const contentRef = createRef<HTMLDivElement>();
+		const chevronRef = createRef<HTMLSpanElement>();
+		const details = result?.details as DelegateDetails | undefined;
+
+		// ── Streaming (no result yet) ──
+		if (!result) {
+			if (params?.parallel && params.parallel.length > 0) {
+				return {
+					content: html`
+						<div>
+							${renderHeader(state, Bot, `Delegating to ${params.parallel.length} agents`)}
+							<div class="mt-2 space-y-1">
+								${params.parallel.map((p) => renderRunningCard(summarizeInstructions(p.instructions)))}
+							</div>
+						</div>
+					`,
+					isCustom: false,
+				};
+			}
+			const summary = params?.instructions ? summarizeInstructions(params.instructions) : "task";
+			return {
+				content: html`
+					<div>
+						${renderHeader(state, Bot, html`Delegating to agent — <span class="font-mono text-xs">${summary}</span>`)}
+					</div>
+				`,
+				isCustom: false,
+			};
+		}
+
+		// ── Completed with details ──
+		if (details?.delegates && details.delegates.length > 0) {
+			const delegates = details.delegates;
+			const cards = delegates.map(toCardEntry);
+			const allOk = delegates.every((d) => d.status === "completed");
+
+			if (delegates.length === 1) {
+				// Single delegate — compact rendering
+				const d = delegates[0];
+				const instructions = params?.instructions || d.instructions;
+				return {
+					content: html`
+						<div>
+							${renderCollapsibleHeader(state, Bot,
+								html`Delegated — <span class="font-mono text-xs">${summarizeInstructions(instructions)}</span>
+									<span class="${statusColor(d.status)} text-xs ml-1">(${formatDuration(d.durationMs)})</span>
+									${renderLogLink(d.id)}`,
+								contentRef, chevronRef, false)}
+							<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
+								<div class="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">${getTextOutput(result)}</div>
+							</div>
+						</div>
+					`,
+					isCustom: false,
+				};
+			}
+
+			// Multiple delegates — show cards
+			const headerContent = html`Delegated to ${delegates.length} agents
+				${renderStatusPills(cards)}
+				${allOk ? html`<span class="text-green-500 ml-1">All completed</span>` : ""}`;
+
+			const parallelInstructions = params?.parallel || [];
+			const isRunning = isStreaming && delegates.some((d) => d.status === "running");
+
+			// Build cards with better names from parallel instructions if available
+			const namedCards: DelegateCardEntry[] = delegates.map((d, i) => {
+				const instr = parallelInstructions[i]?.instructions || d.instructions;
+				return { id: d.id, name: summarizeInstructions(instr), status: d.status, durationMs: d.durationMs };
+			});
+
+			return {
+				content: html`
+					<div>
+						${renderCollapsibleHeader(state, Bot, headerContent, contentRef, chevronRef, isRunning)}
+						<div ${ref(contentRef)} class="${isRunning ? "max-h-[2000px] mt-3" : "max-h-0"} overflow-hidden transition-all duration-300">
+							${renderDelegateCardList(namedCards)}
+						</div>
+					</div>
+				`,
+				isCustom: false,
+			};
+		}
+
+		// ── Fallback (no details) — show text output ──
+		const output = getTextOutput(result);
+		const summary = params?.instructions ? summarizeInstructions(params.instructions) : "task";
+		return {
+			content: html`
+				<div>
+					${renderCollapsibleHeader(state, Bot,
+						html`Delegated — <span class="font-mono text-xs">${summary}</span>`,
+						contentRef, chevronRef, false)}
+					<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
+						<div class="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">${output}</div>
+					</div>
+				</div>
+			`,
+			isCustom: false,
+		};
+	}
+}

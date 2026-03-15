@@ -59,6 +59,8 @@ export class RemoteAgent {
 	onConnectionStatusChange?: (status: ConnectionStatus) => void;
 	/** Callback fired when a goal proposal is detected in an assistant message. */
 	onGoalProposal?: (proposal: { title: string; spec: string; cwd?: string }) => void;
+	/** Callback fired when workflow tool execution updates (for real-time progress). */
+	onWorkflowUpdate?: () => void;
 	private _title = "New session";
 
 	constructor() {
@@ -555,10 +557,14 @@ export class RemoteAgent {
 			}
 
 			case "event":
+				if (msg.data?.type === "agent_start" || msg.data?.type === "agent_end") {
+					console.log(`[RemoteAgent] event: ${msg.data.type}, isStreaming: ${this._state.isStreaming}`);
+				}
 				this.handleAgentEvent(msg.data);
 				break;
 
 			case "session_status":
+				console.log(`[RemoteAgent] session_status: ${msg.status}, isStreaming was: ${this._state.isStreaming}`);
 				this._state.isStreaming = msg.status === "streaming";
 				this.onStatusChange?.(msg.status);
 				break;
@@ -734,10 +740,33 @@ export class RemoteAgent {
 				}
 				break;
 
+			case "tool_execution_update":
+				// Store partial results from long-running tools (e.g., workflow run_phase)
+				// so the UI can show real-time progress.
+				if (event.toolCallId && event.partialResult) {
+					if (!this._state.toolPartialResults) {
+						this._state.toolPartialResults = {};
+					}
+					this._state.toolPartialResults = {
+						...this._state.toolPartialResults,
+						[event.toolCallId]: event.partialResult,
+					};
+					// Notify workflow status bar to re-render
+					this.onWorkflowUpdate?.();
+					this.emit(event);
+					return; // skip default emit at end
+				}
+				break;
+
 			case "tool_execution_end":
 				if (event.toolCallId) {
 					this._state.pendingToolCalls = new Set(this._state.pendingToolCalls);
 					this._state.pendingToolCalls.delete(event.toolCallId);
+					// Clean up partial result now that the tool is done
+					if (this._state.toolPartialResults?.[event.toolCallId]) {
+						const { [event.toolCallId]: _, ...rest } = this._state.toolPartialResults;
+						this._state.toolPartialResults = Object.keys(rest).length > 0 ? rest : undefined;
+					}
 				}
 				break;
 

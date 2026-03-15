@@ -20,7 +20,7 @@ import type { AgentTool } from "@mariozechner/pi-agent-core";
 const MIN_GROUP_SIZE = 2;
 
 /** Tool names eligible for grouping */
-const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep", "workflow"]);
+const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep", "workflow", "delegate"]);
 
 /** Workflow actions that are minor metadata updates — safe to collapse into a group */
 const WORKFLOW_GROUPABLE_ACTIONS = new Set(["set_context", "collect_artifact"]);
@@ -98,6 +98,7 @@ export class AssistantMessage extends LitElement {
 	@property({ type: Object }) pendingToolCalls?: Set<string>;
 	@property({ type: Boolean }) hideToolCalls = false;
 	@property({ type: Object }) toolResultsById?: Map<string, ToolResultMessageType>;
+	@property({ type: Object }) toolPartialResults?: Record<string, any>;
 	@property({ type: Boolean }) isStreaming: boolean = false;
 	@property({ type: Boolean }) hidePendingToolCalls = false;
 	@property({ attribute: false }) onCostClick?: () => void;
@@ -196,6 +197,7 @@ export class AssistantMessage extends LitElement {
 							.tool=${tool}
 							.toolCall=${tc}
 							.result=${result}
+							.partialResult=${this.toolPartialResults?.[tc.id]}
 							.pending=${pending}
 							.aborted=${aborted}
 							.isStreaming=${this.isStreaming}
@@ -296,6 +298,7 @@ export class ToolMessage extends LitElement {
 	@property({ type: Object }) toolCall!: ToolCall;
 	@property({ type: Object }) tool?: AgentTool<any>;
 	@property({ type: Object }) result?: ToolResultMessageType;
+	@property({ type: Object }) partialResult?: any;
 	@property({ type: Boolean }) pending: boolean = false;
 	@property({ type: Boolean }) aborted: boolean = false;
 	@property({ type: Boolean }) isStreaming: boolean = false;
@@ -313,16 +316,24 @@ export class ToolMessage extends LitElement {
 		const toolName = this.tool?.name || this.toolCall.name;
 
 		// Render tool content (renderer handles errors and styling)
-		const result: ToolResultMessageType<any> | undefined = this.aborted
-			? {
-					role: "toolResult",
-					isError: true,
-					content: [],
-					toolCallId: this.toolCall.id,
-					toolName: this.toolCall.name,
-					timestamp: Date.now(),
-				}
-			: this.result;
+		// Use partialResult as a synthetic ToolResultMessage during streaming
+		// so renderers can show progress (e.g., delegate cards completing one by one)
+		let result: ToolResultMessageType<any> | undefined;
+		if (this.aborted) {
+			result = { role: "toolResult", isError: true, content: [], toolCallId: this.toolCall.id, toolName: this.toolCall.name, timestamp: Date.now() };
+		} else if (this.result) {
+			result = this.result;
+		} else if (this.partialResult) {
+			result = {
+				role: "toolResult",
+				isError: false,
+				content: this.partialResult.content || [],
+				toolCallId: this.toolCall.id,
+				toolName: this.toolCall.name,
+				timestamp: Date.now(),
+				details: this.partialResult.details,
+			} as ToolResultMessageType<any>;
+		}
 		const renderResult = renderTool(
 			toolName,
 			this.toolCall.arguments,

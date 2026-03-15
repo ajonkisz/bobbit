@@ -10,6 +10,39 @@ export interface Phase {
 	instructions: string;
 	/** Human-readable description of what must be true to exit this phase */
 	exitCriteria: string;
+
+	// ── Execution control (two orthogonal axes) ──
+
+	/**
+	 * Whether this phase runs as a sub-agent process or inline in the parent session.
+	 * - false (default): executed by the current agent in the parent session
+	 * - true: executed by a spawned sub-agent process
+	 *
+	 * Sub-agents always run to completion before the workflow advances.
+	 */
+	subAgent?: boolean;
+
+	/**
+	 * Context isolation for sub-agent phases. Ignored when subAgent is false.
+	 * - "full" (default for sub-agents): agent gets ONLY phase instructions + AGENTS.md.
+	 *   No parent conversation, no goal spec. Maximum independence/unbiased review.
+	 * - "goal": agent gets phase instructions + AGENTS.md + the original goal spec.
+	 *   Useful when the sub-agent needs to understand the broader objective.
+	 * - "none": agent inherits the parent session's full conversation context.
+	 *   Useful for offloading work that needs the parent's context (e.g., "run this test").
+	 */
+	isolation?: "full" | "goal" | "none";
+
+	/**
+	 * For container phases: sub-phases to run concurrently as parallel sub-agents.
+	 * Each sub-phase inherits its own `subAgent`, `isolation`, and `timeoutMs` settings.
+	 * If a sub-phase doesn't set `subAgent`, it defaults to true (since it's in a parallel group).
+	 * The container phase completes when all sub-phases finish.
+	 */
+	parallelPhases?: Phase[];
+
+	/** Timeout in ms for sub-agent execution (default: 10 minutes). Ignored for inline phases. */
+	timeoutMs?: number;
 }
 
 /** A workflow definition (template) */

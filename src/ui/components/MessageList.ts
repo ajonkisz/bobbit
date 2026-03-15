@@ -12,7 +12,7 @@ import "./ErrorMessage.js";
 import "./ToolGroup.js";
 
 /** Tool names eligible for cross-message grouping */
-const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep"]);
+const GROUPABLE_TOOLS = new Set(["read", "edit", "write", "bash", "ls", "find", "grep", "delegate"]);
 
 /**
  * Check if an assistant message is groupable — contains tool calls of a single type

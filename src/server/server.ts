@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
+import os from "node:os";
 import path from "node:path";
 import { WebSocketServer } from "ws";
 import { ColorStore } from "./agent/color-store.js";
@@ -9,7 +10,7 @@ import { RateLimiter } from "./auth/rate-limit.js";
 import { validateToken } from "./auth/token.js";
 import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
-import { listWorkflows, readArtifact, listArtifactFiles, WorkflowRunner } from "./workflows/index.js";
+import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
 
 export interface TlsConfig {
 	cert: string;  // path to PEM certificate
@@ -28,6 +29,9 @@ export interface GatewayConfig {
 }
 
 export function createGateway(config: GatewayConfig) {
+	// Export workflow definitions so agent-side extensions can discover them
+	exportDefinitions();
+
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
@@ -55,7 +59,8 @@ export function createGateway(config: GatewayConfig) {
 
 			// Auth check
 			const authHeader = req.headers.authorization;
-			const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+			const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7)
+				: url.searchParams.get("token"); // Allow token in query param for links opened in new tabs
 			const ip = req.socket.remoteAddress || "unknown";
 
 			if (rateLimiter.isRateLimited(ip)) {
@@ -407,11 +412,76 @@ async function handleApiRoute(
 		return;
 	}
 
-	// GET /api/sessions/:id/workflow/report — serve the HTML report
+	// Delegate logs — serve JSONL log files from delegate agent runs
+	// Default: serves an HTML viewer; ?format=raw for raw JSONL
+	const delegateLogMatch = url.pathname.match(/^\/api\/delegate-logs\/([a-zA-Z0-9_-]+)$/);
+	if (delegateLogMatch && req.method === "GET") {
+		const logId = delegateLogMatch[1];
+		const logPath = path.join(os.homedir(), ".pi", "delegate-logs", `${logId}.jsonl`);
+		// Path traversal guard
+		const resolvedLog = path.resolve(logPath);
+		const resolvedDir = path.resolve(path.join(os.homedir(), ".pi", "delegate-logs"));
+		if (!resolvedLog.startsWith(resolvedDir)) {
+			res.writeHead(400, { "Content-Type": "text/plain" });
+			res.end("Invalid log ID");
+			return;
+		}
+		if (!fs.existsSync(logPath)) {
+			res.writeHead(404, { "Content-Type": "text/plain" });
+			res.end("Log not found");
+			return;
+		}
+
+		const format = url.searchParams.get("format");
+		if (format === "raw") {
+			// Raw JSONL
+			res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
+			const stream = fs.createReadStream(logPath);
+			stream.pipe(res);
+			return;
+		}
+
+		// HTML log viewer — builds a raw URL that preserves the auth token
+		const token = url.searchParams.get("token");
+		const rawUrl = `/api/delegate-logs/${logId}?format=raw${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+		const { generateLogViewerHtml } = await import("./workflows/log-viewer.js");
+		const html = generateLogViewerHtml(logId, rawUrl);
+		res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
+		res.end(html);
+		return;
+	}
+
+	// The server is the single source of truth for report rendering.
+	// The agent extension writes state + artifacts; the server renders the report.
 	const workflowReportMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/report$/);
 	if (workflowReportMatch && req.method === "GET") {
 		const id = workflowReportMatch[1];
-		const html = readArtifact(id, "report.html");
+
+		const resolvedReportId = resolveWorkflowSessionId(id, sessionManager);
+
+		// Try to load workflow state and regenerate the report from it
+		const runner = (sessionManager.getSession(id) as any)?._workflowRunner as InstanceType<typeof WorkflowRunner> | undefined
+			?? WorkflowRunner.restore(id)
+			?? WorkflowRunner.restore(resolvedReportId);
+		if (runner) {
+			const state = runner.getState();
+			const workflow = getWorkflow(state.workflowId);
+			if (workflow) {
+				try {
+					const html = generateReport(workflow, state);
+					res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+					res.end(html);
+					return;
+				} catch (err) {
+					console.error("[report] Failed to generate report:", err);
+					json({ error: `Report generation failed: ${err instanceof Error ? err.message : String(err)}` }, 500);
+					return;
+				}
+			}
+		}
+
+		// Fallback: serve pre-generated report if it exists on disk
+		const html = readArtifact(resolvedReportId, "report.html");
 		if (!html) {
 			json({ error: "Report not found" }, 404);
 			return;
@@ -425,7 +495,8 @@ async function handleApiRoute(
 	const artifactListMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/artifacts$/);
 	if (artifactListMatch && req.method === "GET") {
 		const id = artifactListMatch[1];
-		json({ artifacts: listArtifactFiles(id) });
+		const resolvedId = resolveWorkflowSessionId(id, sessionManager);
+		json({ artifacts: listArtifactFiles(resolvedId) });
 		return;
 	}
 
@@ -433,7 +504,8 @@ async function handleApiRoute(
 	const artifactMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/artifacts\/([^/]+)$/);
 	if (artifactMatch && req.method === "GET") {
 		const [, id, filename] = artifactMatch;
-		const content = readArtifact(id, decodeURIComponent(filename));
+		const resolvedId = resolveWorkflowSessionId(id, sessionManager);
+		const content = readArtifact(resolvedId, decodeURIComponent(filename));
 		if (!content) {
 			json({ error: "Artifact not found" }, 404);
 			return;
@@ -446,6 +518,94 @@ async function handleApiRoute(
 	}
 
 	json({ error: "Not found" }, 404);
+}
+
+/**
+ * Resolve the workflow session ID used for artifact storage.
+ *
+ * The gateway uses UUIDs for session IDs, but the workflow extension stores
+ * artifacts under the agent's session directory name (extracted from the
+ * agent session file path, e.g., "--C--Users-jsubr-w-bobbit--").
+ *
+ * Resolution order:
+ *   1. Gateway session ID directly
+ *   2. Agent session directory name (from persisted session data)
+ *   3. Scan all workflow-artifacts dirs for matching workflow state
+ */
+function resolveWorkflowSessionId(gatewaySessionId: string, sessionManager: SessionManager): string {
+	// 1. Check if artifacts exist directly under the gateway session ID
+	const directFiles = listArtifactFiles(gatewaySessionId);
+	if (directFiles.length > 0) return gatewaySessionId;
+
+	// 2. Extract agent session directory name from persisted session data
+	const agentDirName = getAgentSessionDirName(gatewaySessionId, sessionManager);
+	if (agentDirName) {
+		const agentFiles = listArtifactFiles(agentDirName);
+		if (agentFiles.length > 0) return agentDirName;
+	}
+
+	// 3. Scan workflow-state files for one referencing this gateway session or agent dir
+	const stateDir = path.join(os.homedir(), ".pi", "workflow-state");
+	try {
+		for (const file of fs.readdirSync(stateDir)) {
+			if (!file.endsWith(".json")) continue;
+			const candidateId = file.replace(/\.json$/, "");
+			const candidateFiles = listArtifactFiles(candidateId);
+			if (candidateFiles.length > 0) {
+				// Check if this state file's sessionId matches something we know
+				if (agentDirName && candidateId === agentDirName) return candidateId;
+				// Also check if the state file itself references our gateway or agent dir
+				try {
+					const stateData = JSON.parse(fs.readFileSync(path.join(stateDir, file), "utf-8"));
+					if (stateData.sessionId === gatewaySessionId || stateData.sessionId === agentDirName) {
+						return stateData.sessionId;
+					}
+				} catch { /* ignore */ }
+			}
+		}
+	} catch { /* ignore */ }
+
+	return gatewaySessionId;
+}
+
+/** Extract the agent session directory name from persisted gateway session data */
+function getAgentSessionDirName(gatewaySessionId: string, sessionManager: SessionManager): string | null {
+	// Try live session first
+	const session = sessionManager.getSession(gatewaySessionId);
+	if (session) {
+		try {
+			// RPC bridge state may have the session file
+			const rpc = session.rpcClient as any;
+			const sf = rpc._lastSessionFile ?? rpc.sessionFile;
+			if (sf) {
+				const dir = extractSessionDirFromPath(sf);
+				if (dir) return dir;
+			}
+		} catch { /* ignore */ }
+	}
+
+	// Try persisted session store
+	try {
+		const storeFile = path.join(os.homedir(), ".pi", "gateway-sessions.json");
+		const data = JSON.parse(fs.readFileSync(storeFile, "utf-8"));
+		const sessions = Array.isArray(data) ? data : [];
+		for (const s of sessions) {
+			if (s.id === gatewaySessionId && s.agentSessionFile) {
+				const dir = extractSessionDirFromPath(s.agentSessionFile);
+				if (dir) return dir;
+			}
+		}
+	} catch { /* ignore */ }
+
+	return null;
+}
+
+/** Extract session directory name from a session file path like ".../sessions/dirname/file.jsonl" */
+function extractSessionDirFromPath(sessionFilePath: string): string | null {
+	const parts = String(sessionFilePath).replace(/\\/g, "/").split("/");
+	const idx = parts.indexOf("sessions");
+	if (idx >= 0 && idx + 1 < parts.length) return parts[idx + 1];
+	return null;
 }
 
 function readBody(req: http.IncomingMessage): Promise<any> {

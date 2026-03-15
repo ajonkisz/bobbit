@@ -1,0 +1,61 @@
+import { LitElement, html } from "lit";
+import { property } from "lit/decorators.js";
+
+/**
+ * A tiny element that counts up from a start time, updating every second.
+ * Usage: <live-timer .startTime=${Date.now()}></live-timer>
+ * Displays: "0s", "1s", "2s", ... "1m30s", etc.
+ * Stops updating when `running` is set to false.
+ */
+export class LiveTimer extends LitElement {
+	@property({ type: Number }) startTime: number = Date.now();
+	@property({ type: Boolean }) running: boolean = true;
+
+	private _interval: ReturnType<typeof setInterval> | null = null;
+
+	protected override createRenderRoot() {
+		return this; // no shadow DOM
+	}
+
+	override connectedCallback() {
+		super.connectedCallback();
+		this._startInterval();
+	}
+
+	override disconnectedCallback() {
+		super.disconnectedCallback();
+		this._stopInterval();
+	}
+
+	override updated(changed: Map<string, unknown>) {
+		if (changed.has("running")) {
+			if (this.running) {
+				this._startInterval();
+			} else {
+				this._stopInterval();
+			}
+		}
+	}
+
+	private _startInterval() {
+		if (this._interval) return;
+		this._interval = setInterval(() => {
+			if (this.running) this.requestUpdate();
+		}, 1000);
+	}
+
+	private _stopInterval() {
+		if (this._interval) {
+			clearInterval(this._interval);
+			this._interval = null;
+		}
+	}
+
+	override render() {
+		const elapsed = Math.max(0, Math.round((Date.now() - this.startTime) / 1000));
+		const display = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
+		return html`${display}`;
+	}
+}
+
+customElements.define("live-timer", LiveTimer);

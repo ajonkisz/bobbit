@@ -9,6 +9,7 @@ import { BrowserNavigateRenderer } from "./renderers/BrowserNavigateRenderer.js"
 import { BrowserTypeRenderer } from "./renderers/BrowserTypeRenderer.js";
 import { BrowserWaitRenderer } from "./renderers/BrowserWaitRenderer.js";
 import { DefaultRenderer } from "./renderers/DefaultRenderer.js";
+import { DelegateRenderer } from "./renderers/DelegateRenderer.js";
 import { EditRenderer } from "./renderers/EditRenderer.js";
 import { FindRenderer } from "./renderers/FindRenderer.js";
 import { GrepRenderer } from "./renderers/GrepRenderer.js";
@@ -38,6 +39,7 @@ registerToolRenderer("browser_wait", new BrowserWaitRenderer());
 registerToolRenderer("web_search", new WebSearchRenderer());
 registerToolRenderer("web_fetch", new WebFetchRenderer());
 registerToolRenderer("workflow", new WorkflowRenderer());
+registerToolRenderer("delegate", new DelegateRenderer());
 
 const defaultRenderer = new DefaultRenderer();
 
