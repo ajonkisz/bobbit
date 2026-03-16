@@ -54,6 +54,8 @@ For simple known URLs, `bash` with `curl -sL <url> | head -200` is also fine.
 
   **Never delegate just to read files.** Reading files is instant — delegating it adds spawn overhead for zero benefit. Read files directly, then delegate only if the *processing* of what you read requires isolation or parallelism.
 
+  **Never delegate to parallelize file reads.** Even if you want to read many files or large files in chunks, do it yourself with parallel `read` calls in one message. Spawning delegate agents to read file segments (e.g., offset 0-2000, 2000-4000) is wasteful — each delegate spins up a full agent process just to return text you could read directly. There is zero speed benefit; delegates are slower.
+
   When in doubt, do the work yourself.
 
   Supports `parallel` parameter to run multiple delegates concurrently. Each gets its own instructions.

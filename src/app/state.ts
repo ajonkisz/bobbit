@@ -82,6 +82,7 @@ export const state = {
 	previewSpecEdited: false,
 	hasReceivedProposal: false,
 	previewSpecEditMode: false,
+	previewSwarmMode: false,
 };
 
 // ============================================================================

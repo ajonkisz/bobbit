@@ -169,11 +169,17 @@ function goalPreviewPanel() {
 		}
 		state.isGoalAssistantSession = false;
 		state.activeGoalProposal = null;
+		state.previewSwarmMode = false;
 		localStorage.removeItem("gateway.sessionId");
 		setHashRoute("landing");
 		state.appView = "authenticated";
 
-		await createGoal(trimmedTitle, state.previewCwd.trim(), state.previewSpec);
+		if (state.previewSwarmMode) {
+			const { createSwarmGoal } = await import("./api.js");
+			await createSwarmGoal(trimmedTitle, state.previewCwd.trim(), state.previewSpec);
+		} else {
+			await createGoal(trimmedTitle, state.previewCwd.trim(), state.previewSpec);
+		}
 		if (sessionId) {
 			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
 			clearSessionModel(sessionId);
@@ -252,14 +258,23 @@ function goalPreviewPanel() {
 					}
 				</div>
 			</div>
-			<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
-				${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
-				${Button({
-					variant: "default",
-					onClick: handleCreateGoal,
-					disabled: !state.previewTitle.trim(),
-					children: html`<span class="inline-flex items-center gap-1.5">${icon(Crosshair, "sm")} Create Goal</span>`,
-				})}
+			<div class="shrink-0 flex flex-col gap-3 px-5 py-3 border-t border-border">
+				<label class="flex items-center gap-2 cursor-pointer">
+					<input type="checkbox"
+						.checked=${state.previewSwarmMode}
+						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; renderApp(); }}
+						class="rounded border-border" />
+					<span class="text-xs text-muted-foreground">🐝 Swarm mode — Team Lead auto-spawns role agents</span>
+				</label>
+				<div class="flex items-center justify-end gap-2">
+					${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
+					${Button({
+						variant: "default",
+						onClick: handleCreateGoal,
+						disabled: !state.previewTitle.trim(),
+						children: html`<span class="inline-flex items-center gap-1.5">${icon(Crosshair, "sm")} Create Goal</span>`,
+					})}
+				</div>
 			</div>
 		</div>
 	`;
