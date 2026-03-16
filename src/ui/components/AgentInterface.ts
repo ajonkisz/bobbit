@@ -28,6 +28,8 @@ export class AgentInterface extends LitElement {
 	@property({ type: Boolean }) enableModelSelector = true;
 	@property({ type: Boolean }) enableThinkingSelector = true;
 	@property({ type: Boolean }) showThemeToggle = false;
+	// Working directory shown in the stats bar
+	@property() cwd?: string;
 	// Optional custom API key prompt handler - if not provided, uses default dialog
 	@property({ attribute: false }) onApiKeyRequired?: (provider: string) => Promise<boolean>;
 	// Optional callback called before sending a message
@@ -647,6 +649,12 @@ export class AgentInterface extends LitElement {
 			})
 			: "";
 
+		const cwdHtml = this.cwd ? (() => {
+			const parts = this.cwd!.split(/[/\\]/).filter(Boolean);
+			const short = parts.length <= 2 ? parts.join("/") : "…/" + parts.slice(-2).join("/");
+			return html`<span class="font-mono opacity-60 truncate" style="max-width:160px;" title="${this.cwd}">${short}</span>`;
+		})() : "";
+
 		return html`
 			<div class="text-xs text-muted-foreground flex justify-between items-center mt-0.5">
 				<div class="flex items-center">
@@ -654,6 +662,7 @@ export class AgentInterface extends LitElement {
 					${thinkingSelect}
 					${modelButton}
 				</div>
+				${cwdHtml ? html`<div class="flex items-center pl-4">${cwdHtml}</div>` : ""}
 				<div class="flex ml-auto items-center gap-3">
 					${contextHtml}
 					${

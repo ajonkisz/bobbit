@@ -52,6 +52,8 @@ For simple known URLs, `bash` with `curl -sL <url> | head -200` is also fine.
   - Context isolation is required (e.g., code review that must not see the parent conversation)
   - Mass parallelism is needed (3+ independent sub-tasks)
 
+  **Never delegate just to read files.** Reading files is instant — delegating it adds spawn overhead for zero benefit. Read files directly, then delegate only if the *processing* of what you read requires isolation or parallelism.
+
   When in doubt, do the work yourself.
 
   Supports `parallel` parameter to run multiple delegates concurrently. Each gets its own instructions.

@@ -148,12 +148,17 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			onApiKeyRequired: async () => true,
 		});
 
+		// Set cwd on the AgentInterface stats bar
+		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
+		if (state.chatPanel.agentInterface && sessionData?.cwd) {
+			state.chatPanel.agentInterface.cwd = sessionData.cwd;
+		}
+
 		if (isExisting) {
 			remote.requestMessages();
 		}
 
 		// Track goal assistant state
-		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
 		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
 
 		if (state.isGoalAssistantSession) {
