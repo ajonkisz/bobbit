@@ -786,6 +786,7 @@ function showGoalEditDialog(existingGoal: Goal): void {
 			cwd: cwdValue.trim() || undefined,
 			state: stateValue,
 			spec: specValue,
+			swarm: swarmValue,
 		});
 		saving = false;
 		cleanup();

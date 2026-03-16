@@ -85,7 +85,7 @@ export class GoalManager {
 		return this.store.getAll();
 	}
 
-	updateGoal(id: string, updates: { title?: string; cwd?: string; state?: GoalState; spec?: string }): boolean {
+	updateGoal(id: string, updates: { title?: string; cwd?: string; state?: GoalState; spec?: string; swarm?: boolean }): boolean {
 		return this.store.update(id, updates);
 	}
 

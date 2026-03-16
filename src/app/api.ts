@@ -137,7 +137,7 @@ export async function createGoal(title: string, cwd: string, spec = ""): Promise
 	}
 }
 
-export async function updateGoal(id: string, updates: Partial<Pick<Goal, "title" | "cwd" | "state" | "spec">>): Promise<boolean> {
+export async function updateGoal(id: string, updates: Partial<Pick<Goal, "title" | "cwd" | "state" | "spec" | "swarm">>): Promise<boolean> {
 	try {
 		const res = await gatewayFetch(`/api/goals/${id}`, {
 			method: "PUT",
