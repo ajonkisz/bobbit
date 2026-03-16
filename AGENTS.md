@@ -39,7 +39,6 @@ src/
 │       ├── artifact-store.ts  # Workflow artifact storage (~/.pi/workflow-artifacts/)
 │       ├── report.ts          # HTML report generation from workflow results
 │       ├── sub-agent.ts       # Spawn isolated agent subprocesses for phases
-│       ├── log-viewer.ts      # HTML viewer for delegate agent JSONL logs
 │       ├── git.ts             # Git worktree helpers for workflow phases
 │       ├── definitions-sync.ts  # Export definitions to ~/.pi/workflow-definitions.json
 │       ├── index.ts           # Barrel export + auto-registration of built-in workflows
@@ -163,7 +162,7 @@ A multi-phase workflow engine for structured tasks like code review and test ana
 - **Definitions** (`src/server/workflows/definitions/`): Workflow templates declaring phases, instructions, and context isolation levels. Registered at import time via `registerWorkflow()`.
 - **Engine** (`WorkflowRunner`): State machine that tracks current phase, phase history, artifacts, and context. Persists to `~/.pi/workflow-state/{sessionId}.json`. Fires `onChange` on every transition.
 - **Artifacts** (`artifact-store.ts`): Files stored at `~/.pi/workflow-artifacts/{workflowId}/`. Track name, MIME type, and originating phase.
-- **Sub-agents** (`sub-agent.ts`): Isolated agent subprocesses for workflow phases. Receive only phase instructions + explicit context + `AGENTS.md` — never the parent conversation. 10-minute default timeout. Logs written to `~/.pi/delegate-logs/{logId}.jsonl`.
+- **Sub-agents** (`sub-agent.ts`): Isolated agent subprocesses for workflow phases. Receive only phase instructions + explicit context + `AGENTS.md` — never the parent conversation. 10-minute default timeout.
 - **Reports** (`report.ts`): Standalone HTML reports with embedded CSS summarizing phase history, timing, artifacts, and status. Generated on workflow completion/failure/cancel.
 - **Definition sync** (`definitions-sync.ts`): Exports registered workflows to `~/.pi/workflow-definitions.json` at startup so agent-side tool extensions can discover available workflows.
 
@@ -187,7 +186,7 @@ A multi-phase workflow engine for structured tasks like code review and test ana
 - `GET /api/sessions/:id/workflow/report` — render HTML report (regenerated from state, with fallback to stored `report.html`)
 - `GET /api/sessions/:id/workflow/artifacts` — list artifacts
 - `GET /api/sessions/:id/workflow/artifacts/:filename` — serve an artifact
-- `GET /api/delegate-logs/:logId` — HTML log viewer for sub-agent runs (`?format=raw` for JSONL)
+
 
 ### Workflow artifact resolution
 
@@ -277,7 +276,7 @@ All persistent state lives under `~/.pi/`:
 | `workflow-state/{sessionId}.json` | `WorkflowRunner` | Workflow execution state |
 | `workflow-artifacts/{workflowId}/` | `artifact-store.ts` | Workflow output files |
 | `workflow-definitions.json` | `definitions-sync.ts` | Exported workflow definitions for agent discovery |
-| `delegate-logs/{logId}.jsonl` | `sub-agent.ts` | Sub-agent execution logs |
+
 | `agent/auth.json` | (external) | API auth credentials (read by title-generator) |
 | `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
 
