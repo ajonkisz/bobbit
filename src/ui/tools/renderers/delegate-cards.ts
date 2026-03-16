@@ -67,19 +67,8 @@ export function getAuthToken(): string | null {
 // ── Render primitives ──
 
 /** Render a session link for a delegate (opens the delegate session in a new tab) */
-export function renderSessionLink(sessionId: string | undefined, delegateId?: string): TemplateResult {
-	if (!sessionId) {
-		// Fallback to old log link if no session ID
-		if (!delegateId || delegateId === "?") return html``;
-		const token = getAuthToken();
-		const logUrl = `/api/delegate-logs/${delegateId}${token ? `?token=${encodeURIComponent(token)}` : ""}`;
-		return html`
-			<a href="${logUrl}" target="_blank" rel="noopener"
-				class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded hover:bg-accent transition-colors"
-				title="View delegate agent logs"
-			>${icon(ScrollText, "xs")} logs</a>
-		`;
-	}
+export function renderSessionLink(sessionId: string | undefined): TemplateResult {
+	if (!sessionId) return html``;
 	const token = getAuthToken();
 	const sessionUrl = `/?token=${token ? encodeURIComponent(token) : ""}#/session/${sessionId}`;
 	return html`
@@ -113,7 +102,7 @@ export function renderDelegateCard(entry: DelegateCardEntry): TemplateResult {
 			<span class="inline-block text-muted-foreground">${icon(Bot, "sm")}</span>
 			<span class="font-mono text-xs flex-1 min-w-0 truncate">${entry.name}</span>
 			${renderDuration(entry)}
-			${renderSessionLink(entry.sessionId, entry.id)}
+			${renderSessionLink(entry.sessionId)}
 		</div>
 	`;
 }

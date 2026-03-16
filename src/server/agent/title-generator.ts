@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { refreshOAuthToken } from "../auth/oauth.js";
 
 const TITLE_MODEL = "claude-haiku-4-5-20251001";
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -100,8 +101,19 @@ function extractConversationPreview(messages: any[]): string {
  * Returns null if generation fails.
  */
 export async function generateSessionTitle(messages: any[]): Promise<string | null> {
-	const auth = loadAuth();
+	let auth = loadAuth();
 	if (!auth) return null;
+
+	// If OAuth token is expired, try to refresh it
+	if (auth.type === "oauth" && auth.expires && Date.now() > auth.expires) {
+		const newToken = await refreshOAuthToken();
+		if (newToken) {
+			auth = { ...auth, access: newToken };
+		} else {
+			console.error("[title-gen] Token expired and refresh failed");
+			return null;
+		}
+	}
 
 	const preview = extractConversationPreview(messages);
 	if (!preview.trim()) {

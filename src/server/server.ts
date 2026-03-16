@@ -470,45 +470,6 @@ async function handleApiRoute(
 		return;
 	}
 
-	// Delegate logs — serve JSONL log files from delegate agent runs
-	// Default: serves an HTML viewer; ?format=raw for raw JSONL
-	const delegateLogMatch = url.pathname.match(/^\/api\/delegate-logs\/([a-zA-Z0-9_-]+)$/);
-	if (delegateLogMatch && req.method === "GET") {
-		const logId = delegateLogMatch[1];
-		const logPath = path.join(os.homedir(), ".pi", "delegate-logs", `${logId}.jsonl`);
-		// Path traversal guard
-		const resolvedLog = path.resolve(logPath);
-		const resolvedDir = path.resolve(path.join(os.homedir(), ".pi", "delegate-logs"));
-		if (!resolvedLog.startsWith(resolvedDir)) {
-			res.writeHead(400, { "Content-Type": "text/plain" });
-			res.end("Invalid log ID");
-			return;
-		}
-		if (!fs.existsSync(logPath)) {
-			res.writeHead(404, { "Content-Type": "text/plain" });
-			res.end("Log not found");
-			return;
-		}
-
-		const format = url.searchParams.get("format");
-		if (format === "raw") {
-			// Raw JSONL
-			res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" });
-			const stream = fs.createReadStream(logPath);
-			stream.pipe(res);
-			return;
-		}
-
-		// HTML log viewer — builds a raw URL that preserves the auth token
-		const token = url.searchParams.get("token");
-		const rawUrl = `/api/delegate-logs/${logId}?format=raw${token ? `&token=${encodeURIComponent(token)}` : ""}`;
-		const { generateLogViewerHtml } = await import("./workflows/log-viewer.js");
-		const html = generateLogViewerHtml(logId, rawUrl);
-		res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" });
-		res.end(html);
-		return;
-	}
-
 	// The server is the single source of truth for report rendering.
 	// The agent extension writes state + artifacts; the server renders the report.
 	const workflowReportMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/report$/);

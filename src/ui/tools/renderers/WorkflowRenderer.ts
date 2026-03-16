@@ -9,7 +9,7 @@ import {
 	formatDuration,
 	getAuthToken,
 	renderDelegateCardList,
-	renderStatusPills,
+
 } from "./delegate-cards.js";
 
 interface RunPhaseDetails {
@@ -221,10 +221,15 @@ export class WorkflowRenderer implements ToolRenderer<WorkflowParams, any> {
 				const isRunning = isStreaming && delegates.some((d) => d.status === "running" || d.status === "starting");
 				const showExpanded = isRunning || delegates.some((d) => d.sessionId);
 
+				const completedCount = delegates.filter((d) => d.status === "completed").length;
+				const failedCount = delegates.filter((d) => d.status !== "completed" && d.status !== "running" && d.status !== "starting").length;
 				const runPhaseHeader = delegates.length > 0
-					? html`Delegated to ${delegates.length} agents
-					${renderStatusPills(delegates)}
-					${allOk ? html`<span class="text-green-500 ml-1">All completed</span>` : ""}`
+					? html`Delegated to ${delegates.length} agents —
+					${allOk
+						? html`<span class="text-green-500 text-xs ml-1">all completed</span>`
+						: failedCount > 0
+							? html`<span class="text-xs ml-1"><span class="text-green-500">${completedCount} done</span>, <span class="text-destructive">${failedCount} failed</span></span>`
+							: html`<span class="text-xs text-muted-foreground ml-1">${completedCount}/${delegates.length} completed</span>`}`
 					: html`${headerText}`;
 
 				return {

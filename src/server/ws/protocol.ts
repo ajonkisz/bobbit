@@ -20,7 +20,14 @@ export type ClientMessage =
 	| { type: "workflow_complete" }
 	| { type: "workflow_fail"; reason?: string }
 	| { type: "workflow_cancel" }
-	| { type: "workflow_status" };
+	| { type: "workflow_status" }
+	| { type: "workflow_batch"; operations: Array<
+		| { op: "collect_artifact"; name: string; content: string; mimeType?: string }
+		| { op: "set_context"; key: string; value: string }
+		| { op: "advance" }
+		| { op: "complete" }
+	> }
+	| { type: "workflow_synthesise_review" };
 
 /** Server → Client messages over WebSocket */
 export type ServerMessage =

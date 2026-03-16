@@ -2083,7 +2083,7 @@ function renderSidebar() {
 							${expanded ? goalSessions.map(renderCollapsedSession) : ""}
 						`;
 					})}
-					${ungrouped.length > 0 && sortedGoals.length > 0 ? html`
+					${sortedGoals.length > 0 ? html`
 						<div class="w-7 border-t border-border/50 my-1.5"></div>
 						<button
 							class="flex items-center py-0.5 w-full rounded-md hover:bg-secondary/50 transition-colors" style="gap:0.225rem;"
@@ -2094,7 +2094,7 @@ function renderSidebar() {
 							<span class="text-[10px] font-extrabold tracking-wider text-muted-foreground" style="font-family: ui-monospace, monospace; line-height: 1;">SES</span>
 						</button>
 						${ungroupedExpanded ? ungrouped.map(renderCollapsedSession) : ""}
-					` : sortedGoals.length === 0 ? ungrouped.map(renderCollapsedSession) : ""}
+					` : ungrouped.map(renderCollapsedSession)}
 				</div>
 				<button
 					class="p-2 mb-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
@@ -2125,7 +2125,7 @@ function renderSidebar() {
 							`)}
 
 							<!-- Ungrouped sessions -->
-							${ungroupedSessions.length > 0 && sortedGoals.length > 0 ? html`
+							${sortedGoals.length > 0 ? html`
 								<div class="border-t border-border/50 my-1.5 mx-1"></div>
 								<div class="flex flex-col gap-0.5">
 									<div class="flex items-center gap-1 px-1 py-0.5">
@@ -2147,7 +2147,7 @@ function renderSidebar() {
 									</div>
 									${ungroupedExpanded ? ungroupedSessions.map(renderSidebarSession) : ""}
 								</div>
-							` : sortedGoals.length === 0 ? html`
+							` : html`
 								<!-- No goals, just show sessions flat -->
 								<div class="flex flex-col gap-0.5">
 									<div class="flex items-center gap-1 px-1 py-0.5">
@@ -2170,7 +2170,7 @@ function renderSidebar() {
 											</div>`
 										: ungroupedSessions.map(renderSidebarSession)}
 								</div>
-							` : ""}
+							`}
 						`
 				}
 			</div>
@@ -2294,8 +2294,14 @@ function renderMobileLanding() {
 									</div>
 								` : ""}
 								<!-- Ungrouped sessions -->
-								${ungroupedSessions.length > 0 ? html`
-									${sortedGoals.length > 0 ? html`<h3 class="text-sm font-medium text-muted-foreground mt-2">Ungrouped Sessions</h3>` : ""}
+								${sortedGoals.length > 0 ? html`
+									<h3 class="text-sm font-medium text-muted-foreground mt-2">Ungrouped Sessions</h3>
+									<div class="flex flex-col gap-2">
+										${ungroupedSessions.length > 0
+											? ungroupedSessions.map((s, i) => renderSessionCard(s, i))
+											: html`<p class="text-xs text-muted-foreground py-2">No ungrouped sessions</p>`}
+									</div>
+								` : ungroupedSessions.length > 0 ? html`
 									<div class="flex flex-col gap-2">
 										${ungroupedSessions.map((s, i) => renderSessionCard(s, i))}
 									</div>

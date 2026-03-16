@@ -11,7 +11,7 @@ import {
 	summarizeInstructions,
 	renderDelegateCard,
 	renderRunningCard,
-	renderStatusPills,
+
 	renderDelegateCardList,
 	renderSessionLink,
 } from "./delegate-cards.js";
@@ -98,7 +98,7 @@ export class DelegateRenderer implements ToolRenderer<DelegateParams, DelegateDe
 							${renderCollapsibleHeader(state, Bot,
 								html`Delegated — <span class="font-mono text-xs">${summarizeInstructions(instructions)}</span>
 									<span class="${statusColor(d.status)} text-xs ml-1">(${formatDuration(d.durationMs)})</span>
-									${renderSessionLink(d.sessionId, d.id)}`,
+									${renderSessionLink(d.sessionId)}`,
 								contentRef, chevronRef, false)}
 							<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
 								<div class="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">${getTextOutput(result)}</div>
@@ -110,9 +110,14 @@ export class DelegateRenderer implements ToolRenderer<DelegateParams, DelegateDe
 			}
 
 			// Multiple delegates — show cards
-			const headerContent = html`Delegated to ${delegates.length} agents
-				${renderStatusPills(cards)}
-				${allOk ? html`<span class="text-green-500 ml-1">All completed</span>` : ""}`;
+			const completedCount = delegates.filter((d) => d.status === "completed").length;
+			const failedCount = delegates.filter((d) => d.status !== "completed" && d.status !== "running" && d.status !== "starting").length;
+			const headerContent = html`Delegated to ${delegates.length} agents —
+				${allOk
+					? html`<span class="text-green-500 text-xs ml-1">all completed</span>`
+					: failedCount > 0
+						? html`<span class="text-xs ml-1"><span class="text-green-500">${completedCount} done</span>, <span class="text-destructive">${failedCount} failed</span></span>`
+						: html`<span class="text-xs text-muted-foreground ml-1">${completedCount}/${delegates.length} completed</span>`}`;
 
 			const parallelInstructions = params?.parallel || [];
 			const isRunning = isStreaming && delegates.some((d) => d.status === "running");

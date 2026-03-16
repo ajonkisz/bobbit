@@ -4,6 +4,7 @@ import os from "node:os";
 import { getWorkflow } from "./registry.js";
 import { storeArtifact } from "./artifact-store.js";
 import { generateReport } from "./report.js";
+import { synthesiseReviewFindings } from "./synthesis.js";
 import type { Workflow, WorkflowState, WorkflowArtifact } from "./types.js";
 
 const STATE_DIR = path.join(os.homedir(), ".pi", "workflow-state");
@@ -194,6 +195,31 @@ export class WorkflowRunner {
 		this.persist();
 	}
 
+	/** Apply multiple collect_artifact and set_context operations with a single persist */
+	batchOperations(ops: Array<
+		| { op: "collect_artifact"; name: string; content: string | Buffer; mimeType?: string }
+		| { op: "set_context"; key: string; value: string }
+	>): void {
+		for (const op of ops) {
+			if (op.op === "collect_artifact") {
+				const filename = op.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+				const filePath = storeArtifact(this.state.sessionId, filename, op.content);
+				const currentPhase = this.getCurrentPhase();
+				const artifact: WorkflowArtifact = {
+					name: op.name,
+					filePath,
+					mimeType: op.mimeType ?? "text/plain",
+					collectedAt: Date.now(),
+					phaseId: currentPhase?.id,
+				};
+				this.state.artifacts.push(artifact);
+			} else if (op.op === "set_context") {
+				this.state.context[op.key] = op.value;
+			}
+		}
+		this.persist();
+	}
+
 	/** Mark workflow as failed */
 	fail(reason?: string): void {
 		this.state.status = "failed";
@@ -233,6 +259,32 @@ export class WorkflowRunner {
 		this.generateAndStoreReport();
 		this.persist();
 		this.onChange?.(this.getState());
+	}
+
+	/**
+	 * Server-side synthesis of code review findings.
+	 * Reads delegate output artifacts, merges/deduplicates/sorts findings,
+	 * stores the merged artifact, and sets all context values.
+	 * Returns the number of findings.
+	 *
+	 * Core logic lives in `synthesis.ts` — this method delegates to it
+	 * and applies the results to workflow state.
+	 */
+	synthesiseFindings(): number {
+		const currentPhase = this.getCurrentPhase();
+		const result = synthesiseReviewFindings(this.state.sessionId, currentPhase?.id);
+
+		this.state.artifacts.push(result.artifact);
+		this.state.context["finding_count"] = String(result.findings.length);
+		this.state.context["critical_count"] = String(result.criticalCount);
+		this.state.context["major_count"] = String(result.majorCount);
+		this.state.context["minor_count"] = String(result.minorCount);
+		this.state.context["nit_count"] = String(result.nitCount);
+		this.state.context["verdict"] = result.verdict;
+		this.state.context["summary"] = result.summary;
+
+		this.persist();
+		return result.findings.length;
 	}
 
 	private generateAndStoreReport(): void {

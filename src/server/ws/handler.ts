@@ -7,6 +7,18 @@ import { validateToken } from "../auth/token.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
 import { WorkflowRunner, getWorkflow, listWorkflows } from "../workflows/index.js";
 
+/** Get or restore the workflow runner for a session, caching it on the session object. */
+function getRunner(session: any, sessionId: string): WorkflowRunner | undefined {
+	let wr = session._workflowRunner as WorkflowRunner | undefined;
+	if (!wr) {
+		wr = WorkflowRunner.restore(sessionId, {
+			onChange: (state) => broadcast(session.clients, { type: "workflow_state", data: state }),
+		}) ?? undefined;
+		if (wr) session._workflowRunner = wr;
+	}
+	return wr;
+}
+
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
 	const data = JSON.stringify(msg);
 	for (const client of clients) {
@@ -211,18 +223,16 @@ export function handleWebSocketConnection(
 					break;
 				}
 				case "workflow_status": {
-					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined
-						?? WorkflowRunner.restore(sessionId);
+					const wr = getRunner(session, sessionId);
 					if (!wr) {
 						send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" });
 						break;
 					}
-					(session as any)._workflowRunner = wr;
 					send(ws, { type: "workflow_state", data: wr.getState() });
 					break;
 				}
 				case "workflow_advance": {
-					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					const wr = getRunner(session, sessionId);
 					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
 					wr.advancePhase();
 					const st = wr.getState();
@@ -232,27 +242,27 @@ export function handleWebSocketConnection(
 					break;
 				}
 				case "workflow_reset": {
-					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					const wr = getRunner(session, sessionId);
 					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
 					wr.resetToPhase(msg.phaseId, msg.context);
 					break;
 				}
 				case "workflow_collect_artifact": {
-					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					const wr = getRunner(session, sessionId);
 					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
 					wr.collectArtifact(msg.name, msg.content, msg.mimeType);
 					send(ws, { type: "workflow_state", data: wr.getState() });
 					break;
 				}
 				case "workflow_set_context": {
-					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					const wr = getRunner(session, sessionId);
 					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
 					wr.setContext(msg.key, msg.value);
 					send(ws, { type: "workflow_state", data: wr.getState() });
 					break;
 				}
 				case "workflow_complete": {
-					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					const wr = getRunner(session, sessionId);
 					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
 					wr.complete();
 					const st = wr.getState();
@@ -263,7 +273,7 @@ export function handleWebSocketConnection(
 					break;
 				}
 				case "workflow_fail": {
-					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					const wr = getRunner(session, sessionId);
 					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
 					wr.fail(msg.reason);
 					const st = wr.getState();
@@ -274,10 +284,68 @@ export function handleWebSocketConnection(
 					break;
 				}
 				case "workflow_cancel": {
-					const wr = (session as any)._workflowRunner as WorkflowRunner | undefined;
+					const wr = getRunner(session, sessionId);
 					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
 					wr.cancel();
 					broadcast(session.clients, { type: "workflow_completed", data: wr.getState() });
+					break;
+				}
+				case "workflow_synthesise_review": {
+					const wr = getRunner(session, sessionId);
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+					wr.synthesiseFindings();
+					send(ws, { type: "workflow_state", data: wr.getState() });
+					break;
+				}
+				case "workflow_batch": {
+					const wr = getRunner(session, sessionId);
+					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
+
+					// Separate batch-able ops (collect_artifact, set_context) from
+					// state-transition ops (advance, complete) which persist on their own.
+					const batchOps: Array<
+						| { op: "collect_artifact"; name: string; content: string | Buffer; mimeType?: string }
+						| { op: "set_context"; key: string; value: string }
+					> = [];
+					const transitionOps: Array<{ op: "advance" } | { op: "complete" }> = [];
+
+					for (const op of msg.operations) {
+						if (op.op === "collect_artifact" || op.op === "set_context") {
+							batchOps.push(op as any);
+						} else {
+							transitionOps.push(op);
+						}
+					}
+
+					// Apply batch ops with a single persist
+					if (batchOps.length > 0) {
+						wr.batchOperations(batchOps);
+					}
+
+					// Apply transition ops in order
+					let didComplete = false;
+					for (const op of transitionOps) {
+						if (op.op === "advance") {
+							wr.advancePhase();
+						} else if (op.op === "complete") {
+							wr.complete();
+							didComplete = true;
+						}
+					}
+
+					// Send state to requester
+					const st = wr.getState();
+					send(ws, { type: "workflow_state", data: st });
+
+					// Broadcast completion and report if applicable
+					if (didComplete) {
+						broadcast(session.clients, { type: "workflow_completed", data: st });
+						if (st.reportPath) {
+							broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
+						}
+					} else if (transitionOps.some(op => op.op === "advance") && st.status === "completed" && st.reportPath) {
+						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
+					}
 					break;
 				}
 				case "ping":

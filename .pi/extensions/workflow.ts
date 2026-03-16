@@ -287,7 +287,8 @@ const extension: ExtensionFactory = (pi) => {
 				Type.Literal("complete"),
 				Type.Literal("fail"),
 				Type.Literal("cancel"),
-			], { description: "The workflow action to perform. 'run_phase' executes a delegated phase (the tool handles it internally, just call it and wait) — required for any phase that says to use it. 'advance' moves to the next phase (blocked until run_phase completes for delegated phases)." }),
+				Type.Literal("synthesise_review"),
+			], { description: "The workflow action to perform. 'run_phase' executes a delegated phase (the tool handles it internally, just call it and wait) — required for any phase that says to use it. 'advance' moves to the next phase (blocked until run_phase completes for delegated phases). 'synthesise_review' merges delegate review artifacts into a single findings JSON." }),
 			workflow_id: Type.Optional(
 				Type.String({ description: "Workflow ID (required for 'start')" }),
 			),
@@ -830,9 +831,180 @@ const extension: ExtensionFactory = (pi) => {
 					};
 				}
 
+				case "synthesise_review": {
+					// Synthesis logic mirrors src/server/workflows/synthesis.ts
+					// (canonical implementation). Keep algorithms in sync when modifying.
+					// Cannot import directly because this extension runs in the agent
+					// process, not the server process.
+
+					const state = loadState(sessionId);
+					if (!state || state.status !== "running") {
+						return { content: [{ type: "text", text: "Error: No running workflow." }], details: undefined };
+					}
+
+					// ── Read delegate artifacts ──
+					const artifactDir = path.join(ARTIFACTS_DIR, sessionId);
+					const reviewFiles = [
+						"delegate-review-correctness.txt",
+						"delegate-review-security.txt",
+						"delegate-review-design.txt",
+					];
+
+					interface Finding {
+						id?: string;
+						severity: string;
+						title: string;
+						file: string;
+						lineRange?: string;
+						line?: number;
+						endLine?: number;
+						description?: string;
+						suggestion?: string;
+						[key: string]: any;
+					}
+
+					// ── Extract findings from text (matches synthesis.ts extractFindings) ──
+					function extractFindingsFromText(text: string): Finding[] {
+						try {
+							const parsed = JSON.parse(text);
+							if (Array.isArray(parsed)) return parsed;
+							if (parsed && Array.isArray(parsed.findings)) return parsed.findings;
+						} catch {
+							// Fall back to fenced code blocks
+						}
+						const results: Finding[] = [];
+						const jsonBlockRegex = /```(?:json)?\s*\n([\s\S]*?)```/g;
+						let match: RegExpExecArray | null;
+						while ((match = jsonBlockRegex.exec(text)) !== null) {
+							try {
+								const parsed = JSON.parse(match[1]);
+								if (Array.isArray(parsed)) results.push(...parsed);
+								else if (parsed && Array.isArray(parsed.findings)) results.push(...parsed.findings);
+							} catch { /* skip */ }
+						}
+						return results;
+					}
+
+					const allFindings: Finding[] = [];
+					for (const filename of reviewFiles) {
+						try {
+							const raw = fs.readFileSync(path.join(artifactDir, filename), "utf-8");
+							allFindings.push(...extractFindingsFromText(raw));
+						} catch { /* file may not exist if delegate failed */ }
+					}
+
+					// ── Sort by severity (matches synthesis.ts sortBySeverity) ──
+					const severityOrder: Record<string, number> = { critical: 0, major: 1, minor: 2, nit: 3, info: 4 };
+					allFindings.sort((a, b) =>
+						(severityOrder[(a.severity || "info").toLowerCase()] ?? 5) -
+						(severityOrder[(b.severity || "info").toLowerCase()] ?? 5),
+					);
+
+					// ── Deduplicate (matches synthesis.ts deduplicateFindings) ──
+					function getLineRange(f: Finding): [number, number] {
+						if (f.lineRange) {
+							const nums = f.lineRange.replace(/[Ll]/g, "").split(/[-–]/);
+							const start = parseInt(nums[0], 10) || 0;
+							const end = parseInt(nums[1] || nums[0], 10) || start;
+							return [start, end];
+						}
+						const start = f.line ?? 0;
+						return [start, f.endLine ?? start];
+					}
+
+					const deduped: Finding[] = [];
+					for (const f of allFindings) {
+						const [fStart, fEnd] = getLineRange(f);
+						const dupIdx = deduped.findIndex((existing) => {
+							if (existing.file !== f.file) return false;
+							const [eStart, eEnd] = getLineRange(existing);
+							const linesOverlap = (eStart === 0 && fStart === 0) || (fStart <= eEnd && fEnd >= eStart);
+							if (!linesOverlap) return false;
+							const na = (existing.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+							const nb = (f.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+							return na === nb || (na.length > 0 && nb.length > 0 && (na.includes(nb) || nb.includes(na)));
+						});
+						if (dupIdx >= 0) {
+							if ((f.description || "").length > (deduped[dupIdx].description || "").length) {
+								deduped[dupIdx] = f;
+							}
+						} else {
+							deduped.push(f);
+						}
+					}
+
+					// ── Renumber IDs (matches synthesis.ts renumberFindings) ──
+					for (let i = 0; i < deduped.length; i++) {
+						deduped[i].id = `F${String(i + 1).padStart(3, "0")}`;
+					}
+
+					// ── Store merged artifact ──
+					const findingsJson = JSON.stringify(deduped, null, 2);
+					const findingsPath = storeArtifactFile(sessionId, "review-findings.json", findingsJson);
+					const wfDef = workflows.get(state.workflowId);
+					const currentPhaseId = wfDef?.phases[state.currentPhaseIndex]?.id;
+					state.artifacts.push({
+						name: "review-findings.json",
+						filePath: findingsPath,
+						mimeType: "application/json",
+						collectedAt: Date.now(),
+						phaseId: currentPhaseId,
+					});
+
+					// ── Compute verdict (matches synthesis.ts computeVerdict) ──
+					const criticalCount = deduped.filter((f) => (f.severity || "").toLowerCase() === "critical").length;
+					const majorCount = deduped.filter((f) => (f.severity || "").toLowerCase() === "major").length;
+					const minorCount = deduped.filter((f) => (f.severity || "").toLowerCase() === "minor").length;
+					const nitCount = deduped.filter((f) => (f.severity || "").toLowerCase() === "nit").length;
+
+					let verdict: string;
+					if (criticalCount > 0 || majorCount > 0) {
+						verdict = "request-changes";
+					} else if (minorCount > 0 || nitCount > 0) {
+						verdict = "comment";
+					} else {
+						verdict = "approve";
+					}
+
+					const verdictDescriptions: Record<string, string> = {
+						approve: "No significant issues found — approve.",
+						comment: "Minor issues only — approve with comments.",
+						"request-changes": "Significant issues found — changes requested.",
+					};
+					const summary = `${deduped.length} findings (${criticalCount} critical, ${majorCount} major). ${verdictDescriptions[verdict]}`;
+
+					// ── Update state ──
+					state.context["finding_count"] = String(deduped.length);
+					state.context["critical_count"] = String(criticalCount);
+					state.context["major_count"] = String(majorCount);
+					state.context["minor_count"] = String(minorCount);
+					state.context["nit_count"] = String(nitCount);
+					state.context["verdict"] = verdict;
+					state.context["summary"] = summary;
+					saveState(state);
+
+					return {
+						content: [{
+							type: "text",
+							text: [
+								`## Review Synthesis Complete`,
+								"",
+								`**Total findings:** ${deduped.length} (from ${allFindings.length} raw, ${allFindings.length - deduped.length} duplicates removed)`,
+								`**Critical:** ${criticalCount} | **Major:** ${majorCount} | **Minor:** ${minorCount} | **Nit:** ${nitCount}`,
+								`**Verdict:** ${verdict}`,
+								"",
+								`Merged findings saved as artifact: review-findings.json`,
+								"",
+								summary,
+							].join("\n"),
+						}],
+						details: undefined,
+					};
+				}
+
 				default:
 					return {
-						content: [{ type: "text", text: `Unknown action: ${params.action}. Valid actions: list, start, status, advance, run_phase, reset, collect_artifact, set_context, complete, fail, cancel` }],
+						content: [{ type: "text", text: `Unknown action: ${params.action}. Valid actions: list, start, status, advance, run_phase, reset, collect_artifact, set_context, synthesise_review, complete, fail, cancel` }],
 						details: undefined,
 					};
 			}

@@ -3,6 +3,15 @@ export { registerWorkflow, getWorkflow, listWorkflows } from "./registry.js";
 export { WorkflowRunner } from "./engine.js";
 export { storeArtifact, readArtifact, listArtifactFiles, cleanupArtifacts } from "./artifact-store.js";
 export { generateReport } from "./report.js";
+export {
+	extractFindings,
+	deduplicateFindings,
+	sortBySeverity,
+	renumberFindings,
+	computeVerdict,
+	synthesiseReviewFindings,
+} from "./synthesis.js";
+export type { Finding, SynthesisResult } from "./synthesis.js";
 export { createWorktree, cleanupWorktree } from "./git.js";
 export { exportDefinitions, DEFINITIONS_PATH } from "./definitions-sync.js";
 export { runSubAgent, runSubAgentsParallel, createSubAgentRequest } from "./sub-agent.js";

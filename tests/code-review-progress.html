@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Code Review Workflow — Performance Report</title>
+<style>
+body { font-family: system-ui; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; background: #0d1117; color: #c9d1d9; }
+h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 0.5rem; }
+h2 { color: #c9d1d9; margin-top: 2rem; }
+.target { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+.target .value { font-size: 2rem; font-weight: bold; }
+.met { color: #3fb950; }
+.over { color: #f85149; }
+table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #21262d; }
+th { color: #8b949e; font-weight: 600; }
+.bar { height: 20px; border-radius: 3px; min-width: 2px; }
+.bar-ok { background: #238636; }
+.bar-fail { background: #da3633; }
+.bar-target { background: #f0883e; opacity: 0.5; position: absolute; height: 20px; border-left: 2px dashed #f0883e; }
+.chart { position: relative; margin: 1rem 0; }
+.iteration { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; margin: 0.5rem 0; }
+.phase-bar { display: inline-block; height: 16px; border-radius: 2px; margin-right: 1px; vertical-align: middle; }
+.legend { display: flex; gap: 1rem; flex-wrap: wrap; margin: 0.5rem 0; }
+.legend-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; }
+.legend-dot { width: 12px; height: 12px; border-radius: 2px; }
+</style></head><body>
+<h1>Code Review Workflow — Performance Optimization</h1>
+<div class="target">
+<div>Target: Complete code review in under <strong>2 minutes</strong> (120s) avg over 5 runs</div>
+<div class="value over">148.4s average </div>
+</div>
+
+<h2>Run History</h2>
+<table>
+<tr><th>Iteration</th><th>Time</th><th>Runs</th><th>Average</th><th>Status</th><th>Visual</th></tr>
+<tr>
+		<td>#1</td>
+		<td>16/03/2026, 13:33:55</td>
+		<td>1/1</td>
+		<td class="met">64.2s</td>
+		<td>✓</td>
+		<td style="width:40%"><div class="chart">
+			<div class="bar bar-ok" style="width:21.406333333333333%" title="64.2s"></div>
+			<div class="bar-target" style="left:40%" title="120s target"></div>
+		</div></td>
+	</tr><tr>
+		<td>#2</td>
+		<td>16/03/2026, 13:39:39</td>
+		<td>5/5</td>
+		<td class="met">67.4s</td>
+		<td>✓</td>
+		<td style="width:40%"><div class="chart">
+			<div class="bar bar-ok" style="width:21.939333333333334%" title="65.8s"></div><div class="bar bar-ok" style="width:24.587666666666667%" title="73.8s"></div><div class="bar bar-ok" style="width:21.698999999999998%" title="65.1s"></div><div class="bar bar-ok" style="width:20.652666666666665%" title="62.0s"></div><div class="bar bar-ok" style="width:23.375666666666667%" title="70.1s"></div>
+			<div class="bar-target" style="left:40%" title="120s target"></div>
+		</div></td>
+	</tr><tr>
+		<td>#3</td>
+		<td>16/03/2026, 13:48:43</td>
+		<td>5/5</td>
+		<td class="met">65.8s</td>
+		<td>✓</td>
+		<td style="width:40%"><div class="chart">
+			<div class="bar bar-ok" style="width:21.003333333333334%" title="63.0s"></div><div class="bar bar-ok" style="width:22.025%" title="66.1s"></div><div class="bar bar-ok" style="width:23.094333333333335%" title="69.3s"></div><div class="bar bar-ok" style="width:22.241666666666667%" title="66.7s"></div><div class="bar bar-ok" style="width:21.35333333333333%" title="64.1s"></div>
+			<div class="bar-target" style="left:40%" title="120s target"></div>
+		</div></td>
+	</tr><tr>
+		<td>#4</td>
+		<td>16/03/2026, 15:49:42</td>
+		<td>1/1</td>
+		<td class="over">280.2s</td>
+		<td>—</td>
+		<td style="width:40%"><div class="chart">
+			<div class="bar bar-ok" style="width:93.408%" title="280.2s"></div>
+			<div class="bar-target" style="left:40%" title="120s target"></div>
+		</div></td>
+	</tr><tr>
+		<td>#5</td>
+		<td>16/03/2026, 15:56:49</td>
+		<td>1/1</td>
+		<td class="over">260.8s</td>
+		<td>—</td>
+		<td style="width:40%"><div class="chart">
+			<div class="bar bar-ok" style="width:86.92966666666668%" title="260.8s"></div>
+			<div class="bar-target" style="left:40%" title="120s target"></div>
+		</div></td>
+	</tr><tr>
+		<td>#6</td>
+		<td>16/03/2026, 16:00:32</td>
+		<td>1/1</td>
+		<td class="over">138.0s</td>
+		<td>—</td>
+		<td style="width:40%"><div class="chart">
+			<div class="bar bar-ok" style="width:45.98733333333334%" title="138.0s"></div>
+			<div class="bar-target" style="left:40%" title="120s target"></div>
+		</div></td>
+	</tr><tr>
+		<td>#7</td>
+		<td>16/03/2026, 16:08:08</td>
+		<td>3/3</td>
+		<td class="over">148.4s</td>
+		<td>—</td>
+		<td style="width:40%"><div class="chart">
+			<div class="bar bar-ok" style="width:49.143%" title="147.4s"></div><div class="bar bar-ok" style="width:47.87166666666667%" title="143.6s"></div><div class="bar bar-ok" style="width:51.38399999999999%" title="154.2s"></div>
+			<div class="bar-target" style="left:40%" title="120s target"></div>
+		</div></td>
+	</tr>
+</table>
+
+<h2>Phase Breakdown (Latest)</h2>
+<div class="iteration">
+			<strong>Run 1:</strong> 147.4s total
+			<div style="margin:0.5rem 0">
+			<div class="phase-bar" style="width:6.386530392357713%;background:#58a6ff" title="gather-diff: 8.4s"></div><div class="phase-bar" style="width:89.3249262100415%;background:#bc8cff" title="review-parallel: 117.7s"></div><div class="phase-bar" style="width:4.288543397600783%;background:#8b949e" title="synthesise-and-complete: 5.7s"></div>
+			</div>
+			<div class="legend">
+			<span class="legend-item"><span class="legend-dot" style="background:#58a6ff"></span>gather-diff: 8.4s</span><span class="legend-item"><span class="legend-dot" style="background:#bc8cff"></span>review-parallel: 117.7s</span><span class="legend-item"><span class="legend-dot" style="background:#8b949e"></span>synthesise-and-complete: 5.7s</span>
+			</div>
+		</div><div class="iteration">
+			<strong>Run 2:</strong> 143.6s total
+			<div style="margin:0.5rem 0">
+			<div class="phase-bar" style="width:6.232440378961124%;background:#58a6ff" title="gather-diff: 7.6s"></div><div class="phase-bar" style="width:87.78585429598171%;background:#bc8cff" title="review-parallel: 107.5s"></div><div class="phase-bar" style="width:5.981705325057171%;background:#8b949e" title="synthesise-and-complete: 7.3s"></div>
+			</div>
+			<div class="legend">
+			<span class="legend-item"><span class="legend-dot" style="background:#58a6ff"></span>gather-diff: 7.6s</span><span class="legend-item"><span class="legend-dot" style="background:#bc8cff"></span>review-parallel: 107.5s</span><span class="legend-item"><span class="legend-dot" style="background:#8b949e"></span>synthesise-and-complete: 7.3s</span>
+			</div>
+		</div><div class="iteration">
+			<strong>Run 3:</strong> 154.2s total
+			<div style="margin:0.5rem 0">
+			<div class="phase-bar" style="width:5.6175148903544585%;background:#58a6ff" title="gather-diff: 7.9s"></div><div class="phase-bar" style="width:90.78466311238579%;background:#bc8cff" title="review-parallel: 127.9s"></div><div class="phase-bar" style="width:3.5978219972597487%;background:#8b949e" title="synthesise-and-complete: 5.1s"></div>
+			</div>
+			<div class="legend">
+			<span class="legend-item"><span class="legend-dot" style="background:#58a6ff"></span>gather-diff: 7.9s</span><span class="legend-item"><span class="legend-dot" style="background:#bc8cff"></span>review-parallel: 127.9s</span><span class="legend-item"><span class="legend-dot" style="background:#8b949e"></span>synthesise-and-complete: 5.1s</span>
+			</div>
+		</div>
+
+<h2>Optimization Log</h2>
+<div id="log">
+<div class="iteration"><strong>#1</strong> (16/03/2026, 13:33:55): avg=64.2s — Baseline: Initial single run test (4-phase workflow)</div><div class="iteration"><strong>#2</strong> (16/03/2026, 13:39:39): avg=67.4s — Baseline: 5-run baseline measurement (4-phase workflow: gather-diff, review-parallel, synthesise-findings, complete-review)</div><div class="iteration"><strong>#3</strong> (16/03/2026, 13:48:43): avg=65.8s — Optimization 1: Merged synthesise+complete into single phase (3 phases), streamlined gather-diff instructions for parallel tool calls, sub-agents read diff from context instead of running git diff, added synthesise_review action to workflow extension</div><div class="iteration"><strong>#4</strong> (16/03/2026, 15:49:42): avg=280.2s</div><div class="iteration"><strong>#5</strong> (16/03/2026, 15:56:49): avg=260.8s</div><div class="iteration"><strong>#6</strong> (16/03/2026, 16:00:32): avg=138.0s</div><div class="iteration"><strong>#7</strong> (16/03/2026, 16:08:08): avg=148.4s</div>
+</div>
+</body></html>

@@ -7,7 +7,6 @@ export interface SubAgentStatus {
 	name: string;
 	status: "pending" | "running" | "completed" | "failed" | "timeout";
 	durationMs?: number;
-	artifactName?: string;
 	/** Session ID for delegate sessions — used to link to the live session */
 	sessionId?: string;
 }
@@ -357,29 +356,32 @@ function parseRunPhaseResult(status: WorkflowStatus, text: string, details?: any
 		activePhase.isParallelGroup = true;
 	}
 
-	// Parse artifact references and assign to sub-agents by phaseId.
-	const artifactRegex = /Output collected as artifact:\s*(?:sub-agent|delegate)-(\S+?)\.txt/g;
-	let artMatch;
-	while ((artMatch = artifactRegex.exec(text)) !== null) {
-		const [, artPhaseId] = artMatch;
-		if (activePhase.subAgents) {
-			const sub = activePhase.subAgents.find((s) => s.phaseId === artPhaseId);
-			if (sub) sub.artifactName = `delegate-${artPhaseId}.txt`;
-		}
-	}
-
-	// Merge session IDs from details.delegates (emitted by workflow run_phase onUpdate)
-	if (details?.delegates && Array.isArray(details.delegates) && activePhase.subAgents) {
-		for (const delegate of details.delegates) {
-			if (!delegate.sessionId) continue;
-			// Match by name or by positional index
-			const sub = activePhase.subAgents.find((s) => s.name === delegate.name)
-				|| activePhase.subAgents[details.delegates.indexOf(delegate)];
-			if (sub) {
-				sub.sessionId = delegate.sessionId;
-				// Also update status and duration from details (more current than text parsing)
-				if (delegate.status) sub.status = delegate.status as SubAgentStatus["status"];
-				if (delegate.durationMs) sub.durationMs = delegate.durationMs;
+	// Create or update sub-agents from details.delegates (emitted by workflow run_phase onUpdate).
+	// This is the primary source during streaming — text patterns may not be available yet.
+	if (details?.delegates && Array.isArray(details.delegates) && details.delegates.length > 0) {
+		if (!activePhase.subAgents || activePhase.subAgents.length === 0) {
+			// Create sub-agents from details (first time)
+			activePhase.subAgents = details.delegates.map((d: any) => ({
+				phaseId: d.id || d.name || "?",
+				name: d.name || d.id || "Delegate",
+				status: (d.status === "starting" ? "running" : d.status || "running") as SubAgentStatus["status"],
+				durationMs: d.durationMs,
+				sessionId: d.sessionId || undefined,
+			}));
+			activePhase.isParallelGroup = details.delegates.length > 1;
+		} else {
+			// Merge into existing sub-agents
+			for (let i = 0; i < details.delegates.length; i++) {
+				const delegate = details.delegates[i];
+				// Match by name, then by position
+				const sub = activePhase.subAgents.find((s) => s.name === delegate.name)
+					|| activePhase.subAgents[i];
+				if (sub) {
+					if (delegate.sessionId) sub.sessionId = delegate.sessionId;
+					if (delegate.status) sub.status = (delegate.status === "starting" ? "running" : delegate.status) as SubAgentStatus["status"];
+					if (delegate.durationMs) sub.durationMs = delegate.durationMs;
+					if (delegate.name && sub.name !== delegate.name) sub.name = delegate.name;
+				}
 			}
 		}
 	}
@@ -474,7 +476,10 @@ const STATUS_COLORS: Record<string, { bg: string; border: string; text: string; 
 export class WorkflowStatusBar extends LitElement {
 	@property({ attribute: false }) status: WorkflowStatus | null = null;
 	private _lastActivePhase: string | null = null;
+	/** Phases explicitly expanded by user click */
 	private _expandedParallel: Set<string> = new Set();
+	/** Phases explicitly collapsed by user click (overrides auto-expand for active phases) */
+	private _collapsedParallel: Set<string> = new Set();
 
 	createRenderRoot() {
 		return this;
@@ -498,10 +503,11 @@ export class WorkflowStatusBar extends LitElement {
 		}
 	}
 
-	/** Is a parallel phase currently expanded? Auto-expand active parallel phases. */
+	/** Is a parallel phase currently expanded? Auto-expand active parallel phases unless user collapsed them. */
 	private isExpanded(phase: WorkflowPhaseStatus): boolean {
 		if (!phase.subAgents || phase.subAgents.length === 0) return false;
-		return this._expandedParallel.has(phase.id) || phase.status === "active";
+		if (this._collapsedParallel.has(phase.id)) return false;
+		return this._expandedParallel.has(phase.id);
 	}
 
 	override render() {
@@ -661,7 +667,7 @@ export class WorkflowStatusBar extends LitElement {
 
 					<!-- Vertical stack of sub-agent chips -->
 					<div class="flex flex-col" style="gap: ${CHIP_GAP}px;">
-						${subs.map((sub) => this.renderSubAgentChip(sub, sessionId))}
+						${subs.map((sub) => this.renderSubAgentChip(sub))}
 					</div>
 
 					<!-- Merge SVG -->
@@ -683,28 +689,17 @@ export class WorkflowStatusBar extends LitElement {
 	// ── Sub-agent chip (used inside the DAG) ──
 	// Same pill shape as top-level phase nodes. Entire chip is clickable to open log.
 
-	private renderSubAgentChip(sub: SubAgentStatus, _workflowSessionId?: string): TemplateResult {
+	private renderSubAgentChip(sub: SubAgentStatus): TemplateResult {
 		const colors = STATUS_COLORS[sub.status] || STATUS_COLORS.pending;
 		const duration = sub.durationMs ? formatDuration(sub.durationMs) : "";
-		// Link to delegate session if available, fall back to artifact log
-		const hasLink = !!sub.sessionId;
-		const hasArtifactLog = !hasLink && !!sub.artifactName && !!_workflowSessionId;
-		const isClickable = hasLink || hasArtifactLog;
-
-		const handleClick = () => {
-			if (hasLink) {
-				this.openDelegateSession(sub.sessionId!);
-			} else if (hasArtifactLog) {
-				this.openSubAgentLog(_workflowSessionId!, sub.artifactName!);
-			}
-		};
+		const isClickable = !!sub.sessionId;
 
 		return html`
 			<div class="inline-flex items-center gap-1.5 px-2 rounded-full border whitespace-nowrap
 				${colors.bg} ${colors.border} ${colors.text}
 				${isClickable ? "cursor-pointer hover:brightness-110" : ""}"
 				style="height: 26px; font-size: 11px;"
-				@click=${isClickable ? handleClick : undefined}
+				@click=${isClickable ? () => this.openDelegateSession(sub.sessionId!) : undefined}
 				title=${isClickable ? `${sub.name} — click to view` : sub.name}>
 				<span class="w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}
 					${sub.status === "running" ? "animate-pulse" : ""}"></span>
@@ -722,10 +717,14 @@ export class WorkflowStatusBar extends LitElement {
 	// ── Helpers ──
 
 	private toggleExpanded(phaseId: string) {
-		if (this._expandedParallel.has(phaseId)) {
+		if (this.isExpanded(this.status?.phases.find((p) => p.id === phaseId) as WorkflowPhaseStatus)) {
+			// Currently expanded — collapse it
 			this._expandedParallel.delete(phaseId);
+			this._collapsedParallel.add(phaseId);
 		} else {
+			// Currently collapsed — expand it
 			this._expandedParallel.add(phaseId);
+			this._collapsedParallel.delete(phaseId);
 		}
 		this.requestUpdate();
 	}
@@ -751,21 +750,6 @@ export class WorkflowStatusBar extends LitElement {
 		} catch { /* ignore */ }
 	}
 
-	private async openSubAgentLog(sessionId: string, artifactName: string) {
-		const url = `/api/sessions/${sessionId}/workflow/artifacts/${encodeURIComponent(artifactName)}`;
-		try {
-			const token = localStorage.getItem("gateway.token");
-			const resp = await fetch(url, {
-				headers: token ? { Authorization: `Bearer ${token}` } : {},
-			});
-			if (!resp.ok) return;
-			const text = await resp.text();
-			const htmlContent = subAgentLogHtml(artifactName, text);
-			const blob = new Blob([htmlContent], { type: "text/html" });
-			window.open(URL.createObjectURL(blob), "_blank");
-		} catch { /* ignore */ }
-	}
-
 	private renderConnector(prevStatus: string, _nextStatus: string): TemplateResult {
 		const filled = prevStatus === "completed";
 		return html`
@@ -785,62 +769,4 @@ function formatDuration(ms: number): string {
 	const m = Math.floor(s / 60);
 	const rem = s % 60;
 	return rem > 0 ? `${m}m${rem}s` : `${m}m`;
-}
-
-/** Wrap sub-agent log text in a styled HTML document for viewing */
-function subAgentLogHtml(title: string, logText: string): string {
-	const escaped = logText
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;");
-	return `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="utf-8">
-	<title>${title}</title>
-	<style>
-		body {
-			font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-			font-size: 13px;
-			line-height: 1.6;
-			background: #0d1117;
-			color: #c9d1d9;
-			padding: 24px 32px;
-			margin: 0;
-		}
-		h1 {
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-			font-size: 16px;
-			font-weight: 600;
-			color: #58a6ff;
-			margin: 0 0 16px 0;
-			padding-bottom: 8px;
-			border-bottom: 1px solid #21262d;
-		}
-		.log-section { margin-bottom: 16px; }
-		.label {
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-			font-size: 11px;
-			font-weight: 600;
-			text-transform: uppercase;
-			letter-spacing: 0.05em;
-			color: #8b949e;
-			margin-bottom: 4px;
-		}
-		pre {
-			white-space: pre-wrap;
-			word-wrap: break-word;
-			margin: 0;
-			padding: 12px 16px;
-			background: #161b22;
-			border-radius: 6px;
-			border: 1px solid #21262d;
-		}
-	</style>
-</head>
-<body>
-	<h1>Sub-Agent Log: ${title.replace(/\.txt$/, "")}</h1>
-	<pre>${escaped}</pre>
-</body>
-</html>`;
 }

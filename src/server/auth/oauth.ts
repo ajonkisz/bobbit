@@ -158,7 +158,7 @@ export async function oauthComplete(
 }
 
 /**
- * Check if Anthropic OAuth credentials exist and are valid.
+ * Check if Anthropic OAuth credentials exist and are valid (not expired).
  */
 export function oauthStatus(): { authenticated: boolean; expires?: number } {
 	const authPath = getAuthJsonPath();
@@ -169,11 +169,86 @@ export function oauthStatus(): { authenticated: boolean; expires?: number } {
 		const cred = data.anthropic;
 		if (!cred || cred.type !== "oauth") return { authenticated: false };
 
+		const expired = cred.expires && Date.now() > cred.expires;
+
 		return {
-			authenticated: true,
+			authenticated: !expired,
 			expires: cred.expires,
 		};
 	} catch {
 		return { authenticated: false };
+	}
+}
+
+/**
+ * Refresh the OAuth access token using the stored refresh token.
+ * Updates ~/.pi/agent/auth.json with the new credentials.
+ * Returns the new access token, or null if refresh fails.
+ */
+export async function refreshOAuthToken(): Promise<string | null> {
+	const authPath = getAuthJsonPath();
+	if (!existsSync(authPath)) return null;
+
+	let authData: Record<string, any>;
+	try {
+		authData = JSON.parse(readFileSync(authPath, "utf-8"));
+	} catch {
+		return null;
+	}
+
+	const cred = authData.anthropic;
+	if (!cred || cred.type !== "oauth" || !cred.refresh) return null;
+
+	// Skip refresh if token is still valid (5-minute buffer already baked into expires)
+	if (cred.expires && Date.now() < cred.expires) return cred.access;
+
+	console.log("[oauth] Access token expired, refreshing...");
+
+	try {
+		const tokenResponse = await fetch(TOKEN_URL, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				grant_type: "refresh_token",
+				client_id: CLIENT_ID,
+				refresh_token: cred.refresh,
+			}),
+		});
+
+		if (!tokenResponse.ok) {
+			const errText = await tokenResponse.text();
+			console.error(`[oauth] Token refresh failed (${tokenResponse.status}): ${errText}`);
+			// Only clear credentials on definitive auth failures (invalid/revoked tokens).
+			// Transient errors (5xx, 429, network) should not destroy valid credentials.
+			const status = tokenResponse.status;
+			if (status === 400 || status === 401 || status === 403) {
+				console.log("[oauth] Credentials revoked or invalid, clearing stored credentials");
+				delete authData.anthropic;
+				writeFileSync(authPath, JSON.stringify(authData, null, 2), "utf-8");
+			}
+			return null;
+		}
+
+		const tokenData = (await tokenResponse.json()) as {
+			access_token: string;
+			refresh_token?: string;
+			expires_in: number;
+		};
+
+		authData.anthropic = {
+			type: "oauth",
+			access: tokenData.access_token,
+			refresh: tokenData.refresh_token || cred.refresh, // keep old refresh if not rotated
+			expires: Date.now() + tokenData.expires_in * 1000 - 5 * 60 * 1000,
+		};
+
+		writeFileSync(authPath, JSON.stringify(authData, null, 2), "utf-8");
+		try { chmodSync(authPath, 0o600); } catch {}
+
+		console.log("[oauth] Token refreshed successfully");
+		return tokenData.access_token;
+	} catch (err) {
+		console.error("[oauth] Token refresh error:", err);
+		return null;
 	}
 }
