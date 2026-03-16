@@ -284,6 +284,8 @@ async function handleApiRoute(
 				state: body.state,
 				spec: body.spec,
 				swarm: body.swarm,
+				repoPath: body.repoPath,
+				branch: body.branch,
 			});
 			if (!ok) { json({ error: "Goal not found" }, 404); return; }
 			json({ ok: true });
