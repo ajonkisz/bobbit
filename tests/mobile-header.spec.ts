@@ -37,7 +37,7 @@ test.describe("Mobile header auto-hide", () => {
 
 	test("header hides when scrolling down", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible !== undefined);
 
 		const scrollEl = page.locator("#scroll-target");
 		
@@ -45,11 +45,9 @@ test.describe("Mobile header auto-hide", () => {
 		await scrollEl.evaluate((el) => {
 			el.scrollTop = 300;
 		});
-		await page.waitForTimeout(100);
 		
-		// Check header state
-		const visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(false);
+		// Wait for scroll handler to update state
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === false, null, { timeout: 2000 });
 
 		const header = page.locator("#app-header");
 		const transform = await header.evaluate(
@@ -60,7 +58,7 @@ test.describe("Mobile header auto-hide", () => {
 
 	test("header shows when scrolling back up", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible !== undefined);
 
 		const scrollEl = page.locator("#scroll-target");
 
@@ -68,21 +66,13 @@ test.describe("Mobile header auto-hide", () => {
 		await scrollEl.evaluate((el) => {
 			el.scrollTop = 300;
 		});
-		await page.waitForTimeout(100);
-
-		// Verify hidden
-		let visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(false);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === false, null, { timeout: 2000 });
 
 		// Now scroll up a bit
 		await scrollEl.evaluate((el) => {
 			el.scrollTop = 250;
 		});
-		await page.waitForTimeout(100);
-
-		// Header should reappear
-		visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(true);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === true, null, { timeout: 2000 });
 
 		const header = page.locator("#app-header");
 		const transform = await header.evaluate(
@@ -93,23 +83,20 @@ test.describe("Mobile header auto-hide", () => {
 
 	test("header always visible near top", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible !== undefined);
 
 		const scrollEl = page.locator("#scroll-target");
 
 		// Scroll down then back near top
 		await scrollEl.evaluate((el) => { el.scrollTop = 300; });
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === false, null, { timeout: 2000 });
 		await scrollEl.evaluate((el) => { el.scrollTop = 10; });
-		await page.waitForTimeout(100);
-
-		const visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(true);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === true, null, { timeout: 2000 });
 	});
 
 	test("header hides/shows with touch-like scrolling", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible !== undefined);
 
 		const scrollEl = page.locator("#scroll-target");
 		const header = page.locator("#app-header");
@@ -121,11 +108,9 @@ test.describe("Mobile header auto-hide", () => {
 			});
 			await page.waitForTimeout(20);
 		}
-		await page.waitForTimeout(50);
 
-		// Should be hidden after scrolling down
-		let visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(false);
+		// Wait for hidden state
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === false, null, { timeout: 2000 });
 
 		// Simulate finger scrolling up
 		for (let i = 0; i < 5; i++) {
@@ -134,11 +119,9 @@ test.describe("Mobile header auto-hide", () => {
 			});
 			await page.waitForTimeout(20);
 		}
-		await page.waitForTimeout(50);
 
-		// Should be visible after scrolling up
-		visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(true);
+		// Wait for visible state
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === true, null, { timeout: 2000 });
 
 		// Verify transform is applied
 		const transform = await header.evaluate((el) => el.style.transform);
@@ -147,24 +130,17 @@ test.describe("Mobile header auto-hide", () => {
 
 	test("capture-phase listener works even with deeply nested scroll containers", async ({ page }) => {
 		await page.goto(TEST_PAGE);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible !== undefined);
 
-		// Remove the overflow-y-auto class — the capture approach doesn't need it for querying
-		// Just verify the scroll event still reaches #app-main via capture
 		const scrollEl = page.locator("#scroll-target");
 
 		// Scroll down
 		await scrollEl.evaluate((el) => { el.scrollTop = 300; });
-		await page.waitForTimeout(100);
-
-		let visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(false);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === false, null, { timeout: 2000 });
 
 		// Scroll up
 		await scrollEl.evaluate((el) => { el.scrollTop = 250; });
-		await page.waitForTimeout(100);
-
-		visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(true);
+		await page.waitForFunction(() => (window as any).__mobileHeaderVisible() === true, null, { timeout: 2000 });
 	});
 
 	test("padding-top is set on app-main", async ({ page }) => {
