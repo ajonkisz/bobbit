@@ -137,15 +137,27 @@ export class SessionManager {
 		if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
 
 		// Re-assemble system prompt (global + AGENTS.md + goal spec)
-		const goal = ps.goalId ? this.goalManager.getGoal(ps.goalId) : undefined;
-		const promptPath = assembleSystemPrompt(ps.id, {
-			baseSystemPromptPath: this.systemPromptPath,
-			cwd: ps.cwd,
-			goalTitle: goal?.title,
-			goalState: goal?.state,
-			goalSpec: goal?.spec,
-		});
-		if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		if (ps.goalAssistant) {
+			// Goal assistant sessions get the special goal assistant prompt
+			const promptPath = assembleSystemPrompt(ps.id, {
+				baseSystemPromptPath: undefined,
+				cwd: ps.cwd,
+				goalSpec: GOAL_ASSISTANT_PROMPT,
+				goalTitle: "Goal Creation Assistant",
+				goalState: "active",
+			});
+			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		} else {
+			const goal = ps.goalId ? this.goalManager.getGoal(ps.goalId) : undefined;
+			const promptPath = assembleSystemPrompt(ps.id, {
+				baseSystemPromptPath: this.systemPromptPath,
+				cwd: ps.cwd,
+				goalTitle: goal?.title,
+				goalState: goal?.state,
+				goalSpec: goal?.spec,
+			});
+			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		}
 
 		const rpcClient = new RpcBridge(bridgeOptions);
 		const eventBuffer = new EventBuffer();
@@ -164,6 +176,7 @@ export class SessionManager {
 			isCompacting: false,
 			titleGenerated: ps.title !== "New session",
 			goalId: ps.goalId,
+			goalAssistant: ps.goalAssistant,
 		};
 
 		const unsub = rpcClient.onEvent((event: any) => {
@@ -521,6 +534,7 @@ export class SessionManager {
 			createdAt: session.createdAt,
 			lastActivity: session.lastActivity,
 			goalId: session.goalId,
+			goalAssistant: session.goalAssistant,
 			role: session.role,
 			swarmGoalId: session.swarmGoalId,
 			worktreePath: session.worktreePath,
