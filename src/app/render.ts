@@ -19,7 +19,7 @@ import {
 } from "./state.js";
 import { createGoal, gatewayFetch, refreshSessions } from "./api.js";
 import { clearSessionModel } from "./routing.js";
-import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession } from "./session-manager.js";
+import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { renderSidebar, toggleSidebar } from "./sidebar.js";
 import { renderSessionCard, goalStateIcon } from "./render-helpers.js";
@@ -170,6 +170,11 @@ function goalPreviewPanel() {
 		state.isGoalAssistantSession = false;
 		state.activeGoalProposal = null;
 		state.previewSwarmMode = false;
+		// Clean up persisted draft
+		if (sessionId) {
+			const { deleteGoalDraft } = await import("./session-manager.js");
+			deleteGoalDraft(sessionId);
+		}
 		localStorage.removeItem("gateway.sessionId");
 		setHashRoute("landing");
 		state.appView = "authenticated";
@@ -218,6 +223,8 @@ function goalPreviewPanel() {
 						onInput: (e: Event) => {
 							state.previewTitle = (e.target as HTMLInputElement).value;
 							state.previewTitleEdited = true;
+							const sid = activeSessionId();
+							if (sid) saveGoalDraft(sid);
 						},
 					})}
 				</div>
@@ -230,6 +237,8 @@ function goalPreviewPanel() {
 						onInput: (e: Event) => {
 							state.previewCwd = (e.target as HTMLInputElement).value;
 							state.previewCwdEdited = true;
+							const sid = activeSessionId();
+							if (sid) saveGoalDraft(sid);
 						},
 					})}
 				</div>
@@ -250,6 +259,8 @@ function goalPreviewPanel() {
 								@input=${(e: Event) => {
 									state.previewSpec = (e.target as HTMLTextAreaElement).value;
 									state.previewSpecEdited = true;
+									const sid = activeSessionId();
+									if (sid) saveGoalDraft(sid);
 								}}
 							></textarea>`
 						: html`<div class="flex-1 min-h-[200px] p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm">
@@ -262,7 +273,7 @@ function goalPreviewPanel() {
 				<label class="flex items-center gap-2 cursor-pointer">
 					<input type="checkbox"
 						.checked=${state.previewSwarmMode}
-						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; renderApp(); }}
+						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
 						class="rounded border-border" />
 					<span class="text-xs text-muted-foreground">🐝 Swarm mode — Team Lead auto-spawns role agents</span>
 				</label>
