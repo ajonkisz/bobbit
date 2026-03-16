@@ -8,6 +8,8 @@ export interface SubAgentStatus {
 	status: "pending" | "running" | "completed" | "failed" | "timeout";
 	durationMs?: number;
 	artifactName?: string;
+	/** Session ID for delegate sessions — used to link to the live session */
+	sessionId?: string;
 }
 
 /** Minimal workflow state extracted from tool call results */
@@ -127,7 +129,7 @@ export function extractWorkflowStatus(
 
 			// Detect run_phase result — parallel sub-agent progress
 			if (action === "run_phase") {
-				parseRunPhaseResult(status, text);
+				parseRunPhaseResult(status, text, (msg as any).details);
 			}
 
 			// Detect advance result — "Completed: X | Next: Y (n/total)"
@@ -242,8 +244,8 @@ export function extractWorkflowStatus(
 				.map((c: any) => c.text)
 				.join("\n") || "";
 
-			if (action === "run_phase" && partialText) {
-				parseRunPhaseResult(status, partialText);
+			if (action === "run_phase") {
+				parseRunPhaseResult(status, partialText, partial.details);
 			}
 		}
 	}
@@ -279,7 +281,7 @@ function extractStreamingWorkflowToolCalls(streamMessage: any): Array<{ id: stri
  *   "Running sub-agent for phase "Name" (isolation: full)..."
  *   "### ✓ phase-id (completed, 42s)"
  */
-function parseRunPhaseResult(status: WorkflowStatus, text: string): void {
+function parseRunPhaseResult(status: WorkflowStatus, text: string, details?: any): void {
 	const activePhase = status.phases.find((p) => p.status === "active");
 	if (!activePhase) return;
 
@@ -356,13 +358,29 @@ function parseRunPhaseResult(status: WorkflowStatus, text: string): void {
 	}
 
 	// Parse artifact references and assign to sub-agents by phaseId.
-	const artifactRegex = /Output collected as artifact:\s*(sub-agent-(\S+?)\.txt)/g;
+	const artifactRegex = /Output collected as artifact:\s*(?:sub-agent|delegate)-(\S+?)\.txt/g;
 	let artMatch;
 	while ((artMatch = artifactRegex.exec(text)) !== null) {
-		const [, artifactName, artPhaseId] = artMatch;
+		const [, artPhaseId] = artMatch;
 		if (activePhase.subAgents) {
 			const sub = activePhase.subAgents.find((s) => s.phaseId === artPhaseId);
-			if (sub) sub.artifactName = artifactName;
+			if (sub) sub.artifactName = `delegate-${artPhaseId}.txt`;
+		}
+	}
+
+	// Merge session IDs from details.delegates (emitted by workflow run_phase onUpdate)
+	if (details?.delegates && Array.isArray(details.delegates) && activePhase.subAgents) {
+		for (const delegate of details.delegates) {
+			if (!delegate.sessionId) continue;
+			// Match by name or by positional index
+			const sub = activePhase.subAgents.find((s) => s.name === delegate.name)
+				|| activePhase.subAgents[details.delegates.indexOf(delegate)];
+			if (sub) {
+				sub.sessionId = delegate.sessionId;
+				// Also update status and duration from details (more current than text parsing)
+				if (delegate.status) sub.status = delegate.status as SubAgentStatus["status"];
+				if (delegate.durationMs) sub.durationMs = delegate.durationMs;
+			}
 		}
 	}
 }
@@ -665,23 +683,34 @@ export class WorkflowStatusBar extends LitElement {
 	// ── Sub-agent chip (used inside the DAG) ──
 	// Same pill shape as top-level phase nodes. Entire chip is clickable to open log.
 
-	private renderSubAgentChip(sub: SubAgentStatus, sessionId?: string): TemplateResult {
+	private renderSubAgentChip(sub: SubAgentStatus, _workflowSessionId?: string): TemplateResult {
 		const colors = STATUS_COLORS[sub.status] || STATUS_COLORS.pending;
 		const duration = sub.durationMs ? formatDuration(sub.durationMs) : "";
-		const hasLogs = !!sub.artifactName && !!sessionId;
+		// Link to delegate session if available, fall back to artifact log
+		const hasLink = !!sub.sessionId;
+		const hasArtifactLog = !hasLink && !!sub.artifactName && !!_workflowSessionId;
+		const isClickable = hasLink || hasArtifactLog;
+
+		const handleClick = () => {
+			if (hasLink) {
+				this.openDelegateSession(sub.sessionId!);
+			} else if (hasArtifactLog) {
+				this.openSubAgentLog(_workflowSessionId!, sub.artifactName!);
+			}
+		};
 
 		return html`
 			<div class="inline-flex items-center gap-1.5 px-2 rounded-full border whitespace-nowrap
 				${colors.bg} ${colors.border} ${colors.text}
-				${hasLogs ? "cursor-pointer hover:brightness-110" : ""}"
+				${isClickable ? "cursor-pointer hover:brightness-110" : ""}"
 				style="height: 26px; font-size: 11px;"
-				@click=${hasLogs ? () => this.openSubAgentLog(sessionId!, sub.artifactName!) : undefined}
-				title=${hasLogs ? `${sub.name} — click to view log` : sub.name}>
+				@click=${isClickable ? handleClick : undefined}
+				title=${isClickable ? `${sub.name} — click to view` : sub.name}>
 				<span class="w-1.5 h-1.5 rounded-full shrink-0 ${colors.dot}
 					${sub.status === "running" ? "animate-pulse" : ""}"></span>
 				<span class="leading-none">${sub.name}</span>
 				${duration ? html`<span class="leading-none opacity-60 text-[10px]">${duration}</span>` : ""}
-				${hasLogs ? html`
+				${isClickable ? html`
 					<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50 shrink-0">
 						<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
 					</svg>
@@ -699,6 +728,12 @@ export class WorkflowStatusBar extends LitElement {
 			this._expandedParallel.add(phaseId);
 		}
 		this.requestUpdate();
+	}
+
+	private openDelegateSession(sessionId: string) {
+		const token = localStorage.getItem("gateway.token");
+		const url = `/?token=${token ? encodeURIComponent(token) : ""}#/session/${sessionId}`;
+		window.open(url, "_blank");
 	}
 
 	private async openReport() {
