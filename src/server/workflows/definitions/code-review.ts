@@ -30,20 +30,25 @@ export const codeReview: Workflow = {
 			name: "Gather Diff",
 			instructions: `Collect the diff and understand the scope of changes.
 
-1. Read the workflow context values: \`base_branch\`, \`feature_branch\`, \`repo_path\`
-2. Generate the unified diff:
+**First**, use the workflow tool with \`action: "set_context"\` to store these values (ask the user if not obvious):
+- \`base_branch\` — the branch to diff against (e.g. "main")
+- \`feature_branch\` — the branch being reviewed (e.g. current branch)
+- \`repo_path\` — absolute path to the repository
+
+**Then:**
+1. Generate the unified diff using bash:
    \`\`\`
    git diff {base_branch}...{feature_branch}
    \`\`\`
    (Use two-dot \`{base_branch}..{feature_branch}\` if the branches share HEAD, or \`git diff HEAD\` for uncommitted changes.)
-3. Collect the diff as an artifact named "diff.patch" (mime: text/x-diff)
-4. Generate a file-level summary: list every changed file with a one-line description of what changed
-5. Collect the summary as an artifact named "change-summary.txt"
-6. If a "spec" context value exists, read it carefully — it describes what the changes SHOULD accomplish
+2. Use the workflow tool with \`action: "collect_artifact"\` to save the diff as "diff.patch" (mime: text/x-diff)
+3. Generate a file-level summary: list every changed file with a one-line description of what changed
+4. Use the workflow tool to collect the summary as artifact "change-summary.txt"
+5. If a "spec" context value exists, read it carefully — it describes what the changes SHOULD accomplish
 
 **Important**: You are performing an independent review. Focus only on what the diff shows, not on how or why decisions were made. You should be a fresh pair of eyes.
 
-After collecting the diff and summarising changes, advance to the next phase.`,
+After collecting the diff and summarising changes, use the workflow tool with \`action: "advance"\` to move to the next phase.`,
 			exitCriteria:
 				"Diff collected as artifact, file-level change summary produced",
 		},
@@ -61,6 +66,8 @@ After collecting the diff and summarising changes, advance to the next phase.`,
 					subAgent: true,
 					isolation: "full",
 					instructions: `You are an independent code reviewer. Analyse the diff for correctness and completeness.
+
+**How to get the diff:** Run \`git diff {base_branch}...{feature_branch}\` in the repo (the context values below tell you the branch names and repo path). If that doesn't work, try \`git diff {base_branch}..{feature_branch}\`. Read the full diff output carefully.
 
 Review each changed file and ask:
 
@@ -82,9 +89,8 @@ For each issue found, produce a JSON finding with this shape:
 {"id":"FC001","file":"path","lineRange":"1-10","category":"correctness|completeness","severity":"critical|major|minor|nit","title":"...","description":"...","suggestion":"..."}
 \`\`\`
 
-Collect ALL findings as a single artifact named "findings-correctness.json" (mime: application/json).
-The artifact should be a JSON array of findings. If no issues found, collect an empty array \`[]\`.`,
-					exitCriteria: "All changed files reviewed for correctness, findings artifact collected",
+**Output your findings as your final response** — a JSON array of finding objects. If no issues found, output \`[]\`. Do NOT use the workflow tool — just output the JSON directly as text.`,
+					exitCriteria: "All changed files reviewed for correctness, findings output as JSON",
 					timeoutMs: 600_000,
 				},
 				{
@@ -93,6 +99,8 @@ The artifact should be a JSON array of findings. If no issues found, collect an 
 					subAgent: true,
 					isolation: "full",
 					instructions: `You are an independent security reviewer. Analyse the diff for security vulnerabilities and robustness issues.
+
+**How to get the diff:** Run \`git diff {base_branch}...{feature_branch}\` in the repo (the context values below tell you the branch names and repo path). If that doesn't work, try \`git diff {base_branch}..{feature_branch}\`. Read the full diff output carefully.
 
 **Security**
 - Command injection: any user input reaching \`exec\`, \`execSync\`, \`spawn\`, or shell commands?
@@ -114,9 +122,8 @@ For each issue found, produce a JSON finding with this shape:
 {"id":"FS001","file":"path","lineRange":"1-10","category":"security|robustness","severity":"critical|major|minor|nit","title":"...","description":"...","suggestion":"..."}
 \`\`\`
 
-Collect ALL findings as a single artifact named "findings-security.json" (mime: application/json).
-The artifact should be a JSON array of findings. If no issues found, collect an empty array \`[]\`.`,
-					exitCriteria: "All changed files reviewed for security, findings artifact collected",
+**Output your findings as your final response** — a JSON array of finding objects. If no issues found, output \`[]\`. Do NOT use the workflow tool — just output the JSON directly as text.`,
+					exitCriteria: "All changed files reviewed for security, findings output as JSON",
 					timeoutMs: 600_000,
 				},
 				{
@@ -125,6 +132,8 @@ The artifact should be a JSON array of findings. If no issues found, collect an 
 					subAgent: true,
 					isolation: "full",
 					instructions: `You are an independent design reviewer. Analyse the diff for design quality, performance, and maintainability.
+
+**How to get the diff:** Run \`git diff {base_branch}...{feature_branch}\` in the repo (the context values below tell you the branch names and repo path). If that doesn't work, try \`git diff {base_branch}..{feature_branch}\`. Read the full diff output carefully.
 
 **Design & Architecture**
 - Does the code fit the existing architecture and patterns of the codebase?
@@ -151,9 +160,8 @@ For each issue found, produce a JSON finding with this shape:
 {"id":"FD001","file":"path","lineRange":"1-10","category":"design|performance|maintainability","severity":"critical|major|minor|nit","title":"...","description":"...","suggestion":"..."}
 \`\`\`
 
-Collect ALL findings as a single artifact named "findings-design.json" (mime: application/json).
-The artifact should be a JSON array of findings. If no issues found, collect an empty array \`[]\`.`,
-					exitCriteria: "All changed files reviewed for design, findings artifact collected",
+**Output your findings as your final response** — a JSON array of finding objects. If no issues found, output \`[]\`. Do NOT use the workflow tool — just output the JSON directly as text.`,
+					exitCriteria: "All changed files reviewed for design, findings output as JSON",
 					timeoutMs: 600_000,
 				},
 			],
@@ -161,13 +169,20 @@ The artifact should be a JSON array of findings. If no issues found, collect an 
 		{
 			id: "synthesise-findings",
 			name: "Synthesise Findings",
-			instructions: `Merge findings from the three parallel review sub-agents into a single structured artifact.
+			instructions: `Merge findings from the three parallel review delegates into a single structured artifact.
 
-1. Read the artifacts: "findings-correctness.json", "findings-security.json", "findings-design.json"
-2. Merge all findings into one array
-3. Re-number IDs sequentially: F001, F002, ...
-4. Sort by severity: critical first, then major, minor, nit
-5. Deduplicate: if two reviewers flagged the same issue, keep the more detailed one
+The previous phase (run_phase) stored each delegate's output as workflow artifacts:
+- "delegate-review-correctness.txt" — correctness findings (JSON array)
+- "delegate-review-security.txt" — security findings (JSON array)
+- "delegate-review-design.txt" — design findings (JSON array)
+
+**Steps:**
+1. Use the workflow tool with \`action: "status"\` to see the current artifacts list
+2. Read each delegate output artifact. Each contains the delegate's full response — extract the JSON array of findings from it. The JSON may be embedded in markdown code blocks.
+3. Merge all findings into one array
+4. Re-number IDs sequentially: F001, F002, ...
+5. Sort by severity: critical first, then major, minor, nit
+6. Deduplicate: if two reviewers flagged the same issue, keep the more detailed one
 
 **Severity guidelines:**
 - **critical**: Will cause bugs in production, data loss, security vulnerability, or crash
@@ -175,9 +190,9 @@ The artifact should be a JSON array of findings. If no issues found, collect an 
 - **minor**: Worth fixing but not a blocker — suboptimal patterns, missing edge cases with low likelihood
 - **nit**: Style preference, naming suggestion, minor readability improvement
 
-Collect the merged array as artifact "review-findings.json" (mime: application/json).
+Use the workflow tool to collect the merged array as artifact "review-findings.json" (mime: application/json).
 
-Set these context values:
+Use the workflow tool with \`action: "set_context"\` to set these values:
 - \`finding_count\`: total number of findings
 - \`critical_count\`: number of critical findings
 - \`major_count\`: number of major findings
@@ -198,9 +213,9 @@ Then advance to complete the workflow.`,
 			name: "Complete Review",
 			instructions: `Finalise the review.
 
-The workflow engine will automatically generate an HTML report from the findings.
+The workflow engine will automatically generate an HTML report from the findings when you complete.
 
-Complete the workflow now.`,
+Use the workflow tool with \`action: "complete"\` to finish the workflow.`,
 			exitCriteria: "Workflow completed and report generated",
 		},
 	],

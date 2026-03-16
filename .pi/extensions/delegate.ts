@@ -73,7 +73,7 @@ async function gatewayFetch(endpoint: string, options: RequestInit = {}): Promis
 }
 
 /** Create a delegate session and return its ID */
-async function createDelegateSession(
+export async function createDelegateSession(
 	parentSessionId: string,
 	instructions: string,
 	cwd: string,
@@ -98,7 +98,7 @@ async function createDelegateSession(
 }
 
 /** Wait for a delegate session to finish and get its output */
-async function waitForDelegate(
+export async function waitForDelegate(
 	sessionId: string,
 	timeoutMs: number,
 	signal?: AbortSignal,
@@ -122,7 +122,7 @@ async function waitForDelegate(
 }
 
 /** Run a single delegate: create session, wait for completion, return result */
-async function runDelegate(
+export async function runDelegateSession(
 	parentSessionId: string,
 	instructions: string,
 	cwd: string,
@@ -177,7 +177,7 @@ async function runDelegate(
  * Try to find the current session's gateway session ID.
  * The gateway passes this via env or we can read from the session state.
  */
-function getParentSessionId(ctx: any): string {
+export function getParentSessionId(ctx: any): string {
 	// The session manager sets this in the agent's environment
 	if (process.env.BOBBIT_SESSION_ID) return process.env.BOBBIT_SESSION_ID;
 	// Fallback: use a placeholder (the server can figure it out from the auth)
@@ -335,7 +335,7 @@ const extension: ExtensionFactory = (pi) => {
 			if (!params.instructions) {
 				return { content: [{ type: "text", text: "Error: 'instructions' is required for a single delegate. Use 'parallel' for multiple delegates." }] };
 			}
-			const result = await runDelegate(
+			const result = await runDelegateSession(
 				parentSessionId,
 				params.instructions,
 				cwd,

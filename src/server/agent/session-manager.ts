@@ -69,42 +69,61 @@ export class SessionManager {
 		const persisted = this.store.getAll();
 		if (persisted.length === 0) return;
 
-		console.log(`[session-manager] Restoring ${persisted.length} session(s)...`);
+		// Separate regular sessions from delegate sessions
+		const regular = persisted.filter(ps => !ps.delegateOf);
+		const delegates = persisted.filter(ps => !!ps.delegateOf);
 
-		for (const ps of persisted) {
-			// Skip if agent session file no longer exists — truly unrecoverable
+		console.log(`[session-manager] Restoring ${regular.length} session(s), deferring ${delegates.length} delegate(s)...`);
+
+		// Restore regular sessions in parallel (batched concurrency)
+		const CONCURRENCY = 5;
+		for (let i = 0; i < regular.length; i += CONCURRENCY) {
+			const batch = regular.slice(i, i + CONCURRENCY);
+			await Promise.all(batch.map(ps => this.restoreOneSession(ps)));
+		}
+
+		// Delegate sessions: dormant entries only — restored on-demand via addClient()
+		for (const ps of delegates) {
 			if (!fs.existsSync(ps.agentSessionFile)) {
-				console.log(`[session-manager] Removing ${ps.id} — agent session file missing: ${ps.agentSessionFile}`);
 				this.store.remove(ps.id);
 				continue;
 			}
-
-			try {
-				await this.restoreSession(ps);
-				console.log(`[session-manager] Restored: "${ps.title}" (${ps.id})`);
-			} catch (err) {
-				// Keep session in the store — the .jsonl file is still on disk.
-				// It will be retried on the next server restart.
-				console.error(`[session-manager] Failed to restore "${ps.title}" (${ps.id}), will retry next restart:`, err);
-
-				// Add a dormant entry so the UI can still list it
-				this.sessions.set(ps.id, {
-					id: ps.id,
-					title: ps.title,
-					cwd: ps.cwd,
-					status: "terminated",
-					createdAt: ps.createdAt,
-					lastActivity: ps.lastActivity,
-					clients: new Set(),
-					rpcClient: new RpcBridge({ cwd: ps.cwd }), // placeholder, not started
-					eventBuffer: new EventBuffer(),
-					unsubscribe: () => {},
-					isCompacting: false,
-					titleGenerated: true,
-					goalId: ps.goalId,
-				});
-			}
+			this.addDormantSession(ps);
 		}
+	}
+
+	private async restoreOneSession(ps: PersistedSession): Promise<void> {
+		if (!fs.existsSync(ps.agentSessionFile)) {
+			console.log(`[session-manager] Removing ${ps.id} — agent session file missing: ${ps.agentSessionFile}`);
+			this.store.remove(ps.id);
+			return;
+		}
+		try {
+			await this.restoreSession(ps);
+			console.log(`[session-manager] Restored: "${ps.title}" (${ps.id})`);
+		} catch (err) {
+			console.error(`[session-manager] Failed to restore "${ps.title}" (${ps.id}), will retry next restart:`, err);
+			this.addDormantSession(ps);
+		}
+	}
+
+	private addDormantSession(ps: PersistedSession): void {
+		this.sessions.set(ps.id, {
+			id: ps.id,
+			title: ps.title,
+			cwd: ps.cwd,
+			status: "terminated",
+			createdAt: ps.createdAt,
+			lastActivity: ps.lastActivity,
+			clients: new Set(),
+			rpcClient: new RpcBridge({ cwd: ps.cwd }), // placeholder, not started
+			eventBuffer: new EventBuffer(),
+			unsubscribe: () => {},
+			isCompacting: false,
+			titleGenerated: true,
+			goalId: ps.goalId,
+			delegateOf: ps.delegateOf,
+		});
 	}
 
 	private async restoreSession(ps: PersistedSession): Promise<void> {
@@ -582,6 +601,20 @@ export class SessionManager {
 	async terminateSession(id: string): Promise<boolean> {
 		const session = this.sessions.get(id);
 		if (!session) return false;
+
+		// Cascade: terminate all delegate (child) sessions first
+		const children = [...this.sessions.values()].filter(s => s.delegateOf === id);
+		for (const child of children) {
+			console.log(`[session ${id}] Cascading terminate to delegate ${child.id}`);
+			await this.terminateSession(child.id);
+		}
+		// Also clean up persisted-but-not-in-memory delegate sessions
+		for (const ps of this.store.getAll()) {
+			if (ps.delegateOf === id && !this.sessions.has(ps.id)) {
+				this.store.remove(ps.id);
+				cleanupSessionPrompt(ps.id);
+			}
+		}
 
 		session.unsubscribe();
 		await session.rpcClient.stop();

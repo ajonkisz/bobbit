@@ -1982,7 +1982,7 @@ function goalStateIcon(state: GoalState, size = 14) {
 
 function renderSidebarGoal(goal: Goal) {
 	const isExpanded = expandedGoals.has(goal.id);
-	const goalSessions = gatewaySessions.filter((s) => s.goalId === goal.id);
+	const goalSessions = gatewaySessions.filter((s) => s.goalId === goal.id && !s.delegateOf);
 	const hasActiveSessions = goalSessions.some((s) => s.status === "streaming");
 	const isCreatingHere = creatingSessionForGoalId === goal.id;
 
@@ -2046,7 +2046,7 @@ function renderSidebar() {
 
 	if (sidebarCollapsed) {
 		const allSessions = gatewaySessions;
-		const ungrouped = allSessions.filter((s) => !s.goalId);
+		const ungrouped = allSessions.filter((s) => !s.goalId && !s.delegateOf);
 
 		const renderCollapsedSession = (s: GatewaySession) => {
 			const active = activeSessionId() === s.id;
@@ -2191,7 +2191,7 @@ function renderSidebar() {
 // ============================================================================
 
 function renderMobileGoalCard(goal: Goal) {
-	const goalSessions = gatewaySessions.filter((s) => s.goalId === goal.id);
+	const goalSessions = gatewaySessions.filter((s) => s.goalId === goal.id && !s.delegateOf);
 	return html`
 		<div class="rounded-lg border border-border p-4 ${goal.state === "shelved" ? "opacity-60" : ""}">
 			<div class="flex items-center justify-between mb-2">

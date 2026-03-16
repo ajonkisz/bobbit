@@ -212,62 +212,46 @@ function formatPhaseExecNote(phase: Phase): string {
 	return "";
 }
 
-/** Try to get the parent session's system prompt path (for isolation: "none") */
-function getParentSystemPromptPath(ctx: any): string | undefined {
-	try {
-		// The agent's system prompt path is typically at ~/.pi/session-prompts/{sessionId}.md
-		const sm = ctx.sessionManager as any;
-		const sessionFile: string | undefined = sm.sessionFile ?? sm.currentSessionFile?.();
-		if (sessionFile) {
-			const parts = sessionFile.replace(/\\/g, "/").split("/");
-			const sessionsIdx = parts.indexOf("sessions");
-			if (sessionsIdx >= 0 && sessionsIdx + 1 < parts.length) {
-				const sessionId = parts[sessionsIdx + 1];
-				const promptPath = path.join(os.homedir(), ".pi", "session-prompts", `${sessionId}.md`);
-				if (fs.existsSync(promptPath)) return promptPath;
-			}
-		}
-	} catch { /* ignore */ }
-	return undefined;
-}
+// ── Delegate integration (uses session-based delegates via gateway API) ──
 
-// ── Delegate integration (uses the delegate extension's spawn logic) ──
-
-import { runDelegate, runDelegatesParallel } from "./delegate";
-import type { DelegateResult, DelegateOptions } from "./delegate";
+import { runDelegateSession, createDelegateSession, waitForDelegate, getParentSessionId } from "./delegate";
+import type { DelegateResult } from "./delegate";
 import { randomUUID } from "node:crypto";
 
-/** Adapt a Phase to DelegateOptions */
-function phaseToDelegate(phase: Phase, context: Record<string, string>, cwd: string, parentSystemPromptPath?: string): DelegateOptions {
-	// Build phase-specific instructions with context
+/** Build instructions string for a phase delegate */
+function buildPhaseInstructions(phase: Phase, context: Record<string, string>): string {
 	const lines: string[] = [];
 	lines.push(`# Workflow Phase: ${phase.name}\n`);
 	lines.push(phase.instructions);
 	lines.push(`\n**Exit criteria:** ${phase.exitCriteria}`);
-	return {
-		instructions: lines.join("\n"),
-		cwd,
-		timeoutMs: phase.timeoutMs ?? 600_000,
-		context,
-		isolation: phase.isolation || "full",
-		parentSystemPromptPath,
-	};
+	if (Object.keys(context).length > 0) {
+		lines.push(`\n## Context`);
+		for (const [k, v] of Object.entries(context)) {
+			lines.push(`- **${k}:** ${v}`);
+		}
+	}
+	return lines.join("\n");
 }
 
-/** Run a single phase as a delegate, returning result with phaseId */
+/** Run a single phase as a delegate session, returning result with phaseId */
 async function runPhaseDelegate(
-	phase: Phase, context: Record<string, string>, cwd: string, parentSystemPromptPath?: string, preAssignedId?: string, signal?: AbortSignal,
+	parentSessionId: string,
+	phase: Phase,
+	context: Record<string, string>,
+	cwd: string,
+	signal?: AbortSignal,
 ): Promise<DelegateResult & { phaseId: string }> {
-	const opts = phaseToDelegate(phase, context, cwd, parentSystemPromptPath);
-	const result = await runDelegate(opts, preAssignedId, signal);
+	const instructions = buildPhaseInstructions(phase, context);
+	const timeoutMs = phase.timeoutMs ?? 600_000;
+	const result = await runDelegateSession(
+		parentSessionId,
+		instructions,
+		cwd,
+		timeoutMs,
+		signal,
+		{ title: `⚡ ${phase.name}`, context },
+	);
 	return { ...result, phaseId: phase.id };
-}
-
-/** Run multiple phases as parallel delegates */
-function runParallelPhaseDelegates(
-	phases: Phase[], context: Record<string, string>, cwd: string, parentSystemPromptPath?: string,
-): Promise<(DelegateResult & { phaseId: string })[]> {
-	return Promise.all(phases.map((p) => runPhaseDelegate(p, context, cwd, parentSystemPromptPath)));
 }
 
 // ── Extension ──
@@ -459,9 +443,9 @@ const extension: ExtensionFactory = (pi) => {
 					}
 
 					const cwd = (ctx as any).cwd || process.cwd();
-					const parentSystemPromptPath = getParentSystemPromptPath(ctx);
+					const parentSessionId = getParentSessionId(ctx);
 					const lines: string[] = [];
-					const delegateEntries: Array<{ id: string; name: string; status: string; durationMs: number }> = [];
+					const delegateEntries: Array<{ id: string; sessionId: string; name: string; status: string; durationMs: number }> = [];
 
 					if (isParallelGroup(phase) && phase.parallelPhases!.length > 0) {
 						const subPhases = phase.parallelPhases!;
@@ -472,9 +456,6 @@ const extension: ExtensionFactory = (pi) => {
 						const completedResults: (DelegateResult & { phaseId: string })[] = [];
 						const phaseStartTime = Date.now();
 
-						// Pre-generate IDs so log links are available immediately
-						const phaseIds = subPhases.map(() => randomUUID().slice(0, 12));
-
 						// Helper: build current progress snapshot
 						function buildPhaseProgress() {
 							return {
@@ -482,8 +463,8 @@ const extension: ExtensionFactory = (pi) => {
 								details: {
 									delegates: subPhases.map((p, i) => {
 										const cr = completedResults.find((r) => r.phaseId === p.id);
-										if (cr) return { id: cr.id, name: p.name, status: cr.status, durationMs: cr.durationMs };
-										return { id: phaseIds[i], name: p.name, status: "running", durationMs: Date.now() - phaseStartTime };
+										if (cr) return { id: cr.id, sessionId: cr.sessionId, name: p.name, status: cr.status, durationMs: cr.durationMs };
+										return { id: "?", sessionId: "", name: p.name, status: "starting", durationMs: Date.now() - phaseStartTime };
 									}),
 								},
 							};
@@ -499,8 +480,8 @@ const extension: ExtensionFactory = (pi) => {
 							}
 						}, 3000);
 
-						const promises = subPhases.map((sp, idx) =>
-							runPhaseDelegate(sp, state.context, cwd, parentSystemPromptPath, phaseIds[idx], signal).then((result) => {
+						const promises = subPhases.map((sp) =>
+							runPhaseDelegate(parentSessionId, sp, state.context, cwd, signal).then((result) => {
 								completedResults.push(result);
 								if (onUpdate) onUpdate(buildPhaseProgress());
 								return result;
@@ -513,7 +494,7 @@ const extension: ExtensionFactory = (pi) => {
 						for (const result of results) {
 							const statusIc = result.status === "completed" ? "✓" : result.status === "timeout" ? "⏱" : "✗";
 							const sp = subPhases.find((p) => p.id === result.phaseId);
-							lines.push(`### ${statusIc} ${result.phaseId} (${result.status}, ${Math.round(result.durationMs / 1000)}s)`);
+							lines.push(`### ${statusIc} ${sp?.name || result.phaseId} (${result.status}, ${Math.round(result.durationMs / 1000)}s)`);
 							if (result.error) lines.push(`**Error:** ${result.error}`);
 							if (result.output) {
 								const artifactName = `delegate-${result.phaseId}.txt`;
@@ -524,26 +505,24 @@ const extension: ExtensionFactory = (pi) => {
 								lines.push("```\n" + excerpt + "\n```");
 							}
 							lines.push("");
-							delegateEntries.push({ id: result.id, name: sp?.name || result.phaseId, status: result.status, durationMs: result.durationMs });
+							delegateEntries.push({ id: result.id, sessionId: result.sessionId, name: sp?.name || result.phaseId, status: result.status, durationMs: result.durationMs });
 						}
 
 						const failedCount = results.filter((r) => r.status !== "completed").length;
 						lines.push(`**Summary:** ${results.length - failedCount}/${results.length} delegates completed successfully.`);
 						if (failedCount > 0) lines.push(`**Warning:** ${failedCount} delegate(s) failed or timed out.`);
 
-						copySubAgentArtifacts(state, phase);
 						saveState(state);
 
 					} else if (phase.subAgent) {
 						lines.push(`Running delegate for phase "${phase.name}"...`);
 						lines.push("");
 
-						const singleId = randomUUID().slice(0, 12);
 						if (onUpdate) {
-							onUpdate({ content: [{ type: "text", text: lines.join("\n") }], details: { delegates: [{ id: singleId, name: phase.name, status: "running", durationMs: 0 }] } });
+							onUpdate({ content: [{ type: "text", text: lines.join("\n") }], details: { delegates: [{ id: "?", sessionId: "", name: phase.name, status: "starting", durationMs: 0 }] } });
 						}
 
-						const result = await runPhaseDelegate(phase, state.context, cwd, parentSystemPromptPath, singleId, signal);
+						const result = await runPhaseDelegate(parentSessionId, phase, state.context, cwd, signal);
 
 						const statusIc = result.status === "completed" ? "✓" : result.status === "timeout" ? "⏱" : "✗";
 						lines.push(`### ${statusIc} ${result.phaseId} (${result.status}, ${Math.round(result.durationMs / 1000)}s)`);
@@ -555,8 +534,7 @@ const extension: ExtensionFactory = (pi) => {
 							lines.push(`Output collected as artifact: ${artifactName}`);
 						}
 
-						delegateEntries.push({ id: result.id, name: phase.name, status: result.status, durationMs: result.durationMs });
-						copySubAgentArtifacts(state, phase);
+						delegateEntries.push({ id: result.id, sessionId: result.sessionId, name: phase.name, status: result.status, durationMs: result.durationMs });
 						saveState(state);
 					}
 
@@ -801,51 +779,5 @@ const extension: ExtensionFactory = (pi) => {
 		},
 	});
 };
-
-/**
- * Copy artifacts that sub-agents stored under their own session IDs
- * to the parent session's artifact directory.
- */
-function copySubAgentArtifacts(state: WorkflowState, phase: Phase): void {
-	// Sub-agents use the workflow extension too, so they write to
-	// ~/.pi/workflow-artifacts/{sub-agent-session-id}/
-	// We scan for recently created sub-agent dirs and copy named artifacts
-	const parentDir = path.join(ARTIFACTS_DIR, state.sessionId);
-	fs.mkdirSync(parentDir, { recursive: true });
-
-	try {
-		const entries = fs.readdirSync(ARTIFACTS_DIR);
-		for (const entry of entries) {
-			if (!entry.startsWith("wf-")) continue; // sub-agent session IDs start with wf-
-			const subDir = path.join(ARTIFACTS_DIR, entry);
-			const stat = fs.statSync(subDir);
-			if (!stat.isDirectory()) continue;
-			// Only consider recently created dirs (within last hour)
-			if (Date.now() - stat.mtimeMs > 3600_000) continue;
-
-			const files = fs.readdirSync(subDir);
-			for (const file of files) {
-				// Copy artifact files that match expected patterns
-				if (file.startsWith("findings-") || file.endsWith(".json") || file.endsWith(".txt") || file.endsWith(".patch")) {
-					const src = path.join(subDir, file);
-					const dest = path.join(parentDir, file);
-					if (!fs.existsSync(dest)) {
-						try {
-							fs.copyFileSync(src, dest);
-							// Add to state artifacts
-							state.artifacts.push({
-								name: file,
-								filePath: dest,
-								mimeType: file.endsWith(".json") ? "application/json" : "text/plain",
-								collectedAt: Date.now(),
-								phaseId: phase.id,
-							});
-						} catch { /* ignore individual file errors */ }
-					}
-				}
-			}
-		}
-	} catch { /* ignore scan errors */ }
-}
 
 export default extension;
