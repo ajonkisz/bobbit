@@ -37,7 +37,12 @@ export function createGateway(config: GatewayConfig) {
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
 	});
-	const swarmManager = new SwarmManager(sessionManager);
+	const protocol = config.tls ? "https" : "http";
+	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
+	const swarmManager = new SwarmManager(sessionManager, {
+		gatewayUrl,
+		authToken: config.authToken,
+	});
 	const colorStore = new ColorStore();
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);

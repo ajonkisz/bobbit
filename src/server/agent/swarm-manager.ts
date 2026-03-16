@@ -51,15 +51,24 @@ const ROLE_EMOJI: Record<string, string> = {
  * Manages swarm goal lifecycles — team lead sessions and role agent sessions
  * with isolated git worktrees.
  */
+export interface SwarmManagerConfig {
+	/** Base URL of the gateway (e.g. "https://10.5.0.2:3000") */
+	gatewayUrl: string;
+	/** Auth token for the gateway REST API */
+	authToken: string;
+}
+
 export class SwarmManager {
 	private sessionManager: SessionManager;
+	private config: SwarmManagerConfig;
 	private swarms = new Map<string, SwarmEntry>();
 
 	/** Reverse lookup: sessionId → goalId for quick dismissal. */
 	private sessionToGoal = new Map<string, string>();
 
-	constructor(sessionManager: SessionManager) {
+	constructor(sessionManager: SessionManager, config: SwarmManagerConfig) {
 		this.sessionManager = sessionManager;
+		this.config = config;
 	}
 
 	private get goalManager(): GoalManager {
@@ -75,7 +84,7 @@ export class SwarmManager {
 		if (!goal) {
 			throw new Error(`Goal not found: ${goalId}`);
 		}
-		if (!(goal as any).swarm) {
+		if (!goal.swarm) {
 			throw new Error(`Goal "${goal.title}" does not have swarm mode enabled`);
 		}
 		if (this.swarms.has(goalId)) {
@@ -85,21 +94,31 @@ export class SwarmManager {
 		// Use the goal's worktree/cwd for the team lead
 		const cwd = goal.worktreePath || goal.cwd;
 
-		// Build the Team Lead role prompt with goal branch substituted
+		// Build the Team Lead role prompt with all placeholders substituted
 		const teamLeadPrompt = (getRolePrompt("team-lead") ?? "")
-			.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main");
+			.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
+			.replace(/\{\{GATEWAY_URL\}\}/g, this.config.gatewayUrl)
+			.replace(/\{\{AUTH_TOKEN\}\}/g, this.config.authToken)
+			.replace(/\{\{GOAL_ID\}\}/g, goalId);
 
 		// Create the team lead session under the goal, with role prompt appended to goal spec
 		const session = await this.sessionManager.createSession(cwd, undefined, goalId, false, {
 			rolePrompt: teamLeadPrompt,
+			env: {
+				BOBBIT_GATEWAY_URL: this.config.gatewayUrl,
+				BOBBIT_AUTH_TOKEN: this.config.authToken,
+				BOBBIT_GOAL_ID: goalId,
+			},
 		});
 
 		// Update the session metadata to indicate team lead
-		session.title = `👑 Team Lead — ${goal.title}`;
+		this.sessionManager.setTitle(session.id, `👑 Team Lead — ${goal.title}`);
 		session.titleGenerated = true;
-		session.role = "team-lead";
-		session.swarmGoalId = goalId;
-		session.worktreePath = goal.worktreePath;
+		this.sessionManager.updateSessionMeta(session.id, {
+			role: "team-lead",
+			swarmGoalId: goalId,
+			worktreePath: goal.worktreePath,
+		});
 
 		// Initialize swarm tracking
 		const entry: SwarmEntry = {
@@ -158,7 +177,8 @@ export class SwarmManager {
 
 		// Create a worktree for this role agent
 		const shortId = randomUUID().slice(0, 8);
-		const branchName = `goal/${goal.branch || goalId.slice(0, 8)}/role-${role}-${shortId}`;
+		const goalSlug = (goal.branch || goalId.slice(0, 8)).replace(/\//g, '-');
+		const branchName = `goal-${goalSlug}-${role}-${shortId}`;
 		const worktreeResult = createWorktree(goal.repoPath, branchName);
 
 		// Build role system prompt
@@ -178,11 +198,13 @@ export class SwarmManager {
 
 		// Update session metadata with role info
 		const emoji = ROLE_EMOJI[role] || "🤖";
-		session.title = `${emoji} ${role.charAt(0).toUpperCase() + role.slice(1)} — ${goal.title}`;
+		this.sessionManager.setTitle(session.id, `${emoji} ${role.charAt(0).toUpperCase() + role.slice(1)} — ${goal.title}`);
 		session.titleGenerated = true;
-		session.role = role;
-		session.swarmGoalId = goalId;
-		session.worktreePath = worktreeResult.worktreePath;
+		this.sessionManager.updateSessionMeta(session.id, {
+			role,
+			swarmGoalId: goalId,
+			worktreePath: worktreeResult.worktreePath,
+		});
 
 		// Track the agent
 		const agent: SwarmAgent = {

@@ -215,13 +215,13 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string> }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
 			cwd,
 			args: agentArgs,
-			env: { BOBBIT_SESSION_ID: id },
+			env: { BOBBIT_SESSION_ID: id, ...opts?.env },
 		};
 		if (this.agentCliPath) {
 			bridgeOptions.cliPath = this.agentCliPath;
@@ -521,6 +521,9 @@ export class SessionManager {
 			createdAt: session.createdAt,
 			lastActivity: session.lastActivity,
 			goalId: session.goalId,
+			role: session.role,
+			swarmGoalId: session.swarmGoalId,
+			worktreePath: session.worktreePath,
 		});
 	}
 
@@ -568,6 +571,17 @@ export class SessionManager {
 		session.title = title;
 		this.store.update(id, { title });
 		broadcast(session.clients, { type: "session_title", sessionId: id, title });
+		return true;
+	}
+
+	/** Update session metadata fields (role, swarmGoalId, worktreePath) and persist. */
+	updateSessionMeta(id: string, updates: { role?: string; swarmGoalId?: string; worktreePath?: string }): boolean {
+		const session = this.sessions.get(id);
+		if (!session) return false;
+		if (updates.role !== undefined) session.role = updates.role;
+		if (updates.swarmGoalId !== undefined) session.swarmGoalId = updates.swarmGoalId;
+		if (updates.worktreePath !== undefined) session.worktreePath = updates.worktreePath;
+		this.store.update(id, updates);
 		return true;
 	}
 
