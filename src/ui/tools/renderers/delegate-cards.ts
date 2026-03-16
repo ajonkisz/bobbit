@@ -18,16 +18,11 @@ export interface DelegateCardEntry {
 	name: string;
 	status: string;
 	durationMs: number;
+	/** The full session ID (for linking to the delegate session) */
+	sessionId?: string;
 }
 
-// ── Start time tracking for live timers ──
 
-const _delegateStartTimes = new Map<string, number>();
-
-export function getStartTime(id: string): number {
-	if (!_delegateStartTimes.has(id)) _delegateStartTimes.set(id, Date.now());
-	return _delegateStartTimes.get(id)!;
-}
 
 // ── Formatting helpers ──
 
@@ -51,13 +46,14 @@ export function summarizeInstructions(instructions: string): string {
 export function statusColor(status: string): string {
 	if (status === "completed") return "text-green-500";
 	if (status === "timeout") return "text-orange-500";
-	if (status === "running") return "text-muted-foreground animate-pulse";
+	if (status === "running" || status === "starting") return "text-muted-foreground animate-pulse";
 	return "text-red-500";
 }
 
 export function statusIcon(status: string): string {
 	if (status === "completed") return "✓";
 	if (status === "running") return "⏳";
+	if (status === "starting") return "⏳";
 	if (status === "timeout") return "⏱";
 	return "✗";
 }
@@ -70,30 +66,46 @@ export function getAuthToken(): string | null {
 
 // ── Render primitives ──
 
-/** Render a log link for a delegate */
-export function renderLogLink(delegateId: string): TemplateResult {
-	if (!delegateId) return html``;
+/** Render a session link for a delegate (opens the delegate session in a new tab) */
+export function renderSessionLink(sessionId: string | undefined, delegateId?: string): TemplateResult {
+	if (!sessionId) {
+		// Fallback to old log link if no session ID
+		if (!delegateId) return html``;
+		const token = getAuthToken();
+		const logUrl = `/api/delegate-logs/${delegateId}${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+		return html`
+			<a href="${logUrl}" target="_blank" rel="noopener"
+				class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded hover:bg-accent transition-colors"
+				title="View delegate agent logs"
+			>${icon(ScrollText, "xs")} logs</a>
+		`;
+	}
 	const token = getAuthToken();
-	const logUrl = `/api/delegate-logs/${delegateId}${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+	const sessionUrl = `/?token=${token ? encodeURIComponent(token) : ""}#/session/${sessionId}`;
 	return html`
-		<a href="${logUrl}" target="_blank" rel="noopener"
+		<a href="${sessionUrl}" target="_blank" rel="noopener"
 			class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground border border-border rounded hover:bg-accent transition-colors"
-			title="View delegate agent logs"
-		>${icon(ScrollText, "xs")} logs</a>
+			title="View delegate session"
+		>${icon(ScrollText, "xs")} view</a>
 	`;
 }
 
-/** Render duration: live timer if running, static text if done */
+
+
+/** Render duration: live timer if running/starting, static text if done */
 export function renderDuration(entry: DelegateCardEntry): TemplateResult {
-	if (entry.status === "running") {
-		return html`<span class="text-xs text-muted-foreground"><live-timer .startTime=${getStartTime(entry.id)} .running=${true}></live-timer></span>`;
+	if (entry.status === "running" || entry.status === "starting") {
+		// Compute real start time from durationMs so it survives page refreshes.
+		// The heartbeat updates durationMs every 3s with the actual elapsed time.
+		const startTime = Date.now() - entry.durationMs;
+		return html`<span class="text-xs text-muted-foreground"><live-timer .startTime=${startTime} .running=${true}></live-timer></span>`;
 	}
 	return html`<span class="text-xs text-muted-foreground">${formatDuration(entry.durationMs)}</span>`;
 }
 
 // ── Composite card renderers ──
 
-/** Render a full delegate card (icon, name, duration, log link) */
+/** Render a full delegate card (icon, name, duration, session link) */
 export function renderDelegateCard(entry: DelegateCardEntry): TemplateResult {
 	return html`
 		<div class="p-2 border border-border rounded text-sm flex items-center gap-2">
@@ -101,7 +113,7 @@ export function renderDelegateCard(entry: DelegateCardEntry): TemplateResult {
 			<span class="inline-block text-muted-foreground">${icon(Bot, "sm")}</span>
 			<span class="font-mono text-xs flex-1 min-w-0 truncate">${entry.name}</span>
 			${renderDuration(entry)}
-			${renderLogLink(entry.id)}
+			${renderSessionLink(entry.sessionId, entry.id)}
 		</div>
 	`;
 }
@@ -134,7 +146,7 @@ export function renderStatusPills(entries: DelegateCardEntry[]): TemplateResult 
 
 /** Render the full card list with optional failure warning */
 export function renderDelegateCardList(entries: DelegateCardEntry[]): TemplateResult {
-	const failCount = entries.filter((d) => d.status !== "completed" && d.status !== "running").length;
+	const failCount = entries.filter((d) => d.status !== "completed" && d.status !== "running" && d.status !== "starting").length;
 	return html`
 		<div class="space-y-1">
 			${entries.map((d) => renderDelegateCard(d))}

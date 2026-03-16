@@ -552,6 +552,10 @@ export class RemoteAgent {
 					if (this._isCompacting) {
 						this._addCompactingPlaceholder();
 					}
+					// Note: we intentionally do NOT try to reconstruct streamMessage
+					// for late-joining clients. The message-list will show all messages
+					// including pending tool calls. The streaming container will pick up
+					// new events as they arrive.
 				}
 				break;
 			}

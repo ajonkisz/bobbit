@@ -6,7 +6,7 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
 	testDir: ".",
-	testMatch: ["workflow-status.spec.ts", "delegate-ui.spec.ts"],
+	testMatch: ["workflow-status.spec.ts", "delegate-ui.spec.ts", "delegate-reconnect.spec.ts"],
 	timeout: 120_000,
 	expect: { timeout: 15_000 },
 	retries: 0,

@@ -42,6 +42,10 @@ export class MessageList extends LitElement {
 	@property({ type: Array }) tools: AgentTool[] = [];
 	@property({ type: Object }) pendingToolCalls?: Set<string>;
 	@property({ type: Boolean }) isStreaming: boolean = false;
+	/** True when the streaming container has a message — only then should we hide pending tool calls */
+	@property({ type: Boolean }) hasStreamMessage: boolean = false;
+	/** Partial results from long-running tools (delegate progress, etc.) */
+	@property({ type: Object }) toolPartialResults?: Record<string, any>;
 	@property({ attribute: false }) onCostClick?: () => void;
 	@property({ attribute: false }) onDismissError?: (id: string) => void;
 
@@ -153,8 +157,9 @@ export class MessageList extends LitElement {
 						.isStreaming=${false}
 						.pendingToolCalls=${this.pendingToolCalls}
 						.toolResultsById=${resultByCallId}
+						.toolPartialResults=${this.toolPartialResults}
 						.hideToolCalls=${false}
-						.hidePendingToolCalls=${this.isStreaming}
+						.hidePendingToolCalls=${this.isStreaming && this.hasStreamMessage}
 						.onCostClick=${this.onCostClick}
 					></assistant-message>`,
 				});

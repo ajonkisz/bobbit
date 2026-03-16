@@ -1,19 +1,16 @@
 /**
- * Delegate extension — spawn independent agent processes to perform tasks.
+ * Delegate extension — create independent agent sessions to perform tasks.
  *
- * Registers a `delegate` tool that the agent (or other extensions) can use to
- * run work in a separate agent process with a controlled system prompt.
+ * Registers a `delegate` tool that creates real Bobbit sessions for each delegate.
+ * Each delegate session appears in the sidebar, has full chat history, survives
+ * restarts, and can be viewed in real-time by clicking on it.
+ *
  * The delegate agent has full tool access (bash, read, write, etc.) but gets
- * only the instructions you provide — it does NOT see the parent conversation.
- *
- * Used standalone for ad-hoc delegation, and internally by the workflow
- * extension for `run_phase` on delegated phases.
+ * only AGENTS.md + the instructions you provide — it does NOT see the parent conversation.
  */
 
 import type { ExtensionFactory } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -22,6 +19,7 @@ import * as path from "node:path";
 
 export interface DelegateResult {
 	id: string;
+	sessionId: string;
 	status: "completed" | "failed" | "timeout";
 	output: string;
 	durationMs: number;
@@ -32,236 +30,158 @@ export interface DelegateResult {
 export interface DelegateDetails {
 	delegates: Array<{
 		id: string;
+		sessionId: string;
 		instructions: string;
 		status: string;
 		durationMs: number;
 	}>;
 }
 
-const LOGS_DIR = path.join(os.homedir(), ".pi", "delegate-logs");
+// ── Gateway API helpers ──
 
-export interface DelegateOptions {
-	/** Task instructions for the delegate agent */
-	instructions: string;
-	/** Working directory (defaults to process.cwd()) */
-	cwd?: string;
-	/** Timeout in ms (default: 600_000 = 10 minutes) */
-	timeoutMs?: number;
-	/** Additional context key-values included in the delegate's prompt */
-	context?: Record<string, string>;
-	/**
-	 * What context the delegate receives:
-	 *   - "full" (default): AGENTS.md + instructions only
-	 *   - "goal": AGENTS.md + instructions + goal spec from context
-	 *   - "none": parent's full system prompt + instructions
-	 */
-	isolation?: "full" | "goal" | "none";
-	/** Path to parent system prompt (used when isolation is "none") */
-	parentSystemPromptPath?: string;
+function getGatewayUrl(): string {
+	const urlPath = path.join(os.homedir(), ".pi", "gateway-url");
+	if (fs.existsSync(urlPath)) {
+		return fs.readFileSync(urlPath, "utf-8").trim();
+	}
+	throw new Error("Gateway URL not found at ~/.pi/gateway-url — is the gateway running?");
 }
 
-// ── Agent CLI resolution (cached) ──
-
-let _cachedCliPath: string | undefined;
-
-function findAgentCli(): string {
-	if (_cachedCliPath) return _cachedCliPath;
-	try {
-		const mainPath = require.resolve("@mariozechner/pi-coding-agent");
-		_cachedCliPath = path.join(path.dirname(mainPath), "cli.js");
-		return _cachedCliPath;
-	} catch { /* ignore */ }
-	const candidates = [
-		path.join(process.cwd(), "node_modules", "@mariozechner", "pi-coding-agent", "dist", "cli.js"),
-	];
-	for (const c of candidates) {
-		if (fs.existsSync(c)) {
-			_cachedCliPath = c;
-			return c;
-		}
+function getGatewayToken(): string {
+	const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
+	if (fs.existsSync(tokenPath)) {
+		return fs.readFileSync(tokenPath, "utf-8").trim();
 	}
-	throw new Error("Could not find pi-coding-agent CLI. Is @mariozechner/pi-coding-agent installed?");
+	throw new Error("Gateway token not found at ~/.pi/gateway-token");
 }
 
-// ── Prompt building ──
+async function gatewayFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+	const url = getGatewayUrl();
+	const token = getGatewayToken();
 
-function buildDelegatePrompt(id: string, options: DelegateOptions): string {
-	const isolation = options.isolation || "full";
-	const cwd = options.cwd || process.cwd();
-	const sections: string[] = [];
+	// Disable TLS verification for self-signed certs
+	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-	if (isolation === "none" && options.parentSystemPromptPath && fs.existsSync(options.parentSystemPromptPath)) {
-		try {
-			const parentPrompt = fs.readFileSync(options.parentSystemPromptPath, "utf-8").trim();
-			if (parentPrompt) sections.push(parentPrompt);
-		} catch { /* ignore */ }
-	} else {
-		const agentsPath = path.join(cwd, "AGENTS.md");
-		if (fs.existsSync(agentsPath)) {
-			try {
-				const agentsMd = fs.readFileSync(agentsPath, "utf-8").trim();
-				if (agentsMd) sections.push("# Project Context\n\n" + agentsMd);
-			} catch { /* ignore */ }
-		}
-
-		if (isolation === "goal" && options.context?.spec) {
-			sections.push("# Goal Spec\n\n" + options.context.spec);
-		}
-	}
-
-	sections.push("# Task\n\n" + options.instructions);
-
-	if (options.context && Object.keys(options.context).length > 0) {
-		sections.push("\n## Context");
-		for (const [key, value] of Object.entries(options.context)) {
-			if (key === "spec" && isolation === "goal") continue;
-			sections.push(`- **${key}**: ${value}`);
-		}
-	}
-
-	const promptsDir = path.join(os.homedir(), ".pi", "session-prompts");
-	fs.mkdirSync(promptsDir, { recursive: true });
-	const promptPath = path.join(promptsDir, `delegate-${id}.md`);
-	fs.writeFileSync(promptPath, sections.join("\n\n") + "\n", "utf-8");
-	return promptPath;
-}
-
-// ── Core spawn function (exported for use by workflow extension) ──
-
-export function runDelegate(options: DelegateOptions, preAssignedId?: string, signal?: AbortSignal): Promise<DelegateResult> {
-	const startTime = Date.now();
-	const id = preAssignedId || randomUUID().slice(0, 12);
-	const timeoutMs = options.timeoutMs ?? 600_000;
-	const cwd = options.cwd || process.cwd();
-
-	// Check if already aborted before spawning
-	if (signal?.aborted) {
-		return Promise.resolve({ id, status: "failed", output: "", durationMs: 0, error: "Aborted before start" });
-	}
-
-	const promptPath = buildDelegatePrompt(id, options);
-
-	let cliPath: string;
-	try {
-		cliPath = findAgentCli();
-	} catch (err: any) {
-		return Promise.resolve({ id, status: "failed", output: "", durationMs: 0, error: err.message });
-	}
-
-	// Set up log file — written incrementally so it's available while running
-	fs.mkdirSync(LOGS_DIR, { recursive: true });
-	const logPath = path.join(LOGS_DIR, `${id}.jsonl`);
-	const logStream = fs.createWriteStream(logPath, { flags: "a" });
-
-	return new Promise<DelegateResult>((resolve) => {
-		const proc = spawn("node", [cliPath, "--mode", "rpc", "--cwd", cwd, "--system-prompt", promptPath], {
-			stdio: ["pipe", "pipe", "pipe"],
-			cwd,
-			env: { ...process.env },
-		});
-
-		let lineBuffer = "";
-		let output = "";
-		let settled = false;
-
-		const timer = setTimeout(() => {
-			if (!settled) {
-				settled = true;
-				proc.kill("SIGKILL");
-				cleanup();
-				resolve({ id, status: "timeout", output, durationMs: Date.now() - startTime, error: `Timed out after ${timeoutMs}ms` });
-			}
-		}, timeoutMs);
-
-		// Listen for abort signal (user pressed Escape/abort)
-		const onAbort = () => {
-			if (!settled) {
-				settled = true;
-				proc.kill("SIGTERM");
-				setTimeout(() => { try { proc.kill("SIGKILL"); } catch { /* already dead */ } }, 2000);
-				cleanup();
-				resolve({ id, status: "failed", output, durationMs: Date.now() - startTime, error: "Aborted by user" });
-			}
-		};
-		signal?.addEventListener("abort", onAbort, { once: true });
-
-		function cleanup() {
-			clearTimeout(timer);
-			signal?.removeEventListener("abort", onAbort);
-			try { logStream.end(); } catch { /* ignore */ }
-			try { if (fs.existsSync(promptPath)) fs.unlinkSync(promptPath); } catch { /* ignore */ }
-		}
-
-		function handleLine(line: string) {
-			const trimmed = line.replace(/\r$/, "").trim();
-			if (!trimmed) return;
-
-			// Write every JSONL line to the log file
-			logStream.write(trimmed + "\n");
-
-			let parsed: any;
-			try { parsed = JSON.parse(trimmed); } catch { return; }
-
-			if (parsed.type === "message_end" && parsed.message?.role === "assistant") {
-				const content = parsed.message.content;
-				const text = Array.isArray(content)
-					? content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n")
-					: typeof content === "string" ? content : "";
-				if (text) { if (output) output += "\n\n"; output += text; }
-			}
-
-			if (parsed.type === "agent_end" && !settled) {
-				settled = true;
-				setTimeout(() => { proc.kill("SIGTERM"); cleanup(); resolve({ id, status: "completed", output, durationMs: Date.now() - startTime }); }, 500);
-			}
-		}
-
-		proc.stdout!.on("data", (chunk: Buffer) => {
-			lineBuffer += chunk.toString("utf-8");
-			const lines = lineBuffer.split("\n");
-			lineBuffer = lines.pop()!;
-			for (const line of lines) handleLine(line);
-		});
-
-		proc.stderr!.on("data", () => { /* suppress */ });
-
-		proc.on("error", (err) => {
-			if (!settled) {
-				settled = true;
-				cleanup();
-				resolve({ id, status: "failed", output: "", durationMs: Date.now() - startTime, error: `Spawn error: ${err.message}` });
-			}
-		});
-
-		proc.on("exit", (code) => {
-			if (!settled) {
-				settled = true;
-				cleanup();
-				resolve({
-					id,
-					status: code !== 0 && code !== null ? "failed" : "completed",
-					output,
-					durationMs: Date.now() - startTime,
-					error: code !== 0 && code !== null ? `Process exited with code ${code}` : undefined,
-				});
-			}
-		});
-
-		setTimeout(() => {
-			if (proc.stdin && !settled) {
-				proc.stdin.write(JSON.stringify({
-					type: "prompt",
-					id: `prompt_${id}`,
-					message: "Execute the task described in your system prompt. Follow the instructions carefully.",
-				}) + "\n");
-			}
-		}, 500);
+	return fetch(`${url}${endpoint}`, {
+		...options,
+		headers: {
+			"Authorization": `Bearer ${token}`,
+			"Content-Type": "application/json",
+			...options.headers,
+		},
 	});
 }
 
-/** Run multiple delegates in parallel */
-export function runDelegatesParallel(optionsList: DelegateOptions[]): Promise<DelegateResult[]> {
-	return Promise.all(optionsList.map(runDelegate));
+/** Create a delegate session and return its ID */
+async function createDelegateSession(
+	parentSessionId: string,
+	instructions: string,
+	cwd: string,
+	opts?: { title?: string; context?: Record<string, string> },
+): Promise<string> {
+	const resp = await gatewayFetch("/api/sessions", {
+		method: "POST",
+		body: JSON.stringify({
+			delegateOf: parentSessionId,
+			instructions,
+			cwd,
+			title: opts?.title,
+			context: opts?.context,
+		}),
+	});
+	if (!resp.ok) {
+		const err = await resp.text();
+		throw new Error(`Failed to create delegate session: ${err}`);
+	}
+	const data = await resp.json() as any;
+	return data.id;
+}
+
+/** Wait for a delegate session to finish and get its output */
+async function waitForDelegate(
+	sessionId: string,
+	timeoutMs: number,
+	signal?: AbortSignal,
+): Promise<{ status: string; output: string }> {
+	// Poll for completion — the /wait endpoint blocks
+	const resp = await gatewayFetch(`/api/sessions/${sessionId}/wait`, {
+		method: "POST",
+		body: JSON.stringify({ timeout_ms: timeoutMs }),
+		signal,
+	});
+
+	if (!resp.ok) {
+		if (resp.status === 408) {
+			return { status: "timeout", output: "" };
+		}
+		return { status: "failed", output: `API error: ${resp.status}` };
+	}
+
+	const data = await resp.json() as any;
+	return { status: "completed", output: data.output || "" };
+}
+
+/** Run a single delegate: create session, wait for completion, return result */
+async function runDelegate(
+	parentSessionId: string,
+	instructions: string,
+	cwd: string,
+	timeoutMs: number,
+	signal?: AbortSignal,
+	opts?: { title?: string; context?: Record<string, string> },
+): Promise<DelegateResult> {
+	const startTime = Date.now();
+	let sessionId = "";
+
+	try {
+		sessionId = await createDelegateSession(parentSessionId, instructions, cwd, opts);
+
+		const result = await waitForDelegate(sessionId, timeoutMs, signal);
+
+		return {
+			id: sessionId.slice(0, 12),
+			sessionId,
+			status: result.status as DelegateResult["status"],
+			output: result.output,
+			durationMs: Date.now() - startTime,
+		};
+	} catch (err: any) {
+		if (signal?.aborted) {
+			// Try to terminate the delegate session on abort
+			if (sessionId) {
+				gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" }).catch(() => {});
+			}
+			return {
+				id: sessionId?.slice(0, 12) || "unknown",
+				sessionId,
+				status: "failed",
+				output: "",
+				durationMs: Date.now() - startTime,
+				error: "Aborted by user",
+			};
+		}
+		return {
+			id: sessionId?.slice(0, 12) || "unknown",
+			sessionId,
+			status: "failed",
+			output: "",
+			durationMs: Date.now() - startTime,
+			error: err.message,
+		};
+	}
+}
+
+// ── Discover parent session ID ──
+
+/**
+ * Try to find the current session's gateway session ID.
+ * The gateway passes this via env or we can read from the session state.
+ */
+function getParentSessionId(ctx: any): string {
+	// The session manager sets this in the agent's environment
+	if (process.env.BOBBIT_SESSION_ID) return process.env.BOBBIT_SESSION_ID;
+	// Fallback: use a placeholder (the server can figure it out from the auth)
+	return "unknown";
 }
 
 // ── Extension registration ──
@@ -284,7 +204,7 @@ const extension: ExtensionFactory = (pi) => {
 			"Use the 'parallel' parameter to run multiple delegates concurrently",
 		],
 		parameters: Type.Object({
-			instructions: Type.String({ description: "Task instructions for the delegate agent. Be specific and self-contained." }),
+			instructions: Type.Optional(Type.String({ description: "Task instructions for the delegate agent. Be specific and self-contained. Required for single delegate, optional when using parallel." })),
 			parallel: Type.Optional(Type.Array(
 				Type.Object({
 					instructions: Type.String({ description: "Instructions for this parallel delegate" }),
@@ -299,91 +219,130 @@ const extension: ExtensionFactory = (pi) => {
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			const cwd = (ctx as any).cwd || process.cwd();
 			const timeoutMs = (params.timeout_minutes ?? 10) * 60_000;
+			const parentSessionId = getParentSessionId(ctx);
 
 			if (params.parallel && params.parallel.length > 0) {
-				const optionsList: DelegateOptions[] = params.parallel.map((p: any) => ({
-					instructions: p.instructions,
-					cwd,
-					timeoutMs,
-					context: { ...params.context, ...p.context },
-					isolation: "full" as const,
-				}));
-
-				// Pre-generate IDs so we can show log links immediately
-				const delegateIds = optionsList.map(() => randomUUID().slice(0, 12));
 				const completedResults: DelegateResult[] = [];
+				const startTime = Date.now();
+				const sessionIds: string[] = new Array(params.parallel.length).fill("");
 
-				// Emit initial progress with all delegate IDs (running state)
-				if (onUpdate) {
-					onUpdate({
-						content: [{ type: "text", text: `Delegating to ${optionsList.length} agents...` }],
+				// Helper: build current state snapshot for progress updates
+				function buildProgressUpdate() {
+					return {
+						content: [{ type: "text" as const, text: `${completedResults.length}/${params.parallel!.length} delegates finished` }],
 						details: {
-							delegates: optionsList.map((opts, i) => ({
-								id: delegateIds[i],
-								instructions: opts.instructions.split("\n")[0].slice(0, 100),
-								status: "running",
-								durationMs: 0,
-							})),
+							delegates: params.parallel!.map((p: any, j: number) => {
+								const sid = sessionIds[j];
+								const cr = completedResults.find((c) => c.sessionId === sid);
+								if (cr) return { id: cr.id, sessionId: cr.sessionId, instructions: p.instructions.split("\n")[0].slice(0, 100), status: cr.status, durationMs: cr.durationMs };
+								return { id: sid?.slice(0, 12) || "?", sessionId: sid || "", instructions: p.instructions.split("\n")[0].slice(0, 100), status: sid ? "running" : "starting", durationMs: Date.now() - startTime };
+							}),
 						},
-					});
+					};
 				}
 
-				const promises = optionsList.map((opts, i) =>
-					runDelegate(opts, delegateIds[i], signal).then((r) => {
-						completedResults.push(r);
-						// Emit progress with mix of completed and running
-						if (onUpdate) {
-							const completedIds = new Set(completedResults.map((cr) => cr.id));
-							onUpdate({
-								content: [{ type: "text", text: `${completedResults.length}/${optionsList.length} delegates finished` }],
-								details: {
-									delegates: optionsList.map((_, j) => {
-										const cr = completedResults.find((c) => c.id === delegateIds[j]);
-										if (cr) return { id: cr.id, instructions: optionsList[j].instructions.split("\n")[0].slice(0, 100), status: cr.status, durationMs: cr.durationMs };
-										return { id: delegateIds[j], instructions: optionsList[j].instructions.split("\n")[0].slice(0, 100), status: "running", durationMs: 0 };
-									}),
-								},
-							});
-						}
-						return r;
-					}),
-				);
+				// Emit immediately so the UI shows "starting..." cards
+				if (onUpdate) onUpdate(buildProgressUpdate());
 
-				const results = await Promise.all(promises);
+				// Start heartbeat right away (before session creation)
+				const heartbeat = setInterval(() => {
+					if (onUpdate && completedResults.length < params.parallel!.length) {
+						onUpdate(buildProgressUpdate());
+					}
+				}, 3000);
+
+				// Create sessions — emit progress after each one so the UI updates incrementally
+				for (let i = 0; i < params.parallel.length; i++) {
+					const p = params.parallel[i];
+					try {
+						const sid = await createDelegateSession(parentSessionId, p.instructions, cwd, {
+							title: p.instructions.split("\n")[0].slice(0, 60),
+							context: { ...params.context, ...p.context },
+						});
+						sessionIds[i] = sid;
+						if (onUpdate) onUpdate(buildProgressUpdate());
+					} catch (err: any) {
+						completedResults.push({
+							id: "error",
+							sessionId: "",
+							status: "failed",
+							output: "",
+							durationMs: 0,
+							error: err.message,
+						});
+						if (onUpdate) onUpdate(buildProgressUpdate());
+					}
+				}
+
+				// Wait for all delegates in parallel
+				const promises = sessionIds.map((sid, i) => {
+					if (!sid) return Promise.resolve(); // already failed
+					return waitForDelegate(sid, timeoutMs, signal).then((result) => {
+						completedResults.push({
+							id: sid.slice(0, 12),
+							sessionId: sid,
+							status: result.status as DelegateResult["status"],
+							output: result.output,
+							durationMs: Date.now() - startTime,
+						});
+						if (onUpdate) onUpdate(buildProgressUpdate());
+					}).catch((err: any) => {
+						completedResults.push({
+							id: sid.slice(0, 12),
+							sessionId: sid,
+							status: "failed",
+							output: "",
+							durationMs: Date.now() - startTime,
+							error: err.message,
+						});
+						if (onUpdate) onUpdate(buildProgressUpdate());
+					});
+				});
+
+				await Promise.all(promises);
+				clearInterval(heartbeat);
+
+				// Build final result
 				const lines: string[] = [];
 				const details: DelegateDetails = { delegates: [] };
 				let failCount = 0;
-				for (let i = 0; i < results.length; i++) {
-					const r = results[i];
-					const ic = r.status === "completed" ? "✓" : r.status === "timeout" ? "⏱" : "✗";
-					lines.push(`### ${ic} Delegate ${i + 1} (${r.status}, ${Math.round(r.durationMs / 1000)}s)`);
-					if (r.error) lines.push(`**Error:** ${r.error}`);
-					if (r.output) {
+				for (let i = 0; i < params.parallel.length; i++) {
+					const sid = sessionIds[i];
+					const r = completedResults.find((c) => c.sessionId === sid);
+					const ic = r?.status === "completed" ? "✓" : r?.status === "timeout" ? "⏱" : "✗";
+					lines.push(`### ${ic} Delegate ${i + 1} (${r?.status || "failed"}, ${Math.round((r?.durationMs || 0) / 1000)}s)`);
+					if (r?.error) lines.push(`**Error:** ${r.error}`);
+					if (r?.output) {
 						const truncated = r.output.length > 3000 ? r.output.slice(0, 3000) + "\n...(truncated)" : r.output;
 						lines.push("```\n" + truncated + "\n```");
 					}
 					lines.push("");
-					if (r.status !== "completed") failCount++;
+					if (r?.status !== "completed") failCount++;
 					details.delegates.push({
-						id: r.id,
-						instructions: optionsList[i].instructions.split("\n")[0].slice(0, 100),
-						status: r.status,
-						durationMs: r.durationMs,
+						id: sid?.slice(0, 12) || "?",
+						sessionId: sid || "",
+						instructions: params.parallel[i].instructions.split("\n")[0].slice(0, 100),
+						status: r?.status || "failed",
+						durationMs: r?.durationMs || 0,
 					});
 				}
-				lines.push(`**Summary:** ${results.length - failCount}/${results.length} delegates completed.`);
+				lines.push(`**Summary:** ${params.parallel.length - failCount}/${params.parallel.length} delegates completed.`);
 
 				return { content: [{ type: "text", text: lines.join("\n") }], details };
 			}
 
 			// Single delegate
-			const result = await runDelegate({
-				instructions: params.instructions,
+			if (!params.instructions) {
+				return { content: [{ type: "text", text: "Error: 'instructions' is required for a single delegate. Use 'parallel' for multiple delegates." }] };
+			}
+			const result = await runDelegate(
+				parentSessionId,
+				params.instructions,
 				cwd,
 				timeoutMs,
-				context: params.context,
-				isolation: "full",
-			}, undefined, signal);
+				signal,
+				{ context: params.context },
+			);
 
 			const lines: string[] = [];
 			lines.push(`**Status:** ${result.status} (${Math.round(result.durationMs / 1000)}s)`);
@@ -396,6 +355,7 @@ const extension: ExtensionFactory = (pi) => {
 			const details: DelegateDetails = {
 				delegates: [{
 					id: result.id,
+					sessionId: result.sessionId,
 					instructions: params.instructions.split("\n")[0].slice(0, 100),
 					status: result.status,
 					durationMs: result.durationMs,

@@ -174,6 +174,30 @@ async function handleApiRoute(
 	// POST /api/sessions
 	if (url.pathname === "/api/sessions" && req.method === "POST") {
 		const body = await readBody(req);
+
+		// ── Delegate session creation ──
+		if (body?.delegateOf && body?.instructions) {
+			try {
+				const cwd = body.cwd || config.defaultCwd;
+				const session = await sessionManager.createDelegateSession(body.delegateOf, {
+					instructions: body.instructions,
+					cwd,
+					title: body.title,
+					context: body.context,
+				});
+				json({
+					id: session.id,
+					cwd: session.cwd,
+					status: session.status,
+					delegateOf: session.delegateOf,
+				}, 201);
+			} catch (err) {
+				json({ error: String(err) }, 500);
+			}
+			return;
+		}
+
+		// ── Normal session creation ──
 		const goalId = body?.goalId;
 		const goalAssistant = body?.goalAssistant === true;
 
@@ -294,6 +318,40 @@ async function handleApiRoute(
 			json({ ok: true });
 			return;
 		}
+	}
+
+	// POST /api/sessions/:id/wait — block until session becomes idle
+	const waitMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/wait$/);
+	if (waitMatch && req.method === "POST") {
+		const id = waitMatch[1];
+		const body = await readBody(req);
+		const timeoutMs = body?.timeout_ms ?? 600_000;
+		try {
+			await sessionManager.waitForIdle(id, timeoutMs);
+			// Session is idle — return the output
+			const output = await sessionManager.getSessionOutput(id);
+			const session = sessionManager.getSession(id);
+			json({
+				status: session?.status || "idle",
+				output,
+			});
+		} catch (err) {
+			json({ error: String(err) }, 408); // Request Timeout
+		}
+		return;
+	}
+
+	// GET /api/sessions/:id/output — get final assistant output
+	const outputMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/output$/);
+	if (outputMatch && req.method === "GET") {
+		const id = outputMatch[1];
+		try {
+			const output = await sessionManager.getSessionOutput(id);
+			json({ output });
+		} catch {
+			json({ error: "Failed to get output" }, 500);
+		}
+		return;
 	}
 
 	// PATCH /api/sessions/:id — update session properties (title, colorIndex, etc.)

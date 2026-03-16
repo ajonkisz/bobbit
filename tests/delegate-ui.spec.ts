@@ -183,7 +183,7 @@ test.describe("Delegate live progress plumbing", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Delegate IDs pre-generated for running log links", () => {
-	test("delegate extension pre-generates IDs and emits them before delegates finish", async () => {
+	test("delegate extension pre-generates IDs and emits heartbeat updates", async () => {
 		const delegateTs = fs.readFileSync(
 			path.join(process.cwd(), ".pi/extensions/delegate.ts"),
 			"utf-8",
@@ -193,11 +193,15 @@ test.describe("Delegate IDs pre-generated for running log links", () => {
 		expect(delegateTs).toContain("Pre-generate IDs");
 		// Must accept pre-assigned IDs
 		expect(delegateTs).toContain("preAssignedId");
-		// Must emit initial progress with all IDs in running state
-		expect(delegateTs).toMatch(/status.*running.*durationMs.*0/);
+		// Must have a heartbeat interval for reconnecting clients
+		expect(delegateTs).toContain("heartbeat");
+		expect(delegateTs).toContain("setInterval");
+		expect(delegateTs).toContain("clearInterval");
+		// Heartbeat should run every 3 seconds
+		expect(delegateTs).toContain("3000");
 	});
 
-	test("workflow extension pre-generates IDs for parallel phases", async () => {
+	test("workflow extension pre-generates IDs and emits heartbeat updates", async () => {
 		const workflowTs = fs.readFileSync(
 			path.join(process.cwd(), ".pi/extensions/workflow.ts"),
 			"utf-8",
@@ -208,6 +212,10 @@ test.describe("Delegate IDs pre-generated for running log links", () => {
 		expect(workflowTs).toContain("randomUUID");
 		// Must pass pre-assigned IDs to runPhaseDelegate
 		expect(workflowTs).toContain("phaseIds[idx]");
+		// Must have heartbeat for reconnecting clients
+		expect(workflowTs).toContain("phaseHeartbeat");
+		expect(workflowTs).toContain("setInterval");
+		expect(workflowTs).toContain("clearInterval");
 	});
 
 	test("DelegateRenderer shows log links when delegate has an ID even if running", async () => {
@@ -216,11 +224,10 @@ test.describe("Delegate IDs pre-generated for running log links", () => {
 			"utf-8",
 		);
 
-		// renderLogLink always renders when given an ID
-		expect(rendererTs).toContain("renderLogLink");
-		// Collapsible section is expanded when delegates are running
-		expect(rendererTs).toContain("isRunning");
-		expect(rendererTs).toMatch(/isRunning.*max-h-\[2000px\]/);
+		// renderSessionLink renders session links for delegates
+		expect(rendererTs).toContain("renderSessionLink");
+		// Collapsible section is expanded when delegates have session links
+		expect(rendererTs).toContain("showExpanded");
 	});
 });
 
@@ -230,33 +237,27 @@ test.describe("Delegate IDs pre-generated for running log links", () => {
 
 test.describe("Delegate log button icon and position", () => {
 	test("uses ScrollText icon before 'logs' text (not ExternalLink after)", async () => {
-		const delegateRenderer = fs.readFileSync(
-			path.join(process.cwd(), "src/ui/tools/renderers/DelegateRenderer.ts"),
-			"utf-8",
-		);
-		const workflowRenderer = fs.readFileSync(
-			path.join(process.cwd(), "src/ui/tools/renderers/WorkflowRenderer.ts"),
+		const cards = fs.readFileSync(
+			path.join(process.cwd(), "src/ui/tools/renderers/delegate-cards.ts"),
 			"utf-8",
 		);
 
 		// ScrollText icon before "logs"
-		expect(delegateRenderer).toContain('${icon(ScrollText, "xs")} logs');
-		expect(workflowRenderer).toContain('${icon(ScrollText, "xs")} logs');
+		expect(cards).toContain('${icon(ScrollText, "xs")} logs');
 
-		// No ExternalLink import or usage
-		expect(delegateRenderer).not.toContain("ExternalLink");
-		expect(workflowRenderer).not.toContain("ExternalLink");
+		// No ExternalLink
+		expect(cards).not.toContain("ExternalLink");
 	});
 
 	test("log link styled as a pill button with border", async () => {
-		const delegateRenderer = fs.readFileSync(
-			path.join(process.cwd(), "src/ui/tools/renderers/DelegateRenderer.ts"),
+		const cards = fs.readFileSync(
+			path.join(process.cwd(), "src/ui/tools/renderers/delegate-cards.ts"),
 			"utf-8",
 		);
 
-		expect(delegateRenderer).toContain("border border-border rounded");
-		expect(delegateRenderer).toContain("px-1.5 py-0.5");
-		expect(delegateRenderer).toContain("hover:bg-accent");
+		expect(cards).toContain("border border-border rounded");
+		expect(cards).toContain("px-1.5 py-0.5");
+		expect(cards).toContain("hover:bg-accent");
 	});
 });
 
@@ -266,40 +267,27 @@ test.describe("Delegate log button icon and position", () => {
 
 test.describe("Running delegate status rendering", () => {
 	test("statusColor and statusIcon handle 'running' status (not red cross)", async () => {
-		const delegateRenderer = fs.readFileSync(
-			path.join(process.cwd(), "src/ui/tools/renderers/DelegateRenderer.ts"),
+		const cards = fs.readFileSync(
+			path.join(process.cwd(), "src/ui/tools/renderers/delegate-cards.ts"),
 			"utf-8",
 		);
 
 		// Must handle "running" explicitly before the default red fallthrough
-		expect(delegateRenderer).toMatch(/if\s*\(status\s*===\s*"running"\)\s*return\s*"text-muted-foreground/);
-		expect(delegateRenderer).toMatch(/if\s*\(status\s*===\s*"running"\)\s*return\s*"⏳"/);
-
-		const workflowRenderer = fs.readFileSync(
-			path.join(process.cwd(), "src/ui/tools/renderers/WorkflowRenderer.ts"),
-			"utf-8",
-		);
-		expect(workflowRenderer).toMatch(/if\s*\(status\s*===\s*"running"\)\s*return\s*"text-muted-foreground/);
-		expect(workflowRenderer).toMatch(/if\s*\(status\s*===\s*"running"\)\s*return\s*"⏳"/);
+		expect(cards).toMatch(/if\s*\(status\s*===\s*"running"\)\s*return\s*"text-muted-foreground/);
+		expect(cards).toMatch(/if\s*\(status\s*===\s*"running"\)\s*return\s*"⏳"/);
 	});
 
 	test("running delegates show live-timer instead of static 0s", async () => {
-		const delegateRenderer = fs.readFileSync(
-			path.join(process.cwd(), "src/ui/tools/renderers/DelegateRenderer.ts"),
-			"utf-8",
-		);
-		const workflowRenderer = fs.readFileSync(
-			path.join(process.cwd(), "src/ui/tools/renderers/WorkflowRenderer.ts"),
+		const cards = fs.readFileSync(
+			path.join(process.cwd(), "src/ui/tools/renderers/delegate-cards.ts"),
 			"utf-8",
 		);
 
-		// Both renderers should import LiveTimer
-		expect(delegateRenderer).toContain("LiveTimer");
-		expect(workflowRenderer).toContain("LiveTimer");
-
-		// Both should render <live-timer> for running delegates
-		expect(delegateRenderer).toContain("live-timer");
-		expect(workflowRenderer).toContain("live-timer");
+		// Shared cards module imports LiveTimer and renders <live-timer>
+		expect(cards).toContain("LiveTimer");
+		expect(cards).toContain("live-timer");
+		// Duration computed from durationMs so it survives refreshes
+		expect(cards).toContain("Date.now() - entry.durationMs");
 
 		// LiveTimer component should exist
 		const liveTimer = fs.readFileSync(
@@ -313,7 +301,90 @@ test.describe("Running delegate status rendering", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 6: Log viewer serves formatted HTML (not raw JSONL)
+// Test 6: Abort signal support
+// ---------------------------------------------------------------------------
+
+test.describe("Delegate abort/cancel support", () => {
+	test("runDelegate accepts an AbortSignal parameter", async () => {
+		const delegateTs = fs.readFileSync(
+			path.join(process.cwd(), ".pi/extensions/delegate.ts"),
+			"utf-8",
+		);
+
+		// runDelegate should accept signal parameter
+		expect(delegateTs).toMatch(/function runDelegate\(.*signal.*AbortSignal/);
+		// Should listen for abort event
+		expect(delegateTs).toContain("addEventListener(\"abort\"");
+		// Should kill process on abort
+		expect(delegateTs).toContain("proc.kill");
+		// Execute should pass signal (not _signal)
+		expect(delegateTs).toMatch(/execute\(_toolCallId,\s*params,\s*signal,/);
+		// Should pass signal to runDelegate calls
+		expect(delegateTs).toContain("signal)");
+	});
+
+	test("workflow extension passes signal to delegate calls", async () => {
+		const workflowTs = fs.readFileSync(
+			path.join(process.cwd(), ".pi/extensions/workflow.ts"),
+			"utf-8",
+		);
+
+		// Execute should use signal (not _signal)
+		expect(workflowTs).toMatch(/execute\(_toolCallId,\s*params,\s*signal,/);
+		// Should pass signal to runPhaseDelegate
+		expect(workflowTs).toContain("signal)");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Test 7: Running delegates don't show failure warning
+// ---------------------------------------------------------------------------
+
+test.describe("Running delegates warning", () => {
+	test("renderDelegateCardList excludes running delegates from fail count", async () => {
+		const cardsTs = fs.readFileSync(
+			path.join(process.cwd(), "src/ui/tools/renderers/delegate-cards.ts"),
+			"utf-8",
+		);
+
+		// failCount should exclude "running" status
+		expect(cardsTs).toContain('d.status !== "running"');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Test 8: Reconnecting clients get replayed tool_execution_update events
+// ---------------------------------------------------------------------------
+
+test.describe("Reconnection partial result replay", () => {
+	test("session-manager replays latest tool_execution_update per toolCallId on client connect", async () => {
+		const sessionMgr = fs.readFileSync(
+			path.join(process.cwd(), "src/server/agent/session-manager.ts"),
+			"utf-8",
+		);
+
+		// Must iterate event buffer on client connect
+		expect(sessionMgr).toContain("tool_execution_update");
+		expect(sessionMgr).toContain("eventBuffer.getAll()");
+		// Must deduplicate by toolCallId (latest only)
+		expect(sessionMgr).toContain("latestUpdates");
+		// Must send to the newly connected client
+		expect(sessionMgr).toContain("ws.send");
+	});
+
+	test("event buffer stores tool_execution_update events", async () => {
+		const sessionMgr = fs.readFileSync(
+			path.join(process.cwd(), "src/server/agent/session-manager.ts"),
+			"utf-8",
+		);
+
+		// Events are pushed to eventBuffer
+		expect(sessionMgr).toContain("eventBuffer.push(event)");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Test 9: Log viewer serves formatted HTML (not raw JSONL)
 // ---------------------------------------------------------------------------
 
 test.describe("Delegate log viewer HTML", () => {

@@ -470,37 +470,45 @@ const extension: ExtensionFactory = (pi) => {
 						lines.push("");
 
 						const completedResults: (DelegateResult & { phaseId: string })[] = [];
+						const phaseStartTime = Date.now();
 
 						// Pre-generate IDs so log links are available immediately
 						const phaseIds = subPhases.map(() => randomUUID().slice(0, 12));
 
-						// Emit initial progress with all delegate IDs
-						if (onUpdate) {
-							onUpdate({
-								content: [{ type: "text", text: lines.join("\n") }],
-								details: { delegates: subPhases.map((sp, i) => ({ id: phaseIds[i], name: sp.name, status: "running", durationMs: 0 })) },
-							});
+						// Helper: build current progress snapshot
+						function buildPhaseProgress() {
+							return {
+								content: [{ type: "text" as const, text: `${completedResults.length}/${subPhases.length} finished.` }],
+								details: {
+									delegates: subPhases.map((p, i) => {
+										const cr = completedResults.find((r) => r.phaseId === p.id);
+										if (cr) return { id: cr.id, name: p.name, status: cr.status, durationMs: cr.durationMs };
+										return { id: phaseIds[i], name: p.name, status: "running", durationMs: Date.now() - phaseStartTime };
+									}),
+								},
+							};
 						}
+
+						// Emit initial progress
+						if (onUpdate) onUpdate(buildPhaseProgress());
+
+						// Heartbeat: re-emit state every 3s for reconnecting clients
+						const phaseHeartbeat = setInterval(() => {
+							if (onUpdate && completedResults.length < subPhases.length) {
+								onUpdate(buildPhaseProgress());
+							}
+						}, 3000);
 
 						const promises = subPhases.map((sp, idx) =>
 							runPhaseDelegate(sp, state.context, cwd, parentSystemPromptPath, phaseIds[idx], signal).then((result) => {
 								completedResults.push(result);
-								if (onUpdate) {
-									const progressDelegates = subPhases.map((p, i) => {
-										const cr = completedResults.find((r) => r.phaseId === p.id);
-										if (cr) return { id: cr.id, name: p.name, status: cr.status, durationMs: cr.durationMs };
-										return { id: phaseIds[i], name: p.name, status: "running", durationMs: 0 };
-									});
-									onUpdate({
-										content: [{ type: "text", text: `${completedResults.length}/${subPhases.length} finished.` }],
-										details: { delegates: progressDelegates },
-									});
-								}
+								if (onUpdate) onUpdate(buildPhaseProgress());
 								return result;
 							}),
 						);
 
 						const results = await Promise.all(promises);
+						clearInterval(phaseHeartbeat);
 
 						for (const result of results) {
 							const statusIc = result.status === "completed" ? "✓" : result.status === "timeout" ? "⏱" : "✗";

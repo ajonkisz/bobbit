@@ -13,7 +13,7 @@ import {
 	renderRunningCard,
 	renderStatusPills,
 	renderDelegateCardList,
-	renderLogLink,
+	renderSessionLink,
 } from "./delegate-cards.js";
 
 interface DelegateParams {
@@ -25,6 +25,7 @@ interface DelegateParams {
 
 interface DelegateDetailsEntry {
 	id: string;
+	sessionId?: string;
 	instructions: string;
 	status: string;
 	durationMs: number;
@@ -41,7 +42,7 @@ function getTextOutput(result: ToolResultMessage<any> | undefined): string {
 
 /** Convert DelegateDetailsEntry to shared DelegateCardEntry */
 function toCardEntry(d: DelegateDetailsEntry): DelegateCardEntry {
-	return { id: d.id, name: summarizeInstructions(d.instructions), status: d.status, durationMs: d.durationMs };
+	return { id: d.id, sessionId: d.sessionId, name: summarizeInstructions(d.instructions), status: d.status, durationMs: d.durationMs };
 }
 
 export class DelegateRenderer implements ToolRenderer<DelegateParams, DelegateDetails> {
@@ -97,7 +98,7 @@ export class DelegateRenderer implements ToolRenderer<DelegateParams, DelegateDe
 							${renderCollapsibleHeader(state, Bot,
 								html`Delegated — <span class="font-mono text-xs">${summarizeInstructions(instructions)}</span>
 									<span class="${statusColor(d.status)} text-xs ml-1">(${formatDuration(d.durationMs)})</span>
-									${renderLogLink(d.id)}`,
+									${renderSessionLink(d.sessionId, d.id)}`,
 								contentRef, chevronRef, false)}
 							<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
 								<div class="mt-2 text-sm whitespace-pre-wrap text-muted-foreground">${getTextOutput(result)}</div>
@@ -119,14 +120,17 @@ export class DelegateRenderer implements ToolRenderer<DelegateParams, DelegateDe
 			// Build cards with better names from parallel instructions if available
 			const namedCards: DelegateCardEntry[] = delegates.map((d, i) => {
 				const instr = parallelInstructions[i]?.instructions || d.instructions;
-				return { id: d.id, name: summarizeInstructions(instr), status: d.status, durationMs: d.durationMs };
+				return { id: d.id, sessionId: d.sessionId, name: summarizeInstructions(instr), status: d.status, durationMs: d.durationMs };
 			});
+
+			// Show cards expanded by default (running or completed with session links)
+			const showExpanded = isRunning || namedCards.some((c) => c.sessionId);
 
 			return {
 				content: html`
 					<div>
-						${renderCollapsibleHeader(state, Bot, headerContent, contentRef, chevronRef, isRunning)}
-						<div ${ref(contentRef)} class="${isRunning ? "max-h-[2000px] mt-3" : "max-h-0"} overflow-hidden transition-all duration-300">
+						${renderCollapsibleHeader(state, Bot, headerContent, contentRef, chevronRef, showExpanded)}
+						<div ${ref(contentRef)} class="${showExpanded ? "max-h-[2000px] mt-3" : "max-h-0"} overflow-hidden transition-all duration-300">
 							${renderDelegateCardList(namedCards)}
 						</div>
 					</div>

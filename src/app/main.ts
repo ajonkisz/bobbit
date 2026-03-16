@@ -77,6 +77,8 @@ interface GatewaySession {
 	goalId?: string;
 	goalAssistant?: boolean;
 	colorIndex?: number;
+	/** If this is a delegate session, the parent session ID */
+	delegateOf?: string;
 }
 
 type GoalState = "todo" | "in-progress" | "complete" | "shelved";
@@ -2037,7 +2039,7 @@ function toggleSidebar() {
 }
 
 function renderSidebar() {
-	const ungroupedSessions = gatewaySessions.filter((s) => !s.goalId);
+	const ungroupedSessions = gatewaySessions.filter((s) => !s.goalId && !s.delegateOf);
 	// Sort goals: in-progress first, then todo, then complete/shelved
 	const stateOrder: Record<GoalState, number> = { "in-progress": 0, "todo": 1, "complete": 2, "shelved": 3 };
 	const sortedGoals = [...goals].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
@@ -2228,7 +2230,7 @@ function renderMobileGoalCard(goal: Goal) {
 }
 
 function renderMobileLanding() {
-	const ungroupedSessions = gatewaySessions.filter((s) => !s.goalId);
+	const ungroupedSessions = gatewaySessions.filter((s) => !s.goalId && !s.delegateOf);
 	const stateOrder: Record<GoalState, number> = { "in-progress": 0, "todo": 1, "complete": 2, "shelved": 3 };
 	const sortedGoals = [...goals].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
 

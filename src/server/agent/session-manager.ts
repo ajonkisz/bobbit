@@ -28,6 +28,8 @@ export interface SessionInfo {
 	goalId?: string;
 	/** True if this is a goal-creation assistant session */
 	goalAssistant?: boolean;
+	/** If this is a delegate session, the parent session ID */
+	delegateOf?: string;
 }
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
@@ -194,6 +196,7 @@ export class SessionManager {
 		const bridgeOptions: RpcBridgeOptions = {
 			cwd,
 			args: agentArgs,
+			env: { BOBBIT_SESSION_ID: id },
 		};
 		if (this.agentCliPath) {
 			bridgeOptions.cliPath = this.agentCliPath;
@@ -285,6 +288,177 @@ export class SessionManager {
 		return session;
 	}
 
+	/**
+	 * Create a delegate session — a real session that runs a task on behalf of a parent session.
+	 * The delegate gets a system prompt built from AGENTS.md + instructions.
+	 * After creation, the instructions are automatically sent as the first prompt.
+	 * Returns the session info immediately (the prompt runs asynchronously).
+	 */
+	async createDelegateSession(parentSessionId: string, opts: {
+		instructions: string;
+		cwd: string;
+		title?: string;
+		context?: Record<string, string>;
+	}): Promise<SessionInfo> {
+		const id = randomUUID();
+
+		// Build the task spec: instructions + optional context
+		let taskSpec = opts.instructions;
+		if (opts.context && Object.keys(opts.context).length > 0) {
+			taskSpec += "\n\n## Context";
+			for (const [key, value] of Object.entries(opts.context)) {
+				taskSpec += `\n- **${key}**: ${value}`;
+			}
+		}
+
+		// assembleSystemPrompt handles AGENTS.md from cwd automatically
+		const promptPath = assembleSystemPrompt(id, {
+			baseSystemPromptPath: undefined, // No global prompt — delegate gets AGENTS.md only
+			cwd: opts.cwd,
+			goalSpec: taskSpec,
+			goalTitle: "Delegate Task",
+			goalState: "active",
+		});
+
+		const bridgeOptions: RpcBridgeOptions = { cwd: opts.cwd, env: { BOBBIT_SESSION_ID: id } };
+		if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
+		if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+
+		const rpcClient = new RpcBridge(bridgeOptions);
+		const eventBuffer = new EventBuffer();
+		const now = Date.now();
+
+		const titleSummary = opts.title || opts.instructions.split("\n")[0].slice(0, 60) || "Delegate";
+		const session: SessionInfo = {
+			id,
+			title: `⚡ ${titleSummary}`,
+			cwd: opts.cwd,
+			status: "starting",
+			createdAt: now,
+			lastActivity: now,
+			clients: new Set(),
+			rpcClient,
+			eventBuffer,
+			unsubscribe: () => {},
+			isCompacting: false,
+			titleGenerated: true,
+			delegateOf: parentSessionId,
+		};
+
+		const unsub = rpcClient.onEvent((event: any) => {
+			session.lastActivity = Date.now();
+			this.store.update(id, { lastActivity: session.lastActivity });
+
+			if (event.type === "agent_start") {
+				session.status = "streaming";
+				this.store.update(id, { wasStreaming: true });
+				broadcast(session.clients, { type: "session_status", status: "streaming" });
+			} else if (event.type === "agent_end") {
+				session.status = "idle";
+				this.store.update(id, { wasStreaming: false });
+				broadcast(session.clients, { type: "session_status", status: "idle" });
+			} else if (event.type === "auto_compaction_start") {
+				session.isCompacting = true;
+			} else if (event.type === "auto_compaction_end") {
+				session.isCompacting = false;
+				if (!event.aborted) this.refreshAfterCompaction(session);
+			}
+
+			eventBuffer.push(event);
+			broadcast(session.clients, { type: "event", data: event });
+		});
+
+		session.unsubscribe = unsub;
+		await rpcClient.start();
+		session.status = "idle";
+		this.sessions.set(id, session);
+
+		// Persist session metadata
+		this.persistSessionMetadata(session).then(() => {
+			this.store.update(id, { delegateOf: parentSessionId });
+		}).catch((err) => {
+			console.error(`[session-manager] Failed to persist delegate session ${id}:`, err);
+		});
+
+		// Send the task prompt and wait for the agent to start streaming
+		// so that waitForIdle() doesn't return immediately.
+		await rpcClient.prompt(
+			"Execute the task described in your system prompt. Follow the instructions carefully."
+		);
+
+		// Wait for agent_start event (so session.status becomes "streaming")
+		await new Promise<void>((resolve) => {
+			if (session.status === "streaming") { resolve(); return; }
+			const timeout = setTimeout(() => { unsub2(); resolve(); }, 10_000);
+			const unsub2 = rpcClient.onEvent((event: any) => {
+				if (event.type === "agent_start") {
+					clearTimeout(timeout);
+					unsub2();
+					resolve();
+				}
+			});
+		});
+
+		console.log(`[session-manager] Created delegate session ${id} (parent: ${parentSessionId}, status: ${session.status})`);
+		return session;
+	}
+
+	/**
+	 * Wait for a session to become idle (not streaming).
+	 * Returns immediately if already idle.
+	 * Rejects on timeout.
+	 */
+	waitForIdle(sessionId: string, timeoutMs = 600_000): Promise<void> {
+		const session = this.sessions.get(sessionId);
+		if (!session) return Promise.reject(new Error("Session not found"));
+		if (session.status === "idle") return Promise.resolve();
+
+		return new Promise<void>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				unsub();
+				reject(new Error(`Timeout waiting for session ${sessionId} to become idle`));
+			}, timeoutMs);
+
+			const unsub = session.rpcClient.onEvent((event: any) => {
+				if (event.type === "agent_end") {
+					clearTimeout(timer);
+					unsub();
+					resolve();
+				}
+			});
+		});
+	}
+
+	/**
+	 * Get the final assistant output from a session's messages.
+	 */
+	async getSessionOutput(sessionId: string): Promise<string> {
+		const session = this.sessions.get(sessionId);
+		if (!session) return "";
+
+		const msgsResp = await session.rpcClient.getMessages();
+		if (!msgsResp.success) return "";
+
+		const messages = msgsResp.data?.messages || msgsResp.data;
+		if (!Array.isArray(messages)) return "";
+
+		// Collect text from all assistant messages
+		const texts: string[] = [];
+		for (const msg of messages) {
+			if (msg.role === "assistant") {
+				const content = msg.content;
+				if (typeof content === "string") {
+					texts.push(content);
+				} else if (Array.isArray(content)) {
+					for (const block of content) {
+						if (block.type === "text" && block.text) texts.push(block.text);
+					}
+				}
+			}
+		}
+		return texts.join("\n\n");
+	}
+
 	/** Query the agent for its session file and save metadata to disk */
 	/** After compaction, refresh messages and state for all connected clients. */
 	async refreshAfterCompaction(session: SessionInfo): Promise<void> {
@@ -335,6 +509,7 @@ export class SessionManager {
 		isCompacting: boolean;
 		goalId?: string;
 		goalAssistant?: boolean;
+		delegateOf?: string;
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -347,6 +522,7 @@ export class SessionManager {
 			isCompacting: s.isCompacting,
 			goalId: s.goalId,
 			goalAssistant: s.goalAssistant,
+			delegateOf: s.delegateOf,
 		}));
 	}
 
@@ -446,6 +622,13 @@ export class SessionManager {
 		}
 
 		session.clients.add(ws);
+
+		// Note: tool_execution_update events from the heartbeat will flow to
+		// this client naturally via the broadcast in the event listener.
+		// The message-list renders partial results from toolPartialResults,
+		// so no event replay is needed — the next heartbeat (every 3s) will
+		// populate the state.
+
 		return true;
 	}
 

@@ -506,6 +506,8 @@ export class AgentInterface extends LitElement {
 					.tools=${state.tools}
 					.pendingToolCalls=${this.session ? this.session.state.pendingToolCalls : new Set<string>()}
 					.isStreaming=${state.isStreaming}
+					.hasStreamMessage=${!!state.streamMessage}
+					.toolPartialResults=${(state as any).toolPartialResults}
 					.onCostClick=${this.onCostClick}
 					.onDismissError=${(id: string) => {
 						if (!this.session) return;

@@ -9,27 +9,66 @@ A remote gateway for AI coding agents. Wraps pi-coding-agent in a WebSocket serv
 ```
 src/
 ├── server/          # Node.js gateway (HTTP + WebSocket + child process management)
-│   ├── cli.ts       # Entry point, arg parsing, NordLynx detection, system prompt resolution
+│   ├── cli.ts       # Entry point, arg parsing, NordLynx detection, TLS setup, system prompt resolution
 │   ├── server.ts    # HTTP server, REST API, static serving, WS upgrade
 │   ├── harness.ts   # Dev server wrapper (watches sentinel file, auto-restarts)
 │   ├── harness-signal.ts  # Touches sentinel to trigger harness restart
-│   ├── agent/       # Session lifecycle, RPC bridge, persistence, title generation
-│   │   ├── session-manager.ts  # Create/destroy/restore sessions, broadcast events
+│   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, title generation
+│   │   ├── session-manager.ts  # Create/destroy/restore sessions, broadcast events, force abort
 │   │   ├── session-store.ts    # Disk persistence (~/.pi/gateway-sessions.json)
 │   │   ├── rpc-bridge.ts       # JSONL stdin/stdout bridge to agent subprocess
-│   │   ├── event-buffer.ts     # Buffer events for late-joining clients
-│   │   └── title-generator.ts  # Auto-generate session titles via Claude Haiku
-│   ├── auth/        # Token auth, rate limiting, OAuth
-│   └── ws/          # WebSocket protocol types and message handler
+│   │   ├── event-buffer.ts     # Circular buffer for tool_execution_update replay on reconnect
+│   │   ├── title-generator.ts  # Auto-generate session titles via Claude Haiku
+│   │   ├── system-prompt.ts    # Assemble system prompt from global + AGENTS.md + goal spec
+│   │   ├── goal-manager.ts     # Goal CRUD operations
+│   │   ├── goal-store.ts       # Disk persistence (~/.pi/gateway-goals.json)
+│   │   ├── goal-assistant.ts   # System prompt for the goal creation assistant
+│   │   └── color-store.ts      # Per-session color index persistence (~/.pi/gateway-session-colors.json)
+│   ├── auth/        # Token auth, rate limiting, TLS, OAuth
+│   │   ├── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
+│   │   ├── rate-limit.ts  # IP-based rate limiting for auth failures
+│   │   ├── tls.ts         # Self-signed TLS certificate generation (~/.pi/gateway-tls/)
+│   │   └── oauth.ts       # OAuth flow (start, complete, status)
+│   ├── ws/          # WebSocket protocol types and message handler
+│   │   ├── protocol.ts   # ClientMessage / ServerMessage type unions
+│   │   └── handler.ts    # Auth handshake, command routing, workflow dispatch
+│   └── workflows/   # Multi-phase workflow engine with sub-agent delegation
+│       ├── types.ts           # Phase, Workflow, WorkflowState interfaces
+│       ├── engine.ts          # WorkflowRunner state machine (~/.pi/workflow-state/)
+│       ├── registry.ts        # In-memory workflow definition registry
+│       ├── artifact-store.ts  # Workflow artifact storage (~/.pi/workflow-artifacts/)
+│       ├── report.ts          # HTML report generation from workflow results
+│       ├── sub-agent.ts       # Spawn isolated agent subprocesses for phases
+│       ├── log-viewer.ts      # HTML viewer for delegate agent JSONL logs
+│       ├── git.ts             # Git worktree helpers for workflow phases
+│       ├── definitions-sync.ts  # Export definitions to ~/.pi/workflow-definitions.json
+│       ├── index.ts           # Barrel export + auto-registration of built-in workflows
+│       └── definitions/       # Built-in workflow templates
+│           ├── code-review.ts       # 4-phase code review with parallel sub-agents
+│           └── test-suite-report.ts # Test suite analysis workflow
 ├── ui/              # Lit web components (forked from pi-web-ui, NOT an npm dep)
 │   ├── ChatPanel.ts # Top-level UI orchestrator
 │   ├── components/  # MessageList, StreamingMessageContainer, AgentInterface, etc.
-│   ├── dialogs/     # ModelSelector, Settings, Sessions
-│   ├── tools/       # Tool call renderers (Bash, Read, Write, Edit, Grep, Find, Ls)
-│   └── storage/     # IndexedDB persistence
+│   │   ├── AgentInterface.ts    # Bridges agent events to UI state
+│   │   ├── MessageList.ts       # Renders state.messages (completed messages)
+│   │   ├── StreamingMessageContainer.ts  # Renders state.streamMessage (in-progress)
+│   │   ├── Messages.ts          # Message rendering by role
+│   │   ├── Input.ts             # Chat input with attachments
+│   │   ├── WorkflowStatusBar.ts # Real-time workflow progress display
+│   │   ├── message-renderer-registry.ts  # Custom message type renderers
+│   │   └── sandbox/             # Sandboxed iframe runtime providers
+│   ├── dialogs/     # ModelSelector, Settings, Sessions, AttachmentOverlay
+│   ├── tools/       # Tool call renderers
+│   │   ├── renderers/    # Per-tool renderers (Bash, Read, Write, Edit, Delegate, Workflow, etc.)
+│   │   ├── artifacts/    # Artifact display (HTML, SVG, PDF, Markdown, etc.)
+│   │   └── renderer-registry.ts  # Tool name → renderer mapping
+│   ├── storage/     # IndexedDB persistence (settings, provider keys, sessions)
+│   └── utils/       # Formatting, auth token, model discovery, i18n
 ├── app/             # Browser entry point (connects to gateway)
 │   ├── main.ts      # Bootstrap, routing, session sidebar, QR code, OAuth
-│   └── remote-agent.ts  # WebSocket ↔ Agent interface adapter (critical file)
+│   ├── remote-agent.ts  # WebSocket ↔ Agent interface adapter (critical file)
+│   ├── custom-messages.ts  # Custom message type definitions
+│   └── oauth.ts     # Browser-side OAuth flow
 └── config/
     └── system-prompt.md  # Custom system prompt for agent sessions
 ```
@@ -62,13 +101,137 @@ The harness also auto-restarts on unexpected crashes. Sessions survive restarts 
 
 ## Key concepts
 
-- **Session**: A running pi-coding-agent child process, managed by SessionManager. Multiple WebSocket clients can connect to one session. Sessions persist to disk and restore on server restart.
-- **Session persistence**: Metadata (id, title, cwd, agent session file) stored in `~/.pi/gateway-sessions.json`. On restart, `restoreSessions()` re-spawns agents and uses `switch_session` RPC to resume from the agent's `.jsonl` file.
-- **Auto-titles**: After the first agent turn, `title-generator.ts` sends the conversation to Claude Haiku for a 2-3 word summary. Falls back silently if auth is unavailable.
-- **RPC Bridge**: JSONL over stdin/stdout to the agent subprocess. Commands in, events out.
-- **RemoteAgent** (`src/app/remote-agent.ts`): Browser-side WebSocket client that duck-types the Agent interface so ChatPanel can use it like a local agent. This is the most complex file — handles streaming message state, deferred tool-call messages to prevent duplicate rendering, and session reconnection.
-- **Deferred assistant messages**: Tool-call assistant messages are held in `_deferredAssistantMessage` instead of going straight into `messages[]`. The streaming container shows them live. They flush to `messages[]` when the next message starts. This prevents both message-list and streaming-container from rendering the same content.
-- **System prompt assembly**: Each session's system prompt is assembled from three layers (in order): (1) global `config/system-prompt.md`, (2) `AGENTS.md` from the session's working directory, (3) goal spec. The `AGENTS.md` supports `@FILENAME.md` syntax — lines matching `@somefile.md` are replaced inline with the referenced file's contents (resolved relative to the file's directory, recursive, with circular reference protection). The assembled prompt is written to `~/.pi/session-prompts/{sessionId}.md` and passed to the agent via `--system-prompt`.
+### Sessions
+
+A **session** is a running pi-coding-agent child process, managed by `SessionManager`. Multiple WebSocket clients can connect to one session. Sessions persist to disk and restore on server restart.
+
+**Session persistence**: Metadata (id, title, cwd, agent session file, `wasStreaming` flag) stored in `~/.pi/gateway-sessions.json`. On restart, `restoreSessions()` re-spawns agents and uses `switch_session` RPC to resume from the agent's `.jsonl` file. If an agent was mid-turn when the server died (`wasStreaming: true`), it is automatically re-prompted with a system message to continue where it left off.
+
+### Auto-titles
+
+When the user sends their first prompt, `tryGenerateTitleFromPrompt()` fires immediately (before the agent replies) and calls `title-generator.ts`, which sends the user text to Claude Haiku (`claude-haiku-4-5-20251001`, `max_tokens: 12`) for a 2-3 word summary. Reads auth from `~/.pi/agent/auth.json`. Falls back silently if auth is unavailable. The explicit `generate_title` WS command uses `autoGenerateTitle()` which reads the full conversation history instead.
+
+### RPC Bridge
+
+JSONL over stdin/stdout to the agent subprocess. Commands include: `prompt`, `steer`, `follow_up`, `abort`, `get_state`, `get_messages`, `set_model`, `compact`, `switch_session`. Each command gets a unique request ID; the bridge matches `response` messages by ID. Non-response messages are forwarded as events to all listeners.
+
+### RemoteAgent
+
+`src/app/remote-agent.ts` is the browser-side WebSocket client that duck-types the Agent interface so ChatPanel can use it like a local agent. This is the most complex file — handles streaming message state, deferred tool-call messages to prevent duplicate rendering, compaction state, task completion notifications, and auto-reconnection with exponential backoff.
+
+### Deferred assistant messages
+
+Tool-call assistant messages are held in `_deferredAssistantMessage` instead of going straight into `messages[]`. The streaming container shows them live via `streamMessage`. They flush to `messages[]` when the next `message_update` arrives (which replaces the streaming container content simultaneously) or when `agent_end` fires. This prevents both `MessageList` and `StreamingMessageContainer` from rendering the same content.
+
+### System prompt assembly
+
+Each session's system prompt is assembled by `system-prompt.ts` from three layers (in order):
+
+1. Global `config/system-prompt.md`
+2. `AGENTS.md` from the session's working directory (with `@ref` resolution)
+3. Goal spec (if session belongs to a goal)
+
+The `AGENTS.md` supports `@FILENAME.md` syntax — lines matching `@somefile.md` are replaced inline with the referenced file's contents (resolved relative to the file's directory, recursive, with circular reference protection via a `seen` set). The assembled prompt is written to `~/.pi/session-prompts/{sessionId}.md` and passed to the agent via `--system-prompt`. Cleaned up when a session is terminated.
+
+### Force abort
+
+When the user aborts a streaming session, `forceAbort()` first tries a graceful `abort` RPC. If the agent doesn't become idle within a grace period (default 3s), it kills the process, emits a synthetic `agent_end` to connected clients, then spawns a fresh agent process and resumes the session via `switch_session`. This ensures sessions remain usable even if the agent hangs.
+
+## Goals
+
+Goals are a task-tracking layer on top of sessions. A goal has a title, spec (markdown), working directory, and state (`todo` | `in-progress` | `done`).
+
+**Storage**: `GoalStore` persists to `~/.pi/gateway-goals.json` (same load-on-construct, write-on-mutate pattern as `SessionStore`).
+
+**REST API**:
+- `GET /api/goals` — list all goals
+- `POST /api/goals` — create a goal (`{ title, cwd, spec }`)
+- `GET /api/goals/:id` — get a goal
+- `PUT /api/goals/:id` — update a goal
+- `DELETE /api/goals/:id` — delete a goal
+
+**Session integration**: When creating a session with `goalId`, the goal's cwd is used as default. Goals auto-transition from `todo` to `in-progress` when their first session starts. The goal's title, state, and spec are included in the assembled system prompt.
+
+**Goal assistant**: Sessions created with `goalAssistant: true` get a special system prompt (`GOAL_ASSISTANT_PROMPT`) that instructs the agent to help the user define a clear goal. The assistant outputs structured `<goal_proposal>` blocks with `<title>`, `<spec>`, and optional `<cwd>` tags. `RemoteAgent` parses these from assistant messages and fires the `onGoalProposal` callback.
+
+## Workflows
+
+A multi-phase workflow engine for structured tasks like code review and test analysis. Workflows consist of ordered phases, some of which spawn isolated sub-agent processes.
+
+### Architecture
+
+- **Definitions** (`src/server/workflows/definitions/`): Workflow templates declaring phases, instructions, and context isolation levels. Registered at import time via `registerWorkflow()`.
+- **Engine** (`WorkflowRunner`): State machine that tracks current phase, phase history, artifacts, and context. Persists to `~/.pi/workflow-state/{sessionId}.json`. Fires `onChange` on every transition.
+- **Artifacts** (`artifact-store.ts`): Files stored at `~/.pi/workflow-artifacts/{workflowId}/`. Track name, MIME type, and originating phase.
+- **Sub-agents** (`sub-agent.ts`): Isolated agent subprocesses for workflow phases. Receive only phase instructions + explicit context + `AGENTS.md` — never the parent conversation. 10-minute default timeout. Logs written to `~/.pi/delegate-logs/{logId}.jsonl`.
+- **Reports** (`report.ts`): Standalone HTML reports with embedded CSS summarizing phase history, timing, artifacts, and status. Generated on workflow completion/failure/cancel.
+- **Definition sync** (`definitions-sync.ts`): Exports registered workflows to `~/.pi/workflow-definitions.json` at startup so agent-side tool extensions can discover available workflows.
+
+### Built-in workflows
+
+- **Code Review** (`code-review.ts`): 4 phases — gather diff, spawn 3 parallel isolated sub-agents (Correctness, Security, Design), merge/deduplicate findings, generate report. Expects `base_branch`, `feature_branch`, `repo_path` context.
+- **Test Suite Report** (`test-suite-report.ts`): Test suite analysis workflow.
+
+### WebSocket protocol
+
+13 workflow-related message types in `protocol.ts`:
+
+**Client → Server**: `start_workflow`, `workflow_advance`, `workflow_reset`, `workflow_collect_artifact`, `workflow_set_context`, `workflow_complete`, `workflow_fail`, `workflow_cancel`, `workflow_status`
+
+**Server → Client**: `workflow_state`, `workflow_phase_changed`, `workflow_completed`, `workflow_report`
+
+### REST endpoints
+
+- `GET /api/workflows` — list available workflow definitions
+- `GET /api/sessions/:id/workflow` — get workflow state for a session
+- `GET /api/sessions/:id/workflow/report` — render HTML report (regenerated from state, with fallback to stored `report.html`)
+- `GET /api/sessions/:id/workflow/artifacts` — list artifacts
+- `GET /api/sessions/:id/workflow/artifacts/:filename` — serve an artifact
+- `GET /api/delegate-logs/:logId` — HTML log viewer for sub-agent runs (`?format=raw` for JSONL)
+
+### Workflow artifact resolution
+
+The gateway uses UUIDs for session IDs, but the workflow extension stores artifacts under the agent's session directory name. `resolveWorkflowSessionId()` in `server.ts` resolves this mismatch by checking: (1) gateway session ID directly, (2) agent session directory name from persisted data, (3) scanning `~/.pi/workflow-state/` files.
+
+## Compaction
+
+Context compaction reduces token usage by summarizing the conversation. Two modes exist:
+
+### Manual compaction
+
+Triggered by the user via the `compact` WS command. The handler:
+1. Sets `session.isCompacting = true` and broadcasts `compaction_start`
+2. Calls `rpcClient.compact()` (120s timeout) in a fire-and-forget async IIFE
+3. On success: broadcasts `compaction_end` with `tokensBefore`, then refreshes messages and state
+4. On failure: broadcasts `compaction_end` with error
+
+### Auto-compaction
+
+Triggered by the agent subprocess. Events `auto_compaction_start` / `auto_compaction_end` flow through the event system. On `auto_compaction_end` (if not aborted), `SessionManager.refreshAfterCompaction()` broadcasts refreshed messages and state.
+
+### Client-side compaction state (RemoteAgent)
+
+- `_isCompacting`: Tracks whether compaction is in progress. Used to re-add the placeholder message after server refreshes.
+- `_compactionSyntheticMessages`: The `/compact` user message and result message are stored separately so they survive the server's post-compaction `messages` refresh (which replaces the entire message array).
+- `_usageStaleAfterCompaction`: Set on `compaction_end`, cleared when a new assistant message with usage arrives. The UI checks this to avoid showing a misleading context percentage from pre-compaction state.
+- A `compacting_placeholder` message (id: `"compacting_placeholder"`) is added to `messages[]` during compaction and replaced with the result on completion.
+
+## Task completion notifications
+
+When the agent finishes a turn, `RemoteAgent` checks how long the task took. It notifies the user via three mechanisms:
+1. **Browser Notification API** — shows session title and elapsed time (requires HTTPS or localhost)
+2. **Title flash** — alternates document title with "Done (Xm)" until the tab regains focus
+3. **Audio beep** — two-tone sine wave (880 Hz, 1046 Hz) via Web Audio API
+
+Notification permission is requested on first user prompt (has user gesture context).
+
+## Reconnection
+
+`RemoteAgent` auto-reconnects on unexpected disconnects with exponential backoff (1s base, 30s max). On reconnect:
+1. Re-authenticates via `auth` message
+2. Requests current messages (`get_messages`) and state (`get_state`) to resync
+3. Server replays the latest `tool_execution_update` per tool call ID from the `EventBuffer` so reconnecting clients see delegate/workflow progress immediately
+4. If the agent is streaming and no `streamMessage` exists (late join), the last assistant message is promoted to the streaming container and removed from `messages[]` to avoid duplicate rendering
 
 ## Dual TypeScript configs
 
@@ -90,12 +253,33 @@ If you need to change UI components or server behavior, edit the forked code dir
 - Auth token at `~/.pi/gateway-token` (256-bit, mode 0600)
 - All API + WS require token. Constant-time comparison. Rate limiting on failures.
 - **The token grants full shell access.** Treat it like an SSH private key.
-- Static file serving has traversal guard.
+- Static file serving has traversal guard (resolved path must start with static dir).
+- **TLS is on by default.** Self-signed certificates are auto-generated and stored at `~/.pi/gateway-tls/`. Use `--no-tls` to disable. The protocol in startup logs and QR codes is `https` by default.
 - **Gateway and Vite auto-detect the NordLynx mesh IP** and bind to it. If NordVPN isn't running, the gateway exits with an error. Pass `--host <addr>` to override. Never bind to `0.0.0.0` — restrict access to the mesh network only.
+- OAuth flow (`/api/oauth/start`, `/api/oauth/complete`, `/api/oauth/status`) for obtaining API credentials.
 
 ## QR code / multi-device access
 
 The QR code dialog (`src/app/main.ts` `showQrCodeDialog()`) encodes `window.location.origin` + the auth token. Since both the gateway and Vite auto-detect and bind to the NordLynx mesh IP, the QR code will contain a routable mesh address by default. The startup logs print the full URL with the token — users can copy-paste or scan from any device on the mesh.
+
+## Disk state summary
+
+All persistent state lives under `~/.pi/`:
+
+| File / Directory | Owner | Purpose |
+|---|---|---|
+| `gateway-token` | `token.ts` | Auth token (mode 0600) |
+| `gateway-sessions.json` | `SessionStore` | Session metadata (id, title, cwd, agentSessionFile, wasStreaming) |
+| `gateway-goals.json` | `GoalStore` | Goal definitions (title, spec, cwd, state) |
+| `gateway-session-colors.json` | `ColorStore` | Session → color index (0-19) mapping |
+| `gateway-tls/` | `tls.ts` | Self-signed TLS cert + key |
+| `session-prompts/{sessionId}.md` | `system-prompt.ts` | Assembled system prompts (cleaned up on session terminate) |
+| `workflow-state/{sessionId}.json` | `WorkflowRunner` | Workflow execution state |
+| `workflow-artifacts/{workflowId}/` | `artifact-store.ts` | Workflow output files |
+| `workflow-definitions.json` | `definitions-sync.ts` | Exported workflow definitions for agent discovery |
+| `delegate-logs/{logId}.jsonl` | `sub-agent.ts` | Sub-agent execution logs |
+| `agent/auth.json` | (external) | API auth credentials (read by title-generator) |
+| `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
 
 ## Development workflow
 
@@ -113,8 +297,16 @@ See [docs/dev-workflow.md](docs/dev-workflow.md) for the full guide on running m
 
 **Add a new tool renderer**: Create in `src/ui/tools/renderers/`, register in `src/ui/tools/index.ts`.
 
+**Add a new workflow definition**: Create in `src/server/workflows/definitions/`, import and register in `src/server/workflows/index.ts`. Define phases with instructions, context isolation, and optional parallel sub-phases. Run `exportDefinitions()` to sync to disk.
+
+**Add a goal-related feature**: Goal CRUD is in `goal-manager.ts`/`goal-store.ts`. REST endpoints in `server.ts`. Goal assistant prompt in `goal-assistant.ts`. Client-side proposal parsing in `remote-agent.ts` `_checkForGoalProposal()`.
+
 **Change how messages render**: `src/ui/components/Messages.ts` for standard roles, `src/ui/components/message-renderer-registry.ts` for custom types.
 
-**Debug duplicate messages**: The deferred message pattern in `remote-agent.ts` is subtle. `message-list` renders `state.messages` (completed), `streaming-message-container` renders `state.streamMessage` (in-progress). They must never show the same message. Tool-call messages stay in streaming until the next message starts.
+**Debug duplicate messages**: The deferred message pattern in `remote-agent.ts` is subtle. `MessageList` renders `state.messages` (completed), `StreamingMessageContainer` renders `state.streamMessage` (in-progress). They must never show the same message. Tool-call messages stay in streaming until the next message starts. Check `flushDeferredMessage()` and `_deferredAssistantMessage`.
 
-**Debug session persistence**: Check `~/.pi/gateway-sessions.json` for persisted session data. Sessions restore on startup via `session-manager.ts` `restoreSessions()`. If an agent's `.jsonl` session file is missing, that session is skipped.
+**Debug session persistence**: Check `~/.pi/gateway-sessions.json` for persisted session data. Sessions restore on startup via `session-manager.ts` `restoreSessions()`. If an agent's `.jsonl` session file is missing, that session is skipped. Failed restores create dormant entries that revive on client connect.
+
+**Debug compaction issues**: Check `_isCompacting`, `_compactionSyntheticMessages`, and `_usageStaleAfterCompaction` in `remote-agent.ts`. The `compacting_placeholder` message must be filtered out and re-added correctly across server refreshes. Manual compaction is fire-and-forget from the WS handler's perspective.
+
+**Debug workflow artifact resolution**: If reports/artifacts 404, check `resolveWorkflowSessionId()` in `server.ts` — it maps gateway UUIDs to agent session directory names via three fallback strategies.
