@@ -184,3 +184,67 @@ export function patchSession(sessionId: string, updates: Record<string, unknown>
 		body: JSON.stringify(updates),
 	}).catch(() => { /* best-effort */ });
 }
+
+// ============================================================================
+// SWARM API
+// ============================================================================
+
+export async function createSwarmGoal(title: string, cwd: string, spec = ""): Promise<Goal | null> {
+	try {
+		const res = await gatewayFetch("/api/goals", {
+			method: "POST",
+			body: JSON.stringify({ title, cwd, spec, swarm: true }),
+		});
+		if (!res.ok) throw new Error(`Failed to create swarm goal: ${res.status}`);
+		const goal = await res.json();
+		await refreshSessions();
+		expandedGoals.add(goal.id);
+		saveExpandedGoals();
+		return goal;
+	} catch (err) {
+		showConnectionError("Failed to create swarm goal", err instanceof Error ? err.message : String(err));
+		return null;
+	}
+}
+
+export async function startSwarm(goalId: string): Promise<string | null> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/swarm/start`, {
+			method: "POST",
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || `Failed: ${res.status}`);
+		}
+		const data = await res.json();
+		await refreshSessions();
+		return data.sessionId;
+	} catch (err) {
+		showConnectionError("Failed to start swarm", err instanceof Error ? err.message : String(err));
+		return null;
+	}
+}
+
+export async function getSwarmState(goalId: string): Promise<any | null> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/swarm`);
+		if (!res.ok) return null;
+		return await res.json();
+	} catch {
+		return null;
+	}
+}
+
+export async function completeSwarm(goalId: string): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/swarm/complete`, {
+			method: "POST",
+		});
+		if (!res.ok) throw new Error(`Failed: ${res.status}`);
+		await refreshSessions();
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to complete swarm", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}

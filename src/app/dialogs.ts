@@ -655,6 +655,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let cwdValue = proposal.cwd || "";
 	let specValue = proposal.spec;
 	let saving = false;
+	let swarmValue = false;
 
 	const cleanup = () => {
 		render(html``, container);
@@ -668,7 +669,12 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 		renderProposalDialog();
 
 		const sessionId = activeSessionId();
-		await createGoal(trimmedTitle, cwdValue.trim(), specValue);
+		if (swarmValue) {
+			const { createSwarmGoal } = await import("./api.js");
+			await createSwarmGoal(trimmedTitle, cwdValue.trim(), specValue);
+		} else {
+			await createGoal(trimmedTitle, cwdValue.trim(), specValue);
+		}
 		state.activeGoalProposal = null;
 		if (sessionId) {
 			const { terminateSession } = await import("./session-manager.js");
@@ -716,6 +722,15 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 										@input=${(e: Event) => { specValue = (e.target as HTMLTextAreaElement).value; }}
 									></textarea>
 								</div>
+								<div class="flex items-center gap-2">
+									<input type="checkbox" id="swarm-toggle"
+										.checked=${swarmValue}
+										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; renderProposalDialog(); }}
+										class="rounded border-border" />
+									<label for="swarm-toggle" class="text-xs text-muted-foreground cursor-pointer">
+										🐝 Swarm mode — Team Lead auto-spawns role agents
+									</label>
+								</div>
 							</div>
 						`,
 					})}
@@ -751,6 +766,7 @@ function showGoalEditDialog(existingGoal: Goal): void {
 	let specValue = existingGoal.spec;
 	let stateValue: GoalState = existingGoal.state;
 	let saving = false;
+	let swarmValue = (existingGoal as any).swarm || false;
 
 	const cleanup = () => {
 		render(html``, container);
@@ -834,6 +850,15 @@ function showGoalEditDialog(existingGoal: Goal): void {
 										@input=${(e: Event) => { specValue = (e.target as HTMLTextAreaElement).value; }}
 									></textarea>
 									<p class="text-[10px] text-muted-foreground mt-1">Injected into the context window of all sessions under this goal.</p>
+								</div>
+								<div class="flex items-center gap-2">
+									<input type="checkbox" id="swarm-toggle-edit"
+										.checked=${swarmValue}
+										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; renderDialog(); }}
+										class="rounded border-border" />
+									<label for="swarm-toggle-edit" class="text-xs text-muted-foreground cursor-pointer">
+										🐝 Swarm mode — Team Lead auto-spawns role agents
+									</label>
 								</div>
 							</div>
 						`,

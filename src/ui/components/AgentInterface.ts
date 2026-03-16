@@ -30,6 +30,8 @@ export class AgentInterface extends LitElement {
 	@property({ type: Boolean }) showThemeToggle = false;
 	// Working directory shown in the stats bar
 	@property() cwd?: string;
+	// Git branch name shown in the stats bar
+	@property() branch?: string;
 	// Optional custom API key prompt handler - if not provided, uses default dialog
 	@property({ attribute: false }) onApiKeyRequired?: (provider: string) => Promise<boolean>;
 	// Optional callback called before sending a message
@@ -652,7 +654,10 @@ export class AgentInterface extends LitElement {
 		const cwdHtml = this.cwd ? (() => {
 			const parts = this.cwd!.split(/[/\\]/).filter(Boolean);
 			const short = parts.length <= 2 ? parts.join("/") : "…/" + parts.slice(-2).join("/");
-			return html`<span class="font-mono opacity-60 truncate" style="max-width:160px;" title="${this.cwd}">${short}</span>`;
+			const branchBadge = this.branch
+				? html`<span class="opacity-50">·</span><span class="opacity-60 truncate" style="max-width:120px;" title="${this.branch}">⎇ ${this.branch.replace(/^goal\//, "")}</span>`
+				: "";
+			return html`<span class="font-mono opacity-60 flex items-center gap-1 truncate" style="max-width:280px;" title="${this.cwd}">${short}${branchBadge}</span>`;
 		})() : "";
 
 		return html`

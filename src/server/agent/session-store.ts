@@ -17,6 +17,12 @@ export interface PersistedSession {
 	wasStreaming?: boolean;
 	/** If this session is a delegate, the parent session ID */
 	delegateOf?: string;
+	/** Role in a swarm goal (e.g., 'coder', 'reviewer', 'tester') */
+	role?: string;
+	/** The swarm goal this agent belongs to */
+	swarmGoalId?: string;
+	/** Path to the git worktree for this session */
+	worktreePath?: string;
 }
 
 const STORE_DIR = path.join(os.homedir(), ".pi");
@@ -81,7 +87,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "swarmGoalId" | "worktreePath">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);

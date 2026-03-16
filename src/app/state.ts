@@ -19,6 +19,12 @@ export interface GatewaySession {
 	colorIndex?: number;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
+	/** Role in a swarm goal */
+	role?: string;
+	/** The swarm goal this agent belongs to */
+	swarmGoalId?: string;
+	/** Git worktree path */
+	worktreePath?: string;
 }
 
 export type GoalState = "todo" | "in-progress" | "complete" | "shelved";
@@ -31,6 +37,11 @@ export interface Goal {
 	spec: string;
 	createdAt: number;
 	updatedAt: number;
+	worktreePath?: string;
+	branch?: string;
+	repoPath?: string;
+	swarm?: boolean;
+	teamLeadSessionId?: string;
 }
 
 export type AppView = "disconnected" | "authenticated";

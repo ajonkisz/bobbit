@@ -30,6 +30,12 @@ export interface SessionInfo {
 	goalAssistant?: boolean;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
+	/** Role in a swarm goal (e.g., 'coder', 'reviewer', 'tester', 'team-lead') */
+	role?: string;
+	/** The swarm goal ID this agent belongs to */
+	swarmGoalId?: string;
+	/** Path to the git worktree for this session */
+	worktreePath?: string;
 }
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
@@ -209,7 +215,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -234,12 +240,17 @@ export class SessionManager {
 		} else {
 			// Normal sessions: global base + AGENTS.md from cwd + goal spec
 			const goal = goalId ? this.goalManager.getGoal(goalId) : undefined;
+			let goalSpec = goal?.spec;
+			// Append role prompt for swarm agents (role instructions after goal spec)
+			if (opts?.rolePrompt) {
+				goalSpec = (goalSpec ? goalSpec + "\n\n---\n\n" : "") + opts.rolePrompt;
+			}
 			const promptPath = assembleSystemPrompt(id, {
 				baseSystemPromptPath: this.systemPromptPath,
 				cwd,
 				goalTitle: goal?.title,
 				goalState: goal?.state,
-				goalSpec: goal?.spec,
+				goalSpec,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
@@ -529,6 +540,9 @@ export class SessionManager {
 		goalId?: string;
 		goalAssistant?: boolean;
 		delegateOf?: string;
+		role?: string;
+		swarmGoalId?: string;
+		worktreePath?: string;
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -542,6 +556,9 @@ export class SessionManager {
 			goalId: s.goalId,
 			goalAssistant: s.goalAssistant,
 			delegateOf: s.delegateOf,
+			role: s.role,
+			swarmGoalId: s.swarmGoalId,
+			worktreePath: s.worktreePath,
 		}));
 	}
 

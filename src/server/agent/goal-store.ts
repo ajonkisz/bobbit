@@ -13,6 +13,16 @@ export interface PersistedGoal {
 	spec: string;
 	createdAt: number;
 	updatedAt: number;
+	/** Git worktree path (if goal has its own worktree) */
+	worktreePath?: string;
+	/** Git branch name for this goal's worktree */
+	branch?: string;
+	/** The original repo path (for worktree cleanup) */
+	repoPath?: string;
+	/** Whether this is a swarm goal with Team Lead orchestration */
+	swarm?: boolean;
+	/** Session ID of the Team Lead agent (for swarm goals) */
+	teamLeadSessionId?: string;
 }
 
 const STORE_DIR = path.join(os.homedir(), ".pi");

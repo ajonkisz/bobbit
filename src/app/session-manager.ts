@@ -148,10 +148,17 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			onApiKeyRequired: async () => true,
 		});
 
-		// Set cwd on the AgentInterface stats bar
+		// Set cwd and branch on the AgentInterface stats bar
 		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
 		if (state.chatPanel.agentInterface && sessionData?.cwd) {
 			state.chatPanel.agentInterface.cwd = sessionData.cwd;
+			// Look up branch from the goal if this session belongs to one
+			if (sessionData.goalId) {
+				const goal = state.goals.find((g) => g.id === sessionData.goalId);
+				if (goal?.branch) {
+					state.chatPanel.agentInterface.branch = goal.branch;
+				}
+			}
 		}
 
 		if (isExisting) {

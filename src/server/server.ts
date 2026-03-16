@@ -11,6 +11,7 @@ import { validateToken } from "./auth/token.js";
 import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
 import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
+import { SwarmManager } from "./agent/swarm-manager.js";
 
 export interface TlsConfig {
 	cert: string;  // path to PEM certificate
@@ -36,6 +37,7 @@ export function createGateway(config: GatewayConfig) {
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
 	});
+	const swarmManager = new SwarmManager(sessionManager);
 	const colorStore = new ColorStore();
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
@@ -76,7 +78,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, swarmManager);
 			return;
 		}
 
@@ -149,6 +151,7 @@ async function handleApiRoute(
 	sessionManager: SessionManager,
 	config: GatewayConfig,
 	colorStore: ColorStore,
+	swarmManager: SwarmManager,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -245,11 +248,12 @@ async function handleApiRoute(
 		const title = body?.title;
 		const cwd = body?.cwd || config.defaultCwd;
 		const spec = body?.spec || "";
+		const swarm = body?.swarm === true;
 		if (!title || typeof title !== "string") {
 			json({ error: "Missing title" }, 400);
 			return;
 		}
-		const goal = sessionManager.goalManager.createGoal(title, cwd, spec);
+		const goal = sessionManager.goalManager.createGoal(title, cwd, spec, swarm);
 		json(goal, 201);
 		return;
 	}
@@ -285,6 +289,90 @@ async function handleApiRoute(
 			json({ ok: true });
 			return;
 		}
+	}
+
+	// ── Swarm endpoints ────────────────────────────────────────────
+
+	// POST /api/goals/:id/swarm/start — start a swarm for a goal
+	const swarmStartMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/start$/);
+	if (swarmStartMatch && req.method === "POST") {
+		const goalId = swarmStartMatch[1];
+		try {
+			const session = await swarmManager.startSwarm(goalId);
+			json({ sessionId: session.id, title: session.title }, 201);
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
+		return;
+	}
+
+	// POST /api/goals/:id/swarm/spawn — spawn a role agent
+	const swarmSpawnMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/spawn$/);
+	if (swarmSpawnMatch && req.method === "POST") {
+		const goalId = swarmSpawnMatch[1];
+		const body = await readBody(req);
+		if (!body?.role || !body?.task) {
+			json({ error: "Missing role or task" }, 400);
+			return;
+		}
+		try {
+			const result = await swarmManager.spawnRole(goalId, body.role, body.task);
+			json(result, 201);
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
+		return;
+	}
+
+	// POST /api/goals/:id/swarm/dismiss — dismiss a role agent
+	const swarmDismissMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/dismiss$/);
+	if (swarmDismissMatch && req.method === "POST") {
+		const body = await readBody(req);
+		if (!body?.sessionId) {
+			json({ error: "Missing sessionId" }, 400);
+			return;
+		}
+		try {
+			const ok = await swarmManager.dismissRole(body.sessionId);
+			json({ ok });
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
+		return;
+	}
+
+	// GET /api/goals/:id/swarm — get swarm state
+	const swarmStateMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm$/);
+	if (swarmStateMatch && req.method === "GET") {
+		const goalId = swarmStateMatch[1];
+		const state = swarmManager.getSwarmState(goalId);
+		if (!state) {
+			json({ error: "No active swarm for this goal" }, 404);
+			return;
+		}
+		json(state);
+		return;
+	}
+
+	// GET /api/goals/:id/swarm/agents — list agents for a swarm goal
+	const swarmAgentsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/agents$/);
+	if (swarmAgentsMatch && req.method === "GET") {
+		const goalId = swarmAgentsMatch[1];
+		json({ agents: swarmManager.listAgents(goalId) });
+		return;
+	}
+
+	// POST /api/goals/:id/swarm/complete — complete a swarm goal
+	const swarmCompleteMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/complete$/);
+	if (swarmCompleteMatch && req.method === "POST") {
+		const goalId = swarmCompleteMatch[1];
+		try {
+			await swarmManager.completeSwarm(goalId);
+			json({ ok: true });
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
+		return;
 	}
 
 	// Routes with :id parameter
