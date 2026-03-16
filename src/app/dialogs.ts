@@ -691,9 +691,11 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 				onClose: cleanup,
 				width: "min(540px, 92vw)",
 				height: "auto",
+				className: "max-h-[90vh]",
 				backdropClassName: "bg-black/50 backdrop-blur-sm",
 				children: html`
 					${DialogContent({
+						className: "overflow-y-auto",
 						children: html`
 							${DialogHeader({ title: "Create Goal from Proposal" })}
 							<div class="mt-4 flex flex-col gap-4">
@@ -800,9 +802,11 @@ function showGoalEditDialog(existingGoal: Goal): void {
 				onClose: cleanup,
 				width: "min(540px, 92vw)",
 				height: "auto",
+				className: "max-h-[90vh]",
 				backdropClassName: "bg-black/50 backdrop-blur-sm",
 				children: html`
 					${DialogContent({
+						className: "overflow-y-auto",
 						children: html`
 							${DialogHeader({ title: "Edit Goal" })}
 							<div class="mt-4 flex flex-col gap-4">
