@@ -187,6 +187,12 @@ export function getParentSessionId(ctx: any): string {
 // ── Extension registration ──
 
 const extension: ExtensionFactory = (pi) => {
+	// Prevent recursive delegation — delegate sessions should not spawn more delegates
+	if (process.env.BOBBIT_DELEGATE_OF) {
+		// Don't register the delegate tool in delegate sessions
+		return;
+	}
+
 	pi.registerTool({
 		name: "delegate",
 		label: "Delegate",

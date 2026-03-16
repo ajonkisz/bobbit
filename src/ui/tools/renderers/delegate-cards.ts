@@ -70,7 +70,7 @@ export function getAuthToken(): string | null {
 export function renderSessionLink(sessionId: string | undefined, delegateId?: string): TemplateResult {
 	if (!sessionId) {
 		// Fallback to old log link if no session ID
-		if (!delegateId) return html``;
+		if (!delegateId || delegateId === "?") return html``;
 		const token = getAuthToken();
 		const logUrl = `/api/delegate-logs/${delegateId}${token ? `?token=${encodeURIComponent(token)}` : ""}`;
 		return html`

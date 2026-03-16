@@ -1,7 +1,7 @@
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import { html, type TemplateResult } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
-import { ListChecks } from "lucide";
+import { Bot, ListChecks } from "lucide";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
 import {
@@ -213,23 +213,25 @@ export class WorkflowRenderer implements ToolRenderer<WorkflowParams, any> {
 				};
 			}
 
-			// For run_phase: show individual delegate cards with log links
+			// For run_phase: show individual delegate cards matching DelegateRenderer pattern
 			if (action === "run_phase") {
 				const details = result.details as RunPhaseDetails | undefined;
 				const delegates = details?.delegates || [];
 				const allOk = delegates.length > 0 && delegates.every((d) => d.status === "completed");
+				const isRunning = isStreaming && delegates.some((d) => d.status === "running" || d.status === "starting");
+				const showExpanded = isRunning || delegates.some((d) => d.sessionId);
 
 				const runPhaseHeader = delegates.length > 0
-					? html`Delegated: ${renderStatusPills(delegates)}
+					? html`Delegated to ${delegates.length} agents
+					${renderStatusPills(delegates)}
 					${allOk ? html`<span class="text-green-500 ml-1">All completed</span>` : ""}`
 					: html`${headerText}`;
 
-				const hasRunning = delegates.some((d) => d.status === "running");
 				return {
 					content: html`
 						<div>
-							${renderCollapsibleHeader(state, ListChecks, runPhaseHeader, contentRef, chevronRef, hasRunning)}
-							<div ${ref(contentRef)} class="${hasRunning ? "max-h-[2000px] mt-3" : "max-h-0"} overflow-hidden transition-all duration-300">
+							${renderCollapsibleHeader(state, Bot, runPhaseHeader, contentRef, chevronRef, showExpanded)}
+							<div ${ref(contentRef)} class="${showExpanded ? "max-h-[2000px] mt-3" : "max-h-0"} overflow-hidden transition-all duration-300">
 								${renderDelegateCardList(delegates)}
 							</div>
 						</div>

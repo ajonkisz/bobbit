@@ -455,6 +455,8 @@ const extension: ExtensionFactory = (pi) => {
 
 						const completedResults: (DelegateResult & { phaseId: string })[] = [];
 						const phaseStartTime = Date.now();
+						// Track session IDs as they're created (before completion)
+						const sessionIds: string[] = new Array(subPhases.length).fill("");
 
 						// Helper: build current progress snapshot
 						function buildPhaseProgress() {
@@ -464,7 +466,7 @@ const extension: ExtensionFactory = (pi) => {
 									delegates: subPhases.map((p, i) => {
 										const cr = completedResults.find((r) => r.phaseId === p.id);
 										if (cr) return { id: cr.id, sessionId: cr.sessionId, name: p.name, status: cr.status, durationMs: cr.durationMs };
-										return { id: "?", sessionId: "", name: p.name, status: "starting", durationMs: Date.now() - phaseStartTime };
+										return { id: sessionIds[i]?.slice(0, 12) || "?", sessionId: sessionIds[i] || "", name: p.name, status: sessionIds[i] ? "running" : "starting", durationMs: Date.now() - phaseStartTime };
 									}),
 								},
 							};
@@ -473,6 +475,25 @@ const extension: ExtensionFactory = (pi) => {
 						// Emit initial progress
 						if (onUpdate) onUpdate(buildPhaseProgress());
 
+						// Step 1: Create all delegate sessions (get IDs immediately)
+						for (let i = 0; i < subPhases.length; i++) {
+							try {
+								const instructions = buildPhaseInstructions(subPhases[i], state.context);
+								const sid = await createDelegateSession(parentSessionId, instructions, cwd, {
+									title: `⚡ ${subPhases[i].name}`,
+									context: state.context,
+								});
+								sessionIds[i] = sid;
+								if (onUpdate) onUpdate(buildPhaseProgress());
+							} catch (err: any) {
+								completedResults.push({
+									id: "error", sessionId: "", status: "failed", output: "",
+									durationMs: Date.now() - phaseStartTime, error: err.message, phaseId: subPhases[i].id,
+								});
+								if (onUpdate) onUpdate(buildPhaseProgress());
+							}
+						}
+
 						// Heartbeat: re-emit state every 3s for reconnecting clients
 						const phaseHeartbeat = setInterval(() => {
 							if (onUpdate && completedResults.length < subPhases.length) {
@@ -480,16 +501,31 @@ const extension: ExtensionFactory = (pi) => {
 							}
 						}, 3000);
 
-						const promises = subPhases.map((sp) =>
-							runPhaseDelegate(parentSessionId, sp, state.context, cwd, signal).then((result) => {
-								completedResults.push(result);
+						// Step 2: Wait for all delegate sessions in parallel
+						const promises = sessionIds.map((sid, i) => {
+							if (!sid) return Promise.resolve(); // already failed during creation
+							const timeoutMs = subPhases[i].timeoutMs ?? 600_000;
+							return waitForDelegate(sid, timeoutMs, signal).then((result) => {
+								completedResults.push({
+									id: sid.slice(0, 12), sessionId: sid,
+									status: result.status as DelegateResult["status"],
+									output: result.output, durationMs: Date.now() - phaseStartTime,
+									phaseId: subPhases[i].id,
+								});
 								if (onUpdate) onUpdate(buildPhaseProgress());
-								return result;
-							}),
-						);
+							}).catch((err: any) => {
+								completedResults.push({
+									id: sid.slice(0, 12), sessionId: sid,
+									status: "failed", output: "", durationMs: Date.now() - phaseStartTime,
+									error: err.message, phaseId: subPhases[i].id,
+								});
+								if (onUpdate) onUpdate(buildPhaseProgress());
+							});
+						});
 
-						const results = await Promise.all(promises);
+						await Promise.all(promises);
 						clearInterval(phaseHeartbeat);
+						const results = completedResults;
 
 						for (const result of results) {
 							const statusIc = result.status === "completed" ? "✓" : result.status === "timeout" ? "⏱" : "✗";
@@ -518,11 +554,35 @@ const extension: ExtensionFactory = (pi) => {
 						lines.push(`Running delegate for phase "${phase.name}"...`);
 						lines.push("");
 
-						if (onUpdate) {
-							onUpdate({ content: [{ type: "text", text: lines.join("\n") }], details: { delegates: [{ id: "?", sessionId: "", name: phase.name, status: "starting", durationMs: 0 }] } });
+						// Create session first to get ID for the link
+						const instructions = buildPhaseInstructions(phase, state.context);
+						const timeoutMs = phase.timeoutMs ?? 600_000;
+						let singleSessionId = "";
+						try {
+							singleSessionId = await createDelegateSession(parentSessionId, instructions, cwd, {
+								title: `⚡ ${phase.name}`,
+								context: state.context,
+							});
+						} catch (err: any) {
+							// Session creation failed
 						}
 
-						const result = await runPhaseDelegate(parentSessionId, phase, state.context, cwd, signal);
+						if (onUpdate) {
+							onUpdate({ content: [{ type: "text", text: lines.join("\n") }], details: { delegates: [{ id: singleSessionId?.slice(0, 12) || "?", sessionId: singleSessionId, name: phase.name, status: singleSessionId ? "running" : "failed", durationMs: 0 }] } });
+						}
+
+						let result: DelegateResult & { phaseId: string };
+						if (singleSessionId) {
+							const startTime = Date.now();
+							const waitResult = await waitForDelegate(singleSessionId, timeoutMs, signal);
+							result = {
+								id: singleSessionId.slice(0, 12), sessionId: singleSessionId,
+								status: waitResult.status as DelegateResult["status"],
+								output: waitResult.output, durationMs: Date.now() - startTime, phaseId: phase.id,
+							};
+						} else {
+							result = { id: "error", sessionId: "", status: "failed", output: "", durationMs: 0, error: "Session creation failed", phaseId: phase.id };
+						}
 
 						const statusIc = result.status === "completed" ? "✓" : result.status === "timeout" ? "⏱" : "✗";
 						lines.push(`### ${statusIc} ${result.phaseId} (${result.status}, ${Math.round(result.durationMs / 1000)}s)`);
