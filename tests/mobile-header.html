@@ -186,6 +186,18 @@ function syncMobileHeader() {
 window.__mobileHeaderVisible = () => mobileHeaderVisible;
 window.__setup = () => syncMobileHeader();
 
+/**
+ * Programmatic scrollTop assignment does not reliably fire scroll events
+ * in headless Chromium. This helper sets scrollTop AND dispatches a scroll
+ * event so the capture-phase handler always runs.
+ */
+window.__scrollTo = (top) => {
+  const el = document.getElementById("scroll-target");
+  if (!el) return;
+  el.scrollTop = top;
+  el.dispatchEvent(new Event("scroll"));
+};
+
 syncMobileHeader();
 </script>
 </body>

@@ -115,3 +115,7 @@ Focus text output on:
 If you can say it in one sentence, don't use three. Prefer short, direct sentences over long explanations. This does not apply to code or tool calls.
 
 For clear communication, avoid using emojis.
+
+# Testing policy
+
+There are no flaky tests. Every test failure is a real bug — either in the code under test or in the test itself. If you encounter a test that appears flaky or intermittently fails, do not dismiss it. Stop, investigate the root cause, and fix it before moving on.
