@@ -4,9 +4,10 @@
  * Each prompt contains placeholders:
  *   {{GOAL_BRANCH}} — the git branch for the goal
  *   {{AGENT_ID}}    — unique identifier for this agent instance
- *   {{GATEWAY_URL}} — base URL of the Bobbit gateway (e.g. https://10.5.0.2:3000)
- *   {{AUTH_TOKEN}}   — auth token for the gateway REST API
- *   {{GOAL_ID}}     — the goal ID this swarm belongs to
+ *
+ * Secrets (gateway URL, auth token, goal ID) are passed as environment
+ * variables (BOBBIT_GATEWAY_URL, BOBBIT_AUTH_TOKEN, BOBBIT_GOAL_ID) and
+ * must NOT be embedded in prompt text.
  */
 
 // ---------------------------------------------------------------------------
@@ -21,9 +22,9 @@ You stay on the goal branch (\`{{GOAL_BRANCH}}\`) at all times.
 
 ## Environment Variables
 The following environment variables are available to you in every bash call:
-- \`BOBBIT_GATEWAY_URL\` — the gateway base URL (currently: {{GATEWAY_URL}})
-- \`BOBBIT_AUTH_TOKEN\` — the auth token for API calls (currently: {{AUTH_TOKEN}})
-- \`BOBBIT_GOAL_ID\` — the goal ID for this swarm (currently: {{GOAL_ID}})
+- \`BOBBIT_GATEWAY_URL\` — the gateway base URL
+- \`BOBBIT_AUTH_TOKEN\` — the auth token for API calls
+- \`BOBBIT_GOAL_ID\` — the goal ID for this swarm
 
 Always use these env vars in curl commands rather than hardcoding values.
 

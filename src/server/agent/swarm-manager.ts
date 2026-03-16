@@ -3,6 +3,8 @@ import type { SessionManager, SessionInfo } from "./session-manager.js";
 import type { GoalManager } from "./goal-manager.js";
 import { createWorktree, cleanupWorktree } from "../workflows/git.js";
 import { getRolePrompt, VALID_ROLES } from "./swarm-prompts.js";
+import { SwarmStore } from "./swarm-store.js";
+import type { PersistedSwarmEntry } from "./swarm-store.js";
 
 
 export interface SwarmAgent {
@@ -62,6 +64,7 @@ export class SwarmManager {
 	private sessionManager: SessionManager;
 	private config: SwarmManagerConfig;
 	private swarms = new Map<string, SwarmEntry>();
+	private store: SwarmStore;
 
 	/** Reverse lookup: sessionId → goalId for quick dismissal. */
 	private sessionToGoal = new Map<string, string>();
@@ -69,6 +72,73 @@ export class SwarmManager {
 	constructor(sessionManager: SessionManager, config: SwarmManagerConfig) {
 		this.sessionManager = sessionManager;
 		this.config = config;
+		this.store = new SwarmStore();
+		this.restoreSwarms();
+	}
+
+	/**
+	 * Convert an in-memory SwarmEntry to a PersistedSwarmEntry for storage.
+	 */
+	private toPersistedEntry(entry: SwarmEntry): PersistedSwarmEntry {
+		return {
+			goalId: entry.goalId,
+			teamLeadSessionId: entry.teamLeadSessionId,
+			agents: entry.agents.map((a) => ({
+				sessionId: a.sessionId,
+				role: a.role,
+				worktreePath: a.worktreePath,
+				branch: a.branch,
+				task: a.task,
+				createdAt: a.createdAt,
+			})),
+			maxConcurrent: entry.maxConcurrent,
+		};
+	}
+
+	/**
+	 * Persist the current state of a swarm entry to disk.
+	 */
+	private persistEntry(goalId: string): void {
+		const entry = this.swarms.get(goalId);
+		if (entry) {
+			this.store.put(this.toPersistedEntry(entry));
+		}
+	}
+
+	/**
+	 * Restore swarms from disk persistence.
+	 * Reconstructs the in-memory Maps from the persisted store.
+	 */
+	private restoreSwarms(): void {
+		const persisted = this.store.getAll();
+		for (const p of persisted) {
+			const entry: SwarmEntry = {
+				goalId: p.goalId,
+				teamLeadSessionId: p.teamLeadSessionId,
+				agents: p.agents.map((a) => ({
+					sessionId: a.sessionId,
+					role: a.role,
+					worktreePath: a.worktreePath,
+					branch: a.branch,
+					task: a.task,
+					createdAt: a.createdAt,
+				})),
+				maxConcurrent: p.maxConcurrent,
+			};
+			this.swarms.set(p.goalId, entry);
+
+			// Rebuild reverse lookup
+			if (p.teamLeadSessionId) {
+				this.sessionToGoal.set(p.teamLeadSessionId, p.goalId);
+			}
+			for (const agent of entry.agents) {
+				this.sessionToGoal.set(agent.sessionId, p.goalId);
+			}
+
+			console.log(
+				`[swarm-manager] Restored swarm for goal ${p.goalId} — team lead: ${p.teamLeadSessionId}, agents: ${entry.agents.length}`,
+			);
+		}
 	}
 
 	private get goalManager(): GoalManager {
@@ -94,12 +164,11 @@ export class SwarmManager {
 		// Use the goal's worktree/cwd for the team lead
 		const cwd = goal.worktreePath || goal.cwd;
 
-		// Build the Team Lead role prompt with all placeholders substituted
+		// Build the Team Lead role prompt with structural placeholders only
+		// Secrets (gateway URL, auth token, goal ID) are passed as env vars, NOT embedded in prompt text
 		const teamLeadPrompt = (getRolePrompt("team-lead") ?? "")
 			.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
-			.replace(/\{\{GATEWAY_URL\}\}/g, this.config.gatewayUrl)
-			.replace(/\{\{AUTH_TOKEN\}\}/g, this.config.authToken)
-			.replace(/\{\{GOAL_ID\}\}/g, goalId);
+			.replace(/\{\{AGENT_ID\}\}/g, `team-lead-${goalId.slice(0, 8)}`);
 
 		// Create the team lead session under the goal, with role prompt appended to goal spec
 		const session = await this.sessionManager.createSession(cwd, undefined, goalId, false, {
@@ -129,6 +198,7 @@ export class SwarmManager {
 		};
 		this.swarms.set(goalId, entry);
 		this.sessionToGoal.set(session.id, goalId);
+		this.persistEntry(goalId);
 
 		// Transition goal to in-progress if needed
 		if (goal.state === "todo") {
@@ -152,6 +222,10 @@ export class SwarmManager {
 		// Validate role
 		if (!VALID_ROLES.includes(role)) {
 			throw new Error(`Invalid role "${role}". Valid roles: ${VALID_ROLES.join(", ")}`);
+		}
+
+		if (role === 'team-lead') {
+			throw new Error('Cannot spawn team-lead role via spawnRole — use startSwarm() instead');
 		}
 
 		const entry = this.swarms.get(goalId);
@@ -181,51 +255,65 @@ export class SwarmManager {
 		const branchName = `goal-${goalSlug}-${role}-${shortId}`;
 		const worktreeResult = createWorktree(goal.repoPath, branchName);
 
-		// Build role system prompt
-		const agentId = `${role}-${shortId}`;
-		const rolePrompt = (getRolePrompt(role) ?? "")
-			.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
-			.replace(/\{\{AGENT_ID\}\}/g, agentId);
+		try {
+			// Build role system prompt
+			const agentId = `${role}-${shortId}`;
+			const rolePrompt = (getRolePrompt(role) ?? "")
+				.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
+				.replace(/\{\{AGENT_ID\}\}/g, agentId);
 
-		// Create the session with the role's worktree as cwd, role prompt appended to goal spec
-		const session = await this.sessionManager.createSession(
-			worktreeResult.worktreePath,
-			undefined,
-			goalId,
-			false,
-			{ rolePrompt },
-		);
+			// Create the session with the role's worktree as cwd, role prompt appended to goal spec
+			const session = await this.sessionManager.createSession(
+				worktreeResult.worktreePath,
+				undefined,
+				goalId,
+				false,
+				{ rolePrompt },
+			);
 
-		// Update session metadata with role info
-		const emoji = ROLE_EMOJI[role] || "🤖";
-		this.sessionManager.setTitle(session.id, `${emoji} ${role.charAt(0).toUpperCase() + role.slice(1)} — ${goal.title}`);
-		session.titleGenerated = true;
-		this.sessionManager.updateSessionMeta(session.id, {
-			role,
-			swarmGoalId: goalId,
-			worktreePath: worktreeResult.worktreePath,
-		});
+			// Update session metadata with role info
+			const emoji = ROLE_EMOJI[role] || "🤖";
+			this.sessionManager.setTitle(session.id, `${emoji} ${role.charAt(0).toUpperCase() + role.slice(1)} — ${goal.title}`);
+			session.titleGenerated = true;
+			this.sessionManager.updateSessionMeta(session.id, {
+				role,
+				swarmGoalId: goalId,
+				worktreePath: worktreeResult.worktreePath,
+			});
 
-		// Track the agent
-		const agent: SwarmAgent = {
-			sessionId: session.id,
-			role,
-			worktreePath: worktreeResult.worktreePath,
-			branch: branchName,
-			task,
-			createdAt: Date.now(),
-		};
-		entry.agents.push(agent);
-		this.sessionToGoal.set(session.id, goalId);
+			// Track the agent
+			const agent: SwarmAgent = {
+				sessionId: session.id,
+				role,
+				worktreePath: worktreeResult.worktreePath,
+				branch: branchName,
+				task,
+				createdAt: Date.now(),
+			};
+			entry.agents.push(agent);
+			this.sessionToGoal.set(session.id, goalId);
+			this.persistEntry(goalId);
 
-		// Send the task as the first prompt
-		session.rpcClient.prompt(task);
+			// Send the task as the first prompt
+			session.rpcClient.prompt(task).catch((err: any) => {
+				console.error('[swarm-manager] Failed to send task prompt:', err);
+			});
 
-		console.log(
-			`[swarm-manager] Spawned ${role} agent (${session.id}) for goal "${goal.title}" — worktree: ${worktreeResult.worktreePath}`,
-		);
+			console.log(
+				`[swarm-manager] Spawned ${role} agent (${session.id}) for goal "${goal.title}" — worktree: ${worktreeResult.worktreePath}`,
+			);
 
-		return { sessionId: session.id, worktreePath: worktreeResult.worktreePath };
+			return { sessionId: session.id, worktreePath: worktreeResult.worktreePath };
+		} catch (err) {
+			// Clean up the orphaned worktree on failure
+			try {
+				cleanupWorktree(goal.repoPath, worktreeResult.worktreePath, branchName, true);
+				console.log(`[swarm-manager] Cleaned up orphaned worktree after spawnRole failure: ${worktreeResult.worktreePath}`);
+			} catch (cleanupErr) {
+				console.error(`[swarm-manager] Failed to clean up orphaned worktree ${worktreeResult.worktreePath}:`, cleanupErr);
+			}
+			throw err;
+		}
 	}
 
 	/**
@@ -271,6 +359,7 @@ export class SwarmManager {
 		// Remove from tracking
 		entry.agents.splice(agentIndex, 1);
 		this.sessionToGoal.delete(sessionId);
+		this.persistEntry(goalId);
 
 		console.log(`[swarm-manager] Dismissed ${agent.role} agent (${sessionId}) for goal ${goalId}`);
 		return true;
@@ -333,6 +422,7 @@ export class SwarmManager {
 
 		// Remove swarm tracking
 		this.swarms.delete(goalId);
+		this.store.remove(goalId);
 
 		console.log(`[swarm-manager] Completed swarm for goal ${goalId}`);
 	}

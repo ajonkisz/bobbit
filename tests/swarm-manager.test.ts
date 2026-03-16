@@ -1,10 +1,15 @@
-import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import { describe, it, before, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { SwarmManager } from "../src/server/agent/swarm-manager.ts";
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+
+// Clean up persisted swarm state to avoid cross-test contamination
+const SWARM_STORE_FILE = path.join(os.homedir(), ".pi", "gateway-swarms.json");
+function clearSwarmStore() { try { fs.unlinkSync(SWARM_STORE_FILE); } catch { /* ignore */ } }
+clearSwarmStore();
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -99,6 +104,12 @@ const DEFAULT_CONFIG = {
 	authToken: "test-token-123",
 };
 
+/** Create a SwarmManager with a clean persisted state. */
+function createSwarmManager(sm: any, config = DEFAULT_CONFIG): InstanceType<typeof SwarmManager> {
+	clearSwarmStore();
+	return new SwarmManager(sm, config);
+}
+
 // ---------------------------------------------------------------------------
 // Tests: startSwarm
 // ---------------------------------------------------------------------------
@@ -110,7 +121,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const session = await swarm.startSwarm("goal-1");
 
@@ -132,7 +143,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal({ state: "todo" });
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -144,7 +155,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal({ state: "in-progress" });
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -153,7 +164,7 @@ describe("SwarmManager", () => {
 
 		it("should throw if goal not found", async () => {
 			const sm = createMockSessionManager(new Map());
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await assert.rejects(() => swarm.startSwarm("nonexistent"), {
 				message: /Goal not found/,
@@ -165,7 +176,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal({ swarm: false });
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await assert.rejects(() => swarm.startSwarm("goal-1"), {
 				message: /does not have swarm mode enabled/,
@@ -177,7 +188,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 			await assert.rejects(() => swarm.startSwarm("goal-1"), {
@@ -190,7 +201,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal({ worktreePath: "/tmp/goal-wt" });
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const session = await swarm.startSwarm("goal-1");
 			assert.equal(session.cwd, "/tmp/goal-wt");
@@ -201,7 +212,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal({ worktreePath: undefined, cwd: "/tmp/fallback" });
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const session = await swarm.startSwarm("goal-1");
 			assert.equal(session.cwd, "/tmp/fallback");
@@ -212,7 +223,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const session = await swarm.startSwarm("goal-1");
 
@@ -231,7 +242,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -242,7 +253,7 @@ describe("SwarmManager", () => {
 
 		it("should throw if no active swarm for the goal", async () => {
 			const sm = createMockSessionManager(new Map());
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await assert.rejects(() => swarm.spawnRole("goal-1", "coder", "code stuff"), {
 				message: /No active swarm/,
@@ -254,7 +265,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal({ repoPath: undefined });
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -263,12 +274,26 @@ describe("SwarmManager", () => {
 			});
 		});
 
+		it("should reject team-lead role in spawnRole", async () => {
+			const goals = new Map<string, MockGoal>();
+			const goal = createMockGoal();
+			goals.set(goal.id, goal);
+			const sm = createMockSessionManager(goals);
+			const swarm = createSwarmManager(sm);
+
+			await swarm.startSwarm("goal-1");
+
+			await assert.rejects(() => swarm.spawnRole("goal-1", "team-lead", "lead stuff"), {
+				message: /Cannot spawn team-lead/,
+			});
+		});
+
 		it("should throw when concurrency limit reached", async () => {
 			const goals = new Map<string, MockGoal>();
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -293,7 +318,7 @@ describe("SwarmManager", () => {
 	describe("dismissRole", () => {
 		it("should return false for an unknown session", async () => {
 			const sm = createMockSessionManager(new Map());
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const result = await swarm.dismissRole("nonexistent");
 			assert.equal(result, false);
@@ -304,7 +329,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const session = await swarm.startSwarm("goal-1");
 
@@ -318,7 +343,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -337,7 +362,7 @@ describe("SwarmManager", () => {
 	describe("listAgents", () => {
 		it("should return empty array for non-existent swarm", () => {
 			const sm = createMockSessionManager(new Map());
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const agents = swarm.listAgents("nonexistent");
 			assert.deepEqual(agents, []);
@@ -348,7 +373,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -361,7 +386,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -388,7 +413,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -424,7 +449,7 @@ describe("SwarmManager", () => {
 	describe("getSwarmState", () => {
 		it("should return undefined for non-existent swarm", () => {
 			const sm = createMockSessionManager(new Map());
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const state = swarm.getSwarmState("nonexistent");
 			assert.equal(state, undefined);
@@ -435,7 +460,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const session = await swarm.startSwarm("goal-1");
 
@@ -455,7 +480,7 @@ describe("SwarmManager", () => {
 	describe("completeSwarm", () => {
 		it("should throw if no active swarm", async () => {
 			const sm = createMockSessionManager(new Map());
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await assert.rejects(() => swarm.completeSwarm("nonexistent"), {
 				message: /No active swarm/,
@@ -467,7 +492,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const session = await swarm.startSwarm("goal-1");
 
@@ -488,7 +513,7 @@ describe("SwarmManager", () => {
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -555,7 +580,7 @@ describe("SwarmManager", () => {
 			goals.set(goal1.id, goal1);
 			goals.set(goal2.id, goal2);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			const s1 = await swarm.startSwarm("goal-1");
 			const s2 = await swarm.startSwarm("goal-2");
@@ -573,6 +598,64 @@ describe("SwarmManager", () => {
 			await swarm.completeSwarm("goal-1");
 			assert.equal(swarm.getSwarmState("goal-1"), undefined);
 			assert.ok(swarm.getSwarmState("goal-2"));
+		});
+	});
+
+	// ---------------------------------------------------------------------------
+	// Tests: persistence (SwarmStore)
+	// ---------------------------------------------------------------------------
+
+	describe("persistence", () => {
+		it("should persist swarm state and restore on new SwarmManager instance", async () => {
+			const goals = new Map<string, MockGoal>();
+			const goal = createMockGoal();
+			goals.set(goal.id, goal);
+			const sm = createMockSessionManager(goals);
+
+			// Clear store and create first manager
+			clearSwarmStore();
+			const swarm1 = new SwarmManager(sm, DEFAULT_CONFIG);
+
+			await swarm1.startSwarm("goal-1");
+
+			// Manually inject an agent to simulate spawnRole (no real git)
+			const entry = (swarm1 as any).swarms.get("goal-1")!;
+			entry.agents.push({
+				sessionId: "agent-session-1",
+				role: "coder",
+				worktreePath: "/tmp/wt",
+				branch: "goal-test-coder-abc",
+				task: "build something",
+				createdAt: Date.now(),
+			});
+			(swarm1 as any).sessionToGoal.set("agent-session-1", "goal-1");
+			(swarm1 as any).persistEntry("goal-1");
+
+			// Create a new SwarmManager (simulates server restart)
+			const swarm2 = new SwarmManager(sm, DEFAULT_CONFIG);
+
+			const state = swarm2.getSwarmState("goal-1");
+			assert.ok(state, "should restore swarm state");
+			assert.equal(state!.teamLeadSessionId, "session-0");
+			assert.equal(state!.agents.length, 1);
+			assert.equal(state!.agents[0].role, "coder");
+			assert.equal(state!.agents[0].task, "build something");
+		});
+
+		it("should remove persisted state on completeSwarm", async () => {
+			const goals = new Map<string, MockGoal>();
+			const goal = createMockGoal();
+			goals.set(goal.id, goal);
+			const sm = createMockSessionManager(goals);
+
+			clearSwarmStore();
+			const swarm1 = new SwarmManager(sm, DEFAULT_CONFIG);
+			await swarm1.startSwarm("goal-1");
+			await swarm1.completeSwarm("goal-1");
+
+			// New manager should not see the swarm
+			const swarm2 = new SwarmManager(sm, DEFAULT_CONFIG);
+			assert.equal(swarm2.getSwarmState("goal-1"), undefined);
 		});
 	});
 
@@ -630,7 +713,7 @@ describe("SwarmManager", () => {
 			});
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -670,7 +753,7 @@ describe("SwarmManager", () => {
 			});
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -690,7 +773,7 @@ describe("SwarmManager", () => {
 			});
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 			const result = await swarm.spawnRole("goal-1", "tester", "Run test suite");
@@ -726,7 +809,7 @@ describe("SwarmManager", () => {
 			});
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 
@@ -757,7 +840,7 @@ describe("SwarmManager", () => {
 			});
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 			const r1 = await swarm.spawnRole("goal-1", "coder", "Code stuff");
@@ -781,7 +864,7 @@ describe("SwarmManager", () => {
 			});
 			goals.set(goal.id, goal);
 			const sm = createMockSessionManager(goals);
-			const swarm = new SwarmManager(sm, DEFAULT_CONFIG);
+			const swarm = createSwarmManager(sm);
 
 			await swarm.startSwarm("goal-1");
 

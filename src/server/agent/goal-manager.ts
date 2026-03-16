@@ -42,8 +42,8 @@ export class GoalManager {
 		let repoPath: string | undefined;
 		let goalCwd = cwd;
 
-		// Create a git worktree if the cwd is a git repo
-		if (isGitRepo(cwd)) {
+		// Create a git worktree if the cwd is a git repo (only for swarm goals)
+		if (swarm && isGitRepo(cwd)) {
 			repoPath = getRepoRoot(cwd);
 			branch = `goal/${toBranchName(title)}-${id.slice(0, 8)}`;
 			try {
@@ -91,6 +91,9 @@ export class GoalManager {
 
 	deleteGoal(id: string): boolean {
 		const goal = this.store.get(id);
+		if (goal?.swarm) {
+			console.warn(`[goal-manager] Deleting swarm goal "${goal.title}" — ensure no active swarm sessions remain (cannot check from GoalManager)`);
+		}
 		if (goal?.worktreePath && goal?.repoPath) {
 			try {
 				cleanupWorktree(goal.repoPath, goal.worktreePath, goal.branch, true);

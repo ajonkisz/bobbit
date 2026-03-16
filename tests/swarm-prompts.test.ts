@@ -41,9 +41,10 @@ describe('TEAM_LEAD_PROMPT', () => {
   it('contains all required placeholders', () => {
     assert.ok(TEAM_LEAD_PROMPT.includes('{{GOAL_BRANCH}}'), 'Missing {{GOAL_BRANCH}}');
     assert.ok(TEAM_LEAD_PROMPT.includes('{{AGENT_ID}}'), 'Missing {{AGENT_ID}}');
-    assert.ok(TEAM_LEAD_PROMPT.includes('{{GATEWAY_URL}}'), 'Missing {{GATEWAY_URL}}');
-    assert.ok(TEAM_LEAD_PROMPT.includes('{{AUTH_TOKEN}}'), 'Missing {{AUTH_TOKEN}}');
-    assert.ok(TEAM_LEAD_PROMPT.includes('{{GOAL_ID}}'), 'Missing {{GOAL_ID}}');
+    // GATEWAY_URL, AUTH_TOKEN, GOAL_ID are passed as env vars, not embedded in prompt
+    assert.ok(TEAM_LEAD_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Should reference BOBBIT_GATEWAY_URL env var');
+    assert.ok(TEAM_LEAD_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Should reference BOBBIT_AUTH_TOKEN env var');
+    assert.ok(TEAM_LEAD_PROMPT.includes('BOBBIT_GOAL_ID'), 'Should reference BOBBIT_GOAL_ID env var');
   });
 
   it('contains curl examples', () => {
@@ -142,9 +143,7 @@ describe('Placeholder substitution', () => {
   const placeholders: Record<string, string> = {
     '{{GOAL_BRANCH}}': 'goal/feature-123',
     '{{AGENT_ID}}': 'agent-abc-456',
-    '{{GATEWAY_URL}}': 'https://10.5.0.2:3000',
-    '{{AUTH_TOKEN}}': 'tok_secret_12345',
-    '{{GOAL_ID}}': 'goal-789',
+
   };
 
   function substitutePlaceholders(prompt: string): string {
@@ -179,8 +178,7 @@ describe('Placeholder substitution', () => {
     const result = substitutePlaceholders(TEAM_LEAD_PROMPT);
     assert.ok(result.includes('goal/feature-123'), 'Expected GOAL_BRANCH value');
     assert.ok(result.includes('agent-abc-456'), 'Expected AGENT_ID value');
-    assert.ok(result.includes('https://10.5.0.2:3000'), 'Expected GATEWAY_URL value');
-    assert.ok(result.includes('tok_secret_12345'), 'Expected AUTH_TOKEN value');
-    assert.ok(result.includes('goal-789'), 'Expected GOAL_ID value');
+    // GATEWAY_URL, AUTH_TOKEN, GOAL_ID are env vars — not substituted in prompt text
+    assert.ok(result.includes('$BOBBIT_GATEWAY_URL'), 'Should reference env var in curl examples');
   });
 });
