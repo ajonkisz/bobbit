@@ -688,10 +688,10 @@ export class AgentInterface extends LitElement {
 				</div>
 
 				<!-- Input Area -->
-				<div class="shrink-0 pt-0 pb-1">
+				<div class="shrink-0 pt-0 pb-1 relative">
 					<div class="max-w-5xl mx-auto px-2">
 						${this.gitStatus || this.gitStatusLoading ? html`
-						<div class="flex justify-end mb-1 min-w-0">
+						<div class="absolute right-2 bottom-full mb-0.5 z-10 pointer-events-auto" style="max-width:calc(100% - 1rem)">
 							<git-status-widget
 								.branch=${this.gitStatus?.branch ?? ''}
 								.primaryBranch=${this.gitStatus?.primaryBranch ?? 'master'}
