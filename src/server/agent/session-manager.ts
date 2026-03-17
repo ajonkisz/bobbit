@@ -10,7 +10,7 @@ import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
-import { CostTracker, type SessionCost } from "./cost-tracker.js";
+import { CostTracker } from "./cost-tracker.js";
 
 export type SessionStatus = "starting" | "idle" | "streaming" | "terminated";
 
@@ -87,9 +87,16 @@ export class SessionManager {
 		if (!usage || typeof usage.cost !== "number") return;
 
 		const cumulativeCost = this.costTracker.recordUsage(session.id, usage);
+
+		// Look up taskId from assigned tasks for this session
+		const assignedTasks = this.taskManager.getTasksForSession(session.id);
+		const taskId = assignedTasks.length > 0 ? assignedTasks[0].id : undefined;
+
 		broadcast(session.clients, {
 			type: "cost_update",
 			sessionId: session.id,
+			goalId: session.goalId,
+			taskId,
 			cost: cumulativeCost,
 		});
 	}

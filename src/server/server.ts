@@ -14,6 +14,9 @@ import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRu
 import { SwarmManager } from "./agent/swarm-manager.js";
 import type { TaskType, TaskState } from "./agent/task-store.js";
 
+const VALID_TASK_TYPES = new Set<string>(["architecture", "design-review", "mock-generation", "tdd-tests", "implementation", "code-review", "security-review", "documentation", "testing", "bug-fix", "refactor", "custom"]);
+const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
+
 export interface TlsConfig {
 	cert: string;  // path to PEM certificate
 	key: string;   // path to PEM private key
@@ -313,6 +316,10 @@ async function handleApiRoute(
 
 	// POST /api/goals/:goalId/tasks — create a task
 	if (goalTasksMatch && req.method === "POST") {
+		const goalId = goalTasksMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
 		const body = await readBody(req);
 		const title = body?.title;
 		const type = body?.type;
@@ -324,8 +331,12 @@ async function handleApiRoute(
 			json({ error: "Missing type" }, 400);
 			return;
 		}
+		if (!VALID_TASK_TYPES.has(type)) {
+			json({ error: `Invalid task type: ${type}` }, 400);
+			return;
+		}
 		try {
-			const task = sessionManager.taskManager.createTask(goalTasksMatch[1], title, type as TaskType, {
+			const task = sessionManager.taskManager.createTask(goalId, title, type as TaskType, {
 				parentTaskId: body.parentTaskId,
 				spec: body.spec,
 				dependsOn: body.dependsOn,
@@ -405,6 +416,10 @@ async function handleApiRoute(
 		const state = body?.state;
 		if (!state || typeof state !== "string") {
 			json({ error: "Missing state" }, 400);
+			return;
+		}
+		if (!VALID_TASK_STATES.has(state)) {
+			json({ error: `Invalid task state: ${state}` }, 400);
 			return;
 		}
 		try {
