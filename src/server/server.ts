@@ -740,6 +740,26 @@ async function handleApiRoute(
 				return;
 			}
 
+			// Detect primary branch (master or main)
+			let primaryBranch = 'master';
+			try {
+				const remoteHead = execSync('git symbolic-ref refs/remotes/origin/HEAD', execOpts).trim();
+				primaryBranch = remoteHead.replace('refs/remotes/origin/', '');
+			} catch {
+				// Fallback: check if master or main exists
+				try {
+					execSync('git rev-parse --verify refs/heads/master', execOpts);
+					primaryBranch = 'master';
+				} catch {
+					try {
+						execSync('git rev-parse --verify refs/heads/main', execOpts);
+						primaryBranch = 'main';
+					} catch { /* keep default */ }
+				}
+			}
+
+			const isOnPrimary = branch === primaryBranch;
+
 			// Get status
 			let statusRaw = '';
 			try {
@@ -752,15 +772,36 @@ async function handleApiRoute(
 				status: line.substring(0, 2).trim(),
 			}));
 
-			// Get ahead/behind
+			// Check if branch has an upstream tracking branch
+			let hasUpstream = false;
+			try {
+				execSync(`git rev-parse --abbrev-ref ${branch}@{u}`, execOpts);
+				hasUpstream = true;
+			} catch { /* no upstream */ }
+
+			// Get ahead/behind vs upstream (only if upstream exists)
 			let ahead = 0;
 			let behind = 0;
-			try {
-				ahead = parseInt(execSync('git rev-list --count @{u}..HEAD', execOpts).trim(), 10) || 0;
-			} catch { /* no upstream */ }
-			try {
-				behind = parseInt(execSync('git rev-list --count HEAD..@{u}', execOpts).trim(), 10) || 0;
-			} catch { /* no upstream */ }
+			if (hasUpstream) {
+				try {
+					ahead = parseInt(execSync('git rev-list --count @{u}..HEAD', execOpts).trim(), 10) || 0;
+				} catch { /* ignore */ }
+				try {
+					behind = parseInt(execSync('git rev-list --count HEAD..@{u}', execOpts).trim(), 10) || 0;
+				} catch { /* ignore */ }
+			}
+
+			// If on a feature branch, count commits ahead of primary branch
+			let aheadOfPrimary = 0;
+			let behindPrimary = 0;
+			if (!isOnPrimary) {
+				try {
+					aheadOfPrimary = parseInt(execSync(`git rev-list --count ${primaryBranch}..HEAD`, execOpts).trim(), 10) || 0;
+				} catch { /* primary branch may not exist locally */ }
+				try {
+					behindPrimary = parseInt(execSync(`git rev-list --count HEAD..${primaryBranch}`, execOpts).trim(), 10) || 0;
+				} catch { /* ignore */ }
+			}
 
 			const clean = statusLines.length === 0;
 
@@ -785,12 +826,17 @@ async function handleApiRoute(
 
 			json({
 				branch,
+				primaryBranch,
+				isOnPrimary,
 				status,
+				hasUpstream,
 				ahead,
 				behind,
+				aheadOfPrimary,
+				behindPrimary,
 				clean,
 				summary,
-				unpushed: ahead > 0,
+				unpushed: hasUpstream ? ahead > 0 : true, // no upstream = definitely not pushed
 			});
 		} catch (err) {
 			json({ error: String(err) }, 500);

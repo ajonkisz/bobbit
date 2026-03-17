@@ -38,10 +38,15 @@ export class AgentInterface extends LitElement {
 	// Git status data for the widget
 	@property({ attribute: false }) gitStatus?: {
 		branch: string;
+		primaryBranch: string;
+		isOnPrimary: boolean;
 		summary: string;
 		clean: boolean;
+		hasUpstream: boolean;
 		ahead: number;
 		behind: number;
+		aheadOfPrimary: number;
+		behindPrimary: number;
 		unpushed: boolean;
 		status: Array<{ file: string; status: string }>;
 	};
@@ -688,10 +693,15 @@ export class AgentInterface extends LitElement {
 						<div class="flex justify-end mb-1 min-w-0">
 							<git-status-widget
 								.branch=${this.gitStatus?.branch ?? ''}
+								.primaryBranch=${this.gitStatus?.primaryBranch ?? 'master'}
+								.isOnPrimary=${this.gitStatus?.isOnPrimary ?? true}
 								.summary=${this.gitStatus?.summary ?? ''}
 								.clean=${this.gitStatus?.clean ?? true}
+								.hasUpstream=${this.gitStatus?.hasUpstream ?? false}
 								.ahead=${this.gitStatus?.ahead ?? 0}
 								.behind=${this.gitStatus?.behind ?? 0}
+								.aheadOfPrimary=${this.gitStatus?.aheadOfPrimary ?? 0}
+								.behindPrimary=${this.gitStatus?.behindPrimary ?? 0}
 								.unpushed=${this.gitStatus?.unpushed ?? false}
 								.statusFiles=${this.gitStatus?.status ?? []}
 								.loading=${this.gitStatusLoading}

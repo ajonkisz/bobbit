@@ -121,10 +121,15 @@ export async function refreshSessions(): Promise<void> {
 
 export interface GitStatusData {
 	branch: string;
+	primaryBranch: string;
+	isOnPrimary: boolean;
 	summary: string;
 	clean: boolean;
+	hasUpstream: boolean;
 	ahead: number;
 	behind: number;
+	aheadOfPrimary: number;
+	behindPrimary: number;
 	unpushed: boolean;
 	status: Array<{ file: string; status: string }>;
 }

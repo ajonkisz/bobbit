@@ -4,10 +4,15 @@ import { customElement, property, state } from 'lit/decorators.js';
 @customElement('git-status-widget')
 export class GitStatusWidget extends LitElement {
     @property() branch = '';
+    @property() primaryBranch = 'master';
+    @property({ type: Boolean }) isOnPrimary = true;
     @property() summary = '';
     @property({ type: Boolean }) clean = true;
+    @property({ type: Boolean }) hasUpstream = false;
     @property({ type: Number }) ahead = 0;
     @property({ type: Number }) behind = 0;
+    @property({ type: Number }) aheadOfPrimary = 0;
+    @property({ type: Number }) behindPrimary = 0;
     @property({ type: Boolean }) unpushed = false;
     @property({ type: Array }) statusFiles: Array<{ file: string; status: string }> = [];
     @property({ type: Boolean }) loading = false;
@@ -41,53 +46,86 @@ export class GitStatusWidget extends LitElement {
 
     private _statusColor(status: string): string {
         switch (status) {
-            case 'M':
-                return 'text-amber-400';
-            case 'A':
-                return 'text-green-400';
-            case 'D':
-                return 'text-red-400';
-            case '?':
-                return 'text-muted-foreground';
-            case 'R':
-                return 'text-blue-400';
-            case 'U':
-                return 'text-red-500';
-            default:
-                return 'text-muted-foreground';
+            case 'M': return 'text-amber-400';
+            case 'A': return 'text-green-400';
+            case 'D': return 'text-red-400';
+            case '?': return 'text-muted-foreground';
+            case 'R': return 'text-blue-400';
+            case 'U': return 'text-red-500';
+            default: return 'text-muted-foreground';
         }
     }
 
     private _statusLabel(status: string): string {
         switch (status) {
-            case 'M':
-                return 'modified';
-            case 'A':
-                return 'added';
-            case 'D':
-                return 'deleted';
-            case '?':
-                return 'untracked';
-            case 'R':
-                return 'renamed';
-            case 'U':
-                return 'unmerged';
-            default:
-                return status;
+            case 'M': return 'modified';
+            case 'A': return 'added';
+            case 'D': return 'deleted';
+            case '?': return 'untracked';
+            case 'R': return 'renamed';
+            case 'U': return 'unmerged';
+            default: return status;
         }
     }
 
-    private _renderPushStatus() {
-        if (this.ahead > 0 && this.behind > 0) {
-            return html`<span class="text-amber-400">${this.ahead} ahead, ${this.behind} behind</span>`;
+    /** Terse pill indicator: ↑ unpushed, ↗ not on primary, ✓ all good */
+    private _pillIndicator() {
+        if (this.unpushed) {
+            return html`<span class="text-amber-400 shrink-0">↑</span>`;
+        }
+        if (!this.isOnPrimary && this.aheadOfPrimary > 0) {
+            return html`<span class="text-blue-400 shrink-0">↗</span>`;
+        }
+        return nothing;
+    }
+
+    private _renderRemoteStatus() {
+        if (this.isOnPrimary) {
+            // On primary branch — show ahead/behind vs remote
+            if (this.ahead > 0 && this.behind > 0) {
+                return html`<span class="text-amber-400">${this.ahead} ahead, ${this.behind} behind remote</span>`;
+            }
+            if (this.ahead > 0) {
+                return html`<span class="text-amber-400">${this.ahead} unpushed commit${this.ahead > 1 ? 's' : ''}</span>`;
+            }
+            if (this.behind > 0) {
+                return html`<span class="text-amber-400">${this.behind} commit${this.behind > 1 ? 's' : ''} behind remote</span>`;
+            }
+            return html`<span class="text-green-400">up to date with remote</span>`;
+        }
+
+        // On a feature branch
+        if (!this.hasUpstream) {
+            return html`<span class="text-amber-400">not pushed to remote</span>`;
         }
         if (this.ahead > 0) {
-            return html`<span class="text-amber-400">${this.ahead} commit${this.ahead > 1 ? 's' : ''} ahead</span>`;
+            return html`<span class="text-amber-400">${this.ahead} unpushed commit${this.ahead > 1 ? 's' : ''}</span>`;
         }
-        if (this.behind > 0) {
-            return html`<span class="text-amber-400">${this.behind} commit${this.behind > 1 ? 's' : ''} behind</span>`;
+        return html`<span class="text-green-400">pushed to remote</span>`;
+    }
+
+    private _renderPrimaryStatus() {
+        if (this.isOnPrimary) return nothing;
+
+        const primary = this.primaryBranch;
+        if (this.aheadOfPrimary > 0 && this.behindPrimary > 0) {
+            return html`<div class="text-muted-foreground">
+                vs ${primary}: <span class="text-blue-400">${this.aheadOfPrimary} ahead</span>, <span class="text-amber-400">${this.behindPrimary} behind</span>
+            </div>`;
         }
-        return html`<span class="text-green-400">up to date with remote</span>`;
+        if (this.aheadOfPrimary > 0) {
+            return html`<div class="text-muted-foreground">
+                vs ${primary}: <span class="text-blue-400">${this.aheadOfPrimary} commit${this.aheadOfPrimary > 1 ? 's' : ''} ahead</span> — not yet merged
+            </div>`;
+        }
+        if (this.behindPrimary > 0) {
+            return html`<div class="text-muted-foreground">
+                vs ${primary}: <span class="text-amber-400">${this.behindPrimary} commit${this.behindPrimary > 1 ? 's' : ''} behind</span>
+            </div>`;
+        }
+        return html`<div class="text-muted-foreground">
+            vs ${primary}: <span class="text-green-400">up to date</span>
+        </div>`;
     }
 
     render() {
@@ -108,7 +146,7 @@ export class GitStatusWidget extends LitElement {
                 ${this.summary
                     ? html`<span class="${summaryColor} font-medium shrink-0">${this.summary}</span>`
                     : nothing}
-                ${this.unpushed ? html`<span class="text-amber-400 shrink-0">↑</span>` : nothing}
+                ${this._pillIndicator()}
             </button>
 
             ${this.expanded
@@ -121,10 +159,16 @@ export class GitStatusWidget extends LitElement {
                           <div class="flex items-center gap-1.5 mb-2 text-foreground font-medium text-sm">
                               <span>⎇</span>
                               <span class="break-all">${this.branch}</span>
+                              ${!this.isOnPrimary
+                                  ? html`<span class="text-[10px] text-muted-foreground font-normal">(feature)</span>`
+                                  : nothing}
                           </div>
 
-                          <div class="mb-2 text-muted-foreground">
-                              Push status: ${this._renderPushStatus()}
+                          <div class="flex flex-col gap-1 mb-2">
+                              <div class="text-muted-foreground">
+                                  Remote: ${this._renderRemoteStatus()}
+                              </div>
+                              ${this._renderPrimaryStatus()}
                           </div>
 
                           ${this.statusFiles.length > 0
@@ -141,10 +185,7 @@ export class GitStatusWidget extends LitElement {
                                                         >
                                                             ${this._statusLabel(f.status)}
                                                         </span>
-                                                        <span
-                                                            class="text-foreground truncate"
-                                                            title=${f.file}
-                                                        >
+                                                        <span class="text-foreground truncate" title=${f.file}>
                                                             ${f.file}
                                                         </span>
                                                     </div>
@@ -176,7 +217,6 @@ export class GitStatusWidget extends LitElement {
         const dropdown = this.querySelector('#git-status-dropdown') as HTMLElement;
         if (!btn || !dropdown) return;
         const rect = btn.getBoundingClientRect();
-        // Position above the button, aligned to its right edge
         dropdown.style.right = `${window.innerWidth - rect.right}px`;
         dropdown.style.bottom = `${window.innerHeight - rect.top + 4}px`;
     }
