@@ -12,6 +12,7 @@ import { gatewayFetch, refreshSessions } from "./api.js";
 import { getRouteFromHash, setHashRoute } from "./routing.js";
 import { authenticateGateway, connectToSession, createAndConnectSession } from "./session-manager.js";
 import { doRenderApp } from "./render.js";
+import { loadDashboardData, clearDashboardState } from "./goal-dashboard.js";
 
 // ============================================================================
 // WIRE UP RENDER
@@ -40,7 +41,17 @@ async function handleHashChange(): Promise<void> {
 			return;
 		}
 
-		if (route.view === "session" && route.sessionId) {
+		if (route.view === "goal" && route.goalId) {
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.appView = "authenticated";
+			await refreshSessions();
+			await loadDashboardData(route.goalId);
+		} else if (route.view === "session" && route.sessionId) {
+			clearDashboardState();
 			if (state.remoteAgent?.gatewaySessionId === route.sessionId) {
 				return;
 			}
@@ -59,6 +70,7 @@ async function handleHashChange(): Promise<void> {
 				await refreshSessions();
 			}
 		} else {
+			clearDashboardState();
 			if (state.remoteAgent) {
 				state.remoteAgent.disconnect();
 				state.remoteAgent = null;
@@ -102,7 +114,9 @@ async function initApp() {
 			await authenticateGateway(savedUrl, savedToken);
 
 			const route = getRouteFromHash();
-			if (route.view === "session" && route.sessionId) {
+			if (route.view === "goal" && route.goalId) {
+				await loadDashboardData(route.goalId);
+			} else if (route.view === "session" && route.sessionId) {
 				const checkRes = await gatewayFetch(`/api/sessions/${route.sessionId}`);
 				if (checkRes.ok) {
 					await connectToSession(route.sessionId, true);
