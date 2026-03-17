@@ -643,10 +643,7 @@ export class AgentInterface extends LitElement {
 		const cwdHtml = this.cwd ? (() => {
 			const parts = this.cwd!.split(/[/\\]/).filter(Boolean);
 			const short = parts.length <= 2 ? parts.join("/") : "…/" + parts.slice(-2).join("/");
-			const branchBadge = this.branch
-				? html`<span class="opacity-50">·</span><span class="opacity-60 truncate" style="max-width:120px;" title="${this.branch}">⎇ ${this.branch.replace(/^goal\//, "")}</span>`
-				: "";
-			return html`<span class="font-mono opacity-60 flex items-center gap-1 truncate" style="max-width:280px;" title="${this.cwd}">${short}${branchBadge}</span>`;
+			return html`<span class="font-mono opacity-60 flex items-center gap-1 truncate" style="max-width:280px;" title="${this.cwd}">${short}</span>`;
 		})() : "";
 
 		return html`
