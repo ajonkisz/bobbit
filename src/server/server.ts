@@ -504,12 +504,25 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/complete — complete a swarm goal
+	// POST /api/goals/:id/swarm/complete — complete a swarm (dismiss agents, keep team lead)
 	const swarmCompleteMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/complete$/);
 	if (swarmCompleteMatch && req.method === "POST") {
 		const goalId = swarmCompleteMatch[1];
 		try {
 			await swarmManager.completeSwarm(goalId);
+			json({ ok: true });
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
+		return;
+	}
+
+	// POST /api/goals/:id/swarm/teardown — fully tear down a swarm (dismiss agents + terminate team lead)
+	const swarmTeardownMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/teardown$/);
+	if (swarmTeardownMatch && req.method === "POST") {
+		const goalId = swarmTeardownMatch[1];
+		try {
+			await swarmManager.teardownSwarm(goalId);
 			json({ ok: true });
 		} catch (err) {
 			json({ error: String(err) }, 400);
