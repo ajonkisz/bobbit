@@ -1,10 +1,10 @@
 ## Backlog
 - [ ] #15 Count lines of code in src/server/ directory and report summary — role:coder
-- [ ] #17 Count lines of code in src/app/ directory and report summary — role:coder
 
 ## In Progress
 
 ## Done
+- [x] #17 Count lines of code in src/app/ directory — role:coder, completed-by:coder-61023dba
 - [x] #16 Count lines of code in src/ui/ directory — role:coder, completed-by:coder-aca841f8
 - [x] #1 Implement TaskStore (`src/server/agent/task-store.ts`) — role:coder, completed-by:6bebd675
 - [x] #2 Implement TaskManager (`src/server/agent/task-manager.ts`) — role:coder, completed-by:ecf5378c
