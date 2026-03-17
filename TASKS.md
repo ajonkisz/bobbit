@@ -15,6 +15,7 @@
 - [x] #14 Server-side TaskStore: persist tasks to ~/.pi/gateway-tasks.json — role:coder, completed-by:coder-c163b737
 - [x] #15 Task REST API: CRUD endpoints — role:coder, completed-by:coder-c163b737
 - [x] #16 Task WebSocket events — role:coder, completed-by:coder-c163b737
+- [x] #13 Create goal dashboard HTML mockup — role:coder, completed-by:coder-621da054
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
 - [x] #2 Client-side: Create `GoalDraftStore` for IndexedDB persistence
 - [x] #3 Client-side: Integrate `GoalDraftStore` with session-manager.ts and render.ts
