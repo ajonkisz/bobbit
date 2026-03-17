@@ -613,7 +613,6 @@ export class RemoteAgent {
 	 */
 	/** Check an assistant message for a <goal_proposal> block and fire the callback. */
 	private _checkForGoalProposal(message: any): void {
-		console.log("[GoalProposal] _checkForGoalProposal called", { hasCallback: !!this.onGoalProposal, role: message?.role });
 		if (!this.onGoalProposal) return;
 
 		// Extract text content from the message
@@ -626,7 +625,6 @@ export class RemoteAgent {
 				.map((c: any) => c.text || "")
 				.join("");
 		}
-		console.log("[GoalProposal] extracted text length:", text.length, "has goal_proposal:", text.includes("<goal_proposal>"), "snippet:", text.substring(0, 200));
 		if (!text) return;
 
 		const match = text.match(/<goal_proposal>([\s\S]*?)<\/goal_proposal>/);
@@ -695,7 +693,6 @@ export class RemoteAgent {
 				break;
 
 			case "message_end":
-				console.log("[RemoteAgent] message_end received", { role: event.message?.role, hasContent: !!event.message?.content });
 				if (event.message) {
 					if (event.message.role === "assistant") {
 						// Check for goal proposal in assistant message
