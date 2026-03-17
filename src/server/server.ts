@@ -12,8 +12,6 @@ import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
 import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
 import { SwarmManager } from "./agent/swarm-manager.js";
-import { CostTracker } from "./agent/cost-tracker.js";
-import { TaskManager } from "./agent/task-manager.js";
 import type { TaskType, TaskState } from "./agent/task-store.js";
 
 export interface TlsConfig {
@@ -758,9 +756,7 @@ async function handleApiRoute(
 	const sessionCostMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/cost$/);
 	if (sessionCostMatch && req.method === "GET") {
 		const id = sessionCostMatch[1];
-		// TODO: wire costTracker as a property on sessionManager instead of creating a new instance
-		const costTracker = new CostTracker();
-		const cost = costTracker.getSessionCost(id);
+		const cost = sessionManager.getCostTracker().getSessionCost(id);
 		if (!cost) {
 			json({ error: "No cost data for this session" }, 404);
 			return;
@@ -781,9 +777,7 @@ async function handleApiRoute(
 		const sessionIds = sessionManager.listSessions()
 			.filter((s) => s.goalId === goalId)
 			.map((s) => s.id);
-		// TODO: wire costTracker as a property on sessionManager instead of creating a new instance
-		const costTracker = new CostTracker();
-		const cost = costTracker.getGoalCost(goalId, sessionIds);
+		const cost = sessionManager.getCostTracker().getGoalCost(goalId, sessionIds);
 		json(cost);
 		return;
 	}
@@ -792,20 +786,16 @@ async function handleApiRoute(
 	const taskCostMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/cost$/);
 	if (taskCostMatch && req.method === "GET") {
 		const taskId = taskCostMatch[1];
-		// TODO: wire taskStore as a property on sessionManager instead of creating a new instance
-		const taskStore = new TaskStore();
-		const task = taskStore.get(taskId);
+		const task = sessionManager.taskManager.getTask(taskId);
 		if (!task) {
 			json({ error: "Task not found" }, 404);
 			return;
 		}
-		// TODO: wire costTracker as a property on sessionManager instead of creating a new instance
-		const costTracker = new CostTracker();
 		if (!task.assignedSessionId) {
 			json({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalCost: 0 });
 			return;
 		}
-		const cost = costTracker.getSessionCost(task.assignedSessionId);
+		const cost = sessionManager.getCostTracker().getSessionCost(task.assignedSessionId);
 		json(cost ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalCost: 0 });
 		return;
 	}
