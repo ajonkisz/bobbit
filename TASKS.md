@@ -10,11 +10,11 @@
 - [ ] #25 Test Phase 1 (TaskStore + API) — role:tester, depends:#24
 
 ## In Progress
-- [x] #14 Server-side TaskStore: persist tasks to ~/.pi/gateway-tasks.json — role:coder, claimed-by:38ff9253
-- [x] #15 Task REST API: CRUD endpoints — role:coder, claimed-by:38ff9253
-- [x] #16 Task WebSocket events — role:coder, claimed-by:38ff9253
 
 ## Done
+- [x] #14 Server-side TaskStore: persist tasks to ~/.pi/gateway-tasks.json — role:coder, completed-by:coder-c163b737
+- [x] #15 Task REST API: CRUD endpoints — role:coder, completed-by:coder-c163b737
+- [x] #16 Task WebSocket events — role:coder, completed-by:coder-c163b737
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
 - [x] #2 Client-side: Create `GoalDraftStore` for IndexedDB persistence
 - [x] #3 Client-side: Integrate `GoalDraftStore` with session-manager.ts and render.ts
