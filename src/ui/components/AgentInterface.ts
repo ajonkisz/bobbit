@@ -685,7 +685,7 @@ export class AgentInterface extends LitElement {
 				<div class="shrink-0 pt-0 pb-1">
 					<div class="max-w-5xl mx-auto px-2">
 						${this.gitStatus || this.gitStatusLoading ? html`
-						<div class="flex justify-end mb-1 min-w-0 overflow-hidden">
+						<div class="flex justify-end mb-1 min-w-0">
 							<git-status-widget
 								.branch=${this.gitStatus?.branch ?? ''}
 								.summary=${this.gitStatus?.summary ?? ''}

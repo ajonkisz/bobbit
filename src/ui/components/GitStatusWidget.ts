@@ -96,70 +96,88 @@ export class GitStatusWidget extends LitElement {
         const summaryColor = this.clean ? 'text-green-400' : 'text-amber-400';
 
         return html`
-            <div class="relative inline-block max-w-full">
-                <button
-                    class="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-[11px] leading-tight max-w-full overflow-hidden"
-                    @click=${this._toggle}
-                >
-                    ${this.loading
-                        ? html`<span class="animate-pulse">⎇</span>`
-                        : html`<span>⎇</span>`}
-                    <span class="max-w-[120px] sm:max-w-[280px] truncate">${this.branch}</span>
-                    ${this.summary
-                        ? html`<span class="${summaryColor} font-medium">${this.summary}</span>`
-                        : nothing}
-                    ${this.unpushed ? html`<span class="text-amber-400">↑</span>` : nothing}
-                </button>
-
-                ${this.expanded
-                    ? html`
-                          <div
-                              class="absolute right-0 bottom-full mb-1 z-50 min-w-[200px] max-w-[calc(100vw-2rem)] sm:max-w-[360px] bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
-                          >
-                              <div class="flex items-center gap-1.5 mb-2 text-foreground font-medium text-sm">
-                                  <span>⎇</span>
-                                  <span>${this.branch}</span>
-                              </div>
-
-                              <div class="mb-2 text-muted-foreground">
-                                  Push status: ${this._renderPushStatus()}
-                              </div>
-
-                              ${this.statusFiles.length > 0
-                                  ? html`
-                                        <div class="border-t border-border pt-2 mt-2">
-                                            <div class="text-muted-foreground mb-1 font-medium">Changes</div>
-                                            <div class="flex flex-col gap-0.5 max-h-[200px] overflow-y-auto">
-                                                ${this.statusFiles.map(
-                                                    (f) => html`
-                                                        <div class="flex items-center gap-2 py-0.5">
-                                                            <span
-                                                                class="${this._statusColor(f.status)} font-mono w-[70px] shrink-0 text-right"
-                                                                title=${this._statusLabel(f.status)}
-                                                            >
-                                                                ${this._statusLabel(f.status)}
-                                                            </span>
-                                                            <span
-                                                                class="text-foreground truncate"
-                                                                title=${f.file}
-                                                            >
-                                                                ${f.file}
-                                                            </span>
-                                                        </div>
-                                                    `
-                                                )}
-                                            </div>
-                                        </div>
-                                    `
-                                  : html`
-                                        <div class="text-green-400 border-t border-border pt-2 mt-2">
-                                            Working tree clean
-                                        </div>
-                                    `}
-                          </div>
-                      `
+            <button
+                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-[11px] leading-tight"
+                style="max-width:100%"
+                @click=${this._toggle}
+            >
+                ${this.loading
+                    ? html`<span class="animate-pulse shrink-0">⎇</span>`
+                    : html`<span class="shrink-0">⎇</span>`}
+                <span class="truncate">${this.branch}</span>
+                ${this.summary
+                    ? html`<span class="${summaryColor} font-medium shrink-0">${this.summary}</span>`
                     : nothing}
-            </div>
+                ${this.unpushed ? html`<span class="text-amber-400 shrink-0">↑</span>` : nothing}
+            </button>
+
+            ${this.expanded
+                ? html`
+                      <div
+                          class="fixed z-50 bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
+                          style="max-width:min(360px, calc(100vw - 1rem))"
+                          id="git-status-dropdown"
+                      >
+                          <div class="flex items-center gap-1.5 mb-2 text-foreground font-medium text-sm">
+                              <span>⎇</span>
+                              <span class="break-all">${this.branch}</span>
+                          </div>
+
+                          <div class="mb-2 text-muted-foreground">
+                              Push status: ${this._renderPushStatus()}
+                          </div>
+
+                          ${this.statusFiles.length > 0
+                              ? html`
+                                    <div class="border-t border-border pt-2 mt-2">
+                                        <div class="text-muted-foreground mb-1 font-medium">Changes</div>
+                                        <div class="flex flex-col gap-0.5 max-h-[200px] overflow-y-auto">
+                                            ${this.statusFiles.map(
+                                                (f) => html`
+                                                    <div class="flex items-center gap-2 py-0.5 min-w-0">
+                                                        <span
+                                                            class="${this._statusColor(f.status)} font-mono w-[70px] shrink-0 text-right"
+                                                            title=${this._statusLabel(f.status)}
+                                                        >
+                                                            ${this._statusLabel(f.status)}
+                                                        </span>
+                                                        <span
+                                                            class="text-foreground truncate"
+                                                            title=${f.file}
+                                                        >
+                                                            ${f.file}
+                                                        </span>
+                                                    </div>
+                                                `
+                                            )}
+                                        </div>
+                                    </div>
+                                `
+                              : html`
+                                    <div class="text-green-400 border-t border-border pt-2 mt-2">
+                                        Working tree clean
+                                    </div>
+                                `}
+                      </div>
+                  `
+                : nothing}
         `;
+    }
+
+    override updated(changed: Map<string, unknown>) {
+        super.updated(changed);
+        if (changed.has('expanded') && this.expanded) {
+            this._positionDropdown();
+        }
+    }
+
+    private _positionDropdown() {
+        const btn = this.querySelector('button');
+        const dropdown = this.querySelector('#git-status-dropdown') as HTMLElement;
+        if (!btn || !dropdown) return;
+        const rect = btn.getBoundingClientRect();
+        // Position above the button, aligned to its right edge
+        dropdown.style.right = `${window.innerWidth - rect.right}px`;
+        dropdown.style.bottom = `${window.innerHeight - rect.top + 4}px`;
     }
 }
