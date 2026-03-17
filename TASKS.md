@@ -3,20 +3,22 @@
 - [ ] #19 Goal dashboard route: add /goal/:id route in main.ts, create GoalDashboard Lit component shell with nav bar (goal title, branch, action buttons, back link) — role:coder, depends:#18
 
 
-- [ ] #26 Fix: validate type/status on PUT /api/goals/:id/tasks/:taskId — role:coder, depends:#24
 - [ ] #27 Fix: cascade-delete tasks when a goal is deleted — role:coder, depends:#24
 - [ ] #29 Test stale detection (#17) — role:tester, depends:#17
 - [ ] #31 Test commit timeline (#22) — role:tester, depends:#22
 - [ ] #33 Test dashboard kanban board (#20) — role:tester, depends:#20
 - [ ] #35 Test dashboard agent activity panel (#21) — role:tester, depends:#21
-- [ ] #36 Fix: command injection in commits API via goal.branch — role:coder, depends:#28
-- [ ] #37 Fix: dashboard not subscribed to WS task events for real-time updates — role:coder, depends:#32
+
 - [ ] #38 Fix: agent polling timer leaks when navigating away before fetch completes — role:coder, depends:#34
 - [ ] #39 Fix: stale detection only compares exact SHA, not ancestry — role:coder, depends:#28
 
 ## In Progress
 
 ## Done
+- [x] #40 Fix review findings: security + real-time updates — role:coder, completed-by:coder-66cf3389
+- [x] #26 Fix: validate type/status on PUT /api/goals/:id/tasks/:taskId — role:coder, depends:#24, completed-by:coder-66cf3389
+- [x] #36 Fix: command injection in commits API via goal.branch — role:coder, depends:#28, completed-by:coder-66cf3389
+- [x] #37 Fix: dashboard not subscribed to WS task events for real-time updates — role:coder, depends:#32, completed-by:coder-66cf3389
 - [x] #23 Dashboard reports viewer: embedded full-screen view of workflow HTML reports linked from commit timeline and task cards — role:coder, depends:#19, completed-by:coder-4c3415a0
 - [x] #25 Test Phase 1 (TaskStore + API) — role:tester, depends:#24, completed-by:tester-7db03d04
 - [x] #28 Review stale detection (#17) — role:reviewer, completed-by:reviewer-25e4d241
