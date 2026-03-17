@@ -1,14 +1,14 @@
 ## Backlog
 - [ ] #15 Count lines of code in src/server/ directory and report summary — role:coder
-- [ ] #16 Count lines of code in src/ui/ directory and report summary — role:coder
 - [ ] #17 Count lines of code in src/app/ directory and report summary — role:coder
 
 ## In Progress
 
 ## Done
-- [x] #1 Implement TaskStore — role:coder, completed-by:6bebd675
-- [x] #2 Implement TaskManager — role:coder, completed-by:ecf5378c
-- [x] #3 Implement CostTracker — role:coder, completed-by:37bc6bcb
+- [x] #16 Count lines of code in src/ui/ directory — role:coder, completed-by:coder-aca841f8
+- [x] #1 Implement TaskStore (`src/server/agent/task-store.ts`) — role:coder, completed-by:6bebd675
+- [x] #2 Implement TaskManager (`src/server/agent/task-manager.ts`) — role:coder, completed-by:ecf5378c
+- [x] #3 Implement CostTracker (`src/server/agent/cost-tracker.ts`) — role:coder, completed-by:37bc6bcb
 - [x] #4 Add Task REST API endpoints — role:coder, completed-by:4eb358a5
 - [x] #5 Add Cost REST API endpoints — role:coder, completed-by:98a6a0c2
 - [x] #6 Add Task + Cost WebSocket protocol messages — role:coder, completed-by:6585203b
@@ -22,4 +22,3 @@
 - [x] #14 Fix minor review findings — role:coder, completed-by:f91180c7
 
 ## Findings
-
