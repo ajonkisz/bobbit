@@ -86,6 +86,9 @@ export const state = {
 	previewWorktree: false,
 	cwdDropdownOpen: false,
 	cwdHighlightIndex: -1,
+
+	/** Currently viewed goal dashboard (null = not on dashboard) */
+	goalDashboardId: null as string | null,
 };
 
 // ============================================================================

@@ -26,6 +26,7 @@ import { renderSessionCard, goalStateIcon } from "./render-helpers.js";
 import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
 import { mobileHeaderVisible, teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
 import { setHashRoute } from "./routing.js";
+import { renderGoalDashboard, fetchDashboardData } from "./goal-dashboard.js";
 
 // Expose for testing
 (window as any).__extractWorkflowStatus = extractWorkflowStatus;
@@ -563,6 +564,12 @@ export function doRenderApp(): void {
 	};
 
 	const mainArea = () => {
+		// Goal dashboard full-screen route
+		if (state.goalDashboardId) {
+			fetchDashboardData(state.goalDashboardId);
+			return renderGoalDashboard();
+		}
+
 		if (connected && state.isGoalAssistantSession) {
 			if (desktop) {
 				return html`
