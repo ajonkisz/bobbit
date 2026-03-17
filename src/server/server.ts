@@ -366,6 +366,41 @@ async function handleApiRoute(
 		}
 	}
 
+	// POST /api/goals/:id/tasks/check-stale — detect and mark stale test/review tasks
+	const checkStaleMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/tasks\/check-stale$/);
+	if (checkStaleMatch && req.method === "POST") {
+		const goalId = checkStaleMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		const body = await readBody(req);
+		let commitSha = body?.commitSha as string | undefined;
+
+		// If no commitSha provided, try to detect from goal cwd
+		if (!commitSha && goal.cwd) {
+			try {
+				const { getGoalBranchHead } = await import("./agent/task-manager.js");
+				commitSha = getGoalBranchHead(goal.cwd);
+			} catch {
+				json({ error: "Could not determine branch HEAD and no commitSha provided" }, 400);
+				return;
+			}
+		}
+
+		if (!commitSha || typeof commitSha !== "string") {
+			json({ error: "Missing commitSha" }, 400);
+			return;
+		}
+
+		const staled = sessionManager.taskManager.markStaleIfNeeded(goalId, commitSha);
+		// Broadcast updates for each staled task
+		for (const task of staled) {
+			sessionManager.broadcastToAll({ type: "task_updated", task });
+		}
+		json({ commitSha, staled });
+		return;
+	}
+
 	// ── Swarm endpoints ────────────────────────────────────────────
 
 	// POST /api/goals/:id/swarm/start — start a swarm for a goal
