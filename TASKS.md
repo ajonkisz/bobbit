@@ -1,8 +1,11 @@
 ## Backlog
+- [ ] #14 Review session-task integration — role:reviewer, depends:#13, branch:task-9-session-task-integration
+- [ ] #15 Test session-task integration — role:tester, depends:#13
 
 ## In Progress
 
 ## Done
+- [x] #13 Session-Task integration (auto-assign, goal cascade, system prompt, taskId in listSessions) — role:coder, claimed-by:coder-28fa9dee, completed-by:coder-28fa9dee
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
 - [x] #2 Client-side: Create `GoalDraftStore` for IndexedDB persistence
 - [x] #3 Client-side: Integrate `GoalDraftStore` with session-manager.ts and render.ts
