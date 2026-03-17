@@ -1,6 +1,7 @@
 ## Backlog
 
 ## In Progress
+- [x] #4 Add Task REST API endpoints to server.ts — role:coder, claimed-by:coder-f019216e
 
 ## Done
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
