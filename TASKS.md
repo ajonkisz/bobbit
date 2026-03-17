@@ -1,6 +1,7 @@
 ## Backlog
 
 ## In Progress
+- [x] #13 Create goal dashboard HTML mockup — role:coder, claimed-by:coder-621da054
 
 ## Done
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
