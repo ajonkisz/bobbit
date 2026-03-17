@@ -1,14 +1,14 @@
 ## Backlog
-- [ ] #23 Dashboard reports viewer: embedded full-screen view of workflow HTML reports linked from commit timeline and task cards — role:coder, depends:#19
-- [ ] #25 Test Phase 1 (TaskStore + API) — role:tester, depends:#24
-- [ ] #26 Review dashboard implementation (#18-#22) — role:reviewer, depends:#20, depends:#21, depends:#22
 
 ## In Progress
-- [x] #20 Dashboard kanban board — role:coder, claimed-by:07418c74
-- [x] #21 Dashboard agent activity panel — role:coder, claimed-by:9d44f4f8
-- [x] #22 Dashboard commit timeline — role:coder, claimed-by:11c43bed
+- [x] #23 Dashboard reports viewer — role:coder, claimed-by:d2f28d44
+- [x] #25 Test Phase 1 (TaskStore + API) — role:tester, claimed-by:60a989dc
+- [x] #26 Review dashboard implementation (#18-#22) — role:reviewer, claimed-by:f8c39d47
 
 ## Done
+- [x] #20 Dashboard kanban board — role:coder, completed-by:coder-4463feee
+- [x] #21 Dashboard agent activity panel — role:coder, completed-by:coder-29e822fb
+- [x] #22 Dashboard commit timeline — role:coder, completed-by:coder-4463feee
 - [x] #17 Commit-aware stale detection — role:coder, completed-by:coder-1b2663aa
 - [x] #18 Sidebar simplification — role:coder, completed-by:coder-5cc090b7
 - [x] #19 Goal dashboard route shell — role:coder, completed-by:coder-5cc090b7
@@ -33,9 +33,6 @@
 - [x] BUG-3: Fix execSync ENOENT on Windows
 
 ## Findings
-- Env vars only passed to Team Lead, not role agents — correct, only Team Lead calls REST API
-- maxConcurrent enforced at spawnRole line 237, completeSwarm properly dismisses all agents + worktrees
-- GoalStore.update() was using Object.assign with undefined values — fixed with undefined stripping
 - #24.1 [medium] TaskStore.update() should strip undefined values like GoalStore fix
 - #24.2 [medium] No input validation on REST task endpoints
 - #24.3 [medium] Missing auth check on task WebSocket broadcasts
