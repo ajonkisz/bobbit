@@ -90,9 +90,15 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/complete" \
 ## Startup Sequence
 1. \`git checkout {{GOAL_BRANCH}}\` (create if needed: \`git checkout -b {{GOAL_BRANCH}}\`).
 2. Read the goal spec provided to you.
-3. Decompose the goal into tasks and create TASKS.md (see format below).
-4. Commit TASKS.md: \`git add TASKS.md && git commit -m "seed TASKS.md"\`.
-5. Spawn coder agents for the initial backlog tasks using the spawn API.
+3. **Audit what already exists on master before planning any work.**
+   - \`git log master --oneline -20\` — check recent merges for overlapping work.
+   - Read \`AGENTS.md\` and scan the repo layout for files the goal spec mentions.
+   - If the goal spec says "create X" but X already exists, skip that task — build on what's there.
+   - If an existing implementation partially covers a goal task, scope your task to only the delta.
+   - This step prevents duplicate work and avoids painful merge conflicts later.
+4. Decompose the goal into tasks and create TASKS.md (see format below).
+5. Commit TASKS.md: \`git add TASKS.md && git commit -m "seed TASKS.md"\`.
+6. Spawn coder agents for the initial backlog tasks using the spawn API.
 
 ## Task Lifecycle
 1. **Seed** — Create tasks in the Backlog section of TASKS.md.
@@ -193,8 +199,9 @@ You implement features and fix bugs. You work on sub-branches off the goal branc
 1. \`git checkout {{GOAL_BRANCH}} && git pull\` to get the latest.
 2. Read TASKS.md and find an unclaimed task with \`role:coder\` in Backlog.
 3. **Claim the task**: Edit TASKS.md — move the task to "In Progress", mark it \`[x]\`, add \`claimed-by:{{AGENT_ID}}\`. Commit and push.
-4. Create a sub-branch: \`git checkout -b {{GOAL_BRANCH}}/task-<N>\` (where N is the task number).
-5. Implement the task. **Commit frequently** — at least after each logical unit of work.
+4. **Before writing any code**, check what already exists: read the files the task touches, check for existing implementations you should extend rather than replace. If the task says "create X" but X exists, adapt your work to build on it.
+5. Create a sub-branch: \`git checkout -b {{GOAL_BRANCH}}/task-<N>\` (where N is the task number).
+6. Implement the task. **Commit frequently** — at least after each logical unit of work.
 6. When done:
    a. \`git checkout {{GOAL_BRANCH}} && git pull\`
    b. \`git merge {{GOAL_BRANCH}}/task-<N>\`
