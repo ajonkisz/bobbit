@@ -11,7 +11,7 @@
 - [ ] #12 Type-check: `npm run check` passes — role:tester, depends:#9
 
 ## In Progress
-- [x] #2 Implement TaskManager (`src/server/agent/task-manager.ts`) — role:coder, claimed-by:ecf5378c
+- [x] #2 Implement TaskManager (`src/server/agent/task-manager.ts`) — role:coder, claimed-by:coder-26bb6705
 - [x] #8 Integrate cost tracking into SessionManager — role:coder, claimed-by:4779048d
 - [x] #5 Add Cost REST API endpoints to `server.ts` — role:coder, claimed-by:98a6a0c2
 
