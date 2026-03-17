@@ -7,8 +7,7 @@ import { customElement, property, query } from "lit/decorators.js";
 import { Brain, Sparkles } from "lucide";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
 import type { MessageEditor } from "./MessageEditor.js";
-import type { QueuedMessage } from "./message-queue.js";
-import { MessageQueue } from "./message-queue.js";
+import type { QueuedMessage } from "./MessageEditor.js";
 import "./MessageEditor.js";
 import "./MessageList.js";
 import "./GitStatusWidget.js";
@@ -71,14 +70,44 @@ export class AgentInterface extends LitElement {
 	private _scrollContainer?: HTMLElement;
 	private _resizeObserver?: ResizeObserver;
 	private _unsubscribeSession?: () => void;
-	private _queue!: MessageQueue;
+	private _queuedMessages: QueuedMessage[] = [];
+	private _queueIdCounter = 0;
 
-	private _initQueue() {
+	private _queueStorageKey(): string | undefined {
 		const id = this.session?.sessionId;
-		const key = id ? `bobbit_queue_${id}` : undefined;
-		this._queue = new MessageQueue(key, typeof sessionStorage !== "undefined" ? sessionStorage : undefined);
-		this._queue.restore();
-		this.requestUpdate();
+		return id ? `bobbit_queue_${id}` : undefined;
+	}
+
+	private _saveQueuedMessages() {
+		const key = this._queueStorageKey();
+		if (!key) return;
+		try {
+			const serializable = this._queuedMessages.map(({ id, text, steered }) => ({ id, text, steered }));
+			if (serializable.length > 0) {
+				sessionStorage.setItem(key, JSON.stringify(serializable));
+			} else {
+				sessionStorage.removeItem(key);
+			}
+		} catch { /* quota exceeded — ignore */ }
+	}
+
+	private _restoreQueuedMessages() {
+		const key = this._queueStorageKey();
+		if (!key) return;
+		try {
+			const raw = sessionStorage.getItem(key);
+			if (raw) {
+				const restored: QueuedMessage[] = JSON.parse(raw);
+				if (Array.isArray(restored) && restored.length > 0) {
+					this._queuedMessages = restored;
+					this._queueIdCounter = Math.max(this._queueIdCounter, ...restored.map(m => {
+						const n = parseInt(m.id.replace("q_", ""), 10);
+						return isNaN(n) ? 0 : n;
+					}));
+					this.requestUpdate();
+				}
+			}
+		} catch { /* parse error — ignore */ }
 	}
 
 	public setInput(text: string, attachments?: Attachment[]) {
@@ -203,8 +232,8 @@ export class AgentInterface extends LitElement {
 			};
 		}
 
-		// Initialize the message queue (restores from sessionStorage)
-		this._initQueue();
+		// Restore any queued messages from a previous page load
+		this._restoreQueuedMessages();
 
 		// If the session is already compacting (e.g. page refresh mid-compaction),
 		// start the animation once the DOM is ready — we missed the compaction_start event.
@@ -405,7 +434,12 @@ export class AgentInterface extends LitElement {
 
 		if (isStreaming) {
 			// Agent is busy — add to local queue, will be sent on agent_end
-			this._queue.enqueue(input, attachments);
+			this._queuedMessages = [...this._queuedMessages, {
+				id: `q_${++this._queueIdCounter}`,
+				text: input,
+				attachments: attachments?.length ? attachments : undefined,
+			}];
+			this._saveQueuedMessages();
 			this.requestUpdate();
 		} else {
 			// Agent is idle — send as regular prompt
@@ -425,8 +459,11 @@ export class AgentInterface extends LitElement {
 
 	/** Send queued messages to the agent now that it's idle */
 	private async drainQueue() {
-		if (this._queue.length === 0 || !this.session) return;
-		const queue = this._queue.drain();
+		if (this._queuedMessages.length === 0 || !this.session) return;
+		// Filter out steered messages — they were already sent
+		const queue = this._queuedMessages.filter((m) => !m.steered);
+		this._queuedMessages = [];
+		this._saveQueuedMessages();
 		this.requestUpdate();
 
 		if (queue.length === 0) return;
@@ -465,7 +502,10 @@ export class AgentInterface extends LitElement {
 	private steerMessage(msg: QueuedMessage) {
 		if (!this.session) return;
 		// Mark as steered — stays visible with "Sent" indicator until agent_end
-		this._queue.steer(msg.id);
+		this._queuedMessages = this._queuedMessages.map((m) =>
+			m.id === msg.id ? { ...m, steered: true } : m,
+		);
+		this._saveQueuedMessages();
 		this.requestUpdate();
 
 		if (msg.attachments?.length) {
@@ -482,7 +522,8 @@ export class AgentInterface extends LitElement {
 
 	/** Remove a message from the queue without sending */
 	private removeQueuedMessage(id: string) {
-		this._queue.remove(id);
+		this._queuedMessages = this._queuedMessages.filter((m) => m.id !== id);
+		this._saveQueuedMessages();
 		this.requestUpdate();
 	}
 
@@ -717,7 +758,7 @@ export class AgentInterface extends LitElement {
 							.showAttachmentButton=${this.enableAttachments}
 							.showModelSelector=${this.enableModelSelector}
 							.showThinkingSelector=${this.enableThinkingSelector}
-							.queuedMessages=${[...this._queue.messages]}
+							.queuedMessages=${this._queuedMessages}
 							.onSend=${(input: string, attachments: Attachment[]) => {
 								this.sendMessage(input, attachments);
 							}}
