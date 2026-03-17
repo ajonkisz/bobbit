@@ -47,6 +47,7 @@ export class AgentInterface extends LitElement {
 		behind: number;
 		aheadOfPrimary: number;
 		behindPrimary: number;
+		mergedIntoPrimary: boolean;
 		unpushed: boolean;
 		status: Array<{ file: string; status: string }>;
 	};
@@ -702,6 +703,7 @@ export class AgentInterface extends LitElement {
 								.behind=${this.gitStatus?.behind ?? 0}
 								.aheadOfPrimary=${this.gitStatus?.aheadOfPrimary ?? 0}
 								.behindPrimary=${this.gitStatus?.behindPrimary ?? 0}
+								.mergedIntoPrimary=${this.gitStatus?.mergedIntoPrimary ?? false}
 								.unpushed=${this.gitStatus?.unpushed ?? false}
 								.statusFiles=${this.gitStatus?.status ?? []}
 								.loading=${this.gitStatusLoading}

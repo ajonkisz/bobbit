@@ -130,6 +130,7 @@ export interface GitStatusData {
 	behind: number;
 	aheadOfPrimary: number;
 	behindPrimary: number;
+	mergedIntoPrimary: boolean;
 	unpushed: boolean;
 	status: Array<{ file: string; status: string }>;
 }

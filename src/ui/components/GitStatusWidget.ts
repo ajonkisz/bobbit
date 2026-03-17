@@ -13,6 +13,7 @@ export class GitStatusWidget extends LitElement {
     @property({ type: Number }) behind = 0;
     @property({ type: Number }) aheadOfPrimary = 0;
     @property({ type: Number }) behindPrimary = 0;
+    @property({ type: Boolean }) mergedIntoPrimary = false;
     @property({ type: Boolean }) unpushed = false;
     @property({ type: Array }) statusFiles: Array<{ file: string; status: string }> = [];
     @property({ type: Boolean }) loading = false;
@@ -68,12 +69,16 @@ export class GitStatusWidget extends LitElement {
         }
     }
 
-    /** Terse pill indicator: ↑ unpushed, ↗ not on primary, ✓ all good */
+    /** Terse pill indicator: ↑ unpushed, ↗ not merged to primary, ✓ all good */
     private _pillIndicator() {
+        if (!this.isOnPrimary && this.mergedIntoPrimary && !this.unpushed) {
+            // All work is on primary — nothing to flag
+            return nothing;
+        }
         if (this.unpushed) {
             return html`<span class="text-amber-400 shrink-0">↑</span>`;
         }
-        if (!this.isOnPrimary && this.aheadOfPrimary > 0) {
+        if (!this.isOnPrimary && !this.mergedIntoPrimary) {
             return html`<span class="text-blue-400 shrink-0">↗</span>`;
         }
         return nothing;
@@ -95,19 +100,30 @@ export class GitStatusWidget extends LitElement {
         }
 
         // On a feature branch
+        if (this.mergedIntoPrimary) {
+            return html`<span class="text-green-400">merged into ${this.primaryBranch}</span>`;
+        }
         if (!this.hasUpstream) {
-            return html`<span class="text-amber-400">not pushed to remote</span>`;
+            return html`<span class="text-amber-400">local only — not pushed</span>`;
         }
         if (this.ahead > 0) {
             return html`<span class="text-amber-400">${this.ahead} unpushed commit${this.ahead > 1 ? 's' : ''}</span>`;
         }
-        return html`<span class="text-green-400">pushed to remote</span>`;
+        return html`<span class="text-green-400">pushed to remote branch</span>`;
     }
 
     private _renderPrimaryStatus() {
         if (this.isOnPrimary) return nothing;
 
         const primary = this.primaryBranch;
+        if (this.mergedIntoPrimary && this.behindPrimary === 0) {
+            return nothing; // Already shown as "merged into master" in remote status
+        }
+        if (this.mergedIntoPrimary && this.behindPrimary > 0) {
+            return html`<div class="text-muted-foreground">
+                ${primary} is <span class="text-blue-400">${this.behindPrimary} commit${this.behindPrimary > 1 ? 's' : ''} ahead</span> of this branch
+            </div>`;
+        }
         if (this.aheadOfPrimary > 0 && this.behindPrimary > 0) {
             return html`<div class="text-muted-foreground">
                 vs ${primary}: <span class="text-blue-400">${this.aheadOfPrimary} ahead</span>, <span class="text-amber-400">${this.behindPrimary} behind</span>
@@ -115,17 +131,10 @@ export class GitStatusWidget extends LitElement {
         }
         if (this.aheadOfPrimary > 0) {
             return html`<div class="text-muted-foreground">
-                vs ${primary}: <span class="text-blue-400">${this.aheadOfPrimary} commit${this.aheadOfPrimary > 1 ? 's' : ''} ahead</span> — not yet merged
+                vs ${primary}: <span class="text-blue-400">${this.aheadOfPrimary} commit${this.aheadOfPrimary > 1 ? 's' : ''} not yet merged</span>
             </div>`;
         }
-        if (this.behindPrimary > 0) {
-            return html`<div class="text-muted-foreground">
-                vs ${primary}: <span class="text-amber-400">${this.behindPrimary} commit${this.behindPrimary > 1 ? 's' : ''} behind</span>
-            </div>`;
-        }
-        return html`<div class="text-muted-foreground">
-            vs ${primary}: <span class="text-green-400">up to date</span>
-        </div>`;
+        return nothing;
     }
 
     render() {

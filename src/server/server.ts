@@ -791,16 +791,28 @@ async function handleApiRoute(
 				} catch { /* ignore */ }
 			}
 
-			// If on a feature branch, count commits ahead of primary branch
+			// If on a feature branch, check relationship to primary
 			let aheadOfPrimary = 0;
 			let behindPrimary = 0;
+			let mergedIntoPrimary = false;
 			if (!isOnPrimary) {
+				// Check against origin/<primary> first (more up-to-date), fall back to local
+				const primaryRef = (() => {
+					try {
+						execSync(`git rev-parse --verify origin/${primaryBranch}`, execOpts);
+						return `origin/${primaryBranch}`;
+					} catch {
+						return primaryBranch;
+					}
+				})();
 				try {
-					aheadOfPrimary = parseInt(execSync(`git rev-list --count ${primaryBranch}..HEAD`, execOpts).trim(), 10) || 0;
-				} catch { /* primary branch may not exist locally */ }
+					aheadOfPrimary = parseInt(execSync(`git rev-list --count ${primaryRef}..HEAD`, execOpts).trim(), 10) || 0;
+				} catch { /* primary branch may not exist */ }
 				try {
-					behindPrimary = parseInt(execSync(`git rev-list --count HEAD..${primaryBranch}`, execOpts).trim(), 10) || 0;
+					behindPrimary = parseInt(execSync(`git rev-list --count HEAD..${primaryRef}`, execOpts).trim(), 10) || 0;
 				} catch { /* ignore */ }
+				// Branch is merged if it has no commits ahead of origin/primary
+				mergedIntoPrimary = aheadOfPrimary === 0;
 			}
 
 			const clean = statusLines.length === 0;
@@ -834,9 +846,10 @@ async function handleApiRoute(
 				behind,
 				aheadOfPrimary,
 				behindPrimary,
+				mergedIntoPrimary,
 				clean,
 				summary,
-				unpushed: hasUpstream ? ahead > 0 : true, // no upstream = definitely not pushed
+				unpushed: hasUpstream ? ahead > 0 : !mergedIntoPrimary,
 			});
 		} catch (err) {
 			json({ error: String(err) }, 500);
