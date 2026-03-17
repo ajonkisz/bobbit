@@ -9,6 +9,7 @@ import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
+import { CostTracker, type SessionCost } from "./cost-tracker.js";
 
 export type SessionStatus = "starting" | "idle" | "streaming" | "terminated";
 
@@ -59,12 +60,35 @@ export class SessionManager {
 	private agentCliPath?: string;
 	private systemPromptPath?: string;
 	private store = new SessionStore();
+	private costTracker = new CostTracker();
 	goalManager: GoalManager;
 
 	constructor(options?: SessionManagerOptions) {
 		this.agentCliPath = options?.agentCliPath;
 		this.systemPromptPath = options?.systemPromptPath;
 		this.goalManager = new GoalManager();
+	}
+
+	getCostTracker(): CostTracker {
+		return this.costTracker;
+	}
+
+	/**
+	 * Check an event for usage data and record it via the cost tracker.
+	 * Broadcasts a cost_update to connected clients if cost data is found.
+	 */
+	private trackCostFromEvent(session: SessionInfo, event: any): void {
+		// message_update events contain usage data with cost
+		if (event.type !== "message_update") return;
+		const usage = event.message?.usage ?? event.usage;
+		if (!usage || typeof usage.cost !== "number") return;
+
+		const cumulativeCost = this.costTracker.recordUsage(session.id, usage);
+		broadcast(session.clients, {
+			type: "cost_update",
+			sessionId: session.id,
+			cost: cumulativeCost,
+		});
 	}
 
 	/**
@@ -195,6 +219,7 @@ export class SessionManager {
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
+			this.trackCostFromEvent(session, event);
 		});
 
 		session.unsubscribe = unsub;
@@ -314,6 +339,7 @@ export class SessionManager {
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
+			this.trackCostFromEvent(session, event);
 		});
 
 		session.unsubscribe = unsub;
@@ -409,6 +435,7 @@ export class SessionManager {
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
+			this.trackCostFromEvent(session, event);
 		});
 
 		session.unsubscribe = unsub;
@@ -804,6 +831,7 @@ export class SessionManager {
 
 				session.eventBuffer.push(event);
 				broadcast(session.clients, { type: "event", data: event });
+				this.trackCostFromEvent(session, event);
 			});
 
 			await rpcClient.start();
