@@ -120,7 +120,7 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 		? `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 ${isCompacting ? "9px" : "0"};`
 		: baseTransform;
 
-	const eyeTop = isTeamLead ? "2px" : "0";
+	const eyeTop = isTeamLead ? "4px" : "0";
 	const eyeLayer = isSelected
 		? html`<span style="position:absolute;left:0;top:${eyeTop};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
 		: "";
