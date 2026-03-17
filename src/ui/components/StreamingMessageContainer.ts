@@ -195,6 +195,7 @@ export class StreamingMessageContainer extends LitElement {
 				return html`<div class="flex flex-col gap-3 mb-3">
 					<div class="${this._blobClass}">
 						<div class="bobbit-blob__sprite"></div>
+						<div class="bobbit-blob__crown"></div>
 						<div class="bobbit-blob__shadow"></div>
 					</div>
 				</div>`;
@@ -224,6 +225,7 @@ export class StreamingMessageContainer extends LitElement {
 					></assistant-message>
 					${this._blobVisible ? html`<div class="${this._blobClass}">
 						<div class="bobbit-blob__sprite"></div>
+						<div class="bobbit-blob__crown"></div>
 						<div class="bobbit-blob__shadow"></div>
 					</div>` : ""}
 				</div>
