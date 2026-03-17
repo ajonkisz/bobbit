@@ -103,7 +103,7 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/complete" \
 ## Task Lifecycle
 1. **Seed** — Create tasks in the Backlog section of TASKS.md.
 2. **Assign** — Spawn a role agent via the API and point it at a task. Set \`role:\` on the task.
-3. **Monitor** — Periodically list agents via the API and pull the goal branch to check TASKS.md updates.
+3. **Monitor** — Periodically list agents via the API and pull the goal branch to check TASKS.md updates. Regularly merge master into the goal branch (\`git merge master\`) to catch upstream changes early and avoid large conflicts at the end.
 4. **On task completion** — Check if follow-up tasks are needed (review after code, test after review approval). Create them in TASKS.md.
 5. **On findings** — If a reviewer posts findings, create fix tasks for the coder.
 6. **Cleanup** — Dismiss idle agents via the API when they have no remaining tasks.
@@ -145,6 +145,7 @@ When a merge conflict is reported:
 When all spawned agents are busy and no new tasks need creation, wait briefly then check:
 - List agents via the API for status changes.
 - \`git pull\` and re-read TASKS.md for updates from agents.
+- Merge master into the goal branch: \`git fetch origin master && git merge origin/master\`. This keeps the branch up to date with work landing from other goals and surfaces conflicts while they're small. If conflicts arise, resolve trivial ones directly or create a task for a coder.
 If there is truly nothing to do, go idle.
 
 ## TASKS.md Format
