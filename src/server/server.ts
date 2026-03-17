@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -298,6 +299,141 @@ async function handleApiRoute(
 			json({ ok: true });
 			return;
 		}
+	}
+
+	// ── Task endpoints ─────────────────────────────────────────────
+
+	// GET /api/goals/:id/tasks — list tasks for a goal
+	// POST /api/goals/:id/tasks — create a task for a goal
+	const goalTasksMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/tasks$/);
+	if (goalTasksMatch) {
+		const goalId = goalTasksMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		if (req.method === "GET") {
+			json({ tasks: sessionManager.taskManager.getByGoalId(goalId) });
+			return;
+		}
+
+		if (req.method === "POST") {
+			const body = await readBody(req);
+			const title = body?.title;
+			const type = body?.type;
+			if (!title || typeof title !== "string") { json({ error: "Missing title" }, 400); return; }
+			if (!type || !["code", "test", "review"].includes(type)) { json({ error: "Invalid or missing type (code|test|review)" }, 400); return; }
+			const task = sessionManager.taskManager.create(goalId, title, type);
+			sessionManager.broadcastToAll({ type: "task_created", task });
+			json(task, 201);
+			return;
+		}
+	}
+
+	// GET/PUT/DELETE /api/goals/:id/tasks/:taskId
+	const goalTaskMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/tasks\/([^/]+)$/);
+	if (goalTaskMatch) {
+		const goalId = goalTaskMatch[1];
+		const taskId = goalTaskMatch[2];
+		const task = sessionManager.taskManager.getById(taskId);
+		if (!task || task.goalId !== goalId) { json({ error: "Task not found" }, 404); return; }
+
+		if (req.method === "GET") {
+			json(task);
+			return;
+		}
+
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			const updated = sessionManager.taskManager.update(taskId, {
+				title: body.title,
+				type: body.type,
+				status: body.status,
+				assignee: body.assignee,
+				commitSha: body.commitSha,
+				resultSummary: body.resultSummary,
+			});
+			if (!updated) { json({ error: "Task not found" }, 404); return; }
+			sessionManager.broadcastToAll({ type: "task_updated", task: updated });
+			json(updated);
+			return;
+		}
+
+		if (req.method === "DELETE") {
+			sessionManager.taskManager.delete(taskId);
+			sessionManager.broadcastToAll({ type: "task_deleted", taskId, goalId });
+			json({ ok: true });
+			return;
+		}
+	}
+
+	// POST /api/goals/:id/tasks/check-stale — detect and mark stale test/review tasks
+	const checkStaleMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/tasks\/check-stale$/);
+	if (checkStaleMatch && req.method === "POST") {
+		const goalId = checkStaleMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		const body = await readBody(req);
+		let commitSha = body?.commitSha as string | undefined;
+
+		// If no commitSha provided, try to detect from goal cwd
+		if (!commitSha && goal.cwd) {
+			try {
+				const { getGoalBranchHead } = await import("./agent/task-manager.js");
+				commitSha = getGoalBranchHead(goal.cwd);
+			} catch {
+				json({ error: "Could not determine branch HEAD and no commitSha provided" }, 400);
+				return;
+			}
+		}
+
+		if (!commitSha || typeof commitSha !== "string") {
+			json({ error: "Missing commitSha" }, 400);
+			return;
+		}
+
+		const staled = sessionManager.taskManager.markStaleIfNeeded(goalId, commitSha);
+		// Broadcast updates for each staled task
+		for (const task of staled) {
+			sessionManager.broadcastToAll({ type: "task_updated", task });
+		}
+		json({ commitSha, staled });
+		return;
+	}
+
+	// GET /api/goals/:id/commits — git log for the goal branch
+	const goalCommitsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/commits$/);
+	if (goalCommitsMatch && req.method === "GET") {
+		const goalId = goalCommitsMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		try {
+			const branch = goal.branch || "HEAD";
+			const cwd = goal.worktreePath || goal.cwd;
+			const limitParam = url.searchParams.get("limit");
+			const limit = Math.min(Math.max(parseInt(limitParam || "20", 10) || 20, 1), 100);
+
+			// Use %x00 as field separator and %x01 as record separator for reliable parsing
+			const format = "%H%x00%h%x00%s%x00%an%x00%aI%x01";
+			const raw = execSync(
+				`git log "${branch}" --format="${format}" -n ${limit}`,
+				{ cwd, shell: true as unknown as string, encoding: "utf-8", timeout: 10_000 },
+			);
+			const commits = raw
+				.split("\x01")
+				.map((r: string) => r.trim())
+				.filter(Boolean)
+				.map((record: string) => {
+					const [sha, shortSha, message, author, timestamp] = record.split("\x00");
+					return { sha, shortSha, message, author, timestamp };
+				});
+			json({ commits });
+		} catch (err) {
+			json({ error: `Failed to get commits: ${err instanceof Error ? err.message : String(err)}` }, 500);
+		}
+		return;
 	}
 
 	// ── Swarm endpoints ────────────────────────────────────────────
