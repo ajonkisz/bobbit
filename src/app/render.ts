@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, Crosshair, PanelLeftOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug } from "lucide";
+import { ArrowLeft, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug } from "lucide";
 import "../ui/components/WorkflowStatusBar.js";
 import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 import {
@@ -21,7 +21,7 @@ import { createGoal, gatewayFetch, refreshSessions } from "./api.js";
 import { clearSessionModel } from "./routing.js";
 import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
-import { renderSidebar, toggleSidebar } from "./sidebar.js";
+import { renderSidebar } from "./sidebar.js";
 import { renderSessionCard, goalStateIcon } from "./render-helpers.js";
 
 const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:18px;image-rendering:pixelated;" />`;
@@ -615,18 +615,11 @@ export function doRenderApp(): void {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
 				<div class="flex items-center border-b border-border shrink-0">
 					${state.sidebarCollapsed ? html`
-					<div class="w-14 shrink-0 flex items-center justify-center gap-1 py-1.5" style="background: var(--sidebar);">
+					<div class="w-14 shrink-0 flex items-center justify-center py-1.5 sidebar-edge" style="background: var(--sidebar);">
 						${bobbitIcon}
-						<button
-							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-							@click=${toggleSidebar}
-							title="Expand sidebar (Ctrl+[)"
-						>
-							${icon(PanelLeftOpen, "sm")}
-						</button>
 					</div>
 					` : html`
-					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5" style="background: var(--sidebar);">
+					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5 sidebar-edge" style="background: var(--sidebar);">
 						<div class="flex items-center gap-2">
 							${bobbitIcon}
 							<span class="text-base font-semibold text-foreground">Bobbit</span>

@@ -127,6 +127,7 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 
 	// Crown overlay for team leads — same pixel grid, not hue-rotated
 	const crownShadow = `
+		3px -2px 0 #000,5px -2px 0 #000,7px -2px 0 #000,
 		2px -1px 0 #000,3px -1px 0 #fde047,4px -1px 0 #000,5px -1px 0 #fde047,6px -1px 0 #000,7px -1px 0 #fde047,8px -1px 0 #000,
 		1px 0 0 #000,2px 0 0 #fbbf24,3px 0 0 #fde047,4px 0 0 #fbbf24,5px 0 0 #fde047,6px 0 0 #fbbf24,7px 0 0 #fde047,8px 0 0 #fbbf24,9px 0 0 #000,
 		1px 1px 0 #000,2px 1px 0 #b45309,3px 1px 0 #d97706,4px 1px 0 #d97706,5px 1px 0 #d97706,6px 1px 0 #d97706,7px 1px 0 #d97706,8px 1px 0 #b45309,9px 1px 0 #000,
