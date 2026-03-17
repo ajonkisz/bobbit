@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -712,6 +713,85 @@ async function handleApiRoute(
 		try {
 			const result = await oauthComplete(body.flowId, body.code);
 			json(result, result.success ? 200 : 400);
+		} catch (err) {
+			json({ error: String(err) }, 500);
+		}
+		return;
+	}
+
+	// GET /api/sessions/:id/git-status — get git status for session's working directory
+	if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/') && url.pathname.endsWith('/git-status')) {
+		const id = url.pathname.split('/')[3];
+		const session = sessionManager.getSession(id);
+		if (!session) {
+			json({ error: "Session not found" }, 404);
+			return;
+		}
+		const cwd = session.cwd;
+		const execOpts = { cwd, encoding: 'utf-8' as const, timeout: 5000 };
+
+		try {
+			// Get branch name
+			let branch = '';
+			try {
+				branch = execSync('git rev-parse --abbrev-ref HEAD', execOpts).trim();
+			} catch {
+				json({ error: "Not a git repository" }, 400);
+				return;
+			}
+
+			// Get status
+			let statusRaw = '';
+			try {
+				statusRaw = execSync('git status --porcelain', execOpts).trim();
+			} catch { /* empty */ }
+
+			const statusLines = statusRaw ? statusRaw.split('\n') : [];
+			const status = statusLines.map(line => ({
+				file: line.substring(3),
+				status: line.substring(0, 2).trim(),
+			}));
+
+			// Get ahead/behind
+			let ahead = 0;
+			let behind = 0;
+			try {
+				ahead = parseInt(execSync('git rev-list --count @{u}..HEAD', execOpts).trim(), 10) || 0;
+			} catch { /* no upstream */ }
+			try {
+				behind = parseInt(execSync('git rev-list --count HEAD..@{u}', execOpts).trim(), 10) || 0;
+			} catch { /* no upstream */ }
+
+			const clean = statusLines.length === 0;
+
+			// Build summary
+			let summary = 'clean';
+			if (!clean) {
+				const counts: Record<string, number> = {};
+				for (const line of statusLines) {
+					const code = line.substring(0, 2).trim();
+					let key: string;
+					if (code.includes('?')) key = '?';
+					else if (code.includes('M')) key = 'M';
+					else if (code.includes('A')) key = 'A';
+					else if (code.includes('D')) key = 'D';
+					else if (code.includes('R')) key = 'R';
+					else if (code.includes('U')) key = 'U';
+					else key = code;
+					counts[key] = (counts[key] || 0) + 1;
+				}
+				summary = Object.entries(counts).map(([k, v]) => `${v}${k}`).join(' ');
+			}
+
+			json({
+				branch,
+				status,
+				ahead,
+				behind,
+				clean,
+				summary,
+				unpushed: ahead > 0,
+			});
 		} catch (err) {
 			json({ error: String(err) }, 500);
 		}

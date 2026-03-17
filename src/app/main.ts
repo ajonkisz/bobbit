@@ -78,6 +78,7 @@ async function handleHashChange(): Promise<void> {
 			}
 			state.goalDashboardId = route.goalId;
 			state.appView = "authenticated";
+			loadDashboardData(route.goalId);
 			renderApp();
 			await refreshSessions();
 		} else {

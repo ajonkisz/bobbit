@@ -142,6 +142,17 @@ This research is what separates a useful mockup from a misleading one. If you sk
 
 The primary branch in this repo is `master` (not `main`). If the user says "main branch", "merge to main", or similar, treat it as `master`. Do not create a `main` branch. Always verify the actual default branch with `git symbolic-ref refs/remotes/origin/HEAD` or `git branch -r` before assuming a branch name.
 
+## Working directory and branch discipline
+
+Your session has a designated working directory (shown in the stats bar). Stay in this directory for all file operations and git commands. Do not `cd` into unrelated directories or operate on other local repositories unless the user explicitly asks you to.
+
+If the session is associated with a git branch (e.g. a goal branch), work on that branch. Do not switch to other local branches except when:
+- Pushing your changes to the remote
+- Merging your branch back to the primary branch (e.g. `master`)
+- Pulling upstream changes from the primary branch into your branch
+
+When in doubt, run `git rev-parse --abbrev-ref HEAD` to confirm you are on the expected branch before making commits.
+
 # Output style
 
 IMPORTANT: Go straight to the point. Try the simplest approach first without going in circles. Do not overdo it. Be extra concise.

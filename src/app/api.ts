@@ -116,6 +116,30 @@ export async function refreshSessions(): Promise<void> {
 }
 
 // ============================================================================
+// GIT STATUS
+// ============================================================================
+
+export interface GitStatusData {
+	branch: string;
+	summary: string;
+	clean: boolean;
+	ahead: number;
+	behind: number;
+	unpushed: boolean;
+	status: Array<{ file: string; status: string }>;
+}
+
+export async function fetchGitStatus(sessionId: string): Promise<GitStatusData | null> {
+	try {
+		const res = await gatewayFetch(`/api/sessions/${sessionId}/git-status`);
+		if (!res.ok) return null;
+		return await res.json();
+	} catch {
+		return null;
+	}
+}
+
+// ============================================================================
 // GOAL API
 // ============================================================================
 

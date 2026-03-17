@@ -11,7 +11,7 @@ import {
 	GW_TOKEN_KEY,
 	GW_SESSION_KEY,
 } from "./state.js";
-import { gatewayFetch, refreshSessions, startSessionPolling, updateLocalSessionTitle, updateLocalSessionStatus } from "./api.js";
+import { gatewayFetch, refreshSessions, startSessionPolling, updateLocalSessionTitle, updateLocalSessionStatus, fetchGitStatus } from "./api.js";
 import { getRouteFromHash, setHashRoute, saveSessionModel, loadSessionModel, clearSessionModel, saveDraft, loadDraft } from "./routing.js";
 import { sessionHueRotation } from "./session-colors.js";
 import { showConnectionError, confirmAction, checkOAuthStatus, openOAuthDialog } from "./dialogs.js";
@@ -179,6 +179,10 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			if (idx >= 0) {
 				state.gatewaySessions[idx] = { ...state.gatewaySessions[idx], isAborting: remote.isAborting };
 			}
+			// Refresh git status when agent becomes idle (turn finished)
+			if (status === "idle") {
+				refreshGitStatusForSession(sessionId);
+			}
 			renderApp();
 		};
 
@@ -234,6 +238,9 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 				}
 			}
 		}
+
+		// Initial git status fetch
+		refreshGitStatusForSession(sessionId);
 
 		if (isExisting) {
 			remote.requestMessages();
@@ -380,4 +387,29 @@ export function disconnectGateway(): void {
 	teardownMobileScrollTracking();
 	setHashRoute("landing");
 	renderApp();
+}
+
+// ============================================================================
+// GIT STATUS
+// ============================================================================
+
+async function refreshGitStatusForSession(sessionId: string): Promise<void> {
+	const ai = state.chatPanel?.agentInterface;
+	if (!ai) return;
+
+	ai.gitStatusLoading = true;
+	try {
+		const data = await fetchGitStatus(sessionId);
+		if (data && activeSessionId() === sessionId) {
+			ai.gitStatus = data;
+			// Also update the branch in the stats bar
+			if (data.branch) ai.branch = data.branch;
+		}
+	} catch {
+		// silently ignore — widget just won't show
+	} finally {
+		if (activeSessionId() === sessionId) {
+			ai.gitStatusLoading = false;
+		}
+	}
 }

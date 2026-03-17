@@ -213,6 +213,10 @@ export class SessionManager {
 			titleGenerated: ps.title !== "New session",
 			goalId: ps.goalId,
 			goalAssistant: ps.goalAssistant,
+			role: ps.role,
+			swarmGoalId: ps.swarmGoalId,
+			worktreePath: ps.worktreePath,
+			taskId: ps.taskId,
 		};
 
 		const unsub = rpcClient.onEvent((event: any) => {

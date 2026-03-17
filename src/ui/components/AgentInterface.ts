@@ -11,6 +11,7 @@ import type { QueuedMessage } from "./message-queue.js";
 import { MessageQueue } from "./message-queue.js";
 import "./MessageEditor.js";
 import "./MessageList.js";
+import "./GitStatusWidget.js";
 import "./Messages.js"; // Import for side effects to register the custom elements
 import { getAppStorage } from "../storage/app-storage.js";
 import "./StreamingMessageContainer.js";
@@ -34,6 +35,17 @@ export class AgentInterface extends LitElement {
 	@property() cwd?: string;
 	// Git branch name shown in the stats bar
 	@property() branch?: string;
+	// Git status data for the widget
+	@property({ attribute: false }) gitStatus?: {
+		branch: string;
+		summary: string;
+		clean: boolean;
+		ahead: number;
+		behind: number;
+		unpushed: boolean;
+		status: Array<{ file: string; status: string }>;
+	};
+	@property({ type: Boolean }) gitStatusLoading = false;
 	// Optional custom API key prompt handler - if not provided, uses default dialog
 	@property({ attribute: false }) onApiKeyRequired?: (provider: string) => Promise<boolean>;
 	// Optional callback called before sending a message
@@ -675,6 +687,20 @@ export class AgentInterface extends LitElement {
 				<!-- Input Area -->
 				<div class="shrink-0 pt-0 pb-1">
 					<div class="max-w-5xl mx-auto px-2">
+						${this.gitStatus || this.gitStatusLoading ? html`
+						<div class="flex justify-end mb-1">
+							<git-status-widget
+								.branch=${this.gitStatus?.branch ?? ''}
+								.summary=${this.gitStatus?.summary ?? ''}
+								.clean=${this.gitStatus?.clean ?? true}
+								.ahead=${this.gitStatus?.ahead ?? 0}
+								.behind=${this.gitStatus?.behind ?? 0}
+								.unpushed=${this.gitStatus?.unpushed ?? false}
+								.statusFiles=${this.gitStatus?.status ?? []}
+								.loading=${this.gitStatusLoading}
+							></git-status-widget>
+						</div>
+						` : ''}
 						<message-editor
 							.isStreaming=${state.isStreaming}
 							.currentModel=${state.model}
