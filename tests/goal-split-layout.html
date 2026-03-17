@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #0a0a1a; color: #e0e0e0; font-family: system-ui, sans-serif; }
+
+  /* ── Full app shell ── */
+  .app {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Top header bar ── */
+  .header-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #2a2a3a;
+  }
+  .header-sidebar-area {
+    width: 240px;
+    flex-shrink: 0;
+    padding: 6px 12px;
+    font-size: 14px;
+    font-weight: 700;
+    background: #0d0d20;
+  }
+  .header-main-area {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  /* ── Body: sidebar + main ── */
+  .body-row {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  /* ── Sidebar (matches real w-[240px] shrink-0) ── */
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #0d0d20;
+    border-right: 1px solid #2a2a3a;
+    overflow-y: auto;
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+  .sidebar-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-item.active { background: #1a1a30; color: #e0e0e0; }
+  .sidebar-section { padding: 12px 12px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #666; }
+
+  /* ── Main area (matches real #app-main flex-1 min-w-0 min-h-0 flex flex-col) ── */
+  .app-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Split container (matches flex-1 flex min-h-0 overflow-hidden) ── */
+  .split-container {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ── Chat panel (left half) ── */
+  .goal-chat-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Goal preview panel (right half) ── */
+  .goal-preview-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #2a2a3a;
+    min-height: 0;
+  }
+
+  /* Desktop: each side gets exactly 50% — mirrors src/app/app.css */
+  @media (min-width: 768px) {
+    .goal-chat-panel {
+      flex: 0 0 50%;
+      max-width: 50%;
+      overflow: hidden;
+    }
+    .goal-preview-panel {
+      flex: 0 0 50%;
+      max-width: 50%;
+      overflow: hidden;
+    }
+  }
+
+  /* ── pi-chat-panel stand-in (matches connectedCallback: display:flex, flex-direction:column, height:100%, min-height:0) ── */
+  .fake-chat-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  .fake-chat-panel-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+  }
+  .fake-chat-panel-inner > .agent-area {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Chat messages ── */
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    min-height: 0;
+  }
+  .message {
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 800px;
+  }
+  .message-user { background: #1a1a35; }
+  .message-assistant { background: #142a1e; }
+  .message code { background: #222; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+
+  /* ── Chat input ── */
+  .chat-input {
+    flex: 0 0 auto;
+    padding: 12px 16px;
+    border-top: 1px solid #2a2a3a;
+  }
+  .chat-input textarea {
+    width: 100%;
+    height: 48px;
+    background: #151528;
+    color: #e0e0e0;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 14px;
+    resize: none;
+  }
+
+  /* ── Status bar ── */
+  .status-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 16px;
+    border-top: 1px solid #2a2a3a;
+    font-size: 11px;
+    color: #666;
+  }
+
+  /* ── Preview panel content ── */
+  .preview-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .preview-field label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .preview-field input {
+    width: 100%;
+    padding: 8px 12px;
+    background: #151528;
+    color: #e0e0e0;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .spec-rendered {
+    flex: 1;
+    min-height: 200px;
+    padding: 16px;
+    background: #111125;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.7;
+    overflow-y: auto;
+  }
+  .spec-rendered h2 { font-size: 18px; font-weight: 700; margin: 16px 0 8px; color: #ddd; }
+  .spec-rendered h2:first-child { margin-top: 0; }
+  .spec-rendered ul { margin: 4px 0 12px 20px; }
+  .spec-rendered li { margin-bottom: 4px; }
+  .spec-rendered code { background: #222; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  .spec-rendered p { margin: 8px 0; }
+
+  .preview-actions {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid #2a2a3a;
+  }
+  .preview-actions .btn-row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .preview-actions button {
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-create { background: #4a8; color: #fff; }
+  .btn-cancel { background: #222; color: #999; }
+
+  /* Toggle switch (mirrors src/app/app.css .toggle-switch) */
+  .toggle-switch {
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    width: 32px;
+    height: 18px;
+    border-radius: 9px;
+    background: #333;
+    cursor: pointer;
+    transition: background 200ms ease;
+    flex-shrink: 0;
+  }
+  .toggle-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #888;
+    transition: transform 200ms ease, background 200ms ease;
+  }
+  .toggle-switch:checked { background: #6d9; }
+  .toggle-switch:checked::after { transform: translateX(14px); background: #fff; }
+
+  /* CWD combobox (mirrors src/app/app.css .cwd-combobox) */
+  .cwd-combobox { position: relative; }
+  .cwd-combobox input[type="text"] {
+    width: 100%;
+    padding: 7px 32px 7px 12px;
+    background: #151528;
+    color: #e0e0e0;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+  }
+  .cwd-combobox .chevron-btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-size: 12px;
+  }
+  .cwd-combobox-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: #151528;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .cwd-combobox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: ui-monospace, monospace;
+    color: #e0e0e0;
+    cursor: pointer;
+  }
+  .cwd-combobox-item:hover { background: #1a1a35; }
+  .cwd-combobox-item .cwd-path { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cwd-combobox-item .cwd-source { flex-shrink:0; font-size:10px; color:#666; }
+
+  .worktree-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #888;
+  }
+  .worktree-label svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  /* ── Placeholder (empty preview) ── */
+  .preview-placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 32px;
+    text-align: center;
+    color: #555;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- Header bar (sidebar portion + main portion) -->
+  <div class="header-bar">
+    <div class="header-sidebar-area">Bobbit</div>
+    <div class="header-main-area">
+      <span>Goal Assistant</span>
+      <span style="color:#666;">⚙ 🌓</span>
+    </div>
+  </div>
+
+  <!-- Body: sidebar + main content -->
+  <div class="body-row">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-section">Goals</div>
+      <div class="sidebar-item">▸ Goal Swarm Orchestration</div>
+      <div class="sidebar-section">Sessions</div>
+      <div class="sidebar-item">Refactor TypeScript Components</div>
+      <div class="sidebar-item">Sub-agent File Reading</div>
+      <div class="sidebar-item active">Goal Assistant</div>
+      <div class="sidebar-item">Chat Layout Overflow</div>
+    </div>
+
+    <!-- Main area -->
+    <div class="app-main" id="app-main">
+      <div class="split-container" id="split-container">
+
+        <!-- Left: Chat panel (wraps fake pi-chat-panel) -->
+        <div class="goal-chat-panel" id="chat-panel">
+          <div class="fake-chat-panel">
+            <div class="fake-chat-panel-inner">
+              <div class="agent-area">
+                <div class="chat-messages" id="chat-messages"></div>
+                <div class="chat-input">
+                  <textarea placeholder="Type a message…"></textarea>
+                </div>
+                <div class="status-bar">
+                  <span>⚡ Off</span>
+                  <span>claude-opus-4-6</span>
+                  <span>~/w/bobbit</span>
+                  <span>16%</span>
+                  <span>$0.4986</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Goal preview panel -->
+        <div class="goal-preview-panel" id="preview-panel">
+          <div class="preview-placeholder" id="preview-placeholder">
+            <div style="font-size: 32px;">⊕</div>
+            <p>Chat with the assistant to define your goal. The proposal will appear here as it takes shape.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Realistic spec content (matches the user's screenshot)
+// ---------------------------------------------------------------------------
+const SPEC_HTML = `
+<h2>Overview</h2>
+<p>Build a server-persisted task tracking system that sits between goals and sessions, representing discrete units of work (architecture, implementation, review, testing, etc.) that can be assigned to agent sessions and tracked through a lifecycle.</p>
+
+<h2>Task Model</h2>
+<p>Each task has:</p>
+<ul>
+  <li><code>id</code> (UUID)</li>
+  <li><code>goalId</code> — parent goal (required)</li>
+  <li><code>parentTaskId</code> — parent task for sub-tasks (optional, max one level of nesting)</li>
+  <li><code>title</code> — short description</li>
+  <li><code>type</code> — predefined task type enum (see below)</li>
+  <li><code>spec</code> — detailed markdown specification</li>
+  <li><code>state</code> — lifecycle state: <code>todo</code> | <code>in-progress</code> | <code>done</code> | <code>blocked</code></li>
+  <li><code>dependsOn</code> — array of task IDs that must complete first</li>
+  <li><code>sessionId</code> — assigned agent session (optional)</li>
+  <li><code>createdAt</code> / <code>updatedAt</code> — timestamps</li>
+</ul>
+
+<h2>Relationships</h2>
+<ul>
+  <li><strong>Task ↔ Goal:</strong> Tasks are scoped to goals. Deleting a goal cascades to delete all its tasks.</li>
+  <li><strong>System Prompt:</strong> When a session has an assigned task's <code>type</code>, <code>title</code>, <code>spec</code>, and any <code>dependsOn</code> context in the assembled system prompt.</li>
+  <li><strong>Goal state inference:</strong> A goal could optionally auto-derive its state from task progress (all tasks complete → goal complete), but this should be opt-in, not forced.</li>
+</ul>
+
+<h2>Constraints</h2>
+<ul>
+  <li>No UI work in this goal — focus on server-side data model, persistence, REST API, and WebSocket protocol</li>
+  <li>Follow existing patterns: <code>TaskStore</code> mirrors <code>GoalStore</code> / <code>SessionStore</code>, <code>TaskManager</code> mirrors <code>GoalManager</code></li>
+  <li>All new files under <code>src/server/agent/</code></li>
+  <li>Cost tracker must handle server restarts gracefully (persist to disk, reload on startup)</li>
+  <li>Task dependency validation must prevent circular dependencies</li>
+</ul>`;
+
+const ASSISTANT_MSG = `I've analyzed your codebase and drafted a comprehensive goal for the task tracking system. Here's what I've put together:
+
+The goal focuses on building a server-persisted task tracking layer that sits between goals and sessions. Key aspects include:
+
+<ul style="margin:8px 0 8px 20px;">
+  <li><strong>Task ↔ Goal:</strong> Tasks are scoped to goals. Deleting a goal cascades to delete all its tasks.</li>
+  <li><strong>System Prompt:</strong> When a session has an assigned task's <code>type</code>, <code>title</code>, <code>spec</code>, and any <code>dependsOn</code> context in the assembled system prompt (extend <code>system-prompt.ts</code>).</li>
+  <li><strong>Goal state inference:</strong> A goal could optionally auto-derive its state from task progress (all tasks complete → goal complete), but this should be opt-in, not forced.</li>
+</ul>
+
+Take a look at the preview panel — you can edit the title, working directory, or spec before creating the goal.`;
+
+function setPreviewEmpty() {
+  document.getElementById("preview-panel").innerHTML = `
+    <div class="preview-placeholder" id="preview-placeholder">
+      <div style="font-size: 32px;">⊕</div>
+      <p>Chat with the assistant to define your goal. The proposal will appear here as it takes shape.</p>
+    </div>`;
+  document.getElementById("chat-messages").innerHTML = "";
+}
+
+function setPreviewPopulated() {
+  document.getElementById("chat-messages").innerHTML = `
+    <div class="message message-user">I want to build a task tracking system that sits between goals and sessions. Propose a goal for this immediately.</div>
+    <div class="message message-assistant">${ASSISTANT_MSG}</div>`;
+
+  document.getElementById("preview-panel").innerHTML = `
+    <div class="preview-content" id="preview-content">
+      <div class="preview-field">
+        <label>Title</label>
+        <input type="text" value="Task Tracking System" id="preview-title" />
+      </div>
+      <div class="preview-field">
+        <label>Working Directory</label>
+        <div class="cwd-combobox" id="cwd-combobox">
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="text" value="" placeholder="(server default)" id="preview-cwd" />
+            <button class="chevron-btn" id="cwd-toggle">▾</button>
+          </div>
+        </div>
+        <label class="worktree-label">
+          <input type="checkbox" class="toggle-switch" id="worktree-toggle" />
+          <span style="display:inline-flex; align-items:center; gap:4px;">
+            <svg viewBox="0 0 24 24"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+            Create worktree
+          </span>
+        </label>
+      </div>
+      <div class="preview-field" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+        <label>Spec</label>
+        <div class="spec-rendered" id="preview-spec">${SPEC_HTML}</div>
+      </div>
+    </div>
+    <div class="preview-actions">
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:12px; color:#888;">
+        <input type="checkbox" class="toggle-switch" /> 🐝 Swarm mode — Team Lead auto-spawns role agents
+      </label>
+      <div class="btn-row">
+        <button class="btn-cancel">Cancel</button>
+        <button class="btn-create">⊕ Create Goal</button>
+      </div>
+    </div>`;
+}
+
+// CWD dropdown management
+const RECENT_CWDS = [
+  { path: "/home/user/projects/bobbit", source: "session" },
+  { path: "/home/user/projects/api-server", source: "session" },
+  { path: "/home/user/projects/frontend", source: "goal" },
+  { path: "/home/user/projects/shared-libs", source: "goal" },
+];
+
+window.__showCwdDropdown = function() {
+  const combobox = document.getElementById("cwd-combobox");
+  if (!combobox) return;
+  // Remove existing dropdown
+  const existing = combobox.querySelector(".cwd-combobox-dropdown");
+  if (existing) { existing.remove(); return; }
+  // Create dropdown
+  const dd = document.createElement("div");
+  dd.className = "cwd-combobox-dropdown";
+  dd.id = "cwd-dropdown";
+  RECENT_CWDS.forEach(c => {
+    const item = document.createElement("div");
+    item.className = "cwd-combobox-item";
+    item.innerHTML = `<span class="cwd-path" title="${c.path}">${c.path}</span><span class="cwd-source">${c.source}</span>`;
+    item.onclick = () => {
+      document.getElementById("preview-cwd").value = c.path;
+      dd.remove();
+    };
+    dd.appendChild(item);
+  });
+  combobox.appendChild(dd);
+};
+
+// Wire up the chevron button
+document.addEventListener("click", (e) => {
+  if (e.target && (e.target.id === "cwd-toggle" || e.target.closest?.("#cwd-toggle"))) {
+    window.__showCwdDropdown();
+  }
+});
+
+// Expose for Playwright
+window.__setPreviewState = function(state) {
+  if (state === "empty") setPreviewEmpty();
+  else if (state === "populated") setPreviewPopulated();
+};
+
+// Start in populated state
+setPreviewPopulated();
+</script>
+</body>
+</html>

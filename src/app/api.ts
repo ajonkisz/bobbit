@@ -119,11 +119,11 @@ export async function refreshSessions(): Promise<void> {
 // GOAL API
 // ============================================================================
 
-export async function createGoal(title: string, cwd: string, spec = ""): Promise<Goal | null> {
+export async function createGoal(title: string, cwd: string, spec = "", worktree = false): Promise<Goal | null> {
 	try {
 		const res = await gatewayFetch("/api/goals", {
 			method: "POST",
-			body: JSON.stringify({ title, cwd, spec }),
+			body: JSON.stringify({ title, cwd, spec, worktree }),
 		});
 		if (!res.ok) throw new Error(`Failed to create goal: ${res.status}`);
 		const goal = await res.json();
@@ -189,11 +189,11 @@ export function patchSession(sessionId: string, updates: Record<string, unknown>
 // SWARM API
 // ============================================================================
 
-export async function createSwarmGoal(title: string, cwd: string, spec = ""): Promise<Goal | null> {
+export async function createSwarmGoal(title: string, cwd: string, spec = "", worktree = true): Promise<Goal | null> {
 	try {
 		const res = await gatewayFetch("/api/goals", {
 			method: "POST",
-			body: JSON.stringify({ title, cwd, spec, swarm: true }),
+			body: JSON.stringify({ title, cwd, spec, swarm: true, worktree }),
 		});
 		if (!res.ok) throw new Error(`Failed to create swarm goal: ${res.status}`);
 		const goal = await res.json();

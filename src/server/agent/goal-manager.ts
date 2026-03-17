@@ -33,7 +33,7 @@ function getRepoRoot(cwd: string): string {
 export class GoalManager {
 	private store = new GoalStore();
 
-	createGoal(title: string, cwd: string, spec = "", swarm = false): PersistedGoal {
+	createGoal(title: string, cwd: string, spec = "", swarm = false, worktree = false): PersistedGoal {
 		const now = Date.now();
 		const id = randomUUID();
 
@@ -43,7 +43,7 @@ export class GoalManager {
 		let goalCwd = cwd;
 
 		// Create a git worktree if the cwd is a git repo (only for swarm goals)
-		if (swarm && isGitRepo(cwd)) {
+		if ((swarm || worktree) && isGitRepo(cwd)) {
 			repoPath = getRepoRoot(cwd);
 			branch = `goal/${toBranchName(title)}-${id.slice(0, 8)}`;
 			try {

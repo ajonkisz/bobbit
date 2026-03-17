@@ -42,6 +42,7 @@ export function saveGoalDraft(sessionId: string): void {
 			hasReceivedProposal: state.hasReceivedProposal,
 			goalAssistantTab: state.goalAssistantTab,
 			previewSwarmMode: state.previewSwarmMode,
+			previewWorktree: state.previewWorktree,
 		};
 		storage.goalDrafts.saveDraft(draft).catch((err) => {
 			console.error("[goal-draft] Failed to save draft:", err);
@@ -65,6 +66,7 @@ async function restoreGoalDraft(sessionId: string): Promise<boolean> {
 		state.hasReceivedProposal = draft.hasReceivedProposal ?? false;
 		state.goalAssistantTab = draft.goalAssistantTab ?? "chat";
 		state.previewSwarmMode = draft.previewSwarmMode ?? false;
+		state.previewWorktree = draft.previewWorktree ?? false;
 		return true;
 	} catch (err) {
 		console.error("[goal-draft] Failed to restore draft:", err);

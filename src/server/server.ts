@@ -254,11 +254,12 @@ async function handleApiRoute(
 		const cwd = body?.cwd || config.defaultCwd;
 		const spec = body?.spec || "";
 		const swarm = body?.swarm === true;
+		const worktree = body?.worktree === true;
 		if (!title || typeof title !== "string") {
 			json({ error: "Missing title" }, 400);
 			return;
 		}
-		const goal = sessionManager.goalManager.createGoal(title, cwd, spec, swarm);
+		const goal = sessionManager.goalManager.createGoal(title, cwd, spec, swarm, worktree);
 		json(goal, 201);
 		return;
 	}
