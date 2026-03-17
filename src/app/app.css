@@ -365,3 +365,294 @@
 		transform: translateY(0);
 	}
 }
+
+/* ============================================================================
+ * GOAL DASHBOARD
+ * ============================================================================ */
+
+.goal-dashboard {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	background: var(--color-background, #0a0a0a);
+	color: var(--color-foreground, #fafafa);
+}
+
+.goal-dashboard-loading,
+.goal-dashboard-error {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100vh;
+	color: var(--color-muted-foreground, #a1a1aa);
+	font-size: 14px;
+}
+
+.goal-dashboard-error a {
+	color: var(--color-primary, #3b82f6);
+	margin-left: 8px;
+}
+
+/* Nav bar */
+.goal-dashboard-nav {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 20px;
+	border-bottom: 1px solid var(--color-border, #27272a);
+	background: var(--color-card, #09090b);
+	flex-shrink: 0;
+}
+
+.goal-dashboard-back {
+	background: none;
+	border: 1px solid var(--color-border, #27272a);
+	color: var(--color-foreground, #fafafa);
+	padding: 6px 12px;
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.goal-dashboard-back:hover {
+	background: var(--color-accent, #27272a);
+}
+
+.goal-dashboard-title-group {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.goal-dashboard-title {
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.goal-dashboard-branch {
+	font-size: 12px;
+	font-family: monospace;
+	color: var(--color-muted-foreground, #a1a1aa);
+	background: var(--color-accent, #27272a);
+	padding: 2px 8px;
+	border-radius: 4px;
+	white-space: nowrap;
+}
+
+.goal-dashboard-state {
+	font-size: 11px;
+	font-weight: 600;
+	color: #fff;
+	padding: 2px 8px;
+	border-radius: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	white-space: nowrap;
+}
+
+/* Body layout */
+.goal-dashboard-body {
+	display: flex;
+	flex: 1;
+	overflow: hidden;
+}
+
+.goal-dashboard-main {
+	flex: 1;
+	overflow-y: auto;
+	padding: 20px;
+}
+
+.goal-dashboard-sidebar {
+	width: 280px;
+	border-left: 1px solid var(--color-border, #27272a);
+	overflow-y: auto;
+	padding: 20px;
+	flex-shrink: 0;
+}
+
+.goal-dashboard-section {
+	margin-bottom: 24px;
+}
+
+.goal-dashboard-section-title {
+	font-size: 13px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--color-muted-foreground, #a1a1aa);
+	margin: 0 0 12px 0;
+}
+
+/* Commit Timeline */
+.commit-timeline {
+	position: relative;
+	padding-left: 20px;
+}
+
+.commit-timeline::before {
+	content: "";
+	position: absolute;
+	left: 5px;
+	top: 4px;
+	bottom: 4px;
+	width: 2px;
+	background: var(--color-border, #27272a);
+}
+
+.commit-item {
+	position: relative;
+	padding: 8px 0 16px 0;
+}
+
+.commit-dot {
+	position: absolute;
+	left: -20px;
+	top: 12px;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: #52525b;
+	border: 2px solid var(--color-background, #0a0a0a);
+	z-index: 1;
+}
+
+.commit-dot--head {
+	background: #3b82f6;
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.commit-content {
+	padding-left: 4px;
+}
+
+.commit-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.commit-sha {
+	font-family: monospace;
+	font-size: 12px;
+	color: #3b82f6;
+	background: rgba(59, 130, 246, 0.1);
+	padding: 1px 6px;
+	border-radius: 3px;
+}
+
+.commit-time {
+	font-size: 11px;
+	color: var(--color-muted-foreground, #71717a);
+	margin-left: auto;
+}
+
+.commit-message {
+	font-size: 13px;
+	margin-top: 4px;
+	line-height: 1.4;
+	color: var(--color-foreground, #fafafa);
+}
+
+.commit-author {
+	font-size: 11px;
+	color: var(--color-muted-foreground, #a1a1aa);
+	margin-top: 2px;
+}
+
+.commit-badges {
+	display: flex;
+	gap: 4px;
+}
+
+.commit-badge {
+	font-size: 10px;
+	font-weight: 600;
+	padding: 1px 6px;
+	border-radius: 3px;
+	white-space: nowrap;
+}
+
+.commit-badge--pass {
+	background: rgba(34, 197, 94, 0.15);
+	color: #22c55e;
+}
+
+.commit-badge--fail {
+	background: rgba(239, 68, 68, 0.15);
+	color: #ef4444;
+}
+
+.commit-badge--stale {
+	background: rgba(245, 158, 11, 0.15);
+	color: #f59e0b;
+}
+
+.commit-badge--pending {
+	background: rgba(107, 114, 128, 0.15);
+	color: #9ca3af;
+}
+
+.commit-timeline-empty {
+	color: var(--color-muted-foreground, #71717a);
+	font-size: 13px;
+	padding: 20px 0;
+	text-align: center;
+}
+
+/* Task Summary */
+.task-summary {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.task-summary-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 6px 8px;
+	border-radius: 4px;
+	background: var(--color-accent, #18181b);
+}
+
+.task-summary-label {
+	font-size: 13px;
+	color: var(--color-muted-foreground, #a1a1aa);
+}
+
+.task-summary-count {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--color-foreground, #fafafa);
+}
+
+.task-summary-count--active { color: #3b82f6; }
+.task-summary-count--done { color: #22c55e; }
+.task-summary-count--fail { color: #ef4444; }
+.task-summary-count--stale { color: #f59e0b; }
+
+.task-summary-empty {
+	color: var(--color-muted-foreground, #71717a);
+	font-size: 13px;
+	text-align: center;
+	padding: 12px;
+}
+
+@media (max-width: 768px) {
+	.goal-dashboard-body {
+		flex-direction: column;
+	}
+	.goal-dashboard-sidebar {
+		width: auto;
+		border-left: none;
+		border-top: 1px solid var(--color-border, #27272a);
+	}
+}

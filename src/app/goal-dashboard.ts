@@ -1,18 +1,16 @@
-import { html, render, nothing, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
 import { state, renderApp, type Goal } from "./state.js";
-import { gatewayFetch } from "./api.js";
+import { gatewayFetch, deleteGoal } from "./api.js";
 import { setHashRoute } from "./routing.js";
 import { createAndConnectSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
-import { deleteGoal } from "./api.js";
 import { statusBobbit } from "./session-colors.js";
-import { formatSessionAge } from "./render-helpers.js";
 
 // ============================================================================
-// TASK TYPES (mirrors server PersistedTask)
+// TASK & COMMIT TYPES (mirrors server PersistedTask)
 // ============================================================================
 
 export type TaskType = "code" | "test" | "review";
@@ -31,6 +29,14 @@ export interface Task {
 	updatedAt: number;
 }
 
+export interface CommitInfo {
+	sha: string;
+	shortSha: string;
+	message: string;
+	author: string;
+	timestamp: string;
+}
+
 // ============================================================================
 // DASHBOARD STATE
 // ============================================================================
@@ -38,6 +44,7 @@ export interface Task {
 let currentGoalId: string | null = null;
 let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
+let commits: CommitInfo[] = [];
 let loading = true;
 let error = "";
 
@@ -52,9 +59,10 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	renderApp();
 
 	try {
-		const [goalRes, tasksRes] = await Promise.all([
+		const [goalRes, tasksRes, commitsRes] = await Promise.all([
 			gatewayFetch(`/api/goals/${goalId}`),
 			gatewayFetch(`/api/goals/${goalId}/tasks`),
+			gatewayFetch(`/api/goals/${goalId}/commits?limit=20`).catch(() => null),
 		]);
 
 		if (!goalRes.ok) throw new Error(`Goal not found (${goalRes.status})`);
@@ -66,6 +74,13 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 			tasks = data.tasks || [];
 		} else {
 			tasks = [];
+		}
+
+		if (commitsRes && commitsRes.ok) {
+			const data = await commitsRes.json();
+			commits = data.commits || [];
+		} else {
+			commits = [];
 		}
 
 		loading = false;
@@ -81,6 +96,7 @@ export function clearDashboardState(): void {
 	currentGoalId = null;
 	currentGoal = null;
 	tasks = [];
+	commits = [];
 	loading = true;
 	error = "";
 }
@@ -105,7 +121,6 @@ function getElapsedTime(task: Task): string {
 		const hours = Math.floor(mins / 60);
 		return `${hours}h ${mins % 60}m`;
 	}
-	// In-progress or backlog: time since creation
 	const elapsed = Date.now() - task.createdAt;
 	const mins = Math.floor(elapsed / 60_000);
 	if (mins < 1) return "<1m";
@@ -206,7 +221,6 @@ function renderKanbanBoard(taskList: Task[]): TemplateResult {
 	];
 
 	for (const task of taskList) {
-		// Stale tasks show in their original column (done) but with a stale badge
 		const status = task.status === "stale" ? "done" : task.status;
 		const col = columns.find((c) => c.key === status);
 		if (col) col.tasks.push(task);
@@ -215,6 +229,103 @@ function renderKanbanBoard(taskList: Task[]): TemplateResult {
 	return html`
 		<div class="kanban-board">
 			${columns.map(renderKanbanColumn)}
+		</div>
+	`;
+}
+
+// ============================================================================
+// COMMIT TIMELINE
+// ============================================================================
+
+type BadgeStatus = "pass" | "fail" | "stale" | "pending";
+
+interface CommitBadges {
+	tests?: BadgeStatus;
+	review?: BadgeStatus;
+}
+
+function deriveBadges(commitList: CommitInfo[], taskList: Task[]): Map<string, CommitBadges> {
+	const badges = new Map<string, CommitBadges>();
+	for (const c of commitList) {
+		badges.set(c.sha, {});
+	}
+
+	const testTasks = taskList.filter(t => t.type === "test" && t.commitSha);
+	const reviewTasks = taskList.filter(t => t.type === "review" && t.commitSha);
+
+	for (const task of testTasks) {
+		const sha = task.commitSha!;
+		if (!badges.has(sha)) continue;
+		const b = badges.get(sha)!;
+		if (task.status === "done") b.tests = "pass";
+		else if (task.status === "failed") b.tests = "fail";
+		else if (task.status === "stale") b.tests = "stale";
+		else if (task.status === "in-progress") b.tests = "pending";
+	}
+
+	for (const task of reviewTasks) {
+		const sha = task.commitSha!;
+		if (!badges.has(sha)) continue;
+		const b = badges.get(sha)!;
+		if (task.status === "done") b.review = "pass";
+		else if (task.status === "failed") b.review = "fail";
+		else if (task.status === "stale") b.review = "stale";
+		else if (task.status === "in-progress") b.review = "pending";
+	}
+
+	return badges;
+}
+
+function formatRelativeTime(timestamp: string): string {
+	const diffMs = Date.now() - new Date(timestamp).getTime();
+	const mins = Math.floor(diffMs / 60_000);
+	if (mins < 1) return "just now";
+	if (mins < 60) return `${mins}m ago`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+}
+
+const badgeIcons: Record<BadgeStatus, string> = {
+	pass: "\u2713",
+	fail: "\u2717",
+	stale: "\u27F3",
+	pending: "\u23F3",
+};
+
+function renderCommitBadge(label: string, status: BadgeStatus): TemplateResult {
+	return html`<span class="commit-badge commit-badge--${status}" title="${label}: ${status}">${badgeIcons[status]} ${label}</span>`;
+}
+
+function renderCommitTimeline(commitList: CommitInfo[], taskList: Task[]): TemplateResult {
+	if (commitList.length === 0) {
+		return html`<div class="commit-timeline-empty">No commits found on this branch.</div>`;
+	}
+
+	const badges = deriveBadges(commitList, taskList);
+
+	return html`
+		<div class="commit-timeline">
+			${commitList.map((commit, index) => {
+				const isHead = index === 0;
+				const b = badges.get(commit.sha) || {};
+				return html`
+					<div class="commit-item" data-sha="${commit.sha}">
+						<div class="${isHead ? "commit-dot commit-dot--head" : "commit-dot"}"></div>
+						<div class="commit-content">
+							<div class="commit-header">
+								<code class="commit-sha">${commit.shortSha}</code>
+								${b.tests ? renderCommitBadge("Tests", b.tests) : nothing}
+								${b.review ? renderCommitBadge("Review", b.review) : nothing}
+								<span class="commit-time">${formatRelativeTime(commit.timestamp)}</span>
+							</div>
+							<div class="commit-message">${commit.message}</div>
+							<div class="commit-author">${commit.author}</div>
+						</div>
+					</div>
+				`;
+			})}
 		</div>
 	`;
 }
@@ -298,7 +409,7 @@ export function renderGoalDashboard(): TemplateResult {
 					<svg class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
 					</svg>
-					<span>Loading dashboard…</span>
+					<span>Loading dashboard\u2026</span>
 				</div>
 			</div>
 		`;
@@ -328,7 +439,12 @@ export function renderGoalDashboard(): TemplateResult {
 				<h2 class="dashboard-section-title">Tasks</h2>
 				${renderKanbanBoard(tasks)}
 			</div>
-			<!-- Future sections: commit timeline, agent activity, reports -->
+			${commits.length > 0 ? html`
+				<div class="dashboard-section">
+					<h2 class="dashboard-section-title">Commit Timeline</h2>
+					${renderCommitTimeline(commits, tasks)}
+				</div>
+			` : nothing}
 		</div>
 	`;
 }
