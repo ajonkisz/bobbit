@@ -1,417 +1,450 @@
+import { html, nothing, type TemplateResult } from "lit";
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
-import { html, render } from "lit";
-import {
-	ArrowLeft,
-	Crosshair,
-	LayoutDashboard,
-	Pencil,
-	Plus,
-	Trash2,
-	Users,
-	CheckCircle2,
-	Clock,
-	Activity,
-	GitBranch,
-} from "lucide";
-import {
-	state,
-	renderApp,
-	GOAL_STATE_LABELS,
-	GOAL_STATE_COLORS,
-	type Goal,
-	type GoalState,
-} from "./state.js";
-import { gatewayFetch, refreshSessions, deleteGoal, startSwarm } from "./api.js";
-import { showGoalDialog } from "./dialogs.js";
-import { createAndConnectSession, connectToSession } from "./session-manager.js";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
+import { state, renderApp, type Goal } from "./state.js";
+import { gatewayFetch, deleteGoal } from "./api.js";
 import { setHashRoute } from "./routing.js";
-import { goalStateIcon } from "./render-helpers.js";
+import { createAndConnectSession } from "./session-manager.js";
+import { showGoalDialog } from "./dialogs.js";
+import { statusBobbit } from "./session-colors.js";
 
 // ============================================================================
-// NAVIGATION
+// TASK & COMMIT TYPES (mirrors server PersistedTask)
 // ============================================================================
 
-export function navigateToGoalDashboard(goalId: string): void {
-	if (state.remoteAgent) {
-		state.remoteAgent.disconnect();
-		state.remoteAgent = null;
-		state.connectionStatus = "disconnected";
-	}
-	state.goalDashboardId = goalId;
-	setHashRoute("goal-dashboard", goalId);
-	renderApp();
-}
+export type TaskType = "code" | "test" | "review";
+export type TaskStatus = "backlog" | "in-progress" | "done" | "failed" | "stale";
 
-// ============================================================================
-// DATA TYPES
-// ============================================================================
-
-interface Task {
+export interface Task {
 	id: string;
 	title: string;
-	type: "code" | "test" | "review";
-	status: "backlog" | "in-progress" | "done" | "failed";
-	assignee?: string;
+	type: TaskType;
+	status: TaskStatus;
+	assignee?: string; // session ID
 	goalId: string;
 	commitSha?: string;
 	resultSummary?: string;
 	createdAt: number;
 	updatedAt: number;
-	stale?: boolean;
 }
 
-interface SwarmAgent {
-	sessionId: string;
-	role: string;
-	status: string;
-	worktreePath?: string;
+export interface CommitInfo {
+	sha: string;
+	shortSha: string;
+	message: string;
+	author: string;
+	timestamp: string;
 }
 
-interface DashboardData {
-	goal: Goal | null;
-	tasks: Task[];
-	agents: SwarmAgent[];
-	loading: boolean;
-	error: string;
-}
+// ============================================================================
+// DASHBOARD STATE
+// ============================================================================
 
-let dashboardData: DashboardData = {
-	goal: null,
-	tasks: [],
-	agents: [],
-	loading: false,
-	error: "",
-};
+let currentGoalId: string | null = null;
+let currentGoal: Goal | null = null;
+let tasks: Task[] = [];
+let commits: CommitInfo[] = [];
+let loading = true;
+let error = "";
 
 // ============================================================================
 // DATA FETCHING
 // ============================================================================
 
-let _lastFetchedGoalId: string | null = null;
-
-export async function fetchDashboardData(goalId: string): Promise<void> {
-	if (_lastFetchedGoalId === goalId && dashboardData.goal) return;
-	_lastFetchedGoalId = goalId;
-
-	dashboardData = { goal: null, tasks: [], agents: [], loading: true, error: "" };
+export async function loadDashboardData(goalId: string): Promise<void> {
+	currentGoalId = goalId;
+	loading = true;
+	error = "";
 	renderApp();
 
 	try {
-		// Fetch goal data — required
-		const goalRes = await gatewayFetch(`/api/goals/${goalId}`);
-		if (!goalRes.ok) {
-			dashboardData.error = "Goal not found";
-			dashboardData.loading = false;
-			renderApp();
-			return;
+		const [goalRes, tasksRes, commitsRes] = await Promise.all([
+			gatewayFetch(`/api/goals/${goalId}`),
+			gatewayFetch(`/api/goals/${goalId}/tasks`),
+			gatewayFetch(`/api/goals/${goalId}/commits?limit=20`).catch(() => null),
+		]);
+
+		if (!goalRes.ok) throw new Error(`Goal not found (${goalRes.status})`);
+
+		currentGoal = await goalRes.json();
+
+		if (tasksRes.ok) {
+			const data = await tasksRes.json();
+			tasks = data.tasks || [];
+		} else {
+			tasks = [];
 		}
-		dashboardData.goal = await goalRes.json();
 
-		// Fetch tasks (may 404 if task API not yet implemented)
-		try {
-			const tasksRes = await gatewayFetch(`/api/goals/${goalId}/tasks`);
-			if (tasksRes.ok) {
-				const data = await tasksRes.json();
-				dashboardData.tasks = data.tasks || [];
-			}
-		} catch { /* tasks API not available yet */ }
+		if (commitsRes && commitsRes.ok) {
+			const data = await commitsRes.json();
+			commits = data.commits || [];
+		} else {
+			commits = [];
+		}
 
-		// Fetch swarm agents (may 404 if not a swarm goal)
-		try {
-			const agentsRes = await gatewayFetch(`/api/goals/${goalId}/swarm/agents`);
-			if (agentsRes.ok) {
-				const data = await agentsRes.json();
-				dashboardData.agents = data.agents || [];
-			}
-		} catch { /* swarm API not available */ }
-
-		dashboardData.loading = false;
-		renderApp();
+		loading = false;
 	} catch (err) {
-		dashboardData.error = err instanceof Error ? err.message : "Failed to load dashboard";
-		dashboardData.loading = false;
-		renderApp();
+		error = err instanceof Error ? err.message : String(err);
+		loading = false;
+	}
+
+	renderApp();
+}
+
+export function clearDashboardState(): void {
+	currentGoalId = null;
+	currentGoal = null;
+	tasks = [];
+	commits = [];
+	loading = true;
+	error = "";
+}
+
+// ============================================================================
+// KANBAN BOARD
+// ============================================================================
+
+interface KanbanColumn {
+	key: TaskStatus;
+	label: string;
+	dotColor: string;
+	tasks: Task[];
+}
+
+function getElapsedTime(task: Task): string {
+	if (task.status === "done" || task.status === "failed") {
+		const elapsed = task.updatedAt - task.createdAt;
+		const mins = Math.floor(elapsed / 60_000);
+		if (mins < 1) return "<1m";
+		if (mins < 60) return `${mins}m`;
+		const hours = Math.floor(mins / 60);
+		return `${hours}h ${mins % 60}m`;
+	}
+	const elapsed = Date.now() - task.createdAt;
+	const mins = Math.floor(elapsed / 60_000);
+	if (mins < 1) return "<1m";
+	if (mins < 60) return `${mins}m`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ${mins % 60}m`;
+	const days = Math.floor(hours / 24);
+	return `${days}d`;
+}
+
+function typeColor(type: TaskType): string {
+	switch (type) {
+		case "code": return "var(--type-code)";
+		case "test": return "var(--type-test)";
+		case "review": return "var(--type-review)";
 	}
 }
 
-export function resetDashboardData(): void {
-	_lastFetchedGoalId = null;
-	dashboardData = { goal: null, tasks: [], agents: [], loading: false, error: "" };
-}
-
-// ============================================================================
-// HEALTH DERIVATION
-// ============================================================================
-
-function deriveHealth(tasks: Task[]): { label: string; color: string; cssClass: string } {
-	if (tasks.length === 0) return { label: "No tasks", color: "var(--muted-foreground)", cssClass: "text-muted-foreground" };
-	const allDone = tasks.every((t) => t.status === "done");
-	const hasFailed = tasks.some((t) => t.status === "failed");
-	const hasStale = tasks.some((t) => t.stale);
-	if (hasFailed) return { label: "Needs attention", color: "var(--destructive)", cssClass: "text-red-500" };
-	if (hasStale) return { label: "Stale results", color: "#eab308", cssClass: "text-yellow-500" };
-	if (allDone) return { label: "Healthy", color: "#22c55e", cssClass: "text-green-500" };
-	return { label: "In progress", color: "#3b82f6", cssClass: "text-blue-500" };
-}
-
-// ============================================================================
-// RENDER
-// ============================================================================
-
-export function renderGoalDashboard(): ReturnType<typeof html> {
-	const goalId = state.goalDashboardId;
-	if (!goalId) return html``;
-
-	// Trigger data fetch if needed
-	if (_lastFetchedGoalId !== goalId) {
-		fetchDashboardData(goalId);
+function typeLabel(type: TaskType): string {
+	switch (type) {
+		case "code": return "Code";
+		case "test": return "Test";
+		case "review": return "Review";
 	}
+}
 
-	if (dashboardData.loading) {
-		return html`
-			<div class="goal-dashboard flex-1 flex flex-col items-center justify-center gap-4 bg-background text-foreground">
-				<svg class="animate-spin" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-				<span class="text-sm text-muted-foreground">Loading dashboard…</span>
+function findAssigneeSession(sessionId: string | undefined) {
+	if (!sessionId) return null;
+	return state.gatewaySessions.find((s) => s.id === sessionId) || null;
+}
+
+function renderTaskCard(task: Task): TemplateResult {
+	const isDone = task.status === "done";
+	const isFailed = task.status === "failed";
+	const isStale = task.status === "stale";
+	const assignee = findAssigneeSession(task.assignee);
+	const color = typeColor(task.type);
+
+	return html`
+		<div
+			class="kanban-card"
+			style="
+				opacity: ${isDone ? "0.75" : "1"};
+				--card-type-color: ${color};
+			"
+		>
+			<div class="kanban-card-stripe" style="background: ${color};"></div>
+			<div class="kanban-card-body">
+				<div class="kanban-card-title">${task.title}</div>
+				<div class="kanban-card-meta">
+					<span class="kanban-type-badge" style="background: ${color}20; color: ${color};">
+						${typeLabel(task.type)}
+					</span>
+					${isStale ? html`<span class="kanban-stale-badge">Stale</span>` : nothing}
+					${assignee ? html`
+						<span class="kanban-assignee" title="${assignee.title}" @click=${(e: Event) => {
+							e.stopPropagation();
+							setHashRoute("session", assignee.id);
+						}}>
+							${statusBobbit(assignee.status, assignee.isCompacting, assignee.id, false, assignee.isAborting, assignee.role === "team-lead")}
+							<span class="kanban-assignee-name">${assignee.title || assignee.id.slice(0, 8)}</span>
+						</span>
+					` : nothing}
+					<span class="kanban-elapsed">${getElapsedTime(task)}</span>
+				</div>
+				${isFailed && task.resultSummary ? html`
+					<div class="kanban-error">${task.resultSummary}</div>
+				` : nothing}
 			</div>
-		`;
+		</div>
+	`;
+}
+
+function renderKanbanColumn(col: KanbanColumn): TemplateResult {
+	return html`
+		<div class="kanban-column">
+			<div class="kanban-column-header">
+				<span class="kanban-column-dot" style="background: ${col.dotColor};"></span>
+				<span class="kanban-column-name">${col.label}</span>
+				<span class="kanban-column-count">${col.tasks.length}</span>
+			</div>
+			<div class="kanban-column-cards">
+				${col.tasks.length > 0
+					? col.tasks.map(renderTaskCard)
+					: html`<div class="kanban-empty">No tasks</div>`
+				}
+			</div>
+		</div>
+	`;
+}
+
+function renderKanbanBoard(taskList: Task[]): TemplateResult {
+	const columns: KanbanColumn[] = [
+		{ key: "backlog", label: "Backlog", dotColor: "var(--kanban-backlog)", tasks: [] },
+		{ key: "in-progress", label: "In Progress", dotColor: "var(--kanban-in-progress)", tasks: [] },
+		{ key: "done", label: "Done", dotColor: "var(--kanban-done)", tasks: [] },
+		{ key: "failed", label: "Failed", dotColor: "var(--kanban-failed)", tasks: [] },
+	];
+
+	for (const task of taskList) {
+		const status = task.status === "stale" ? "done" : task.status;
+		const col = columns.find((c) => c.key === status);
+		if (col) col.tasks.push(task);
 	}
 
-	if (dashboardData.error || !dashboardData.goal) {
-		return html`
-			<div class="goal-dashboard flex-1 flex flex-col items-center justify-center gap-4 bg-background text-foreground">
-				<p class="text-sm text-red-500">${dashboardData.error || "Goal not found"}</p>
+	return html`
+		<div class="kanban-board">
+			${columns.map(renderKanbanColumn)}
+		</div>
+	`;
+}
+
+// ============================================================================
+// COMMIT TIMELINE
+// ============================================================================
+
+type BadgeStatus = "pass" | "fail" | "stale" | "pending";
+
+interface CommitBadges {
+	tests?: BadgeStatus;
+	review?: BadgeStatus;
+}
+
+function deriveBadges(commitList: CommitInfo[], taskList: Task[]): Map<string, CommitBadges> {
+	const badges = new Map<string, CommitBadges>();
+	for (const c of commitList) {
+		badges.set(c.sha, {});
+	}
+
+	const testTasks = taskList.filter(t => t.type === "test" && t.commitSha);
+	const reviewTasks = taskList.filter(t => t.type === "review" && t.commitSha);
+
+	for (const task of testTasks) {
+		const sha = task.commitSha!;
+		if (!badges.has(sha)) continue;
+		const b = badges.get(sha)!;
+		if (task.status === "done") b.tests = "pass";
+		else if (task.status === "failed") b.tests = "fail";
+		else if (task.status === "stale") b.tests = "stale";
+		else if (task.status === "in-progress") b.tests = "pending";
+	}
+
+	for (const task of reviewTasks) {
+		const sha = task.commitSha!;
+		if (!badges.has(sha)) continue;
+		const b = badges.get(sha)!;
+		if (task.status === "done") b.review = "pass";
+		else if (task.status === "failed") b.review = "fail";
+		else if (task.status === "stale") b.review = "stale";
+		else if (task.status === "in-progress") b.review = "pending";
+	}
+
+	return badges;
+}
+
+function formatRelativeTime(timestamp: string): string {
+	const diffMs = Date.now() - new Date(timestamp).getTime();
+	const mins = Math.floor(diffMs / 60_000);
+	if (mins < 1) return "just now";
+	if (mins < 60) return `${mins}m ago`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+}
+
+const badgeIcons: Record<BadgeStatus, string> = {
+	pass: "\u2713",
+	fail: "\u2717",
+	stale: "\u27F3",
+	pending: "\u23F3",
+};
+
+function renderCommitBadge(label: string, status: BadgeStatus): TemplateResult {
+	return html`<span class="commit-badge commit-badge--${status}" title="${label}: ${status}">${badgeIcons[status]} ${label}</span>`;
+}
+
+function renderCommitTimeline(commitList: CommitInfo[], taskList: Task[]): TemplateResult {
+	if (commitList.length === 0) {
+		return html`<div class="commit-timeline-empty">No commits found on this branch.</div>`;
+	}
+
+	const badges = deriveBadges(commitList, taskList);
+
+	return html`
+		<div class="commit-timeline">
+			${commitList.map((commit, index) => {
+				const isHead = index === 0;
+				const b = badges.get(commit.sha) || {};
+				return html`
+					<div class="commit-item" data-sha="${commit.sha}">
+						<div class="${isHead ? "commit-dot commit-dot--head" : "commit-dot"}"></div>
+						<div class="commit-content">
+							<div class="commit-header">
+								<code class="commit-sha">${commit.shortSha}</code>
+								${b.tests ? renderCommitBadge("Tests", b.tests) : nothing}
+								${b.review ? renderCommitBadge("Review", b.review) : nothing}
+								<span class="commit-time">${formatRelativeTime(commit.timestamp)}</span>
+							</div>
+							<div class="commit-message">${commit.message}</div>
+							<div class="commit-author">${commit.author}</div>
+						</div>
+					</div>
+				`;
+			})}
+		</div>
+	`;
+}
+
+// ============================================================================
+// DASHBOARD LAYOUT
+// ============================================================================
+
+function renderNavBar(goal: Goal): TemplateResult {
+	return html`
+		<div class="dashboard-nav">
+			<div class="dashboard-nav-left">
+				<button class="dashboard-back" @click=${() => setHashRoute("landing")} title="Back to sessions">
+					${icon(ArrowLeft, "sm")}
+				</button>
+				<div class="dashboard-title-group">
+					<h1 class="dashboard-title">${goal.title}</h1>
+					${goal.branch ? html`<span class="dashboard-branch">${goal.branch}</span>` : nothing}
+				</div>
+			</div>
+			<div class="dashboard-nav-right">
 				${Button({
 					variant: "ghost",
 					size: "sm",
-					onClick: () => { state.goalDashboardId = null; setHashRoute("landing"); renderApp(); },
-					children: html`<span class="inline-flex items-center gap-1.5">${icon(ArrowLeft, "sm")} Back</span>`,
+					onClick: () => showGoalDialog(goal),
+					children: html`<span class="inline-flex items-center gap-1">${icon(Pencil, "sm")} Edit</span>`,
 				})}
+				${Button({
+					variant: "ghost",
+					size: "sm",
+					onClick: () => deleteGoal(goal.id),
+					children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Trash2, "sm")} Delete</span>`,
+				})}
+				${Button({
+					variant: "default",
+					size: "sm",
+					onClick: () => createAndConnectSession(goal.id),
+					children: html`<span class="inline-flex items-center gap-1">${icon(Plus, "sm")} New Session</span>`,
+				})}
+			</div>
+		</div>
+	`;
+}
+
+function renderSummaryHeader(goal: Goal, taskList: Task[]): TemplateResult {
+	const total = taskList.length;
+	const done = taskList.filter((t) => t.status === "done").length;
+	const inProgress = taskList.filter((t) => t.status === "in-progress").length;
+	const failed = taskList.filter((t) => t.status === "failed").length;
+	const activeAgents = state.gatewaySessions.filter(
+		(s) => s.goalId === goal.id && !s.delegateOf && (s.status === "streaming" || s.status === "busy"),
+	).length;
+
+	return html`
+		<div class="dashboard-summary">
+			<div class="dashboard-stat">
+				<span class="dashboard-stat-value">${done}/${total}</span>
+				<span class="dashboard-stat-label">Tasks done</span>
+			</div>
+			<div class="dashboard-stat">
+				<span class="dashboard-stat-value">${inProgress}</span>
+				<span class="dashboard-stat-label">In progress</span>
+			</div>
+			<div class="dashboard-stat">
+				<span class="dashboard-stat-value">${failed}</span>
+				<span class="dashboard-stat-label">Failed</span>
+			</div>
+			<div class="dashboard-stat">
+				<span class="dashboard-stat-value">${activeAgents}</span>
+				<span class="dashboard-stat-label">Active agents</span>
+			</div>
+		</div>
+	`;
+}
+
+export function renderGoalDashboard(): TemplateResult {
+	if (loading) {
+		return html`
+			<div class="dashboard-container">
+				<div class="dashboard-loading">
+					<svg class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+					</svg>
+					<span>Loading dashboard\u2026</span>
+				</div>
 			</div>
 		`;
 	}
 
-	const goal = dashboardData.goal;
-	const tasks = dashboardData.tasks;
-	const agents = dashboardData.agents;
-	const health = deriveHealth(tasks);
-
-	const tasksByStatus = {
-		backlog: tasks.filter((t) => t.status === "backlog"),
-		"in-progress": tasks.filter((t) => t.status === "in-progress"),
-		done: tasks.filter((t) => t.status === "done"),
-		failed: tasks.filter((t) => t.status === "failed"),
-	};
-
-	const activeAgents = agents.filter((a) => a.status === "active" || a.status === "working");
-	const goalSessions = state.gatewaySessions.filter((s) => s.goalId === goal.id || s.swarmGoalId === goal.id);
-
-	return html`
-		<div class="goal-dashboard flex-1 flex flex-col min-h-0 bg-background text-foreground overflow-hidden">
-			<!-- Nav Bar -->
-			<div class="gd-navbar shrink-0 flex items-center justify-between px-5 py-3 border-b border-border bg-card/80 backdrop-blur-sm">
-				<div class="flex items-center gap-3 min-w-0">
-					<button class="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-						@click=${() => { state.goalDashboardId = null; setHashRoute("landing"); renderApp(); }}
-						title="Back to sessions">
-						${icon(ArrowLeft, "sm")}
-					</button>
-					<div class="flex items-center gap-2 min-w-0">
-						<span class="shrink-0">${goalStateIcon(goal.state, 16)}</span>
-						<h1 class="text-base font-semibold text-foreground truncate">${goal.title}</h1>
-						${goal.branch ? html`
-							<span class="flex items-center gap-1 text-xs text-muted-foreground font-mono bg-secondary/50 px-2 py-0.5 rounded-md shrink-0">
-								${icon(GitBranch, "xs")}
-								${goal.branch}
-							</span>
-						` : ""}
-					</div>
-				</div>
-				<div class="flex items-center gap-1.5 shrink-0">
+	if (error || !currentGoal) {
+		return html`
+			<div class="dashboard-container">
+				<div class="dashboard-error">
+					<p>${error || "Goal not found"}</p>
 					${Button({
 						variant: "ghost",
 						size: "sm",
-						onClick: () => showGoalDialog(goal),
-						children: html`<span class="inline-flex items-center gap-1">${icon(Pencil, "xs")} Edit</span>`,
-					})}
-					${Button({
-						variant: "ghost",
-						size: "sm",
-						onClick: () => deleteGoal(goal.id),
-						children: html`<span class="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive">${icon(Trash2, "xs")} Delete</span>`,
-					})}
-					${goal.swarm ? Button({
-						variant: "default",
-						size: "sm",
-						onClick: async () => { const sid = await startSwarm(goal.id); if (sid) connectToSession(sid, true); },
-						children: html`<span class="inline-flex items-center gap-1.5">🐝 Start Swarm</span>`,
-					}) : ""}
-					${Button({
-						variant: "default",
-						size: "sm",
-						onClick: () => createAndConnectSession(goal.id),
-						children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "xs")} New Session</span>`,
+						onClick: () => setHashRoute("landing"),
+						children: "Back to sessions",
 					})}
 				</div>
 			</div>
-
-			<!-- Scrollable Content -->
-			<div class="flex-1 overflow-y-auto">
-				<!-- Summary Header -->
-				<div class="gd-summary px-5 py-4 border-b border-border/50">
-					<div class="flex items-center gap-6 flex-wrap">
-						<div class="flex items-center gap-2">
-							<div class="w-2.5 h-2.5 rounded-full" style="background:${health.color}"></div>
-							<span class="text-sm font-medium ${health.cssClass}">${health.label}</span>
-						</div>
-						<div class="flex items-center gap-1.5 text-sm text-muted-foreground">
-							${icon(CheckCircle2, "xs")}
-							<span>${tasksByStatus.done.length}/${tasks.length} tasks done</span>
-						</div>
-						<div class="flex items-center gap-1.5 text-sm text-muted-foreground">
-							${icon(Users, "xs")}
-							<span>${activeAgents.length > 0 ? `${activeAgents.length} active agent${activeAgents.length !== 1 ? "s" : ""}` : `${goalSessions.length} session${goalSessions.length !== 1 ? "s" : ""}`}</span>
-						</div>
-						<div class="flex items-center gap-1.5 text-sm text-muted-foreground">
-							${icon(Clock, "xs")}
-							<span>${formatElapsed(goal.createdAt)}</span>
-						</div>
-						<span class="text-xs px-2 py-0.5 rounded-full border border-border ${GOAL_STATE_COLORS[goal.state]}">${GOAL_STATE_LABELS[goal.state]}</span>
-					</div>
-				</div>
-
-				<!-- Dashboard Grid -->
-				<div class="gd-grid grid gap-5 p-5" style="grid-template-columns: 1fr 1fr; grid-template-rows: auto auto;">
-					<!-- Kanban Board -->
-					<div class="gd-kanban col-span-2 rounded-lg border border-border bg-card p-4">
-						<h2 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-							${icon(Activity, "sm")}
-							Task Board
-						</h2>
-						${tasks.length > 0 ? html`
-							<div class="grid grid-cols-4 gap-3" style="min-height:120px;">
-								${renderKanbanColumn("Backlog", tasksByStatus.backlog, "text-muted-foreground")}
-								${renderKanbanColumn("In Progress", tasksByStatus["in-progress"], "text-blue-500")}
-								${renderKanbanColumn("Done", tasksByStatus.done, "text-green-500")}
-								${renderKanbanColumn("Failed", tasksByStatus.failed, "text-red-500")}
-							</div>
-						` : html`
-							<div class="flex flex-col items-center justify-center py-8 text-muted-foreground">
-								<p class="text-sm">No tasks yet</p>
-								<p class="text-xs mt-1">Tasks will appear here when the structured task API is available</p>
-							</div>
-						`}
-					</div>
-
-					<!-- Agent Activity Panel -->
-					<div class="gd-agents rounded-lg border border-border bg-card p-4">
-						<h2 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-							${icon(Users, "sm")}
-							Agent Activity
-						</h2>
-						${goalSessions.length > 0 ? html`
-							<div class="flex flex-col gap-2">
-								${goalSessions.map((s) => html`
-									<button class="flex items-center gap-2 px-3 py-2 rounded-md border border-border/50 hover:bg-secondary/50 transition-colors text-left w-full"
-										@click=${() => connectToSession(s.id, true)}>
-										<div class="w-2 h-2 rounded-full shrink-0 ${s.status === "streaming" ? "bg-green-500" : s.status === "idle" ? "bg-muted-foreground/40" : "bg-yellow-500"}"></div>
-										<div class="flex-1 min-w-0">
-											<div class="text-xs font-medium text-foreground truncate">${s.title || "Untitled"}</div>
-											<div class="text-[10px] text-muted-foreground">${s.role || "session"} · ${s.status}</div>
-										</div>
-									</button>
-								`)}
-							</div>
-						` : html`
-							<div class="flex flex-col items-center justify-center py-6 text-muted-foreground">
-								<p class="text-sm">No active agents</p>
-								${goal.swarm ? html`
-									<button class="text-xs text-primary hover:underline mt-1"
-										@click=${async () => { const sid = await startSwarm(goal.id); if (sid) connectToSession(sid, true); }}>Start swarm</button>
-								` : html`
-									<button class="text-xs text-primary hover:underline mt-1"
-										@click=${() => createAndConnectSession(goal.id)}>Create a session</button>
-								`}
-							</div>
-						`}
-					</div>
-
-					<!-- Commit Timeline (placeholder) -->
-					<div class="gd-timeline rounded-lg border border-border bg-card p-4">
-						<h2 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-							${icon(GitBranch, "sm")}
-							Commit Timeline
-						</h2>
-						<div class="flex flex-col items-center justify-center py-6 text-muted-foreground">
-							<p class="text-sm">Coming soon</p>
-							<p class="text-xs mt-1">Commit history with status badges will appear here</p>
-						</div>
-					</div>
-
-					<!-- Reports Viewer (placeholder) -->
-					<div class="gd-reports col-span-2 rounded-lg border border-border bg-card p-4">
-						<h2 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-							${icon(LayoutDashboard, "sm")}
-							Reports
-						</h2>
-						<div class="flex flex-col items-center justify-center py-6 text-muted-foreground">
-							<p class="text-sm">Coming soon</p>
-							<p class="text-xs mt-1">Code review and test suite reports will be embedded here</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	`;
-}
-
-// ============================================================================
-// KANBAN COLUMN
-// ============================================================================
-
-function renderKanbanColumn(title: string, tasks: Task[], titleColor: string) {
-	return html`
-		<div class="flex flex-col gap-2">
-			<div class="flex items-center justify-between">
-				<span class="text-xs font-semibold ${titleColor} uppercase tracking-wider">${title}</span>
-				<span class="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-full">${tasks.length}</span>
-			</div>
-			<div class="flex flex-col gap-1.5 min-h-[60px]">
-				${tasks.map((t) => html`
-					<div class="px-2.5 py-2 rounded-md border border-border/50 bg-background hover:bg-secondary/30 transition-colors">
-						<div class="text-xs font-medium text-foreground">${t.title}</div>
-						<div class="flex items-center gap-2 mt-1">
-							<span class="text-[10px] px-1.5 py-0.5 rounded-full ${taskTypeColor(t.type)}">${t.type}</span>
-							${t.assignee ? html`<span class="text-[10px] text-muted-foreground">${t.assignee}</span>` : ""}
-							${t.stale ? html`<span class="text-[10px] text-yellow-500 font-medium">stale</span>` : ""}
-						</div>
-					</div>
-				`)}
-			</div>
-		</div>
-	`;
-}
-
-function taskTypeColor(type: string): string {
-	switch (type) {
-		case "code": return "bg-blue-500/10 text-blue-500";
-		case "test": return "bg-green-500/10 text-green-500";
-		case "review": return "bg-purple-500/10 text-purple-500";
-		default: return "bg-secondary text-muted-foreground";
+		`;
 	}
-}
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-function formatElapsed(createdAt: number): string {
-	const ms = Date.now() - createdAt;
-	const minutes = Math.floor(ms / 60000);
-	if (minutes < 1) return "just now";
-	if (minutes < 60) return `${minutes}m`;
-	const hours = Math.floor(minutes / 60);
-	if (hours < 24) return `${hours}h ${minutes % 60}m`;
-	const days = Math.floor(hours / 24);
-	return `${days}d ${hours % 24}h`;
+	return html`
+		<div class="dashboard-container">
+			${renderNavBar(currentGoal)}
+			${renderSummaryHeader(currentGoal, tasks)}
+			<div class="dashboard-section">
+				<h2 class="dashboard-section-title">Tasks</h2>
+				${renderKanbanBoard(tasks)}
+			</div>
+			${commits.length > 0 ? html`
+				<div class="dashboard-section">
+					<h2 class="dashboard-section-title">Commit Timeline</h2>
+					${renderCommitTimeline(commits, tasks)}
+				</div>
+			` : nothing}
+		</div>
+	`;
 }

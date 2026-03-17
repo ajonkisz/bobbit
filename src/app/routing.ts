@@ -1,8 +1,8 @@
 // ============================================================================
-// URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected)
+// URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected, #/goal/{id} = dashboard)
 // ============================================================================
 
-export type RouteView = "landing" | "session" | "goal-dashboard";
+export type RouteView = "landing" | "session" | "goal" | "goal-dashboard";
 
 export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string } {
 	const hash = window.location.hash || "";

@@ -28,8 +28,9 @@ const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:
 
 import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
 import { mobileHeaderVisible, teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
-import { setHashRoute } from "./routing.js";
-import { renderGoalDashboard, fetchDashboardData } from "./goal-dashboard.js";
+import { getRouteFromHash, setHashRoute } from "./routing.js";
+import { renderGoalDashboard } from "./goal-dashboard.js";
+import "./goal-dashboard.css";
 
 // Expose for testing
 (window as any).__extractWorkflowStatus = extractWorkflowStatus;
@@ -569,9 +570,9 @@ export function doRenderApp(): void {
 	};
 
 	const mainArea = () => {
-		// Goal dashboard full-screen route
-		if (state.goalDashboardId) {
-			fetchDashboardData(state.goalDashboardId);
+		// Goal dashboard route
+		const route = getRouteFromHash();
+		if (route.view === "goal" && route.goalId) {
 			return renderGoalDashboard();
 		}
 

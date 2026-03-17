@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -398,6 +399,40 @@ async function handleApiRoute(
 			sessionManager.broadcastToAll({ type: "task_updated", task });
 		}
 		json({ commitSha, staled });
+		return;
+	}
+
+	// GET /api/goals/:id/commits — git log for the goal branch
+	const goalCommitsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/commits$/);
+	if (goalCommitsMatch && req.method === "GET") {
+		const goalId = goalCommitsMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		try {
+			const branch = goal.branch || "HEAD";
+			const cwd = goal.worktreePath || goal.cwd;
+			const limitParam = url.searchParams.get("limit");
+			const limit = Math.min(Math.max(parseInt(limitParam || "20", 10) || 20, 1), 100);
+
+			// Use %x00 as field separator and %x01 as record separator for reliable parsing
+			const format = "%H%x00%h%x00%s%x00%an%x00%aI%x01";
+			const raw = execSync(
+				`git log "${branch}" --format="${format}" -n ${limit}`,
+				{ cwd, shell: true as unknown as string, encoding: "utf-8", timeout: 10_000 },
+			);
+			const commits = raw
+				.split("\x01")
+				.map((r: string) => r.trim())
+				.filter(Boolean)
+				.map((record: string) => {
+					const [sha, shortSha, message, author, timestamp] = record.split("\x00");
+					return { sha, shortSha, message, author, timestamp };
+				});
+			json({ commits });
+		} catch (err) {
+			json({ error: `Failed to get commits: ${err instanceof Error ? err.message : String(err)}` }, 500);
+		}
 		return;
 	}
 
