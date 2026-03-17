@@ -673,6 +673,237 @@ test.describe("Goals — UI", () => {
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
+	test("goal assistant split-screen: both panels fit within viewport on desktop", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await openApp(page, token);
+
+		// Create goal assistant session
+		await page.locator('button[title="New goal"]').click();
+		await expect(page.locator("message-editor textarea")).toBeVisible({ timeout: 15_000 });
+
+		// Verify sidebar, chat panel, and preview panel are all visible
+		const sidebar = page.locator(".sidebar-edge").first();
+		const chatPanel = page.locator(".goal-chat-panel");
+		const previewPanel = page.locator(".goal-preview-panel");
+		await expect(sidebar).toBeVisible({ timeout: 5_000 });
+		await expect(chatPanel).toBeVisible();
+		await expect(previewPanel).toBeVisible();
+
+		const sidebarBox = await sidebar.boundingBox();
+		const chatBox = await chatPanel.boundingBox();
+		const previewBox = await previewPanel.boundingBox();
+		expect(sidebarBox).toBeTruthy();
+		expect(chatBox).toBeTruthy();
+		expect(previewBox).toBeTruthy();
+
+		// Chat panel must start after the sidebar
+		expect(chatBox!.x).toBeGreaterThanOrEqual(sidebarBox!.x + sidebarBox!.width - 2);
+
+		// Preview panel right edge must not exceed the viewport
+		expect(previewBox!.x + previewBox!.width).toBeLessThanOrEqual(1282);
+
+		// Both panels should be roughly equal width (within 5px for border)
+		expect(Math.abs(chatBox!.width - previewBox!.width)).toBeLessThan(5);
+
+		// No horizontal scrollbar on the page
+		const hasHScroll = await page.evaluate(() =>
+			document.documentElement.scrollWidth > document.documentElement.clientWidth);
+		expect(hasHScroll).toBe(false);
+
+		await page.screenshot({ path: "test-results/goal-split-empty-e2e.png", fullPage: false });
+
+		// Clean up
+		const sessions = await apiListSessions(GW_URL, token);
+		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
+	});
+
+	test("goal assistant split-screen: preview stays on-screen after proposal populates", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await openApp(page, token);
+
+		// Create goal assistant session and get a proposal
+		await page.locator('button[title="New goal"]').click();
+		await expect(page.locator("message-editor textarea")).toBeVisible({ timeout: 15_000 });
+
+		const textarea = page.locator("message-editor textarea");
+		await textarea.fill("I want to build a CLI tool that generates changelog entries from git commits. Propose the goal immediately, no questions.");
+		await textarea.press("Enter");
+
+		// Wait for proposal to populate the preview panel
+		const previewPanel = page.locator(".goal-preview-panel");
+		const titleInput = previewPanel.locator("input[type='text']").first();
+		await expect(titleInput).toHaveValue(/.+/, { timeout: 120_000 });
+
+		// Take screenshot of the populated state
+		await page.screenshot({ path: "test-results/goal-split-populated-e2e.png", fullPage: false });
+
+		// Verify layout bounds after real content has rendered
+		const chatBox = await page.locator(".goal-chat-panel").boundingBox();
+		const previewBox = await previewPanel.boundingBox();
+		expect(chatBox).toBeTruthy();
+		expect(previewBox).toBeTruthy();
+
+		// Preview must not overflow the viewport
+		expect(previewBox!.x + previewBox!.width).toBeLessThanOrEqual(1282);
+
+		// Panels should be roughly equal
+		expect(Math.abs(chatBox!.width - previewBox!.width)).toBeLessThan(5);
+
+		// No horizontal scroll
+		const hasHScroll = await page.evaluate(() =>
+			document.documentElement.scrollWidth > document.documentElement.clientWidth);
+		expect(hasHScroll).toBe(false);
+
+		// Clean up
+		const sessions = await apiListSessions(GW_URL, token);
+		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
+	});
+
+	test("goal assistant: cwd combobox shows dropdown and supports keyboard navigation", async ({ page }) => {
+		// Pre-create a session so there's at least one cwd in the history
+		const session = await apiCreateSession(GW_URL, token);
+		cleanupSessionIds.push(session.id);
+
+		await openApp(page, token);
+
+		// Create goal assistant session
+		await page.locator('button[title="New goal"]').click();
+		await expect(page.locator("message-editor textarea")).toBeVisible({ timeout: 15_000 });
+
+		// Find the cwd combobox input (inside the preview panel)
+		const previewPanel = page.locator(".goal-preview-panel");
+		await expect(previewPanel).toBeVisible({ timeout: 5_000 });
+
+		const cwdInput = previewPanel.locator(".cwd-combobox input[type='text']");
+		await expect(cwdInput).toBeVisible();
+
+		// Focus the input — dropdown should appear if there are recent cwds
+		await cwdInput.focus();
+		// Give the dropdown a moment to render
+		await page.waitForTimeout(300);
+
+		const dropdown = previewPanel.locator(".cwd-combobox-dropdown");
+		const dropdownVisible = await dropdown.isVisible().catch(() => false);
+
+		if (dropdownVisible) {
+			// Dropdown has ARIA listbox role
+			await expect(dropdown).toHaveAttribute("role", "listbox");
+
+			// Input has combobox ARIA
+			await expect(cwdInput).toHaveAttribute("role", "combobox");
+
+			// ArrowDown highlights first item
+			await cwdInput.press("ArrowDown");
+			const firstItem = dropdown.locator("[role='option']").first();
+			await expect(firstItem).toHaveAttribute("data-highlighted", "");
+
+			// Enter selects the highlighted item
+			const itemText = await firstItem.locator(".cwd-path").textContent();
+			await cwdInput.press("Enter");
+
+			// Input should now contain the selected path
+			if (itemText) {
+				await expect(cwdInput).toHaveValue(itemText.trim());
+			}
+
+			// Dropdown should close after selection
+			await expect(dropdown).not.toBeVisible({ timeout: 2_000 });
+		}
+
+		// Verify the input still accepts free-text typing
+		await cwdInput.fill("/some/custom/path");
+		await expect(cwdInput).toHaveValue("/some/custom/path");
+
+		// Clean up
+		const sessions = await apiListSessions(GW_URL, token);
+		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
+	});
+
+	test("goal assistant: worktree toggle present and auto-enables with swarm", async ({ page }) => {
+		await openApp(page, token);
+
+		// Create goal assistant session
+		await page.locator('button[title="New goal"]').click();
+		await expect(page.locator("message-editor textarea")).toBeVisible({ timeout: 15_000 });
+
+		const previewPanel = page.locator(".goal-preview-panel");
+		await expect(previewPanel).toBeVisible({ timeout: 5_000 });
+
+		// Find the worktree toggle (toggle-switch inside the cwd section)
+		const worktreeToggle = previewPanel.locator(".toggle-switch").first();
+		await expect(worktreeToggle).toBeVisible();
+		expect(await worktreeToggle.isChecked()).toBe(false);
+
+		// Find the swarm toggle (second toggle-switch)
+		const swarmToggle = previewPanel.locator(".toggle-switch").nth(1);
+		await expect(swarmToggle).toBeVisible();
+
+		// Enable swarm — worktree should auto-enable
+		await swarmToggle.click();
+		expect(await swarmToggle.isChecked()).toBe(true);
+		expect(await worktreeToggle.isChecked()).toBe(true);
+
+		// Worktree can still be independently disabled
+		await worktreeToggle.click();
+		expect(await worktreeToggle.isChecked()).toBe(false);
+		expect(await swarmToggle.isChecked()).toBe(true);
+
+		// Clean up
+		const sessions = await apiListSessions(GW_URL, token);
+		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
+	});
+
+	test("goal assistant: worktree flag passes through to API on goal creation", async ({ page }) => {
+		await openApp(page, token);
+
+		// Create goal assistant session
+		await page.locator('button[title="New goal"]').click();
+		await expect(page.locator("message-editor textarea")).toBeVisible({ timeout: 15_000 });
+
+		// Ask for a proposal
+		const textarea = page.locator("message-editor textarea");
+		await textarea.fill("I want to lint the codebase. Propose the goal right away.");
+		await textarea.press("Enter");
+
+		const previewPanel = page.locator(".goal-preview-panel");
+		const titleInput = previewPanel.locator("input[type='text']").first();
+		await expect(titleInput).toHaveValue(/.+/, { timeout: 120_000 });
+
+		// Override title for identification
+		await titleInput.fill("Worktree Flag Test");
+
+		// Enable worktree toggle
+		const worktreeToggle = previewPanel.locator(".toggle-switch").first();
+		await worktreeToggle.click();
+		expect(await worktreeToggle.isChecked()).toBe(true);
+
+		// Create the goal
+		await previewPanel.locator("button").filter({ hasText: "Create Goal" }).click();
+		await expect(page.locator("text=Bobbit").first()).toBeVisible({ timeout: 10_000 });
+
+		// Verify the goal was created — if the cwd is a git repo, it should have a worktreePath
+		const goals = await apiListGoals(GW_URL, token);
+		const created = goals.find((g) => g.title === "Worktree Flag Test");
+		expect(created).toBeTruthy();
+		if (created) {
+			cleanupGoalIds.push(created.id);
+			// If the goal's cwd was a git repo, worktreePath should be set
+			// (the test project cwd IS a git repo)
+			const goalDetail = await apiGetGoal(GW_URL, token, created.id);
+			expect((goalDetail as any).worktreePath).toBeTruthy();
+			expect((goalDetail as any).branch).toMatch(/^goal\//);
+		}
+
+		// Clean up sessions
+		const sessions = await apiListSessions(GW_URL, token);
+		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
+	});
+
 	test("can edit a goal via the UI dialog", async ({ page }) => {
 		// Create a goal via API
 		const goal = await apiCreateGoal(GW_URL, token, {

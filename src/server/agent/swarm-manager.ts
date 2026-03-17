@@ -389,7 +389,8 @@ export class SwarmManager {
 	}
 
 	/**
-	 * Complete a swarm: dismiss all role agents and update the goal state.
+	 * Complete a swarm: dismiss all role agents but keep the team lead alive.
+	 * The team lead remains active to present a report and await further instructions.
 	 */
 	async completeSwarm(goalId: string): Promise<void> {
 		const entry = this.swarms.get(goalId);
@@ -407,6 +408,39 @@ export class SwarmManager {
 			}
 		}
 
+		// Keep the team lead session alive — do NOT terminate it.
+		// The team lead will present a report and await further instructions.
+
+		// Update goal state
+		this.goalManager.updateGoal(goalId, { state: "complete" });
+
+		// Keep swarm tracking alive so the team lead can still be found
+		// but persist the updated state (agents cleared)
+		this.persistEntry(goalId);
+
+		console.log(`[swarm-manager] Completed swarm for goal ${goalId} — team lead remains active: ${entry.teamLeadSessionId}`);
+	}
+
+	/**
+	 * Fully tear down a swarm: dismiss all agents AND terminate the team lead.
+	 * Use this when explicitly shutting down everything.
+	 */
+	async teardownSwarm(goalId: string): Promise<void> {
+		const entry = this.swarms.get(goalId);
+		if (!entry) {
+			throw new Error(`No active swarm for goal: ${goalId}`);
+		}
+
+		// Dismiss all role agents
+		const agentSessionIds = entry.agents.map((a) => a.sessionId);
+		for (const sessionId of agentSessionIds) {
+			try {
+				await this.dismissRole(sessionId);
+			} catch (err) {
+				console.error(`[swarm-manager] Error dismissing agent ${sessionId} during swarm teardown:`, err);
+			}
+		}
+
 		// Terminate the team lead session
 		if (entry.teamLeadSessionId) {
 			try {
@@ -417,14 +451,11 @@ export class SwarmManager {
 			this.sessionToGoal.delete(entry.teamLeadSessionId);
 		}
 
-		// Update goal state
-		this.goalManager.updateGoal(goalId, { state: "complete" });
-
-		// Remove swarm tracking
+		// Remove swarm tracking entirely
 		this.swarms.delete(goalId);
 		this.store.remove(goalId);
 
-		console.log(`[swarm-manager] Completed swarm for goal ${goalId}`);
+		console.log(`[swarm-manager] Tore down swarm for goal ${goalId}`);
 	}
 
 	/**

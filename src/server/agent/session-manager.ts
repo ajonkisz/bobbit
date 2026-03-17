@@ -4,11 +4,13 @@ import type { WebSocket } from "ws";
 import type { ServerMessage } from "../ws/protocol.js";
 import { EventBuffer } from "./event-buffer.js";
 import { GoalManager } from "./goal-manager.js";
+import { TaskManager } from "./task-manager.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
+import { CostTracker } from "./cost-tracker.js";
 
 export type SessionStatus = "starting" | "idle" | "streaming" | "terminated";
 
@@ -36,6 +38,8 @@ export interface SessionInfo {
 	swarmGoalId?: string;
 	/** Path to the git worktree for this session */
 	worktreePath?: string;
+	/** Task ID this session is working on */
+	taskId?: string;
 }
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
@@ -59,12 +63,44 @@ export class SessionManager {
 	private agentCliPath?: string;
 	private systemPromptPath?: string;
 	private store = new SessionStore();
+	private costTracker = new CostTracker();
 	goalManager: GoalManager;
+	taskManager: TaskManager;
 
 	constructor(options?: SessionManagerOptions) {
 		this.agentCliPath = options?.agentCliPath;
 		this.systemPromptPath = options?.systemPromptPath;
 		this.goalManager = new GoalManager();
+		this.taskManager = new TaskManager();
+	}
+
+	getCostTracker(): CostTracker {
+		return this.costTracker;
+	}
+
+	/**
+	 * Check an event for usage data and record it via the cost tracker.
+	 * Broadcasts a cost_update to connected clients if cost data is found.
+	 */
+	private trackCostFromEvent(session: SessionInfo, event: any): void {
+		// message_update events contain usage data with cost
+		if (event.type !== "message_update") return;
+		const usage = event.message?.usage ?? event.usage;
+		if (!usage || typeof usage.cost !== "number") return;
+
+		const cumulativeCost = this.costTracker.recordUsage(session.id, usage);
+
+		// Look up taskId from assigned tasks for this session
+		const assignedTasks = this.taskManager.getTasksForSession(session.id);
+		const taskId = assignedTasks.length > 0 ? assignedTasks[0].id : undefined;
+
+		broadcast(session.clients, {
+			type: "cost_update",
+			sessionId: session.id,
+			goalId: session.goalId,
+			taskId,
+			cost: cumulativeCost,
+		});
 	}
 
 	/**
@@ -195,6 +231,7 @@ export class SessionManager {
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
+			this.trackCostFromEvent(session, event);
 		});
 
 		session.unsubscribe = unsub;
@@ -228,7 +265,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string> }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -258,12 +295,37 @@ export class SessionManager {
 			if (opts?.rolePrompt) {
 				goalSpec = (goalSpec ? goalSpec + "\n\n---\n\n" : "") + opts.rolePrompt;
 			}
+
+			// Build task context if taskId is provided
+			let taskTitle: string | undefined;
+			let taskType: string | undefined;
+			let taskSpec: string | undefined;
+			let taskDependsOn: string[] | undefined;
+			if (opts?.taskId) {
+				const task = this.taskManager.getTask(opts.taskId);
+				if (task) {
+					taskTitle = task.title;
+					taskType = task.type;
+					taskSpec = task.spec;
+					if (task.dependsOn && task.dependsOn.length > 0) {
+						taskDependsOn = task.dependsOn.map(depId => {
+							const dep = this.taskManager.getTask(depId);
+							return dep?.title || depId;
+						});
+					}
+				}
+			}
+
 			const promptPath = assembleSystemPrompt(id, {
 				baseSystemPromptPath: this.systemPromptPath,
 				cwd,
 				goalTitle: goal?.title,
 				goalState: goal?.state,
 				goalSpec,
+				taskTitle,
+				taskType,
+				taskSpec,
+				taskDependsOn,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
@@ -287,7 +349,17 @@ export class SessionManager {
 			titleGenerated: goalAssistant ? true : false,
 			goalId,
 			goalAssistant,
+			taskId: opts?.taskId,
 		};
+
+		// Auto-assign task to this session
+		if (opts?.taskId) {
+			try {
+				this.taskManager.assignTask(opts.taskId, id);
+			} catch (err) {
+				console.error(`[session-manager] Failed to assign task ${opts.taskId} to session ${id}:`, err);
+			}
+		}
 
 		// Subscribe to agent events — broadcast to all connected clients
 		const unsub = rpcClient.onEvent((event: any) => {
@@ -314,6 +386,7 @@ export class SessionManager {
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
+			this.trackCostFromEvent(session, event);
 		});
 
 		session.unsubscribe = unsub;
@@ -409,6 +482,7 @@ export class SessionManager {
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
+			this.trackCostFromEvent(session, event);
 		});
 
 		session.unsubscribe = unsub;
@@ -538,6 +612,7 @@ export class SessionManager {
 			role: session.role,
 			swarmGoalId: session.swarmGoalId,
 			worktreePath: session.worktreePath,
+			taskId: session.taskId,
 		});
 	}
 
@@ -560,6 +635,7 @@ export class SessionManager {
 		role?: string;
 		swarmGoalId?: string;
 		worktreePath?: string;
+		taskId?: string;
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -576,7 +652,24 @@ export class SessionManager {
 			role: s.role,
 			swarmGoalId: s.swarmGoalId,
 			worktreePath: s.worktreePath,
+			taskId: s.taskId,
 		}));
+	}
+
+	/**
+	 * Get all session IDs for a goal, including terminated sessions from the store.
+	 * Useful for cost aggregation where terminated sessions still have cost data.
+	 */
+	getAllSessionIdsForGoal(goalId: string): string[] {
+		const ids = new Set(
+			Array.from(this.sessions.values())
+				.filter((s) => s.goalId === goalId)
+				.map((s) => s.id),
+		);
+		for (const ps of this.store.getAll()) {
+			if (ps.goalId === goalId) ids.add(ps.id);
+		}
+		return [...ids];
 	}
 
 	setTitle(id: string, title: string): boolean {
@@ -804,6 +897,7 @@ export class SessionManager {
 
 				session.eventBuffer.push(event);
 				broadcast(session.clients, { type: "event", data: event });
+				this.trackCostFromEvent(session, event);
 			});
 
 			await rpcClient.start();

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader } from "@mariozechner
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
 import { WandSparkles } from "lucide";
+import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
 import QRCode from "qrcode";
 import {
 	state,
@@ -656,6 +657,9 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let specValue = proposal.spec;
 	let saving = false;
 	let swarmValue = false;
+	let worktreeValue = false;
+	let cwdDropdownOpen = false;
+	let cwdHighlightIndex = -1;
 
 	const cleanup = () => {
 		render(html``, container);
@@ -669,12 +673,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 		renderProposalDialog();
 
 		const sessionId = activeSessionId();
-		if (swarmValue) {
-			const { createSwarmGoal } = await import("./api.js");
-			await createSwarmGoal(trimmedTitle, cwdValue.trim(), specValue);
-		} else {
-			await createGoal(trimmedTitle, cwdValue.trim(), specValue);
-		}
+		await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, swarm: swarmValue, worktree: worktreeValue });
 		state.activeGoalProposal = null;
 		if (sessionId) {
 			const { terminateSession } = await import("./session-manager.js");
@@ -709,12 +708,23 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 								</div>
 								<div>
 									<label class="text-xs text-muted-foreground mb-1 block">Working Directory</label>
-									${Input({
-										type: "text",
-										placeholder: "(server default)",
+									${cwdCombobox({
 										value: cwdValue,
-										onInput: (e: Event) => { cwdValue = (e.target as HTMLInputElement).value; },
+										placeholder: "(server default)",
+										onInput: (v) => { cwdValue = v; renderProposalDialog(); },
+										onSelect: (v) => { cwdValue = v; renderProposalDialog(); },
+										dropdownOpen: cwdDropdownOpen,
+										onToggle: (open) => { cwdDropdownOpen = open; renderProposalDialog(); },
+										highlightedIndex: cwdHighlightIndex,
+										onHighlight: (i) => { cwdHighlightIndex = i; renderProposalDialog(); },
 									})}
+									<div class="mt-2">
+										${worktreeToggle({
+											checked: worktreeValue,
+											onChange: (v) => { worktreeValue = v; renderProposalDialog(); },
+											id: "worktree-toggle",
+										})}
+									</div>
 								</div>
 								<div>
 									<label class="text-xs text-muted-foreground mb-1 block">Goal Spec (Markdown)</label>
@@ -724,11 +734,11 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 										@input=${(e: Event) => { specValue = (e.target as HTMLTextAreaElement).value; }}
 									></textarea>
 								</div>
-								<div class="flex items-center gap-2">
+								<div class="flex items-center gap-2.5">
 									<input type="checkbox" id="swarm-toggle"
 										.checked=${swarmValue}
-										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; renderProposalDialog(); }}
-										class="rounded border-border" />
+										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; if (swarmValue) worktreeValue = true; renderProposalDialog(); }}
+										class="toggle-switch" />
 									<label for="swarm-toggle" class="text-xs text-muted-foreground cursor-pointer">
 										🐝 Swarm mode — Team Lead auto-spawns role agents
 									</label>
@@ -769,6 +779,8 @@ function showGoalEditDialog(existingGoal: Goal): void {
 	let stateValue: GoalState = existingGoal.state;
 	let saving = false;
 	let swarmValue = (existingGoal as any).swarm || false;
+	let cwdDropdownOpenEdit = false;
+	let cwdHighlightIndexEdit = -1;
 
 	const cleanup = () => {
 		render(html``, container);
@@ -825,11 +837,15 @@ function showGoalEditDialog(existingGoal: Goal): void {
 								</div>
 								<div>
 									<label class="text-xs text-muted-foreground mb-1 block">Working Directory</label>
-									${Input({
-										type: "text",
-										placeholder: "/path/to/project",
+									${cwdCombobox({
 										value: cwdValue,
-										onInput: (e: Event) => { cwdValue = (e.target as HTMLInputElement).value; },
+										placeholder: "/path/to/project",
+										onInput: (v) => { cwdValue = v; renderDialog(); },
+										onSelect: (v) => { cwdValue = v; renderDialog(); },
+										dropdownOpen: cwdDropdownOpenEdit,
+										onToggle: (open) => { cwdDropdownOpenEdit = open; renderDialog(); },
+										highlightedIndex: cwdHighlightIndexEdit,
+										onHighlight: (i) => { cwdHighlightIndexEdit = i; renderDialog(); },
 									})}
 								</div>
 								<div>
@@ -856,11 +872,11 @@ function showGoalEditDialog(existingGoal: Goal): void {
 									></textarea>
 									<p class="text-[10px] text-muted-foreground mt-1">Injected into the context window of all sessions under this goal.</p>
 								</div>
-								<div class="flex items-center gap-2">
+								<div class="flex items-center gap-2.5">
 									<input type="checkbox" id="swarm-toggle-edit"
 										.checked=${swarmValue}
 										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; renderDialog(); }}
-										class="rounded border-border" />
+										class="toggle-switch" />
 									<label for="swarm-toggle-edit" class="text-xs text-muted-foreground cursor-pointer">
 										🐝 Swarm mode — Team Lead auto-spawns role agents
 									</label>

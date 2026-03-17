@@ -14,6 +14,7 @@ export interface GoalDraft {
 	hasReceivedProposal?: boolean;
 	goalAssistantTab?: "chat" | "preview";
 	previewSwarmMode?: boolean;
+	previewWorktree?: boolean;
 }
 
 export class GoalDraftStore extends Store {

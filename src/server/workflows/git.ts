@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 export interface WorktreeResult {
@@ -13,11 +13,10 @@ export interface WorktreeResult {
 export function createWorktree(repoPath: string, branchName: string): WorktreeResult {
 	const worktreePath = path.resolve(repoPath, "..", `${path.basename(repoPath)}-wt-${branchName}`);
 
-	// Create branch and worktree in one step
-	execSync(`git worktree add -b "${branchName}" "${worktreePath}" HEAD`, {
+	// Create branch and worktree in one step — uses execFileSync (no shell) to prevent injection
+	execFileSync("git", ["worktree", "add", "-b", branchName, worktreePath, "HEAD"], {
 		cwd: repoPath,
 		stdio: "pipe",
-		shell: true as unknown as string,
 	});
 
 	return { worktreePath, branchName };
@@ -33,15 +32,14 @@ export function cleanupWorktree(
 	deleteBranch = false,
 ): void {
 	try {
-		execSync(`git worktree remove "${worktreePath}" --force`, {
+		execFileSync("git", ["worktree", "remove", worktreePath, "--force"], {
 			cwd: repoPath,
 			stdio: "pipe",
-			shell: true as unknown as string,
 		});
 	} catch {
 		// If remove fails, try prune
 		try {
-			execSync("git worktree prune", { cwd: repoPath, stdio: "pipe", shell: true as unknown as string });
+			execFileSync("git", ["worktree", "prune"], { cwd: repoPath, stdio: "pipe" });
 		} catch {
 			// ignore
 		}
@@ -49,7 +47,7 @@ export function cleanupWorktree(
 
 	if (deleteBranch && branchName) {
 		try {
-			execSync(`git branch -D "${branchName}"`, { cwd: repoPath, stdio: "pipe", shell: true as unknown as string });
+			execFileSync("git", ["branch", "-D", branchName], { cwd: repoPath, stdio: "pipe" });
 		} catch {
 			// branch may not exist
 		}

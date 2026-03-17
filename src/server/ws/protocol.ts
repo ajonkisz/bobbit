@@ -27,7 +27,10 @@ export type ClientMessage =
 		| { op: "advance" }
 		| { op: "complete" }
 	> }
-	| { type: "workflow_synthesise_review" };
+	| { type: "workflow_synthesise_review" }
+	| { type: "task_create"; goalId: string; title: string; taskType: string; parentTaskId?: string; spec?: string; dependsOn?: string[] }
+	| { type: "task_update"; taskId: string; updates: { title?: string; spec?: string; state?: string; assignedSessionId?: string; dependsOn?: string[] } }
+	| { type: "task_delete"; taskId: string };
 
 /** Server → Client messages over WebSocket */
 export type ServerMessage =
@@ -45,4 +48,7 @@ export type ServerMessage =
 	| { type: "workflow_state"; data: unknown }
 	| { type: "workflow_phase_changed"; data: unknown }
 	| { type: "workflow_completed"; data: unknown }
-	| { type: "workflow_report"; reportUrl: string };
+	| { type: "workflow_report"; reportUrl: string }
+	| { type: "cost_update"; sessionId: string; goalId?: string; taskId?: string; cost: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; totalCost: number } }
+	| { type: "task_changed"; task: unknown }
+	| { type: "tasks_list"; tasks: unknown[] };

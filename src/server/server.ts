@@ -12,6 +12,10 @@ import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
 import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
 import { SwarmManager } from "./agent/swarm-manager.js";
+import type { TaskType, TaskState } from "./agent/task-store.js";
+
+const VALID_TASK_TYPES = new Set<string>(["architecture", "design-review", "mock-generation", "tdd-tests", "implementation", "code-review", "security-review", "documentation", "testing", "bug-fix", "refactor", "custom"]);
+const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
 
 export interface TlsConfig {
 	cert: string;  // path to PEM certificate
@@ -254,11 +258,12 @@ async function handleApiRoute(
 		const cwd = body?.cwd || config.defaultCwd;
 		const spec = body?.spec || "";
 		const swarm = body?.swarm === true;
+		const worktree = body?.worktree === true;
 		if (!title || typeof title !== "string") {
 			json({ error: "Missing title" }, 400);
 			return;
 		}
-		const goal = sessionManager.goalManager.createGoal(title, cwd, spec, swarm);
+		const goal = sessionManager.goalManager.createGoal(title, cwd, { spec, swarm, worktree });
 		json(goal, 201);
 		return;
 	}
@@ -293,10 +298,139 @@ async function handleApiRoute(
 		}
 
 		if (req.method === "DELETE") {
+			sessionManager.taskManager.deleteTasksForGoal(id);
 			sessionManager.goalManager.deleteGoal(id);
 			json({ ok: true });
 			return;
 		}
+	}
+
+	// ── Task endpoints ─────────────────────────────────────────────
+
+	// GET /api/goals/:goalId/tasks — list tasks for a goal
+	const goalTasksMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/tasks$/);
+	if (goalTasksMatch && req.method === "GET") {
+		const tasks = sessionManager.taskManager.getTasksForGoal(goalTasksMatch[1]);
+		json({ tasks });
+		return;
+	}
+
+	// POST /api/goals/:goalId/tasks — create a task
+	if (goalTasksMatch && req.method === "POST") {
+		const goalId = goalTasksMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		const body = await readBody(req);
+		const title = body?.title;
+		const type = body?.type;
+		if (!title || typeof title !== "string") {
+			json({ error: "Missing title" }, 400);
+			return;
+		}
+		if (!type || typeof type !== "string") {
+			json({ error: "Missing type" }, 400);
+			return;
+		}
+		if (!VALID_TASK_TYPES.has(type)) {
+			json({ error: `Invalid task type: ${type}` }, 400);
+			return;
+		}
+		try {
+			const task = sessionManager.taskManager.createTask(goalId, title, type as TaskType, {
+				parentTaskId: body.parentTaskId,
+				spec: body.spec,
+				dependsOn: body.dependsOn,
+			});
+			json(task, 201);
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
+	}
+
+	// Routes with task :id parameter
+	const taskMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)$/);
+	if (taskMatch) {
+		const id = taskMatch[1];
+
+		// GET /api/tasks/:id
+		if (req.method === "GET") {
+			const task = sessionManager.taskManager.getTask(id);
+			if (!task) { json({ error: "Task not found" }, 404); return; }
+			json(task);
+			return;
+		}
+
+		// PUT /api/tasks/:id
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			try {
+				const ok = sessionManager.taskManager.updateTask(id, {
+					title: body.title,
+					spec: body.spec,
+					state: body.state,
+					assignedSessionId: body.assignedSessionId,
+					dependsOn: body.dependsOn,
+				});
+				if (!ok) { json({ error: "Task not found" }, 404); return; }
+				json({ ok: true });
+			} catch (err: any) {
+				json({ error: err.message }, 400);
+			}
+			return;
+		}
+
+		// DELETE /api/tasks/:id
+		if (req.method === "DELETE") {
+			const ok = sessionManager.taskManager.deleteTask(id);
+			if (!ok) { json({ error: "Task not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
+	}
+
+	// POST /api/tasks/:id/assign — assign task to session
+	const taskAssignMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/assign$/);
+	if (taskAssignMatch && req.method === "POST") {
+		const body = await readBody(req);
+		const sessionId = body?.sessionId;
+		if (!sessionId || typeof sessionId !== "string") {
+			json({ error: "Missing sessionId" }, 400);
+			return;
+		}
+		try {
+			const ok = sessionManager.taskManager.assignTask(taskAssignMatch[1], sessionId);
+			if (!ok) { json({ error: "Task not found" }, 400); return; }
+			json({ ok: true });
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
+	}
+
+	// POST /api/tasks/:id/transition — state transition
+	const taskTransitionMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/transition$/);
+	if (taskTransitionMatch && req.method === "POST") {
+		const body = await readBody(req);
+		const state = body?.state;
+		if (!state || typeof state !== "string") {
+			json({ error: "Missing state" }, 400);
+			return;
+		}
+		if (!VALID_TASK_STATES.has(state)) {
+			json({ error: `Invalid task state: ${state}` }, 400);
+			return;
+		}
+		try {
+			const ok = sessionManager.taskManager.transitionTask(taskTransitionMatch[1], state as TaskState);
+			if (!ok) { json({ error: "Task not found" }, 400); return; }
+			json({ ok: true });
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
 	}
 
 	// ── Swarm endpoints ────────────────────────────────────────────
@@ -370,12 +504,25 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/complete — complete a swarm goal
+	// POST /api/goals/:id/swarm/complete — complete a swarm (dismiss agents, keep team lead)
 	const swarmCompleteMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/complete$/);
 	if (swarmCompleteMatch && req.method === "POST") {
 		const goalId = swarmCompleteMatch[1];
 		try {
 			await swarmManager.completeSwarm(goalId);
+			json({ ok: true });
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
+		return;
+	}
+
+	// POST /api/goals/:id/swarm/teardown — fully tear down a swarm (dismiss agents + terminate team lead)
+	const swarmTeardownMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/teardown$/);
+	if (swarmTeardownMatch && req.method === "POST") {
+		const goalId = swarmTeardownMatch[1];
+		try {
+			await swarmManager.teardownSwarm(goalId);
 			json({ ok: true });
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -629,6 +776,54 @@ async function handleApiRoute(
 		const mimeType = MIME_TYPES[`.${ext}`] || "application/octet-stream";
 		res.writeHead(200, { "Content-Type": mimeType });
 		res.end(content);
+		return;
+	}
+
+	// ── Cost endpoints ─────────────────────────────────────────────
+
+	// GET /api/sessions/:id/cost — cost for a single session
+	const sessionCostMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/cost$/);
+	if (sessionCostMatch && req.method === "GET") {
+		const id = sessionCostMatch[1];
+		const cost = sessionManager.getCostTracker().getSessionCost(id);
+		if (!cost) {
+			json({ error: "No cost data for this session" }, 404);
+			return;
+		}
+		json(cost);
+		return;
+	}
+
+	// GET /api/goals/:goalId/cost — aggregate cost across all sessions linked to a goal
+	const goalCostMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/cost$/);
+	if (goalCostMatch && req.method === "GET") {
+		const goalId = goalCostMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) {
+			json({ error: "Goal not found" }, 404);
+			return;
+		}
+		const sessionIds = sessionManager.getAllSessionIdsForGoal(goalId);
+		const cost = sessionManager.getCostTracker().getGoalCost(goalId, sessionIds);
+		json(cost);
+		return;
+	}
+
+	// GET /api/tasks/:id/cost — cost for the session(s) assigned to a task
+	const taskCostMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/cost$/);
+	if (taskCostMatch && req.method === "GET") {
+		const taskId = taskCostMatch[1];
+		const task = sessionManager.taskManager.getTask(taskId);
+		if (!task) {
+			json({ error: "Task not found" }, 404);
+			return;
+		}
+		if (!task.assignedSessionId) {
+			json({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalCost: 0 });
+			return;
+		}
+		const cost = sessionManager.getCostTracker().getSessionCost(task.assignedSessionId);
+		json(cost ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalCost: 0 });
 		return;
 	}
 

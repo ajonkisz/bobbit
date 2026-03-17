@@ -83,6 +83,9 @@ export const state = {
 	hasReceivedProposal: false,
 	previewSpecEditMode: false,
 	previewSwarmMode: false,
+	previewWorktree: false,
+	cwdDropdownOpen: false,
+	cwdHighlightIndex: -1,
 };
 
 // ============================================================================

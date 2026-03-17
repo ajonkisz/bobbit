@@ -23,6 +23,7 @@ import { backToSessions, disconnectGateway, createAndConnectSession, connectToSe
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { renderSidebar, toggleSidebar } from "./sidebar.js";
 import { renderSessionCard, goalStateIcon } from "./render-helpers.js";
+import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
 import { mobileHeaderVisible, teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
 import { setHashRoute } from "./routing.js";
 
@@ -169,7 +170,10 @@ function goalPreviewPanel() {
 		}
 		state.isGoalAssistantSession = false;
 		state.activeGoalProposal = null;
+		const swarmMode = state.previewSwarmMode;
+		const worktree = state.previewWorktree;
 		state.previewSwarmMode = false;
+		state.previewWorktree = false;
 		// Clean up persisted draft
 		if (sessionId) {
 			deleteGoalDraft(sessionId);
@@ -178,12 +182,7 @@ function goalPreviewPanel() {
 		setHashRoute("landing");
 		state.appView = "authenticated";
 
-		if (state.previewSwarmMode) {
-			const { createSwarmGoal } = await import("./api.js");
-			await createSwarmGoal(trimmedTitle, state.previewCwd.trim(), state.previewSpec);
-		} else {
-			await createGoal(trimmedTitle, state.previewCwd.trim(), state.previewSpec);
-		}
+		await createGoal(trimmedTitle, state.previewCwd.trim(), { spec: state.previewSpec, swarm: swarmMode, worktree });
 		if (sessionId) {
 			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
 			clearSessionModel(sessionId);
@@ -229,17 +228,32 @@ function goalPreviewPanel() {
 				</div>
 				<div>
 					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Working Directory</label>
-					${Input({
-						type: "text",
+					${cwdCombobox({
 						value: state.previewCwd,
 						placeholder: "(server default)",
-						onInput: (e: Event) => {
-							state.previewCwd = (e.target as HTMLInputElement).value;
+						onInput: (v) => {
+							state.previewCwd = v;
 							state.previewCwdEdited = true;
 							const sid = activeSessionId();
 							if (sid) saveGoalDraft(sid);
+							renderApp();
 						},
+						onSelect: (v) => {
+							state.previewCwd = v;
+							state.previewCwdEdited = true;
+							const sid = activeSessionId();
+							if (sid) saveGoalDraft(sid);
+							renderApp();
+						},
+						dropdownOpen: state.cwdDropdownOpen,
+						onToggle: (open) => { state.cwdDropdownOpen = open; renderApp(); },
+						highlightedIndex: state.cwdHighlightIndex,
+						onHighlight: (i) => { state.cwdHighlightIndex = i; renderApp(); },
 					})}
+					<div class="mt-2">${worktreeToggle({
+						checked: state.previewWorktree,
+						onChange: (v) => { state.previewWorktree = v; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); },
+					})}</div>
 				</div>
 				<div class="flex-1 flex flex-col min-h-0">
 					<div class="flex items-center justify-between mb-1.5">
@@ -269,11 +283,11 @@ function goalPreviewPanel() {
 				</div>
 			</div>
 			<div class="shrink-0 flex flex-col gap-3 px-5 py-3 border-t border-border">
-				<label class="flex items-center gap-2 cursor-pointer">
+				<label class="flex items-center gap-2.5 cursor-pointer">
 					<input type="checkbox"
 						.checked=${state.previewSwarmMode}
-						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
-						class="rounded border-border" />
+						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; if (state.previewSwarmMode) state.previewWorktree = true; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
+						class="toggle-switch" />
 					<span class="text-xs text-muted-foreground">🐝 Swarm mode — Team Lead auto-spawns role agents</span>
 				</label>
 				<div class="flex items-center justify-end gap-2">
@@ -496,7 +510,7 @@ export function doRenderApp(): void {
 							size: "sm",
 							onClick: async () => {
 								const sessionId = activeSessionId();
-								await createGoal(p.title, p.cwd || "", p.spec);
+								await createGoal(p.title, p.cwd || "", { spec: p.spec });
 								state.activeGoalProposal = null;
 								if (sessionId) {
 									await terminateSession(sessionId);
@@ -553,8 +567,8 @@ export function doRenderApp(): void {
 			if (desktop) {
 				return html`
 					${reconnectBanner()}
-					<div class="flex-1 flex min-h-0">
-						<div class="flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
+					<div class="flex-1 flex min-h-0 overflow-hidden">
+						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
 						${goalPreviewPanel()}
 					</div>
 				`;
@@ -626,7 +640,7 @@ export function doRenderApp(): void {
 				</div>
 				<div class="flex-1 flex min-h-0">
 					${renderSidebar()}
-					<div id="app-main" class="flex-1 min-h-0 flex flex-col">
+					<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">
 						${workflowBar()}
 						${mainArea()}
 					</div>

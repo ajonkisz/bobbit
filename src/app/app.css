@@ -152,11 +152,17 @@
  * GOAL ASSISTANT — split-screen preview panel & mobile tabs
  * ============================================================================ */
 
-/* Preview panel takes 50% on desktop */
+/* Chat and preview panels each take 50% on desktop */
 @media (min-width: 768px) {
+	.goal-chat-panel {
+		flex: 0 0 50%;
+		max-width: 50%;
+		overflow: hidden;
+	}
 	.goal-preview-panel {
 		flex: 0 0 50%;
 		max-width: 50%;
+		overflow: hidden;
 	}
 }
 
@@ -221,6 +227,106 @@
 
 .goal-tab-pill--active .goal-tab-dot {
 	background: var(--color-primary-foreground, hsl(var(--primary-foreground)));
+}
+
+/* ============================================================================
+ * CWD COMBOBOX — dropdown with autocomplete for working directory
+ * ============================================================================ */
+.cwd-combobox {
+	position: relative;
+}
+.cwd-combobox-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	z-index: 50;
+	margin-top: 4px;
+	max-height: 200px;
+	overflow-y: auto;
+	border-radius: 6px;
+	border: 1px solid var(--color-border, hsl(var(--border)));
+	background: var(--color-popover, hsl(var(--popover)));
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.cwd-combobox-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 10px;
+	font-size: 12px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	color: var(--color-foreground, hsl(var(--foreground)));
+	cursor: pointer;
+	transition: background 100ms ease;
+	overflow: hidden;
+}
+.cwd-combobox-item:first-child {
+	border-radius: 6px 6px 0 0;
+}
+.cwd-combobox-item:last-child {
+	border-radius: 0 0 6px 6px;
+}
+.cwd-combobox-item:hover,
+.cwd-combobox-item[data-highlighted] {
+	background: var(--color-accent, hsl(var(--accent)));
+}
+.cwd-combobox-item .cwd-path {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.cwd-combobox-item .cwd-source {
+	flex-shrink: 0;
+	font-size: 10px;
+	color: var(--color-muted-foreground, hsl(var(--muted-foreground)));
+	opacity: 0.7;
+}
+.cwd-combobox-empty {
+	padding: 12px 10px;
+	font-size: 12px;
+	color: var(--color-muted-foreground, hsl(var(--muted-foreground)));
+	text-align: center;
+}
+
+/* ============================================================================
+ * TOGGLE SWITCH — replaces native checkboxes
+ * ============================================================================ */
+.toggle-switch {
+	-webkit-appearance: none;
+	appearance: none;
+	position: relative;
+	width: 32px;
+	height: 18px;
+	border-radius: 9px;
+	background: var(--color-border, hsl(var(--border)));
+	cursor: pointer;
+	transition: background 200ms ease;
+	flex-shrink: 0;
+}
+.toggle-switch::after {
+	content: "";
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: var(--color-muted-foreground, hsl(var(--muted-foreground)));
+	transition: transform 200ms ease, background 200ms ease;
+}
+.toggle-switch:checked {
+	background: var(--color-primary, hsl(var(--primary)));
+}
+.toggle-switch:checked::after {
+	transform: translateX(14px);
+	background: var(--color-primary-foreground, hsl(var(--primary-foreground)));
+}
+.toggle-switch:focus-visible {
+	outline: 2px solid var(--color-ring, hsl(var(--ring)));
+	outline-offset: 2px;
 }
 
 /* ============================================================================
