@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug } from "lucide";
+import { ArrowLeft, Crosshair, Pencil, Play, Plus, QrCode, Server, Square, Trash2, Unplug } from "lucide";
 import "../ui/components/WorkflowStatusBar.js";
 import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 import {
@@ -17,7 +17,7 @@ import {
 	GOAL_STATE_COLORS,
 	type GoalState,
 } from "./state.js";
-import { createGoal, gatewayFetch, refreshSessions } from "./api.js";
+import { createGoal, gatewayFetch, refreshSessions, startSwarm, teardownSwarm } from "./api.js";
 import { clearSessionModel } from "./routing.js";
 import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
@@ -39,29 +39,64 @@ import "./goal-dashboard.css";
 // MOBILE LANDING PAGE
 // ============================================================================
 
-function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; state: GoalState; spec: string }) {
+/** Track which goals have a swarm start/stop in flight (mobile landing). */
+const mobileSwarmLoading = new Set<string>();
+
+function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; state: GoalState; spec: string; swarm?: boolean }) {
 	const goalSessions = state.gatewaySessions.filter((s) => s.goalId === goal.id && !s.delegateOf);
+	const isSwarmGoal = !!(goal as any).swarm;
+	const hasActiveSwarm = isSwarmGoal && goalSessions.some((s) => s.role === "team-lead" && s.status !== "terminated");
+	const isLoading = mobileSwarmLoading.has(goal.id);
+
+	const handleStartSwarm = async () => {
+		mobileSwarmLoading.add(goal.id);
+		renderApp();
+		const sid = await startSwarm(goal.id);
+		mobileSwarmLoading.delete(goal.id);
+		if (sid) {
+			connectToSession(sid, false);
+		} else {
+			renderApp();
+		}
+	};
+
+	const handleEndSwarm = async () => {
+		mobileSwarmLoading.add(goal.id);
+		renderApp();
+		await teardownSwarm(goal.id);
+		mobileSwarmLoading.delete(goal.id);
+		await refreshSessions();
+		renderApp();
+	};
+
 	return html`
-		<div class="rounded-lg border border-border p-4 ${goal.state === "shelved" ? "opacity-60" : ""}">
+		<div class="rounded-lg border border-border p-4 ${goal.state === "shelved" ? "opacity-60" : ""}"
+			@click=${() => setHashRoute("goal-dashboard", goal.id)}>
 			<div class="flex items-center justify-between mb-2">
 				<div class="flex items-center gap-2">
 					<span class="shrink-0">${goalStateIcon(goal.state, 16)}</span>
 					<span class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">${goal.title}</span>
 				</div>
-				<div class="flex items-center gap-1">
-					<button class="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-						@click=${() => showGoalDialog(goal as any)} title="Edit goal">
-						${icon(Pencil, "sm")}
-					</button>
-					<button class="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-						@click=${async () => { const { deleteGoal } = await import("./api.js"); deleteGoal(goal.id); }} title="Delete goal">
-						${icon(Trash2, "sm")}
-					</button>
-				</div>
-			</div>
-			<div class="text-xs text-muted-foreground font-mono truncate mb-2" title=${goal.cwd}>${goal.cwd}</div>
-			<div class="flex items-center justify-between">
 				<span class="text-xs px-2 py-0.5 rounded-full border border-border ${GOAL_STATE_COLORS[goal.state]}">${GOAL_STATE_LABELS[goal.state]}</span>
+			</div>
+			<div class="text-xs text-muted-foreground font-mono truncate mb-3" title=${goal.cwd}>${goal.cwd}</div>
+			<div class="flex items-center justify-end gap-1.5" @click=${(e: Event) => e.stopPropagation()}>
+				${isSwarmGoal ? (hasActiveSwarm
+					? Button({
+						variant: "ghost",
+						size: "sm",
+						disabled: isLoading,
+						onClick: handleEndSwarm,
+						children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Square, "xs")} ${isLoading ? "Stopping\u2026" : "End Swarm"}</span>`,
+					})
+					: Button({
+						variant: "default",
+						size: "sm",
+						disabled: isLoading,
+						onClick: handleStartSwarm,
+						children: html`<span class="inline-flex items-center gap-1">${icon(Play, "xs")} ${isLoading ? "Starting\u2026" : "Start Swarm"}</span>`,
+					})
+				) : ""}
 				${Button({
 					variant: "ghost",
 					size: "sm",
