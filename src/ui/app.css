@@ -1290,3 +1290,13 @@ html {
 	backdrop-filter: blur(10px);
 	max-width: 100%;
 }
+
+/* ── Mobile: pull bobbit idle position inward so it doesn't hug the screen edge ── */
+@media (max-width: 639px) {
+	.bobbit-blob--idle .bobbit-blob__sprite,
+	.bobbit-blob--idle .bobbit-blob__shadow,
+	.bobbit-blob--idle .bobbit-blob__crown,
+	.bobbit-blob--idle .bobbit-blob__bandana {
+		transform: scale(3.5) translateX(-3px);
+	}
+}

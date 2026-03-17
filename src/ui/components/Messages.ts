@@ -69,8 +69,8 @@ export class UserMessage extends LitElement {
 				: this.message.content.find((c) => c.type === "text")?.text || "";
 
 		return html`
-			<div class="flex justify-start mx-4">
-				<div class="user-message-container py-2 px-4 rounded-xl">
+			<div class="flex justify-start mx-2 sm:mx-4">
+				<div class="user-message-container py-2 px-3 sm:px-4 rounded-xl">
 					<markdown-block .content=${content}></markdown-block>
 					${
 						this.message.role === "user-with-attachments" &&
@@ -212,16 +212,16 @@ export class AssistantMessage extends LitElement {
 
 		return html`
 			<div>
-				${orderedParts.length ? html` <div class="px-4 flex flex-col gap-3">${orderedParts}</div> ` : ""}
+				${orderedParts.length ? html` <div class="px-2 sm:px-4 flex flex-col gap-3">${orderedParts}</div> ` : ""}
 				${
 					this.message.usage && this.isStreaming
-						? html` <div class="px-4 mt-2 text-xs text-muted-foreground text-right">${formatUsage(this.message.usage)}</div> `
+						? html` <div class="px-2 sm:px-4 mt-2 text-xs text-muted-foreground text-right">${formatUsage(this.message.usage)}</div> `
 						: ""
 				}
 				${
 					this.message.stopReason === "error" && this.message.errorMessage
 						? html`
-							<div class="mx-4 mt-3 p-3 bg-destructive/10 text-destructive rounded-lg text-sm overflow-hidden">
+							<div class="mx-2 sm:mx-4 mt-3 p-3 bg-destructive/10 text-destructive rounded-lg text-sm overflow-hidden">
 								<strong>${i18n("Error:")}</strong> ${this.message.errorMessage}
 							</div>
 						`
