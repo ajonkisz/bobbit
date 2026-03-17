@@ -105,7 +105,7 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 	const filters: string[] = [];
 	if (hueRotate && status !== "starting" && status !== "terminated") filters.push(`hue-rotate(${hueRotate}deg)`);
 	if (isCancelling) filters.push("saturate(0.3)");
-	else if (isIdle) filters.push("saturate(0.55)");
+	else if (isIdle) filters.push("saturate(0.4)");
 	const filterStyle = filters.length ? `filter:${filters.join(" ")};` : "";
 	const idleAnim = isIdle ? "animation:bobbit-breathe 4s ease-in-out infinite;" : "";
 	const bobAnim = isBusy && !isCancelling ? "animation:bobbit-bob 1.8s cubic-bezier(0.34,1.2,0.64,1) infinite;" : "";
