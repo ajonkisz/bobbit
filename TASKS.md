@@ -3,18 +3,20 @@
 - [ ] #19 Goal dashboard route: add /goal/:id route in main.ts, create GoalDashboard Lit component shell with nav bar (goal title, branch, action buttons, back link) — role:coder, depends:#18
 - [ ] #20 Dashboard kanban board: render tasks in Backlog/In Progress/Done/Failed columns with type icons, assigned agent, elapsed time — role:coder, depends:#19
 - [ ] #21 Dashboard agent activity panel: show active agents with role, current task, status, session links — role:coder, depends:#19
-- [x] #22 Dashboard commit timeline: linear commit history on goal branch with status badges derived from task completions — role:coder, depends:#17, depends:#19, claimed-by:coder-ec3592d1
+
 - [ ] #23 Dashboard reports viewer: embedded full-screen view of workflow HTML reports linked from commit timeline and task cards — role:coder, depends:#19
 - [ ] #26 Fix: validate type/status on PUT /api/goals/:id/tasks/:taskId — role:coder, depends:#24
 - [ ] #27 Fix: cascade-delete tasks when a goal is deleted — role:coder, depends:#24
 - [ ] #25 Test Phase 1 (TaskStore + API) — role:tester, depends:#24
+- [ ] #30 Review commit timeline (#22) — role:reviewer, depends:#22, branch:task-22-commit-timeline
+- [ ] #31 Test commit timeline (#22) — role:tester, depends:#22
 - [ ] #28 Review stale detection (#17) — role:reviewer, depends:#17, branch:task-17-stale-detection
 - [ ] #29 Test stale detection (#17) — role:tester, depends:#17
 
 ## In Progress
-- [x] #22 Dashboard commit timeline — claimed-by:coder-ec3592d1
 
 ## Done
+- [x] #22 Dashboard commit timeline: linear commit history on goal branch with status badges derived from task completions — role:coder, completed-by:coder-ec3592d1
 - [x] #24 Review Phase 1 (TaskStore + API + WS events) — role:reviewer, completed-by:reviewer-c71341a9
 - [x] #17 Commit-aware stale detection: when goal branch HEAD advances past a task's commitSha, mark test/review tasks as stale — role:coder, depends:#15, completed-by:coder-1b2663aa
 - [x] #14 Server-side TaskStore: persist tasks to ~/.pi/gateway-tasks.json — role:coder, completed-by:coder-c163b737
