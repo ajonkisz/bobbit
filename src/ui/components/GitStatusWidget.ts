@@ -104,7 +104,7 @@ export class GitStatusWidget extends LitElement {
                     ${this.loading
                         ? html`<span class="animate-pulse">⎇</span>`
                         : html`<span>⎇</span>`}
-                    <span class="max-w-[120px] truncate">${this.branch}</span>
+                    <span class="max-w-[120px] sm:max-w-[280px] truncate">${this.branch}</span>
                     ${this.summary
                         ? html`<span class="${summaryColor} font-medium">${this.summary}</span>`
                         : nothing}
