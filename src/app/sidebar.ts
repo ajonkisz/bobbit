@@ -43,7 +43,8 @@ function renderSidebarGoal(goal: Goal) {
 	return html`
 		<div class="flex flex-col gap-0.5">
 			<div class="group relative flex items-center gap-1 px-1 py-0.5 rounded-md cursor-pointer hover:bg-secondary/50 transition-colors"
-				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); saveExpandedGoals(); renderApp(); }}>
+				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); saveExpandedGoals(); renderApp(); }}
+				@dblclick=${() => { if (goal.swarm) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } }}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
 				<span class="shrink-0" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state, 12)}</span>
 				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}" style="line-height:12px;transform:translateY(-1px)">${goal.title}${goal.swarm ? html`<span class="font-normal opacity-50 ml-1" style="font-size:9px;">🐝</span>` : goal.branch ? html`<span class="font-normal opacity-40 ml-1" style="font-size:9px;">⎇</span>` : ""}</span>
@@ -70,7 +71,7 @@ function renderSidebarGoal(goal: Goal) {
 					${goalSessions.length === 0 && !isCreatingHere
 						? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground">
 								${goal.swarm
-									? html`No agents — <button class="text-primary hover:underline" @click=${() => startSwarm(goal.id)}>start swarm</button>`
+									? html`No agents — <button class="text-primary hover:underline" @click=${async () => { const sid = await startSwarm(goal.id); if (sid) connectToSession(sid, false); }}>start swarm</button>`
 									: html`No sessions — <button class="text-primary hover:underline" @click=${() => createAndConnectSession(goal.id)}>start one</button>`}
 							</div>`
 						: goalSessions.map(renderSidebarSession)}
