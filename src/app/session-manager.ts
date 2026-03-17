@@ -22,24 +22,31 @@ import { storage } from "./storage.js";
 // GOAL DRAFT PERSISTENCE HELPERS
 // ============================================================================
 
-/** Save the current goal assistant preview state to IndexedDB. */
+/** Debounce timer for draft saves. */
+let _draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Save the current goal assistant preview state to IndexedDB (debounced 300ms). */
 export function saveGoalDraft(sessionId: string): void {
-	const draft: GoalDraft = {
-		sessionId,
-		activeGoalProposal: state.activeGoalProposal ?? undefined,
-		previewTitle: state.previewTitle,
-		previewSpec: state.previewSpec,
-		previewCwd: state.previewCwd,
-		previewTitleEdited: state.previewTitleEdited,
-		previewSpecEdited: state.previewSpecEdited,
-		previewCwdEdited: state.previewCwdEdited,
-		hasReceivedProposal: state.hasReceivedProposal,
-		goalAssistantTab: state.goalAssistantTab,
-		previewSwarmMode: state.previewSwarmMode,
-	};
-	storage.goalDrafts.saveDraft(draft).catch((err) => {
-		console.error("[goal-draft] Failed to save draft:", err);
-	});
+	if (_draftSaveTimer) clearTimeout(_draftSaveTimer);
+	_draftSaveTimer = setTimeout(() => {
+		_draftSaveTimer = null;
+		const draft: GoalDraft = {
+			sessionId,
+			activeGoalProposal: state.activeGoalProposal ?? undefined,
+			previewTitle: state.previewTitle,
+			previewSpec: state.previewSpec,
+			previewCwd: state.previewCwd,
+			previewTitleEdited: state.previewTitleEdited,
+			previewSpecEdited: state.previewSpecEdited,
+			previewCwdEdited: state.previewCwdEdited,
+			hasReceivedProposal: state.hasReceivedProposal,
+			goalAssistantTab: state.goalAssistantTab,
+			previewSwarmMode: state.previewSwarmMode,
+		};
+		storage.goalDrafts.saveDraft(draft).catch((err) => {
+			console.error("[goal-draft] Failed to save draft:", err);
+		});
+	}, 300);
 }
 
 /** Restore goal assistant preview state from IndexedDB. Returns true if a draft was found. */
@@ -56,7 +63,7 @@ async function restoreGoalDraft(sessionId: string): Promise<boolean> {
 		state.previewSpecEdited = draft.previewSpecEdited ?? false;
 		state.previewCwdEdited = draft.previewCwdEdited ?? false;
 		state.hasReceivedProposal = draft.hasReceivedProposal ?? false;
-		state.goalAssistantTab = (draft.goalAssistantTab as "chat" | "preview") ?? "chat";
+		state.goalAssistantTab = draft.goalAssistantTab ?? "chat";
 		state.previewSwarmMode = draft.previewSwarmMode ?? false;
 		return true;
 	} catch (err) {

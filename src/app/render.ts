@@ -19,7 +19,7 @@ import {
 } from "./state.js";
 import { createGoal, gatewayFetch, refreshSessions } from "./api.js";
 import { clearSessionModel } from "./routing.js";
-import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft } from "./session-manager.js";
+import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { renderSidebar, toggleSidebar } from "./sidebar.js";
 import { renderSessionCard, goalStateIcon } from "./render-helpers.js";
@@ -172,7 +172,6 @@ function goalPreviewPanel() {
 		state.previewSwarmMode = false;
 		// Clean up persisted draft
 		if (sessionId) {
-			const { deleteGoalDraft } = await import("./session-manager.js");
 			deleteGoalDraft(sessionId);
 		}
 		localStorage.removeItem("gateway.sessionId");
