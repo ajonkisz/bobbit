@@ -142,8 +142,8 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 		: "";
 
 	// Shift inner content down 2px when hatted so crown tips aren't clipped
-	const innerTop = isTeamLead ? "2px" : "0";
-	const containerHeight = isTeamLead ? "17px" : "15px";
+	const innerTop = isTeamLead ? "4px" : "0";
+	const containerHeight = isTeamLead ? "19px" : "15px";
 
 	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:${containerHeight};flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}${cancelAnim}${idleAnim}"><span style="position:absolute;left:0;top:${innerTop};display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}${crownLayer}</span>`;
 }

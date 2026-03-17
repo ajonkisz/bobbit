@@ -382,6 +382,10 @@ body {
 .bobbit-blob__crown {
 	display: none;
 }
+/* Push the whole bobbit down when crowned to prevent crown tip clipping */
+.bobbit-crowned .bobbit-blob {
+	padding-top: 6px;
+}
 .bobbit-crowned .bobbit-blob__crown {
 	display: block;
 	position: absolute;
