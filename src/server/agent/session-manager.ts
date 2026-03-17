@@ -609,6 +609,22 @@ export class SessionManager {
 		}));
 	}
 
+	/**
+	 * Get all session IDs for a goal, including terminated sessions from the store.
+	 * Useful for cost aggregation where terminated sessions still have cost data.
+	 */
+	getAllSessionIdsForGoal(goalId: string): string[] {
+		const ids = new Set(
+			Array.from(this.sessions.values())
+				.filter((s) => s.goalId === goalId)
+				.map((s) => s.id),
+		);
+		for (const ps of this.store.getAll()) {
+			if (ps.goalId === goalId) ids.add(ps.id);
+		}
+		return [...ids];
+	}
+
 	setTitle(id: string, title: string): boolean {
 		const session = this.sessions.get(id);
 		if (!session) return false;

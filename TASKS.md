@@ -1,7 +1,7 @@
 ## Backlog
 - [ ] #10 Review all task tracking code — role:reviewer, depends:#4,#5,#6,#7,#8,#9
 - [ ] #13 Fix: Goal cost endpoint should include terminated sessions — role:coder, depends:#11
-- [ ] #14 Fix: `getSessionCost()` should return a defensive copy, `load()` should validate numeric fields — role:coder, depends:#11
+- [x] #14 Fix minor review findings — robustness and performance — role:coder, depends:#11, claimed-by:coder-3780b145
 
 ## In Progress
 - [x] #6 Add Task + Cost WebSocket protocol messages to `protocol.ts` and handle in `handler.ts` — role:coder, claimed-by:6585203b

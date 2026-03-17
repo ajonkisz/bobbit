@@ -53,7 +53,7 @@ export class TaskStore {
 				const data = JSON.parse(fs.readFileSync(STORE_FILE, "utf-8"));
 				if (Array.isArray(data)) {
 					for (const t of data) {
-						if (t.id) {
+						if (t.id && t.goalId && t.title && t.type && t.state) {
 							this.tasks.set(t.id, t);
 						}
 					}
@@ -88,6 +88,13 @@ export class TaskStore {
 	remove(id: string): void {
 		this.tasks.delete(id);
 		this.save();
+	}
+
+	removeMany(ids: string[]): void {
+		for (const id of ids) {
+			this.tasks.delete(id);
+		}
+		if (ids.length > 0) this.save();
 	}
 
 	getAll(): PersistedTask[] {

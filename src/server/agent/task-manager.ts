@@ -23,7 +23,9 @@ export class TaskManager {
 		type: TaskType,
 		opts?: { parentTaskId?: string; spec?: string; dependsOn?: string[] },
 	): PersistedTask {
-		const { parentTaskId, spec, dependsOn } = opts ?? {};
+		const { parentTaskId, spec } = opts ?? {};
+		// Deduplicate dependsOn
+		let dependsOn = opts?.dependsOn ? [...new Set(opts.dependsOn)] : undefined;
 
 		// Validate sub-task depth: if parentTaskId is set, the parent must not itself be a sub-task
 		if (parentTaskId) {
@@ -104,8 +106,9 @@ export class TaskManager {
 			}
 		}
 
-		// Validate dependsOn: references must exist and no cycles
+		// Validate dependsOn: deduplicate, remove self-references, check existence and cycles
 		if (updates.dependsOn !== undefined) {
+			updates.dependsOn = [...new Set(updates.dependsOn)].filter((depId) => depId !== id);
 			for (const depId of updates.dependsOn) {
 				if (!this.store.get(depId)) {
 					throw new Error(`Dependency task ${depId} not found`);
@@ -137,13 +140,11 @@ export class TaskManager {
 		const task = this.store.get(id);
 		if (!task) return false;
 
-		// Cascade delete sub-tasks
+		// Cascade delete sub-tasks + the task itself in a single write
 		const subTasks = this.store.getByParentTaskId(id);
-		for (const sub of subTasks) {
-			this.store.remove(sub.id);
-		}
-
-		this.store.remove(id);
+		const idsToRemove = subTasks.map((s) => s.id);
+		idsToRemove.push(id);
+		this.store.removeMany(idsToRemove);
 		return true;
 	}
 
@@ -240,9 +241,7 @@ export class TaskManager {
 	/** Delete all tasks for a goal (for cascade from goal deletion). */
 	deleteTasksForGoal(goalId: string): void {
 		const tasks = this.store.getByGoalId(goalId);
-		for (const task of tasks) {
-			this.store.remove(task.id);
-		}
+		this.store.removeMany(tasks.map((t) => t.id));
 	}
 
 	// --- Private helpers ---
