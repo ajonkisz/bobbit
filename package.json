@@ -15,7 +15,7 @@
     "restart-server": "node dist/server/harness-signal.js",
     "start": "node dist/server/cli.js --cwd .",
     "check": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
-    "test": "playwright test tests/mobile-header.spec.ts --config tests/playwright.config.ts",
+    "test": "npx tsx --test tests/message-queue.test.ts && playwright test tests/mobile-header.spec.ts --config tests/playwright.config.ts",
     "test:e2e": "playwright test --config tests/playwright-e2e.config.ts",
     "clean": "shx rm -rf dist"
   },

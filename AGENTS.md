@@ -286,6 +286,16 @@ See [docs/dev-workflow.md](docs/dev-workflow.md) for the full guide on running m
 
 **Quick reference**: UI changes (`src/ui/`, `src/app/`) hot-reload automatically. Server changes (`src/server/`) require `npm run restart-server` to rebuild and restart. Always run `npm run check` to verify types before triggering a restart.
 
+## Testing
+
+**Unit-style tests** (`npm test`): Use Playwright with `file://` fixtures — plain HTML/JS files that test logic without a build step or dev server. See `tests/mobile-header.spec.ts` and `tests/mobile-header.html` for the pattern.
+
+**Do not start background dev servers** (Vite, gateway, etc.) from agent sessions — they make the agent unresponsive. If a test needs real Lit components rendered, run `npm run build:ui` first and reference the built bundle from a static HTML fixture via `file://`. Never use Playwright's `webServer` config or background `&` processes.
+
+**E2E tests** (`npm run test:e2e`): Require a running gateway + vite started by the user (not the agent). These test full WebSocket flows.
+
+**Writing new tests**: Prefer `file://` fixtures with plain HTML/JS that simulate the logic under test. Extract state machine logic into testable functions where possible. Only involve real Lit components when the bug is specifically about rendering behavior.
+
 ## Common tasks
 
 **Add a new REST endpoint**: Edit `src/server/server.ts` `handleApiRoute()`.

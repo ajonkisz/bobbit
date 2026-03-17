@@ -6,7 +6,9 @@ import { html, LitElement } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 import { Brain, Sparkles } from "lucide";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
-import type { MessageEditor, QueuedMessage } from "./MessageEditor.js";
+import type { MessageEditor } from "./MessageEditor.js";
+import type { QueuedMessage } from "./message-queue.js";
+import { MessageQueue } from "./message-queue.js";
 import "./MessageEditor.js";
 import "./MessageList.js";
 import "./Messages.js"; // Import for side effects to register the custom elements
@@ -51,49 +53,14 @@ export class AgentInterface extends LitElement {
 	private _scrollContainer?: HTMLElement;
 	private _resizeObserver?: ResizeObserver;
 	private _unsubscribeSession?: () => void;
-	private _queuedMessages: QueuedMessage[] = [];
-	private _queueIdCounter = 0;
+	private _queue!: MessageQueue;
 
-	private _queueStorageKey(): string | undefined {
+	private _initQueue() {
 		const id = this.session?.sessionId;
-		return id ? `bobbit_queue_${id}` : undefined;
-	}
-
-	private _saveQueuedMessages() {
-		const key = this._queueStorageKey();
-		if (!key) return;
-		try {
-			// Persist text-only (skip attachments — they may contain large base64 data)
-			const serializable = this._queuedMessages.map(({ id, text, steered }) => ({ id, text, steered }));
-			if (serializable.length > 0) {
-				sessionStorage.setItem(key, JSON.stringify(serializable));
-			} else {
-				sessionStorage.removeItem(key);
-			}
-		} catch { /* quota exceeded — ignore */ }
-	}
-
-	private _restoreQueuedMessages() {
-		const key = this._queueStorageKey();
-		if (!key) return;
-		try {
-			const raw = sessionStorage.getItem(key);
-			if (raw) {
-				const restored: QueuedMessage[] = JSON.parse(raw);
-				if (Array.isArray(restored) && restored.length > 0) {
-					// Drop steered messages — they were already sent to the
-					// agent and we can't know if they were processed before
-					// the page reloaded.
-					this._queuedMessages = restored.filter(m => !m.steered);
-					this._queueIdCounter = Math.max(this._queueIdCounter, ...restored.map(m => {
-						const n = parseInt(m.id.replace("q_", ""), 10);
-						return isNaN(n) ? 0 : n;
-					}));
-					this._saveQueuedMessages();
-					this.requestUpdate();
-				}
-			}
-		} catch { /* parse error — ignore */ }
+		const key = id ? `bobbit_queue_${id}` : undefined;
+		this._queue = new MessageQueue(key, typeof sessionStorage !== "undefined" ? sessionStorage : undefined);
+		this._queue.restore();
+		this.requestUpdate();
 	}
 
 	public setInput(text: string, attachments?: Attachment[]) {
@@ -218,8 +185,8 @@ export class AgentInterface extends LitElement {
 			};
 		}
 
-		// Restore any queued messages from a previous page load
-		this._restoreQueuedMessages();
+		// Initialize the message queue (restores from sessionStorage)
+		this._initQueue();
 
 		// If the session is already compacting (e.g. page refresh mid-compaction),
 		// start the animation once the DOM is ready — we missed the compaction_start event.
@@ -269,15 +236,11 @@ export class AgentInterface extends LitElement {
 					break;
 				case "turn_start":
 				case "message_start":
-					// Clear steered messages — the agent has picked them up.
-					// We listen on both turn_start (local agent) and
-					// message_start (RemoteAgent, which never emits
-					// turn_start) so steered messages disappear as soon as
-					// the agent begins responding after the steer.
-					if (this._queuedMessages.some((m) => m.steered)) {
-						this._queuedMessages = this._queuedMessages.filter((m) => !m.steered);
-						this._saveQueuedMessages();
-					}
+					// Steered messages are kept visible until agent_end
+					// (cleaned up by drainQueue). No mid-turn cleanup here —
+					// message_start fires too early (before the steer text
+					// appears in chat) and turn_start is never emitted by
+					// RemoteAgent.
 					this.requestUpdate();
 					break;
 				case "message_end":
@@ -424,12 +387,7 @@ export class AgentInterface extends LitElement {
 
 		if (isStreaming) {
 			// Agent is busy — add to local queue, will be sent on agent_end
-			this._queuedMessages = [...this._queuedMessages, {
-				id: `q_${++this._queueIdCounter}`,
-				text: input,
-				attachments: attachments?.length ? attachments : undefined,
-			}];
-			this._saveQueuedMessages();
+			this._queue.enqueue(input, attachments);
 			this.requestUpdate();
 		} else {
 			// Agent is idle — send as regular prompt
@@ -449,11 +407,8 @@ export class AgentInterface extends LitElement {
 
 	/** Send queued messages to the agent now that it's idle */
 	private async drainQueue() {
-		if (this._queuedMessages.length === 0 || !this.session) return;
-		// Filter out steered messages — they were already sent
-		const queue = this._queuedMessages.filter((m) => !m.steered);
-		this._queuedMessages = [];
-		this._saveQueuedMessages();
+		if (this._queue.length === 0 || !this.session) return;
+		const queue = this._queue.drain();
 		this.requestUpdate();
 
 		if (queue.length === 0) return;
@@ -492,10 +447,7 @@ export class AgentInterface extends LitElement {
 	private steerMessage(msg: QueuedMessage) {
 		if (!this.session) return;
 		// Mark as steered — stays visible with "Sent" indicator until agent_end
-		this._queuedMessages = this._queuedMessages.map((m) =>
-			m.id === msg.id ? { ...m, steered: true } : m,
-		);
-		this._saveQueuedMessages();
+		this._queue.steer(msg.id);
 		this.requestUpdate();
 
 		if (msg.attachments?.length) {
@@ -512,8 +464,7 @@ export class AgentInterface extends LitElement {
 
 	/** Remove a message from the queue without sending */
 	private removeQueuedMessage(id: string) {
-		this._queuedMessages = this._queuedMessages.filter((m) => m.id !== id);
-		this._saveQueuedMessages();
+		this._queue.remove(id);
 		this.requestUpdate();
 	}
 
@@ -731,7 +682,7 @@ export class AgentInterface extends LitElement {
 							.showAttachmentButton=${this.enableAttachments}
 							.showModelSelector=${this.enableModelSelector}
 							.showThinkingSelector=${this.enableThinkingSelector}
-							.queuedMessages=${this._queuedMessages}
+							.queuedMessages=${[...this._queue.messages]}
 							.onSend=${(input: string, attachments: Attachment[]) => {
 								this.sendMessage(input, attachments);
 							}}

@@ -10,14 +10,8 @@ import { type Attachment, loadAttachment } from "../utils/attachment-utils.js";
 import { i18n } from "../utils/i18n.js";
 import "./AttachmentTile.js";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
-
-export interface QueuedMessage {
-	id: string;
-	text: string;
-	attachments?: Attachment[];
-	/** Set to true after the user clicks Steer — shows "Sent" indicator until agent picks it up */
-	steered?: boolean;
-}
+import type { QueuedMessage } from "./message-queue.js";
+export type { QueuedMessage };
 
 @customElement("message-editor")
 export class MessageEditor extends LitElement {

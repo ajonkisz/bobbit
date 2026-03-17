@@ -170,6 +170,7 @@ async function initApp() {
 		if (mod && e.key === "[") {
 			e.preventDefault();
 			state.sidebarCollapsed = !state.sidebarCollapsed;
+			localStorage.setItem("bobbit-sidebar-collapsed", String(state.sidebarCollapsed));
 			renderApp();
 		}
 	});
