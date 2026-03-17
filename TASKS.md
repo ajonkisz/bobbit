@@ -1,12 +1,12 @@
 ## Backlog
 - [ ] #10 Review all task tracking code — role:reviewer, depends:#4,#5,#6,#7,#8,#9
-- [ ] #12 Type-check: `npm run check` passes — role:tester, depends:#9
 - [ ] #13 Fix: Goal cost endpoint should include terminated sessions — role:coder, depends:#11
 - [ ] #14 Fix: `getSessionCost()` should return a defensive copy, `load()` should validate numeric fields — role:coder, depends:#11
 
 ## In Progress
 - [x] #6 Add Task + Cost WebSocket protocol messages to `protocol.ts` and handle in `handler.ts` — role:coder, claimed-by:6585203b
 - [x] #9 Session ↔ Task integration — auto-assign task on session creation with `taskId`, goal deletion cascades to tasks — role:coder, claimed-by:21957dc2
+- [x] #12 Type-check: `npm run check` passes — role:tester, depends:#9, claimed-by:tester-55f3ffd8
 
 ## Done
 - [x] #11 Review cost tracking code — role:reviewer, completed-by:reviewer-af572498
