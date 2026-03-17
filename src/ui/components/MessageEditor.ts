@@ -476,7 +476,7 @@ export class MessageEditor extends LitElement {
 				<!-- Queued messages -->
 				${this.queuedMessages.length > 0 ? html`
 					<div class="px-3 pt-2 pb-1 flex flex-col gap-1.5">
-						${this.queuedMessages.map((msg) => html`
+						${[...this.queuedMessages].sort((a, b) => (b.steered ? 1 : 0) - (a.steered ? 1 : 0)).map((msg) => html`
 							<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${msg.steered ? "bg-amber-500/10 border border-amber-500/30" : "bg-muted/50 border border-border/50"} text-xs text-muted-foreground">
 								<span class="flex-1 truncate font-mono">${msg.text}</span>
 								${msg.steered
