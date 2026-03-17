@@ -6,6 +6,7 @@ import type { RateLimiter } from "../auth/rate-limit.js";
 import { validateToken } from "../auth/token.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
 import { WorkflowRunner, getWorkflow, listWorkflows } from "../workflows/index.js";
+import type { TaskType, TaskState } from "../agent/task-store.js";
 
 /** Get or restore the workflow runner for a session, caching it on the session object. */
 function getRunner(session: any, sessionId: string): WorkflowRunner | undefined {
@@ -345,6 +346,37 @@ export function handleWebSocketConnection(
 						}
 					} else if (transitionOps.some(op => op.op === "advance") && st.status === "completed" && st.reportPath) {
 						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
+					}
+					break;
+				}
+				case "task_create": {
+					const task = sessionManager.taskManager.createTask(
+						msg.goalId,
+						msg.title,
+						msg.taskType as TaskType,
+						{ parentTaskId: msg.parentTaskId, spec: msg.spec, dependsOn: msg.dependsOn },
+					);
+					broadcast(session.clients, { type: "task_changed", task });
+					break;
+				}
+				case "task_update": {
+					const updates = { ...msg.updates, state: msg.updates.state as TaskState | undefined };
+					const updated = sessionManager.taskManager.updateTask(msg.taskId, updates);
+					if (updated) {
+						const task = sessionManager.taskManager.getTask(msg.taskId);
+						broadcast(session.clients, { type: "task_changed", task });
+					} else {
+						send(ws, { type: "error", message: `Task ${msg.taskId} not found`, code: "TASK_NOT_FOUND" });
+					}
+					break;
+				}
+				case "task_delete": {
+					const task = sessionManager.taskManager.getTask(msg.taskId);
+					if (task) {
+						sessionManager.taskManager.deleteTask(msg.taskId);
+						broadcast(session.clients, { type: "task_changed", task: { ...task, _deleted: true } });
+					} else {
+						send(ws, { type: "error", message: `Task ${msg.taskId} not found`, code: "TASK_NOT_FOUND" });
 					}
 					break;
 				}
