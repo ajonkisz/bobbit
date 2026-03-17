@@ -11,9 +11,9 @@
 - [ ] #12 Type-check: `npm run check` passes — role:tester, depends:#9
 
 ## In Progress
-- [x] #1 Implement TaskStore (`src/server/agent/task-store.ts`) — role:coder, claimed-by:6bebd675
-- [x] #3 Implement CostTracker (`src/server/agent/cost-tracker.ts`) — role:coder, claimed-by:37bc6bcb
 
 ## Done
+- [x] #1 Implement TaskStore (`src/server/agent/task-store.ts`) — role:coder, completed-by:6bebd675
+- [x] #3 Implement CostTracker (`src/server/agent/cost-tracker.ts`) — role:coder, completed-by:37bc6bcb
 
 ## Findings
