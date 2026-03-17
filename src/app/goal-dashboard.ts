@@ -75,8 +75,9 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	error = "";
 	renderApp();
 
-	// Start agent polling (runs independently of the main data load)
+	// Start polling (runs independently of the main data load)
 	startAgentPolling(goalId);
+	startTaskPolling(goalId);
 
 	try {
 		const [goalRes, tasksRes, commitsRes] = await Promise.all([
@@ -173,6 +174,7 @@ export function clearDashboardState(): void {
 	loading = true;
 	error = "";
 	stopAgentPolling();
+	stopTaskPolling();
 }
 
 // ============================================================================
@@ -235,9 +237,9 @@ function renderTaskCard(task: Task): TemplateResult {
 
 	return html`
 		<div
-			class="kanban-card"
+			class="kanban-card ${isStale ? "kanban-card--stale" : ""}"
 			style="
-				opacity: ${isDone ? "0.75" : "1"};
+				opacity: ${isDone || isStale ? "0.65" : "1"};
 				--card-type-color: ${color};
 			"
 		>
@@ -291,12 +293,12 @@ function renderKanbanBoard(taskList: Task[]): TemplateResult {
 		{ key: "backlog", label: "Backlog", dotColor: "var(--kanban-backlog)", tasks: [] },
 		{ key: "in-progress", label: "In Progress", dotColor: "var(--kanban-in-progress)", tasks: [] },
 		{ key: "done", label: "Done", dotColor: "var(--kanban-done)", tasks: [] },
+		{ key: "stale", label: "Stale", dotColor: "var(--kanban-stale, #9ca3af)", tasks: [] },
 		{ key: "failed", label: "Failed", dotColor: "var(--kanban-failed)", tasks: [] },
 	];
 
 	for (const task of taskList) {
-		const status = task.status === "stale" ? "done" : task.status;
-		const col = columns.find((c) => c.key === status);
+		const col = columns.find((c) => c.key === task.status);
 		if (col) col.tasks.push(task);
 	}
 
@@ -420,6 +422,7 @@ export interface SwarmAgent {
 
 let agents: SwarmAgent[] = [];
 let agentPollTimer: ReturnType<typeof setInterval> | null = null;
+let taskPollTimer: ReturnType<typeof setInterval> | null = null;
 
 async function fetchAgents(goalId: string): Promise<SwarmAgent[]> {
 	try {
@@ -429,6 +432,32 @@ async function fetchAgents(goalId: string): Promise<SwarmAgent[]> {
 		return data.agents ?? [];
 	} catch {
 		return [];
+	}
+}
+
+function startTaskPolling(goalId: string): void {
+	stopTaskPolling();
+	taskPollTimer = setInterval(async () => {
+		if (!currentGoalId || currentGoalId !== goalId) return;
+		try {
+			const res = await gatewayFetch(`/api/goals/${goalId}/tasks`);
+			if (res.ok) {
+				const data = await res.json();
+				const newTasks: Task[] = data.tasks || [];
+				// Only re-render if data actually changed
+				if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
+					tasks = newTasks;
+					renderApp();
+				}
+			}
+		} catch { /* ignore poll errors */ }
+	}, 10_000);
+}
+
+function stopTaskPolling(): void {
+	if (taskPollTimer) {
+		clearInterval(taskPollTimer);
+		taskPollTimer = null;
 	}
 }
 

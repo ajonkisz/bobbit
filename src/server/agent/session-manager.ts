@@ -871,4 +871,17 @@ export class SessionManager {
 			}
 		}
 	}
+
+	/** Broadcast a message only to clients connected to sessions belonging to the given goal. */
+	broadcastToGoal(goalId: string, msg: ServerMessage): void {
+		const payload = JSON.stringify(msg);
+		for (const session of this.sessions.values()) {
+			if (session.goalId !== goalId) continue;
+			for (const client of session.clients) {
+				if (client.readyState === 1) { // WebSocket.OPEN
+					client.send(payload);
+				}
+			}
+		}
+	}
 }

@@ -13,6 +13,7 @@
 	--kanban-in-progress: #3b82f6;
 	--kanban-done: #22c55e;
 	--kanban-failed: #ef4444;
+	--kanban-stale: #9ca3af;
 
 	flex: 1;
 	display: flex;
@@ -264,6 +265,11 @@
 	color: #f59e0b;
 	text-transform: uppercase;
 	letter-spacing: 0.03em;
+}
+
+.kanban-card--stale {
+	filter: grayscale(0.5);
+	border-style: dashed;
 }
 
 .kanban-assignee {

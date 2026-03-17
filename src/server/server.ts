@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -323,7 +323,7 @@ async function handleApiRoute(
 			if (!title || typeof title !== "string") { json({ error: "Missing title" }, 400); return; }
 			if (!type || !["code", "test", "review"].includes(type)) { json({ error: "Invalid or missing type (code|test|review)" }, 400); return; }
 			const task = sessionManager.taskManager.create(goalId, title, type);
-			sessionManager.broadcastToAll({ type: "task_created", task });
+			sessionManager.broadcastToGoal(goalId, { type: "task_created", task });
 			json(task, 201);
 			return;
 		}
@@ -345,6 +345,31 @@ async function handleApiRoute(
 		if (req.method === "PUT") {
 			const body = await readBody(req);
 			if (!body) { json({ error: "Missing body" }, 400); return; }
+
+			// Validate type if provided
+			const validTypes = ["code", "test", "review"];
+			if (body.type !== undefined) {
+				if (!body.type || !validTypes.includes(body.type)) {
+					json({ error: "Invalid type (code|test|review)" }, 400);
+					return;
+				}
+			}
+
+			// Validate status if provided
+			const validStatuses = ["backlog", "in-progress", "done", "failed", "stale"];
+			if (body.status !== undefined) {
+				if (!body.status || !validStatuses.includes(body.status)) {
+					json({ error: "Invalid status (backlog|in-progress|done|failed|stale)" }, 400);
+					return;
+				}
+			}
+
+			// Reject empty string for title
+			if (body.title !== undefined && (!body.title || typeof body.title !== "string")) {
+				json({ error: "Title must be a non-empty string" }, 400);
+				return;
+			}
+
 			const updated = sessionManager.taskManager.update(taskId, {
 				title: body.title,
 				type: body.type,
@@ -354,14 +379,14 @@ async function handleApiRoute(
 				resultSummary: body.resultSummary,
 			});
 			if (!updated) { json({ error: "Task not found" }, 404); return; }
-			sessionManager.broadcastToAll({ type: "task_updated", task: updated });
+			sessionManager.broadcastToGoal(task.goalId, { type: "task_updated", task: updated });
 			json(updated);
 			return;
 		}
 
 		if (req.method === "DELETE") {
 			sessionManager.taskManager.delete(taskId);
-			sessionManager.broadcastToAll({ type: "task_deleted", taskId, goalId });
+			sessionManager.broadcastToGoal(goalId, { type: "task_deleted", taskId, goalId });
 			json({ ok: true });
 			return;
 		}
@@ -396,7 +421,7 @@ async function handleApiRoute(
 		const staled = sessionManager.taskManager.markStaleIfNeeded(goalId, commitSha);
 		// Broadcast updates for each staled task
 		for (const task of staled) {
-			sessionManager.broadcastToAll({ type: "task_updated", task });
+			sessionManager.broadcastToGoal(goalId, { type: "task_updated", task });
 		}
 		json({ commitSha, staled });
 		return;
@@ -415,11 +440,19 @@ async function handleApiRoute(
 			const limitParam = url.searchParams.get("limit");
 			const limit = Math.min(Math.max(parseInt(limitParam || "20", 10) || 20, 1), 100);
 
+			// Validate branch name to prevent injection (only allow safe chars)
+			if (!/^[a-zA-Z0-9\/_.\-]+$/.test(branch)) {
+				json({ error: "Invalid branch name" }, 400);
+				return;
+			}
+
 			// Use %x00 as field separator and %x01 as record separator for reliable parsing
 			const format = "%H%x00%h%x00%s%x00%an%x00%aI%x01";
-			const raw = execSync(
-				`git log "${branch}" --format="${format}" -n ${limit}`,
-				{ cwd, shell: true as unknown as string, encoding: "utf-8", timeout: 10_000 },
+			// Use execFileSync to avoid shell interpretation of branch name
+			const raw = execFileSync(
+				"git",
+				["log", branch, `--format=${format}`, "-n", String(limit)],
+				{ cwd, encoding: "utf-8", timeout: 10_000 },
 			);
 			const commits = raw
 				.split("\x01")
