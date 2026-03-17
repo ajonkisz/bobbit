@@ -17,6 +17,7 @@ export function createWorktree(repoPath: string, branchName: string): WorktreeRe
 	execSync(`git worktree add -b "${branchName}" "${worktreePath}" HEAD`, {
 		cwd: repoPath,
 		stdio: "pipe",
+		shell: process.env.SHELL || process.env.COMSPEC || "sh",
 	});
 
 	return { worktreePath, branchName };
@@ -35,11 +36,12 @@ export function cleanupWorktree(
 		execSync(`git worktree remove "${worktreePath}" --force`, {
 			cwd: repoPath,
 			stdio: "pipe",
+			shell: process.env.SHELL || process.env.COMSPEC || "sh",
 		});
 	} catch {
 		// If remove fails, try prune
 		try {
-			execSync("git worktree prune", { cwd: repoPath, stdio: "pipe" });
+			execSync("git worktree prune", { cwd: repoPath, stdio: "pipe", shell: process.env.SHELL || process.env.COMSPEC || "sh" });
 		} catch {
 			// ignore
 		}
@@ -47,7 +49,7 @@ export function cleanupWorktree(
 
 	if (deleteBranch && branchName) {
 		try {
-			execSync(`git branch -D "${branchName}"`, { cwd: repoPath, stdio: "pipe" });
+			execSync(`git branch -D "${branchName}"`, { cwd: repoPath, stdio: "pipe", shell: process.env.SHELL || process.env.COMSPEC || "sh" });
 		} catch {
 			// branch may not exist
 		}

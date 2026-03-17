@@ -89,7 +89,12 @@ export class GoalStore {
 	update(id: string, updates: Partial<Omit<PersistedGoal, "id" | "createdAt">>): boolean {
 		const existing = this.goals.get(id);
 		if (!existing) return false;
-		Object.assign(existing, updates, { updatedAt: Date.now() });
+		// Strip undefined values to avoid overwriting existing fields
+		const cleaned: Record<string, unknown> = {};
+		for (const [k, v] of Object.entries(updates)) {
+			if (v !== undefined) cleaned[k] = v;
+		}
+		Object.assign(existing, cleaned, { updatedAt: Date.now() });
 		this.save();
 		return true;
 	}
