@@ -1,9 +1,9 @@
 ## Backlog
 
 ## In Progress
-- [x] #4 Add Task REST API endpoints to server.ts — role:coder, claimed-by:coder-f019216e
 
 ## Done
+- [x] #4 Add Task REST API endpoints to server.ts — role:coder, completed-by:coder-f019216e
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
 - [x] #2 Client-side: Create `GoalDraftStore` for IndexedDB persistence
 - [x] #3 Client-side: Integrate `GoalDraftStore` with session-manager.ts and render.ts
