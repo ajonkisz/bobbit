@@ -118,7 +118,7 @@ async function killServer(): Promise<void> {
 		// On Windows, SIGTERM doesn't work well — use tree-kill pattern
 		if (process.platform === "win32") {
 			try {
-				execSync(`taskkill /pid ${child!.pid} /T /F`, { stdio: "ignore", shell: process.env.SHELL || process.env.COMSPEC || "sh" });
+				execSync(`taskkill /pid ${child!.pid} /T /F`, { stdio: "ignore", shell: true as unknown as string });
 			} catch {
 				child?.kill("SIGKILL");
 			}
@@ -163,7 +163,7 @@ function buildServer(): void {
 			cwd: PROJECT_ROOT,
 			stdio: "inherit",
 			timeout: BUILD_TIMEOUT_MS,
-			shell: process.env.SHELL || process.env.COMSPEC || "sh",
+			shell: true as unknown as string,
 		});
 		console.log("[harness] Build complete.");
 	} catch (err) {

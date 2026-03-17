@@ -18,7 +18,7 @@ function toBranchName(title: string): string {
 /** Check if a directory is inside a git repository. */
 function isGitRepo(cwd: string): boolean {
 	try {
-		execSync("git rev-parse --is-inside-work-tree", { cwd, stdio: "pipe", shell: process.env.SHELL || process.env.COMSPEC || "sh" });
+		execSync("git rev-parse --is-inside-work-tree", { cwd, stdio: "pipe", shell: true as unknown as string });
 		return true;
 	} catch {
 		return false;
@@ -27,7 +27,7 @@ function isGitRepo(cwd: string): boolean {
 
 /** Get the git repo root for a directory. */
 function getRepoRoot(cwd: string): string {
-	return execSync("git rev-parse --show-toplevel", { cwd, stdio: "pipe", shell: process.env.SHELL || process.env.COMSPEC || "sh" }).toString().trim();
+	return execSync("git rev-parse --show-toplevel", { cwd, stdio: "pipe", shell: true as unknown as string }).toString().trim();
 }
 
 export class GoalManager {
