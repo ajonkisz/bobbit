@@ -81,11 +81,15 @@ export class AgentInterface extends LitElement {
 			if (raw) {
 				const restored: QueuedMessage[] = JSON.parse(raw);
 				if (Array.isArray(restored) && restored.length > 0) {
-					this._queuedMessages = restored;
+					// Drop steered messages — they were already sent to the
+					// agent and we can't know if they were processed before
+					// the page reloaded.
+					this._queuedMessages = restored.filter(m => !m.steered);
 					this._queueIdCounter = Math.max(this._queueIdCounter, ...restored.map(m => {
 						const n = parseInt(m.id.replace("q_", ""), 10);
 						return isNaN(n) ? 0 : n;
 					}));
+					this._saveQueuedMessages();
 					this.requestUpdate();
 				}
 			}
@@ -259,13 +263,17 @@ export class AgentInterface extends LitElement {
 				return;
 			}
 			switch (ev.type) {
-				case "message_start":
 				case "turn_end":
 				case "agent_start":
 					this.requestUpdate();
 					break;
 				case "turn_start":
-					// Clear steered messages — the agent has picked them up
+				case "message_start":
+					// Clear steered messages — the agent has picked them up.
+					// We listen on both turn_start (local agent) and
+					// message_start (RemoteAgent, which never emits
+					// turn_start) so steered messages disappear as soon as
+					// the agent begins responding after the steer.
 					if (this._queuedMessages.some((m) => m.steered)) {
 						this._queuedMessages = this._queuedMessages.filter((m) => !m.steered);
 						this._saveQueuedMessages();
