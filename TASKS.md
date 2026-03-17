@@ -1,7 +1,4 @@
 ## Backlog
-- [ ] #14 Server-side TaskStore: persist tasks to ~/.pi/gateway-tasks.json with fields: id, title, type (code/test/review), status (backlog/in-progress/done/failed/stale), assignee (session ID), goalId, commitSha, resultSummary, createdAt, updatedAt — role:coder
-- [ ] #15 Task REST API: CRUD endpoints (GET/POST/PUT/DELETE /api/goals/:id/tasks, GET /api/goals/:id/tasks/:taskId) + query by goal — role:coder, depends:#14
-- [ ] #16 Task WebSocket events: add task_created, task_updated, task_deleted server→client message types to protocol.ts + broadcast on mutations — role:coder, depends:#15
 - [ ] #17 Commit-aware stale detection: when goal branch HEAD advances past a task's commitSha, mark test/review tasks as stale — role:coder, depends:#15
 - [ ] #18 Sidebar simplification: replace 3-button cluster on goal group headers with single dashboard-link icon, move edit/delete/create-session to dashboard — role:coder, depends:#15
 - [ ] #19 Goal dashboard route: add /goal/:id route in main.ts, create GoalDashboard Lit component shell with nav bar (goal title, branch, action buttons, back link) — role:coder, depends:#18
@@ -13,6 +10,9 @@
 - [ ] #25 Test Phase 1 (TaskStore + API) — role:tester, depends:#24
 
 ## In Progress
+- [x] #14 Server-side TaskStore: persist tasks to ~/.pi/gateway-tasks.json — role:coder, claimed-by:38ff9253
+- [x] #15 Task REST API: CRUD endpoints — role:coder, claimed-by:38ff9253
+- [x] #16 Task WebSocket events — role:coder, claimed-by:38ff9253
 
 ## Done
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
