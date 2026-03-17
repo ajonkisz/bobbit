@@ -71,6 +71,11 @@
 body {
 	font-size: 16px;
 	-webkit-font-smoothing: antialiased;
+	overflow-x: hidden;
+}
+
+html {
+	overflow-x: hidden;
 }
 
 * {
@@ -116,11 +121,13 @@ body {
 	animation: shimmer 2s ease-in-out infinite;
 }
 
-/* Let code blocks and tool output use full available width */
+/* Let code blocks and tool output use full available width
+   but constrain to viewport to prevent horizontal scrollbar on mobile */
 .max-w-5xl code-block,
 .max-w-5xl console-block,
 .max-w-5xl .tool-content {
 	max-width: none;
+	overflow-x: auto;
 }
 
 /* ============================================================================

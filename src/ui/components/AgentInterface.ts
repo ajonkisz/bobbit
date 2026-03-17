@@ -680,10 +680,10 @@ export class AgentInterface extends LitElement {
 		const session = this.session;
 		const state = this.session.state;
 		return html`
-			<div class="flex flex-col h-full bg-background text-foreground">
+			<div class="flex flex-col h-full bg-background text-foreground min-w-0">
 				<!-- Messages Area -->
-				<div class="flex-1 overflow-y-auto">
-					<div class="max-w-5xl mx-auto p-4 pb-0">${this.renderMessages()}</div>
+				<div class="flex-1 overflow-y-auto overflow-x-hidden">
+					<div class="max-w-5xl mx-auto p-4 pb-0 min-w-0">${this.renderMessages()}</div>
 				</div>
 
 				<!-- Input Area -->

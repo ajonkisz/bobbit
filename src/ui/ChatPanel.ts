@@ -171,7 +171,7 @@ export class ChatPanel extends LitElement {
 
 		return html`
 			<div class="relative w-full h-full overflow-hidden flex">
-				<div class="h-full" style="${!isMobile && this.showArtifactsPanel && this.hasArtifacts ? "width: 50%;" : "width: 100%;"}">
+				<div class="h-full min-w-0" style="${!isMobile && this.showArtifactsPanel && this.hasArtifacts ? "width: 50%;" : "width: 100%;"}">
 						${this.agentInterface}
 					</div>
 
