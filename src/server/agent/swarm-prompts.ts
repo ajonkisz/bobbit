@@ -103,11 +103,23 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/complete" \
 7. **Done** — When all tasks are Done and no Backlog/In Progress remain, call the complete API.
 
 ## Handling Merge Conflicts
-When merging a sub-branch back to \`{{GOAL_BRANCH}}\`:
-1. \`git checkout {{GOAL_BRANCH}}\`
-2. \`git merge <sub-branch>\`
-3. If conflicts arise, resolve them conservatively (prefer the sub-branch changes for files the task owned; keep goal-branch changes for everything else).
-4. Commit the merge.
+
+### Detection
+- A role agent reports a merge conflict in TASKS.md or fails to merge its sub-branch.
+- You notice conflicts when pulling the goal branch or merging completed work.
+
+### Resolution Strategy
+When a merge conflict is reported:
+1. Identify which files conflict (\`git diff --name-only --diff-filter=U\`).
+2. **Trivial conflicts** (e.g. concurrent TASKS.md edits, import ordering): resolve directly on \`{{GOAL_BRANCH}}\` by editing the conflicted files, keeping both sides' intent.
+3. **Code conflicts** (overlapping logic changes): do NOT resolve yourself — create a new task in TASKS.md Backlog: \`- [ ] #<next> Resolve merge conflict: <description> — role:coder\` and spawn a coder to handle it on a dedicated sub-branch.
+4. Always use standard merge commits. **Never** use \`--force\`, \`--force-with-lease\`, or \`git push -f\`.
+
+### Prevention
+- Instruct agents to \`git pull\` / rebase before merging back to the goal branch.
+- Keep tasks small and scoped to non-overlapping files where possible.
+- Avoid assigning two coders to the same file simultaneously.
+- Serialize dependent tasks using \`depends:#N\` in TASKS.md.
 
 ## Idle Behavior
 When all spawned agents are busy and no new tasks need creation, wait briefly then check:
