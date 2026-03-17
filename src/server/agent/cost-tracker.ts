@@ -79,7 +79,7 @@ export class CostTracker {
 	 * Add usage data to the cumulative totals for a session.
 	 * Handles partial usage objects — undefined fields are treated as 0.
 	 */
-	recordUsage(sessionId: string, usage: UsageData): void {
+	recordUsage(sessionId: string, usage: UsageData): SessionCost {
 		const existing = this.costs.get(sessionId) ?? emptyCost();
 		existing.inputTokens += usage.inputTokens ?? 0;
 		existing.outputTokens += usage.outputTokens ?? 0;
@@ -88,6 +88,7 @@ export class CostTracker {
 		existing.totalCost += usage.cost ?? 0;
 		this.costs.set(sessionId, existing);
 		this.save();
+		return { ...existing };
 	}
 
 	getSessionCost(sessionId: string): SessionCost | undefined {

@@ -45,4 +45,5 @@ export type ServerMessage =
 	| { type: "workflow_state"; data: unknown }
 	| { type: "workflow_phase_changed"; data: unknown }
 	| { type: "workflow_completed"; data: unknown }
-	| { type: "workflow_report"; reportUrl: string };
+	| { type: "workflow_report"; reportUrl: string }
+	| { type: "cost_update"; sessionId: string; cost: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; totalCost: number } };
