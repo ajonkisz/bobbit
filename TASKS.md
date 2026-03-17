@@ -9,6 +9,7 @@
 
 
 ## Done
+- [x] #14 Fix minor review findings — robustness and performance — role:coder, completed-by:coder-3780b145
 - [x] #12 Type-check: `npm run check` passes — role:tester, completed-by:tester-55f3ffd8
 - [x] #11 Review cost tracking code — role:reviewer, completed-by:reviewer-af572498
 - [x] #1 Implement TaskStore (`src/server/agent/task-store.ts`) — role:coder, completed-by:6bebd675
