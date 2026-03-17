@@ -5,6 +5,7 @@ import type { Model } from "@mariozechner/pi-ai";
 import { html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createRef, ref } from "lit/directives/ref.js";
+import { live } from "lit/directives/live.js";
 import { Brain, Loader2, Mic, MicOff, Paperclip, Send, Sparkles, Square, Zap, X } from "lucide";
 import { type Attachment, loadAttachment } from "../utils/attachment-utils.js";
 import { i18n } from "../utils/i18n.js";
@@ -504,8 +505,9 @@ export class MessageEditor extends LitElement {
 						class="flex-1 bg-transparent text-foreground placeholder-muted-foreground outline-none resize-none overflow-y-auto py-1 px-1"
 						placeholder=${i18n("Type a message...")}
 						rows="1"
+						autocomplete="off"
 						style="max-height: 200px; field-sizing: content; min-height: 1lh; height: auto;"
-						.value=${this.value}
+						.value=${live(this.value)}
 						@input=${this.handleTextareaInput}
 						@keydown=${this.handleKeyDown}
 						@paste=${this.handlePaste}
