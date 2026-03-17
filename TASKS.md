@@ -8,12 +8,14 @@
 - [ ] #26 Fix: validate type/status on PUT /api/goals/:id/tasks/:taskId — role:coder, depends:#24
 - [ ] #27 Fix: cascade-delete tasks when a goal is deleted — role:coder, depends:#24
 - [ ] #25 Test Phase 1 (TaskStore + API) — role:tester, depends:#24
+- [ ] #28 Review stale detection (#17) — role:reviewer, depends:#17, branch:task-17-stale-detection
+- [ ] #29 Test stale detection (#17) — role:tester, depends:#17
 
 ## In Progress
-- [x] #17 Commit-aware stale detection: when goal branch HEAD advances past a task's commitSha, mark test/review tasks as stale — role:coder, depends:#15, claimed-by:coder-1b2663aa
 
 ## Done
 - [x] #24 Review Phase 1 (TaskStore + API + WS events) — role:reviewer, completed-by:reviewer-c71341a9
+- [x] #17 Commit-aware stale detection: when goal branch HEAD advances past a task's commitSha, mark test/review tasks as stale — role:coder, depends:#15, completed-by:coder-1b2663aa
 - [x] #14 Server-side TaskStore: persist tasks to ~/.pi/gateway-tasks.json — role:coder, completed-by:coder-c163b737
 - [x] #15 Task REST API: CRUD endpoints — role:coder, completed-by:coder-c163b737
 - [x] #16 Task WebSocket events — role:coder, completed-by:coder-c163b737
