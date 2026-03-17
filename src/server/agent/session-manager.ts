@@ -4,6 +4,7 @@ import type { WebSocket } from "ws";
 import type { ServerMessage } from "../ws/protocol.js";
 import { EventBuffer } from "./event-buffer.js";
 import { GoalManager } from "./goal-manager.js";
+import { TaskManager } from "./task-manager.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
@@ -60,11 +61,13 @@ export class SessionManager {
 	private systemPromptPath?: string;
 	private store = new SessionStore();
 	goalManager: GoalManager;
+	taskManager: TaskManager;
 
 	constructor(options?: SessionManagerOptions) {
 		this.agentCliPath = options?.agentCliPath;
 		this.systemPromptPath = options?.systemPromptPath;
 		this.goalManager = new GoalManager();
+		this.taskManager = new TaskManager();
 	}
 
 	/**
@@ -855,6 +858,17 @@ export class SessionManager {
 			}
 			session.clients.clear();
 			this.sessions.delete(id);
+		}
+	}
+
+	/** Broadcast a message to all connected WebSocket clients across all sessions. */
+	broadcastToAll(msg: ServerMessage): void {
+		for (const session of this.sessions.values()) {
+			for (const client of session.clients) {
+				if (client.readyState === 1) { // WebSocket.OPEN
+					client.send(JSON.stringify(msg));
+				}
+			}
 		}
 	}
 }

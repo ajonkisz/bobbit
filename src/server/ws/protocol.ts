@@ -45,4 +45,7 @@ export type ServerMessage =
 	| { type: "workflow_state"; data: unknown }
 	| { type: "workflow_phase_changed"; data: unknown }
 	| { type: "workflow_completed"; data: unknown }
-	| { type: "workflow_report"; reportUrl: string };
+	| { type: "workflow_report"; reportUrl: string }
+	| { type: "task_created"; task: unknown }
+	| { type: "task_updated"; task: unknown }
+	| { type: "task_deleted"; taskId: string; goalId: string };
