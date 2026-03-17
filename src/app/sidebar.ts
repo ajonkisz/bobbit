@@ -9,7 +9,6 @@ import {
 	ungroupedExpanded,
 	setUngroupedExpanded,
 	saveExpandedGoals,
-	GOAL_STATE_LABELS,
 	type Goal,
 	type GoalState,
 } from "./state.js";
@@ -18,7 +17,7 @@ import { deleteGoal, startSwarm } from "./api.js";
 import { refreshSessions } from "./api.js";
 import { showGoalDialog } from "./dialogs.js";
 import { statusBobbit, sessionAcronym, sessionColorMap } from "./session-colors.js";
-import { renderSidebarSession, goalStateIcon, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
+import { renderSidebarSession, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
 
 // ============================================================================
@@ -46,8 +45,8 @@ function renderSidebarGoal(goal: Goal) {
 				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); saveExpandedGoals(); renderApp(); }}
 				@dblclick=${() => { if (goal.swarm) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } }}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
-				<span class="shrink-0" title="${GOAL_STATE_LABELS[goal.state]}">${goalStateIcon(goal.state, 12)}</span>
-				<span class="flex-1 min-w-0 truncate text-xs font-medium text-foreground ${goal.state === "shelved" ? "opacity-60" : ""}" style="line-height:12px;transform:translateY(-1px)">${goal.title}${goal.swarm ? html`<span class="font-normal opacity-50 ml-1" style="font-size:9px;">🐝</span>` : goal.branch ? html`<span class="font-normal opacity-40 ml-1" style="font-size:9px;">⎇</span>` : ""}</span>
+
+				<span class="flex-1 min-w-0 truncate text-[10px] text-muted-foreground uppercase tracking-wider font-medium ${goal.state === "shelved" ? "opacity-60" : ""}">${goal.title}</span>
 				<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
 					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
 						@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(goal.id); }}
@@ -191,7 +190,7 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 				@mouseleave=${hideSessionTooltip}
 				@click=${() => { if (!active) connectToSession(s.id, true); }}
 			>
-				${statusBobbit(s.status, s.isCompacting, s.id, active)}
+				${statusBobbit(s.status, s.isCompacting, s.id, active, s.isAborting, s.role === "team-lead")}
 				<span class="text-[8px] font-bold tracking-wide ${active ? "text-foreground" : "text-muted-foreground"}" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(displayTitle)}</span>
 			</button>
 		`;

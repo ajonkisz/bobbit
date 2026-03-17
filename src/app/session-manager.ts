@@ -175,6 +175,10 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		remote.onStatusChange = (status: string) => {
 			updateLocalSessionStatus(sessionId, status);
+			const idx = state.gatewaySessions.findIndex((s) => s.id === sessionId);
+			if (idx >= 0) {
+				state.gatewaySessions[idx] = { ...state.gatewaySessions[idx], isAborting: remote.isAborting };
+			}
 			renderApp();
 		};
 

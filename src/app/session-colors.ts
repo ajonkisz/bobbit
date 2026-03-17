@@ -68,7 +68,7 @@ export function sessionAcronym(title: string): string {
  * Same 10×9 pixel grid as the streaming blob, but scaled down and colored
  * per session status. No animation, no blinking — just a little Bobbit.
  */
-export function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false) {
+export function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false, isAborting = false, isTeamLead = false) {
 	const hueRotate = sessionId ? sessionHueRotation(sessionId) : 0;
 
 	const canonical = { main: "#8ec63f", light: "#b5d98a", dark: "#6b9930", eye: "#1a3010" };
@@ -101,21 +101,48 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 	const shimmerDelay = -(Date.now() % 8000);
 	const shimmer = isBusy ? `animation:blob-shimmer 8s ease-in-out infinite;animation-delay:${shimmerDelay}ms;` : "";
 	const isIdle = status === "idle" && !isCompacting && !isSelected;
+	const isCancelling = isAborting && (status === "streaming" || isBusy);
 	const filters: string[] = [];
 	if (hueRotate && status !== "starting" && status !== "terminated") filters.push(`hue-rotate(${hueRotate}deg)`);
-	if (isIdle) filters.push("saturate(0.55)");
+	if (isCancelling) filters.push("saturate(0.3)");
+	else if (isIdle) filters.push("saturate(0.55)");
 	const filterStyle = filters.length ? `filter:${filters.join(" ")};` : "";
-	const bobAnim = isBusy ? "animation:bobbit-bob 2.5s ease-in-out infinite;" : "";
+	const idleAnim = isIdle ? "animation:bobbit-breathe 4s ease-in-out infinite;" : "";
+	const bobAnim = isBusy && !isCancelling ? "animation:bobbit-bob 1.8s cubic-bezier(0.34,1.2,0.64,1) infinite;" : "";
+	const cancelAnim = isCancelling ? "animation:bobbit-cancel-fade 1.2s ease-in-out infinite;" : "";
+	const compactSquish = isCompacting && !isCancelling;
 	const baseTransform = isCompacting
-		? "transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px);transform-origin:0 9px;"
+		? (compactSquish
+			? "transform-origin:0 9px;animation:bobbit-squish 1.5s ease-in-out infinite;"
+			: "transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px);transform-origin:0 9px;")
 		: "transform:scale(1.6);transform-origin:0 0;";
 	const eyeAnim = isSelected
 		? `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 ${isCompacting ? "9px" : "0"};`
 		: baseTransform;
 
+	const eyeTop = isTeamLead ? "2px" : "0";
 	const eyeLayer = isSelected
-		? html`<span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
+		? html`<span style="position:absolute;left:0;top:${eyeTop};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
 		: "";
 
-	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:15px;flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}"><span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}</span>`;
+	// Crown overlay for team leads — same pixel grid, not hue-rotated
+	const crownShadow = `
+		2px -1px 0 #000,3px -1px 0 #fde047,4px -1px 0 #000,5px -1px 0 #fde047,6px -1px 0 #000,7px -1px 0 #fde047,8px -1px 0 #000,
+		1px 0 0 #000,2px 0 0 #fbbf24,3px 0 0 #fde047,4px 0 0 #fbbf24,5px 0 0 #fde047,6px 0 0 #fbbf24,7px 0 0 #fde047,8px 0 0 #fbbf24,9px 0 0 #000,
+		1px 1px 0 #000,2px 1px 0 #b45309,3px 1px 0 #d97706,4px 1px 0 #d97706,5px 1px 0 #d97706,6px 1px 0 #d97706,7px 1px 0 #d97706,8px 1px 0 #b45309,9px 1px 0 #000,
+		1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000
+	`;
+	// Counter-rotate crown so it keeps fixed gold colour regardless of identity hue
+	const crownFilter = hueRotate && status !== "starting" && status !== "terminated"
+		? `filter:hue-rotate(${-hueRotate}deg);`
+		: "";
+	const crownLayer = isTeamLead
+		? html`<span style="position:absolute;left:0;top:${isTeamLead ? "2px" : "0"};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${crownShadow};${baseTransform}${crownFilter}"></span>`
+		: "";
+
+	// Shift inner content down 2px when hatted so crown tips aren't clipped
+	const innerTop = isTeamLead ? "2px" : "0";
+	const containerHeight = isTeamLead ? "17px" : "15px";
+
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:${containerHeight};flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}${cancelAnim}${idleAnim}"><span style="position:absolute;left:0;top:${innerTop};display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}${crownLayer}</span>`;
 }
