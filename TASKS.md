@@ -1,6 +1,6 @@
 ## Backlog
 - [ ] #10 Review all task tracking code — role:reviewer, depends:#4,#5,#6,#7,#8,#9
-- [ ] #13 Fix: Goal cost endpoint should include terminated sessions — role:coder, depends:#11
+- [x] #13 Fix: Goal cost endpoint should include terminated sessions — role:coder, depends:#11, completed-by:coder-3780b145 (addressed in #14)
 - [x] #14 Fix minor review findings — robustness and performance — role:coder, depends:#11, claimed-by:coder-3780b145
 
 ## In Progress
