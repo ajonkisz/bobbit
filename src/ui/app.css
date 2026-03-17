@@ -1291,14 +1291,11 @@ html {
 	max-width: 100%;
 }
 
-/* ── Mobile: reduce idle leftward offset to compensate for tighter container padding ── */
+/* ── Mobile: add left margin to bobbit so idle position doesn't hug the screen edge
+      when container padding is tighter (p-2 vs p-4). This avoids changing translateX
+      which would break the seamless exit/enter transition animations. ── */
 @media (max-width: 639px) {
-	.bobbit-blob--idle .bobbit-blob__sprite {
-		transform: scale(3.5) translateX(-2px) !important;
-	}
-	.bobbit-blob--idle .bobbit-blob__shadow,
-	.bobbit-blob--idle .bobbit-blob__crown,
-	.bobbit-blob--idle .bobbit-blob__bandana {
-		transform: scale(3.5) translateX(-2px);
+	.bobbit-blob {
+		margin-left: 8px;
 	}
 }
