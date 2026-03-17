@@ -382,6 +382,10 @@ body {
 .bobbit-blob__crown {
 	display: none;
 }
+/* Push the whole bobbit down when crowned to prevent crown tip clipping */
+.bobbit-crowned .bobbit-blob {
+	padding-top: 6px;
+}
 .bobbit-crowned .bobbit-blob__crown {
 	display: block;
 	position: absolute;
@@ -395,6 +399,7 @@ body {
 	/* Counter hue-rotate so crown stays gold */
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
+		3px -2px 0 #000, 5px -2px 0 #000, 7px -2px 0 #000,
 		2px -1px 0 #000, 3px -1px 0 #fde047, 4px -1px 0 #000, 5px -1px 0 #fde047, 6px -1px 0 #000, 7px -1px 0 #fde047, 8px -1px 0 #000,
 		1px 0px 0 #000, 2px 0px 0 #fbbf24, 3px 0px 0 #fde047, 4px 0px 0 #fbbf24, 5px 0px 0 #fde047, 6px 0px 0 #fbbf24, 7px 0px 0 #fde047, 8px 0px 0 #fbbf24, 9px 0px 0 #000,
 		1px 1px 0 #000, 2px 1px 0 #b45309, 3px 1px 0 #d97706, 4px 1px 0 #d97706, 5px 1px 0 #d97706, 6px 1px 0 #d97706, 7px 1px 0 #d97706, 8px 1px 0 #b45309, 9px 1px 0 #000,
@@ -407,7 +412,7 @@ body {
 /* Crown follows all sprite state animations */
 .bobbit-blob--idle .bobbit-blob__crown {
 	animation: none;
-	transform: scale(3.5);
+	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__crown {
 	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;

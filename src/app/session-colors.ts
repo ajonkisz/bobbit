@@ -105,7 +105,7 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 	const filters: string[] = [];
 	if (hueRotate && status !== "starting" && status !== "terminated") filters.push(`hue-rotate(${hueRotate}deg)`);
 	if (isCancelling) filters.push("saturate(0.3)");
-	else if (isIdle) filters.push("saturate(0.55)");
+	else if (isIdle) filters.push("saturate(0.4)");
 	const filterStyle = filters.length ? `filter:${filters.join(" ")};` : "";
 	const idleAnim = isIdle ? "animation:bobbit-breathe 4s ease-in-out infinite;" : "";
 	const bobAnim = isBusy && !isCancelling ? "animation:bobbit-bob 1.8s cubic-bezier(0.34,1.2,0.64,1) infinite;" : "";
@@ -120,17 +120,18 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 		? `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 ${isCompacting ? "9px" : "0"};`
 		: baseTransform;
 
-	const eyeTop = isTeamLead ? "2px" : "0";
+	const eyeTop = isTeamLead ? "4px" : "0";
 	const eyeLayer = isSelected
 		? html`<span style="position:absolute;left:0;top:${eyeTop};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
 		: "";
 
 	// Crown overlay for team leads — same pixel grid, not hue-rotated
 	const crownShadow = `
-		2px -1px 0 #000,3px -1px 0 #fde047,4px -1px 0 #000,5px -1px 0 #fde047,6px -1px 0 #000,7px -1px 0 #fde047,8px -1px 0 #000,
-		1px 0 0 #000,2px 0 0 #fbbf24,3px 0 0 #fde047,4px 0 0 #fbbf24,5px 0 0 #fde047,6px 0 0 #fbbf24,7px 0 0 #fde047,8px 0 0 #fbbf24,9px 0 0 #000,
-		1px 1px 0 #000,2px 1px 0 #b45309,3px 1px 0 #d97706,4px 1px 0 #d97706,5px 1px 0 #d97706,6px 1px 0 #d97706,7px 1px 0 #d97706,8px 1px 0 #b45309,9px 1px 0 #000,
-		1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000
+		3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,
+		2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,
+		1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,
+		1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,
+		1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000
 	`;
 	// Counter-rotate crown so it keeps fixed gold colour regardless of identity hue
 	const crownFilter = hueRotate && status !== "starting" && status !== "terminated"
@@ -141,8 +142,8 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 		: "";
 
 	// Shift inner content down 2px when hatted so crown tips aren't clipped
-	const innerTop = isTeamLead ? "2px" : "0";
-	const containerHeight = isTeamLead ? "17px" : "15px";
+	const innerTop = isTeamLead ? "4px" : "0";
+	const containerHeight = isTeamLead ? "19px" : "15px";
 
 	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:${containerHeight};flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}${cancelAnim}${idleAnim}"><span style="position:absolute;left:0;top:${innerTop};display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}${crownLayer}</span>`;
 }

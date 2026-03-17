@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bobbit Hats — Flat Beret, Lowered Crown</title>
+<title>Bobbit Coder Accessories</title>
 <style>
   :root { --bg: #1a1a2e; --sidebar-bg: #111827; --text: #e0e0e0; --muted: #888; --border: #2a2a4a; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,15 +12,18 @@
   .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 32px; line-height: 1.6; max-width: 800px; }
   .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 40px 0 16px; }
   .section-title:first-of-type { margin-top: 0; }
-  .row { display: flex; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; align-items: flex-end; }
+  .row { display: flex; gap: 24px; margin-bottom: 24px; flex-wrap: wrap; align-items: flex-end; }
   .opt { text-align: center; }
-  .opt .label { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+  .opt .label { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .opt .sublabel { font-size: 10px; color: var(--muted); line-height: 1.4; margin-bottom: 8px; max-width: 100px; }
 
-  .big { display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: visible; image-rendering: pixelated; background: var(--sidebar-bg); border-radius: 8px; border: 1px solid var(--border); width: 70px; height: 72px; }
-  .big .body { position: absolute; left: 12px; top: 16px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(5); transform-origin: 0 0; }
-  .big .hat  { position: absolute; left: 12px; top: 16px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(5); transform-origin: 0 0; }
+  /* 5x close-up */
+  .big { display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: visible; image-rendering: pixelated; background: var(--sidebar-bg); border-radius: 8px; border: 1px solid var(--border); width: 80px; height: 80px; }
+  .big .body { position: absolute; left: 14px; top: 22px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(5); transform-origin: 0 0; }
+  .big .acc  { position: absolute; left: 14px; top: 22px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(5); transform-origin: 0 0; }
 
-  .sidebar-mock { background: var(--sidebar-bg); border-radius: 8px; padding: 6px 0; font-size: 12px; width: 240px; }
+  /* Sidebar 1.6x */
+  .sidebar-mock { background: var(--sidebar-bg); border-radius: 8px; padding: 6px 0; font-size: 12px; width: 260px; }
   .sidebar-row { display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: default; border-radius: 6px; margin: 1px 4px; }
   .sidebar-row.active { background: #1f2937; }
   .sidebar-row .title { flex: 1; font-size: 12px; color: #9ca3af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -28,9 +31,9 @@
   .sidebar-row .role-tag { font-size: 8px; color: #6b7280; background: #1f2937; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
   .group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; padding: 4px 10px 2px; font-weight: 500; }
 
-  .bw { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; position: relative; overflow: visible; image-rendering: pixelated; }
-  .bw .body { position: absolute; left: 0; top: 2px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0; }
-  .bw .hat  { position: absolute; left: 0; top: 2px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0; }
+  .bw { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 19px; flex-shrink: 0; position: relative; overflow: visible; image-rendering: pixelated; }
+  .bw .body { position: absolute; left: 0; top: 4px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0; }
+  .bw .acc  { position: absolute; left: 0; top: 4px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0; }
 
   .st-active { animation: refined 1.8s cubic-bezier(0.34, 1.2, 0.64, 1) infinite; }
   @keyframes refined {
@@ -41,9 +44,21 @@
     78%  { transform: scale(1.6) translateY(0) scaleY(0.98); }
     100% { transform: scale(1.6) translateY(0) scaleY(1); }
   }
-  .st-idle { filter: saturate(0.55); }
+  .st-idle { filter: saturate(0.4); }
   .hue-100 { filter: hue-rotate(100deg); }
   .hue-200 { filter: hue-rotate(200deg); }
+  .hue-n85 { filter: hue-rotate(-85deg); }
+
+  /* Chat area 3.5x */
+  .chat-mock { background: var(--sidebar-bg); border-radius: 12px; border: 1px solid var(--border); padding: 20px; width: 360px; }
+  .chat-blob { display: flex; align-items: end; position: relative; overflow: visible; margin-bottom: -24px; }
+  .chat-blob .body { width: 1px; height: 1px; overflow: visible; transform-origin: 5px 8px; transform: scale(3.5); margin: 8px 18px 28px 18px; image-rendering: pixelated; }
+  .chat-blob .acc { position: absolute; width: 1px; height: 1px; overflow: visible; transform-origin: 5px 8px; transform: scale(3.5); margin: 8px 18px 28px 18px; image-rendering: pixelated; }
+  .chat-blob .shadow { width: 1px; height: 1px; overflow: visible; position: absolute; transform-origin: 5px 8px; transform: scale(3.5); margin: 8px 18px 28px 18px; image-rendering: pixelated;
+    box-shadow: 2px 9px 0 rgba(0,0,0,0.08), 3px 9px 0 rgba(0,0,0,0.15), 4px 9px 0 rgba(0,0,0,0.22), 5px 9px 0 rgba(0,0,0,0.25), 6px 9px 0 rgba(0,0,0,0.22), 7px 9px 0 rgba(0,0,0,0.15), 8px 9px 0 rgba(0,0,0,0.08);
+  }
+  .chat-label { font-size: 10px; color: var(--muted); margin-bottom: 8px; }
+  .chat-ctx { display: flex; gap: 16px; align-items: flex-start; }
 
   .px-base {
     box-shadow:
@@ -58,99 +73,325 @@
       2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;
   }
 
-  /*
-   * CROWN — shifted down 1 row from previous.
-   *
-   * y=-1: . . X . X . X . X .   tips outlined
-   * y= 0: . X G G G G G G G X   gold body
-   * y= 1: . X D D D D D D D X   dark band
-   * y= 2: . X X X X X X X X X   bottom outline
-   */
-  .hat-crown-1x { box-shadow:
-    2px -1px 0 #000, 3px -1px 0 #fde047, 4px -1px 0 #000, 5px -1px 0 #fde047, 6px -1px 0 #000, 7px -1px 0 #fde047, 8px -1px 0 #000,
-    1px 0 0 #000, 2px 0 0 #fbbf24, 3px 0 0 #fde047, 4px 0 0 #fbbf24, 5px 0 0 #fde047, 6px 0 0 #fbbf24, 7px 0 0 #fde047, 8px 0 0 #fbbf24, 9px 0 0 #000,
-    1px 1px 0 #000, 2px 1px 0 #b45309, 3px 1px 0 #d97706, 4px 1px 0 #d97706, 5px 1px 0 #d97706, 6px 1px 0 #d97706, 7px 1px 0 #d97706, 8px 1px 0 #b45309, 9px 1px 0 #000,
-    1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000;
+  /* Crown for team lead reference */
+  .acc-crown { box-shadow:
+    3px -1px 0 #000, 5px -1px 0 #000, 7px -1px 0 #000,
+    2px 0 0 #000, 3px 0 0 #fde047, 4px 0 0 #000, 5px 0 0 #fde047, 6px 0 0 #000, 7px 0 0 #fde047, 8px 0 0 #000,
+    1px 1px 0 #000, 2px 1px 0 #fbbf24, 3px 1px 0 #fde047, 4px 1px 0 #fbbf24, 5px 1px 0 #fde047, 6px 1px 0 #fbbf24, 7px 1px 0 #fde047, 8px 1px 0 #fbbf24, 9px 1px 0 #000,
+    1px 2px 0 #000, 2px 2px 0 #b45309, 3px 2px 0 #d97706, 4px 2px 0 #d97706, 5px 2px 0 #d97706, 6px 2px 0 #d97706, 7px 2px 0 #d97706, 8px 2px 0 #b45309, 9px 2px 0 #000,
+    1px 3px 0 #000, 2px 3px 0 #000, 3px 3px 0 #000, 4px 3px 0 #000, 5px 3px 0 #000, 6px 3px 0 #000, 7px 3px 0 #000, 8px 3px 0 #000, 9px 3px 0 #000;
   }
 
-  /*
-   * BERET — nub replaced with black to flatten top.
-   *
-   * y=-1: . . X X X X X . . . . .   flat top outline (x=2..6)
-   * y= 0: . X P P P P P P X . . .   puff wide (x=1..8)
-   * y= 1: . X P P P P P P P P X .   body + droop right (x=1..10)
-   * y= 2: . X X X X X X X X X X X   bottom outline (x=1..11)
-   */
-  .hat-beret-1x { box-shadow:
-    2px -1px 0 #000, 3px -1px 0 #000, 4px -1px 0 #000, 5px -1px 0 #000, 6px -1px 0 #000,
-    1px 0 0 #000, 2px 0 0 #4f46e5, 3px 0 0 #6366f1, 4px 0 0 #818cf8, 5px 0 0 #6366f1, 6px 0 0 #4f46e5, 7px 0 0 #4338ca, 8px 0 0 #000,
-    1px 1px 0 #000, 2px 1px 0 #4338ca, 3px 1px 0 #4f46e5, 4px 1px 0 #6366f1, 5px 1px 0 #4f46e5, 6px 1px 0 #4338ca, 7px 1px 0 #3730a3, 8px 1px 0 #312e81, 9px 1px 0 #1e1b4b, 10px 1px 0 #000,
-    1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000, 10px 2px 0 #000, 11px 2px 0 #000;
+  /* ============================================================
+     HEADPHONES — 3 variants
+     ============================================================ */
+
+  /* H1: Classic over-ear — chunky red cups, thick band */
+  .acc-hp1 { box-shadow:
+    /* headband */
+    3px -1px 0 #000, 4px -1px 0 #374151, 5px -1px 0 #4b5563, 6px -1px 0 #374151, 7px -1px 0 #000,
+    2px 0 0 #000, 3px 0 0 #374151, 7px 0 0 #374151, 8px 0 0 #000,
+    /* left cup */
+    0px 1px 0 #000, 1px 1px 0 #000,
+    0px 2px 0 #000, 1px 2px 0 #ef4444,
+    0px 3px 0 #000, 1px 3px 0 #ef4444,
+    0px 4px 0 #000, 1px 4px 0 #000,
+    /* right cup */
+    9px 1px 0 #000, 10px 1px 0 #000,
+    9px 2px 0 #ef4444, 10px 2px 0 #000,
+    9px 3px 0 #ef4444, 10px 3px 0 #000,
+    9px 4px 0 #000, 10px 4px 0 #000;
   }
 
-  .finalists { display: grid; grid-template-columns: 240px 240px; gap: 20px; }
+  /* H2: Sleek — thinner band, smaller cups, more modern */
+  .acc-hp2 { box-shadow:
+    /* thin headband */
+    4px -1px 0 #000, 5px -1px 0 #6b7280, 6px -1px 0 #000,
+    3px 0 0 #000, 7px 0 0 #000,
+    2px 1px 0 #000, 8px 1px 0 #000,
+    /* left cup — single pixel, cyan accent */
+    0px 2px 0 #000, 1px 2px 0 #22d3ee, 1px 3px 0 #000,
+    /* right cup */
+    9px 2px 0 #22d3ee, 10px 2px 0 #000, 9px 3px 0 #000;
+  }
+
+  /* H3: DJ — big cups with highlight, wider band */
+  .acc-hp3 { box-shadow:
+    /* wide padded headband */
+    3px -1px 0 #000, 4px -1px 0 #1f2937, 5px -1px 0 #374151, 6px -1px 0 #1f2937, 7px -1px 0 #000,
+    2px 0 0 #000, 3px 0 0 #1f2937, 7px 0 0 #1f2937, 8px 0 0 #000,
+    1px 1px 0 #000, 9px 1px 0 #000,
+    /* left cup — 2px tall, with highlight */
+    0px 2px 0 #000, 1px 2px 0 #7c3aed, 0px 3px 0 #000, 1px 3px 0 #a78bfa,
+    0px 4px 0 #000, 1px 4px 0 #7c3aed, 0px 5px 0 #000, 1px 5px 0 #000,
+    /* right cup */
+    9px 2px 0 #7c3aed, 10px 2px 0 #000, 9px 3px 0 #a78bfa, 10px 3px 0 #000,
+    9px 4px 0 #7c3aed, 10px 4px 0 #000, 9px 5px 0 #000, 10px 5px 0 #000;
+  }
+
+  /* ============================================================
+     BANDANA — 3 variants
+     ============================================================ */
+
+  /* B1: Classic tied bandana — knot on right, tail trails */
+  .acc-ban1 { box-shadow:
+    /* band across forehead */
+    1px 2px 0 #000, 2px 2px 0 #ef4444, 3px 2px 0 #dc2626, 4px 2px 0 #ef4444, 5px 2px 0 #dc2626, 6px 2px 0 #ef4444, 7px 2px 0 #dc2626, 8px 2px 0 #ef4444, 9px 2px 0 #000,
+    /* bottom edge */
+    1px 3px 0 #000, 2px 3px 0 #000, 3px 3px 0 #000, 4px 3px 0 #000, 5px 3px 0 #000, 6px 3px 0 #000, 7px 3px 0 #000, 8px 3px 0 #000, 9px 3px 0 #000,
+    /* knot + tail on right */
+    10px 2px 0 #000, 10px 3px 0 #dc2626, 11px 3px 0 #000,
+    10px 4px 0 #b91c1c, 11px 4px 0 #000,
+    10px 5px 0 #000;
+  }
+
+  /* B2: Ninja style — covers top of head, tied at back */
+  .acc-ban2 { box-shadow:
+    /* top cover */
+    3px 0 0 #000, 4px 0 0 #1e3a5f, 5px 0 0 #1e40af, 6px 0 0 #1e3a5f, 7px 0 0 #000,
+    /* band wraps around */
+    1px 1px 0 #000, 2px 1px 0 #1e40af, 3px 1px 0 #2563eb, 4px 1px 0 #1e40af, 5px 1px 0 #2563eb, 6px 1px 0 #1e40af, 7px 1px 0 #2563eb, 8px 1px 0 #1e40af, 9px 1px 0 #000,
+    /* lower edge */
+    1px 2px 0 #000, 2px 2px 0 #1e3a5f, 3px 2px 0 #1e40af, 4px 2px 0 #1e3a5f, 5px 2px 0 #1e40af, 6px 2px 0 #1e3a5f, 7px 2px 0 #1e40af, 8px 2px 0 #1e3a5f, 9px 2px 0 #000,
+    /* bottom outline */
+    1px 3px 0 #000, 2px 3px 0 #000, 3px 3px 0 #000, 4px 3px 0 #000, 5px 3px 0 #000, 6px 3px 0 #000, 7px 3px 0 #000, 8px 3px 0 #000, 9px 3px 0 #000,
+    /* tail at back-right */
+    10px 2px 0 #000, 10px 3px 0 #1e3a5f, 11px 3px 0 #000,
+    11px 4px 0 #1e3a5f, 12px 4px 0 #000;
+  }
+
+  /* B3: Pirate bandana — spotted pattern, looser look */
+  .acc-ban3 { box-shadow:
+    /* dome cover */
+    3px -1px 0 #000, 4px -1px 0 #000, 5px -1px 0 #000, 6px -1px 0 #000, 7px -1px 0 #000,
+    2px 0 0 #000, 3px 0 0 #1f2937, 4px 0 0 #374151, 5px 0 0 #1f2937, 6px 0 0 #374151, 7px 0 0 #1f2937, 8px 0 0 #000,
+    /* band */
+    1px 1px 0 #000, 2px 1px 0 #374151, 3px 1px 0 #1f2937, 4px 1px 0 #374151, 5px 1px 0 #1f2937, 6px 1px 0 #374151, 7px 1px 0 #1f2937, 8px 1px 0 #374151, 9px 1px 0 #000,
+    /* bottom outline */
+    1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000,
+    /* knot + skullyish tail */
+    10px 1px 0 #000, 10px 2px 0 #374151, 11px 2px 0 #000,
+    10px 3px 0 #1f2937, 11px 3px 0 #000;
+  }
+
+  /* ============================================================
+     WILDCARD — 3 variants
+     ============================================================ */
+
+  /* W1: Terminal cursor — blinking block above head */
+  .acc-wc1 { box-shadow:
+    4px -2px 0 #000, 5px -2px 0 #22c55e, 6px -2px 0 #000,
+    4px -1px 0 #000, 5px -1px 0 #22c55e, 6px -1px 0 #000;
+  }
+
+  /* W2: Antenna with signal — robot/tech feel */
+  .acc-wc2 { box-shadow:
+    /* antenna mast */
+    5px -3px 0 #000,
+    5px -2px 0 #6b7280, 6px -2px 0 #000,
+    5px -1px 0 #000,
+    /* signal arcs */
+    7px -3px 0 #22d3ee, 8px -4px 0 #22d3ee,
+    7px -4px 0 #06b6d4;
+  }
+
+  /* W3: Brackets < > — wrapping the bobbit like code */
+  .acc-wc3 { box-shadow:
+    /* left bracket < */
+    -1px 2px 0 #22c55e, -2px 3px 0 #22c55e, -2px 4px 0 #22c55e, -1px 5px 0 #22c55e,
+    /* right bracket > */
+    11px 2px 0 #22c55e, 12px 3px 0 #22c55e, 12px 4px 0 #22c55e, 11px 5px 0 #22c55e;
+  }
+
+  .sidebars { display: flex; gap: 20px; flex-wrap: wrap; }
+  .chats { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
 </style>
 </head>
 <body>
 
-<h1>Crown & Beret — Lowered Crown, Flat Beret</h1>
+<h1>Coder Accessories — Headphones, Bandana, Wildcard</h1>
 <p class="subtitle">
-  Crown shifted down 1 row. Beret top flattened — nub replaced with black outline.
+  3 variants of each category. Shown at 5x close-up, in sidebar context with the full swarm, and at chat-area scale (3.5x).
 </p>
 
-<div class="section-title">Close-up at 5x</div>
+<!-- ===== HEADPHONES ===== -->
+<div class="section-title">Headphones</div>
 <div class="row">
-  <div class="opt"><div class="label">Bare</div><div class="big"><span class="body px-base"></span></div></div>
-  <div class="opt"><div class="label">Crown</div><div class="big"><span class="body px-base"></span><span class="hat hat-crown-1x"></span></div></div>
-  <div class="opt"><div class="label">Beret</div><div class="big"><span class="body px-base"></span><span class="hat hat-beret-1x"></span></div></div>
+  <div class="opt">
+    <div class="label">H1 Classic</div>
+    <div class="sublabel">Chunky red cups, thick grey band</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-hp1"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">H2 Sleek</div>
+    <div class="sublabel">Thin band, small cyan cups</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-hp2"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">H3 DJ</div>
+    <div class="sublabel">Big purple cups, padded band</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-hp3"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">Bare</div>
+    <div class="sublabel">Reference</div>
+    <div class="big"><span class="body px-base"></span></div>
+  </div>
 </div>
 
-<div class="section-title">At sidebar scale — hats bob with body</div>
-<div class="finalists">
-  <div>
-    <div class="sidebar-mock">
-      <div class="group-label">API Redesign</div>
-      <div class="sidebar-row active">
-        <div class="bw"><span class="body px-base st-active"></span><span class="hat hat-crown-1x st-active"></span></div>
-        <span class="title bold">Team Lead</span>
-        <span class="role-tag">lead</span>
-      </div>
-      <div class="sidebar-row">
-        <div class="bw"><span class="body px-base st-active hue-100"></span></div>
-        <span class="title bold">Auth Module</span>
-      </div>
-      <div class="sidebar-row">
-        <div class="bw"><span class="body px-base st-active hue-200"></span></div>
-        <span class="title bold">Database Layer</span>
-      </div>
-      <div class="sidebar-row">
-        <div class="bw"><span class="body px-base st-idle"></span></div>
-        <span class="title">Test Harness</span>
-      </div>
+<!-- ===== BANDANA ===== -->
+<div class="section-title">Bandana</div>
+<div class="row">
+  <div class="opt">
+    <div class="label">B1 Classic</div>
+    <div class="sublabel">Red band, knot + tail on right</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-ban1"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">B2 Ninja</div>
+    <div class="sublabel">Blue, covers dome, tied back</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-ban2"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">B3 Pirate</div>
+    <div class="sublabel">Dark grey, spotted, knot trail</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-ban3"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">Bare</div>
+    <div class="sublabel">Reference</div>
+    <div class="big"><span class="body px-base"></span></div>
+  </div>
+</div>
+
+<!-- ===== WILDCARD ===== -->
+<div class="section-title">Wildcard</div>
+<div class="row">
+  <div class="opt">
+    <div class="label">W1 Cursor</div>
+    <div class="sublabel">Terminal block cursor, green</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-wc1"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">W2 Antenna</div>
+    <div class="sublabel">Mast + signal arcs</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-wc2"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">W3 Brackets</div>
+    <div class="sublabel">&lt; &gt; wrapping the body</div>
+    <div class="big"><span class="body px-base"></span><span class="acc acc-wc3"></span></div>
+  </div>
+  <div class="opt">
+    <div class="label">Bare</div>
+    <div class="sublabel">Reference</div>
+    <div class="big"><span class="body px-base"></span></div>
+  </div>
+</div>
+
+<!-- ===== SIDEBAR CONTEXT — one of each category ===== -->
+<div class="section-title">In sidebar — swarm with each coder variant</div>
+<div class="sidebars">
+
+  <div class="sidebar-mock">
+    <div class="group-label">H1 Headphones</div>
+    <div class="sidebar-row active">
+      <div class="bw"><span class="body px-base st-active"></span><span class="acc acc-crown st-active"></span></div>
+      <span class="title bold">Team Lead</span>
+      <span class="role-tag">lead</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-active hue-100"></span><span class="acc acc-hp1 st-active"></span></div>
+      <span class="title bold">Coder</span>
+      <span class="role-tag">coder</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-idle hue-200"></span></div>
+      <span class="title">Reviewer</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-idle hue-n85"></span></div>
+      <span class="title">Tester</span>
     </div>
   </div>
-  <div>
-    <div class="sidebar-mock">
-      <div class="group-label">API Redesign</div>
-      <div class="sidebar-row active">
-        <div class="bw"><span class="body px-base st-active"></span><span class="hat hat-beret-1x st-active"></span></div>
-        <span class="title bold">Team Lead</span>
-        <span class="role-tag">lead</span>
-      </div>
-      <div class="sidebar-row">
-        <div class="bw"><span class="body px-base st-active hue-100"></span></div>
-        <span class="title bold">Auth Module</span>
-      </div>
-      <div class="sidebar-row">
-        <div class="bw"><span class="body px-base st-active hue-200"></span></div>
-        <span class="title bold">Database Layer</span>
-      </div>
-      <div class="sidebar-row">
-        <div class="bw"><span class="body px-base st-idle"></span></div>
-        <span class="title">Test Harness</span>
-      </div>
+
+  <div class="sidebar-mock">
+    <div class="group-label">B2 Ninja Bandana</div>
+    <div class="sidebar-row active">
+      <div class="bw"><span class="body px-base st-active"></span><span class="acc acc-crown st-active"></span></div>
+      <span class="title bold">Team Lead</span>
+      <span class="role-tag">lead</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-active hue-100"></span><span class="acc acc-ban2 st-active"></span></div>
+      <span class="title bold">Coder</span>
+      <span class="role-tag">coder</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-idle hue-200"></span></div>
+      <span class="title">Reviewer</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-idle hue-n85"></span></div>
+      <span class="title">Tester</span>
     </div>
   </div>
+
+  <div class="sidebar-mock">
+    <div class="group-label">W3 Brackets</div>
+    <div class="sidebar-row active">
+      <div class="bw"><span class="body px-base st-active"></span><span class="acc acc-crown st-active"></span></div>
+      <span class="title bold">Team Lead</span>
+      <span class="role-tag">lead</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-active hue-100"></span><span class="acc acc-wc3 st-active"></span></div>
+      <span class="title bold">Coder</span>
+      <span class="role-tag">coder</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-idle hue-200"></span></div>
+      <span class="title">Reviewer</span>
+    </div>
+    <div class="sidebar-row">
+      <div class="bw"><span class="body px-base st-idle hue-n85"></span></div>
+      <span class="title">Tester</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== CHAT AREA CONTEXT ===== -->
+<div class="section-title">In chat area — 3.5x scale</div>
+<div class="chats">
+
+  <div class="chat-mock">
+    <div class="chat-label">H1 Classic Headphones</div>
+    <div class="chat-blob">
+      <div class="body px-base" style="filter:hue-rotate(100deg)"></div>
+      <div class="acc acc-hp1"></div>
+      <div class="shadow"></div>
+    </div>
+  </div>
+
+  <div class="chat-mock">
+    <div class="chat-label">B2 Ninja Bandana</div>
+    <div class="chat-blob">
+      <div class="body px-base" style="filter:hue-rotate(100deg)"></div>
+      <div class="acc acc-ban2"></div>
+      <div class="shadow"></div>
+    </div>
+  </div>
+
+  <div class="chat-mock">
+    <div class="chat-label">W3 Brackets</div>
+    <div class="chat-blob">
+      <div class="body px-base" style="filter:hue-rotate(100deg)"></div>
+      <div class="acc acc-wc3"></div>
+      <div class="shadow"></div>
+    </div>
+  </div>
+
 </div>
 
 </body>
