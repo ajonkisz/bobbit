@@ -114,7 +114,7 @@ export class GitStatusWidget extends LitElement {
                 ${this.expanded
                     ? html`
                           <div
-                              class="absolute right-0 top-full mt-1 z-50 min-w-[260px] max-w-[360px] bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
+                              class="absolute right-0 bottom-full mb-1 z-50 min-w-[260px] max-w-[360px] bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
                           >
                               <div class="flex items-center gap-1.5 mb-2 text-foreground font-medium text-sm">
                                   <span>⎇</span>
