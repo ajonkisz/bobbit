@@ -134,7 +134,7 @@ export async function generateSessionTitle(messages: any[]): Promise<string | nu
 		headers["x-api-key"] = auth.access;
 	}
 
-	const coreInstruction = "Output a 2-3 word label for this conversation. MAXIMUM 3 words. Examples: \"Fix Login Bug\", \"Redis Setup\", \"CSV Parser\", \"Dark Mode\". Output ONLY the label. No quotes, no markdown, no explanation.";
+	const coreInstruction = "Output a 2-3 word label for this conversation. MAXIMUM 3 words. Examples: \"Fix Login Bug\", \"Redis Setup\", \"CSV Parser\", \"Dark Mode\". Output ONLY the label. No quotes, no markdown, no explanation. No emojis.";
 	const systemText = auth.type === "oauth"
 		? `You are Claude Code, Anthropic's official CLI for Claude. ${coreInstruction}`
 		: coreInstruction;
@@ -184,6 +184,7 @@ export async function generateSessionTitle(messages: any[]): Promise<string | nu
 		let title = text
 			.replace(/^#+\s*/, "")           // strip markdown headers
 			.replace(/^["'"']+|["'"']+$/g, "") // strip quotes
+			.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{27BF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}\u{FE0F}]/gu, '') // strip emojis
 			.replace(/\n.*/s, "")              // only first line
 			.trim();
 		if (title.length > 30) title = title.slice(0, 27) + "…";

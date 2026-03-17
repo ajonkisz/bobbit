@@ -483,6 +483,31 @@ async function handleApiRoute(
 		return;
 	}
 
+	// GET /api/goals/:id/commits — get commit history for goal branch
+	const commitsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/commits$/);
+	if (commitsMatch && req.method === "GET") {
+		const goalId = commitsMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+		const branch = goal.branch || "HEAD";
+		// Validate branch name to prevent injection
+		if (!/^[a-zA-Z0-9/_.\-]+$/.test(branch)) { json({ error: "Invalid branch name" }, 400); return; }
+		try {
+			const { execFileSync } = require("node:child_process");
+			const out = execFileSync("git", ["log", "--format=%H|%h|%s|%an|%aI", "-20", branch], {
+				cwd: goal.cwd, encoding: "utf-8",
+			});
+			const commits = out.trim().split("\n").filter(Boolean).map((line: string) => {
+				const [sha, shortSha, message, author, timestamp] = line.split("|");
+				return { sha, shortSha, message, author, timestamp };
+			});
+			json(commits);
+		} catch (e: any) {
+			json({ error: "Failed to read git log", detail: e.message }, 500);
+		}
+		return;
+	}
+
 	// GET /api/goals/:id/swarm — get swarm state
 	const swarmStateMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm$/);
 	if (swarmStateMatch && req.method === "GET") {

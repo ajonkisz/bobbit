@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, Crosshair, PanelLeftOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug } from "lucide";
+import { ArrowLeft, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug } from "lucide";
 import "../ui/components/WorkflowStatusBar.js";
 import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 import {
@@ -21,11 +21,16 @@ import { createGoal, gatewayFetch, refreshSessions } from "./api.js";
 import { clearSessionModel } from "./routing.js";
 import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
-import { renderSidebar, toggleSidebar } from "./sidebar.js";
+import { renderSidebar } from "./sidebar.js";
 import { renderSessionCard, goalStateIcon } from "./render-helpers.js";
+
+const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:18px;image-rendering:pixelated;" />`;
+
 import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
 import { mobileHeaderVisible, teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
-import { setHashRoute } from "./routing.js";
+import { getRouteFromHash, setHashRoute } from "./routing.js";
+import { renderGoalDashboard } from "./goal-dashboard.js";
+import "./goal-dashboard.css";
 
 // Expose for testing
 (window as any).__extractWorkflowStatus = extractWorkflowStatus;
@@ -320,6 +325,7 @@ export function doRenderApp(): void {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
 				<div class="flex items-center justify-between border-b border-border shrink-0">
 					<div class="flex items-center gap-2 px-4 py-1">
+						${bobbitIcon}
 						<span class="text-base font-semibold text-foreground">Bobbit</span>
 					</div>
 					<div class="flex items-center gap-1 px-2">
@@ -413,6 +419,7 @@ export function doRenderApp(): void {
 
 		if (!desktop) {
 			return html`<div class="flex items-center gap-2 px-4 py-1">
+				${bobbitIcon}
 				<span class="text-base font-semibold text-foreground">Bobbit</span>
 			</div>`;
 		}
@@ -563,6 +570,12 @@ export function doRenderApp(): void {
 	};
 
 	const mainArea = () => {
+		// Goal dashboard route
+		const route = getRouteFromHash();
+		if (route.view === "goal-dashboard" && route.goalId) {
+			return renderGoalDashboard();
+		}
+
 		if (connected && state.isGoalAssistantSession) {
 			if (desktop) {
 				return html`
@@ -610,25 +623,23 @@ export function doRenderApp(): void {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
 				<div class="flex items-center border-b border-border shrink-0">
 					${state.sidebarCollapsed ? html`
-					<div class="w-14 shrink-0 flex items-center justify-center py-1.5" style="background: var(--sidebar);">
-						<button
-							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-							@click=${toggleSidebar}
-							title="Expand sidebar (Ctrl+[)"
-						>
-							${icon(PanelLeftOpen, "sm")}
-						</button>
+					<div class="w-14 shrink-0 flex items-center justify-center" style="background: var(--sidebar);">
+						${bobbitIcon}
 					</div>
 					` : html`
-					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5" style="background: var(--sidebar);">
-						<span class="text-base font-semibold text-foreground">Bobbit</span>
+					<div class="w-[240px] shrink-0 flex items-center justify-between px-3" style="background: var(--sidebar);">
+						<div class="flex items-center gap-2">
+							${bobbitIcon}
+							<span class="text-base font-semibold text-foreground">Bobbit</span>
+						</div>
 						<div class="flex items-center gap-0.5">
 							<button
-								class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+								class="inline-flex items-center gap-1 p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
 								@click=${() => showGoalDialog()}
 								title="New goal"
 							>
 								${icon(Crosshair, "sm")}
+								<span class="text-xs">New Goal</span>
 							</button>
 						</div>
 					</div>

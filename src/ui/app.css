@@ -377,6 +377,65 @@ body {
 		7px 8px 0 #000;
 }
 
+/* ===== Crown overlay for team leads ===== */
+/* Hidden by default — shown when html.bobbit-crowned is set */
+.bobbit-blob__crown {
+	display: none;
+}
+/* Push the whole bobbit down when crowned to prevent crown tip clipping */
+.bobbit-crowned .bobbit-blob {
+	padding-top: 6px;
+}
+.bobbit-crowned .bobbit-blob__crown {
+	display: block;
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: visible;
+	transform-origin: 5px 8px; /* same as sprite */
+	transform: scale(3.5);
+	margin: 8px 18px 28px 18px;
+	image-rendering: pixelated;
+	/* Counter hue-rotate so crown stays gold */
+	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
+	box-shadow:
+		3px -2px 0 #000, 5px -2px 0 #000, 7px -2px 0 #000,
+		2px -1px 0 #000, 3px -1px 0 #fde047, 4px -1px 0 #000, 5px -1px 0 #fde047, 6px -1px 0 #000, 7px -1px 0 #fde047, 8px -1px 0 #000,
+		1px 0px 0 #000, 2px 0px 0 #fbbf24, 3px 0px 0 #fde047, 4px 0px 0 #fbbf24, 5px 0px 0 #fde047, 6px 0px 0 #fbbf24, 7px 0px 0 #fde047, 8px 0px 0 #fbbf24, 9px 0px 0 #000,
+		1px 1px 0 #000, 2px 1px 0 #b45309, 3px 1px 0 #d97706, 4px 1px 0 #d97706, 5px 1px 0 #d97706, 6px 1px 0 #d97706, 7px 1px 0 #d97706, 8px 1px 0 #b45309, 9px 1px 0 #000,
+		1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000;
+	/* Match sprite's busy animation so crown moves in sync */
+	animation:
+		blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+}
+
+/* Crown follows all sprite state animations */
+.bobbit-blob--idle .bobbit-blob__crown {
+	animation: none;
+	transform: scale(3.5) translateX(-7px);
+}
+.bobbit-blob--exit .bobbit-blob__crown {
+	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+}
+.bobbit-blob--exit-roll .bobbit-blob__crown {
+	animation: blob-exit-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+}
+.bobbit-blob--enter .bobbit-blob__crown {
+	animation: blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+}
+.bobbit-blob--enter-roll .bobbit-blob__crown {
+	animation: blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+}
+.bobbit-blob--compact-shake .bobbit-blob__crown {
+	animation: blob-compact-shake 0.8s ease-in-out forwards !important;
+}
+.bobbit-blob--compacting .bobbit-blob__crown {
+	animation: blob-compact-squash 3s ease-in-out infinite !important;
+}
+.bobbit-blob--compact-pop .bobbit-blob__crown {
+	animation: blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+}
+
 /* Disney 12-principles bounce:
    anticipation → launch → hang → land → settle → breathe → wiggle */
 @keyframes blob-bounce {

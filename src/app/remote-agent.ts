@@ -24,6 +24,7 @@ export class RemoteAgent {
 	// Compaction tracking — persists across message refreshes.
 	// Exposed on state so the UI can queue messages during compact.
 	private _isCompacting = false;
+	private _isAborting = false;
 
 	// After compaction, usage from the last assistant message is stale (reflects
 	// pre-compaction context size).  Set to true on compaction_end, cleared when
@@ -424,7 +425,10 @@ export class RemoteAgent {
 		this.send({ type: "follow_up", text });
 	}
 
+	get isAborting(): boolean { return this._isAborting; }
+
 	abort(): void {
+		this._isAborting = true;
 		this.send({ type: "abort" });
 	}
 
@@ -570,6 +574,7 @@ export class RemoteAgent {
 			case "session_status":
 				console.log(`[RemoteAgent] session_status: ${msg.status}, isStreaming was: ${this._state.isStreaming}`);
 				this._state.isStreaming = msg.status === "streaming";
+				if (msg.status !== "streaming") this._isAborting = false;
 				this.onStatusChange?.(msg.status);
 				break;
 
@@ -659,6 +664,7 @@ export class RemoteAgent {
 			case "agent_end": {
 				this.flushDeferredMessage();
 				this._state.isStreaming = false;
+				this._isAborting = false;
 				this._state.streamMessage = null;
 				this._state.pendingToolCalls = new Set();
 

@@ -47,6 +47,7 @@ export class AgentInterface extends LitElement {
 
 	private _stickToBottom = true;
 	private _isAutoScrolling = false;
+	private _autoScrollTimer?: ReturnType<typeof setTimeout>;
 	private _scrollContainer?: HTMLElement;
 	private _resizeObserver?: ResizeObserver;
 	private _unsubscribeSession?: () => void;
@@ -80,11 +81,15 @@ export class AgentInterface extends LitElement {
 			if (raw) {
 				const restored: QueuedMessage[] = JSON.parse(raw);
 				if (Array.isArray(restored) && restored.length > 0) {
-					this._queuedMessages = restored;
+					// Drop steered messages — they were already sent to the
+					// agent and we can't know if they were processed before
+					// the page reloaded.
+					this._queuedMessages = restored.filter(m => !m.steered);
 					this._queueIdCounter = Math.max(this._queueIdCounter, ...restored.map(m => {
 						const n = parseInt(m.id.replace("q_", ""), 10);
 						return isNaN(n) ? 0 : n;
 					}));
+					this._saveQueuedMessages();
 					this.requestUpdate();
 				}
 			}
@@ -142,9 +147,14 @@ export class AgentInterface extends LitElement {
 				if (this._stickToBottom && this._scrollContainer) {
 					this._isAutoScrolling = true;
 					this._scrollContainer.scrollTop = this._scrollContainer.scrollHeight;
-					requestAnimationFrame(() => {
+					// Clear the flag on a timeout rather than rAF — in Chrome,
+					// scroll events fire *after* rAF callbacks (during "run the
+					// scroll steps"), so an rAF-based reset races with the
+					// scroll handler and can falsely set _stickToBottom = false.
+					clearTimeout(this._autoScrollTimer);
+					this._autoScrollTimer = setTimeout(() => {
 						this._isAutoScrolling = false;
-					});
+					}, 150);
 				}
 			});
 
@@ -164,7 +174,8 @@ export class AgentInterface extends LitElement {
 	override disconnectedCallback() {
 		super.disconnectedCallback();
 
-		// Clean up observers and listeners
+		// Clean up timers, observers, and listeners
+		clearTimeout(this._autoScrollTimer);
 		if (this._resizeObserver) {
 			this._resizeObserver.disconnect();
 			this._resizeObserver = undefined;
@@ -187,8 +198,9 @@ export class AgentInterface extends LitElement {
 		}
 		if (!this.session) return;
 
-		// Reset scroll state for new session
+		// Reset scroll state for new session and scroll to bottom once rendered
 		this._stickToBottom = true;
+		this.updateComplete.then(() => this._scrollToBottom());
 
 		// Set default streamFn with proxy support if not already set
 		if (this.session.streamFn === streamSimple) {
@@ -231,8 +243,13 @@ export class AgentInterface extends LitElement {
 				return;
 			}
 			if ((ev as any).type === "state_update") {
-				// Server state refresh (e.g. after compaction) — re-render stats
+				// Server state refresh (e.g. after compaction or reconnect) — re-render stats
+				// and scroll to bottom if we were tracking bottom (content may have been
+				// bulk-replaced without triggering a ResizeObserver change).
 				this.requestUpdate();
+				if (this._stickToBottom) {
+					this.updateComplete.then(() => this._scrollToBottom());
+				}
 				return;
 			}
 			if ((ev as any).type === "tool_execution_update") {
@@ -246,13 +263,17 @@ export class AgentInterface extends LitElement {
 				return;
 			}
 			switch (ev.type) {
-				case "message_start":
 				case "turn_end":
 				case "agent_start":
 					this.requestUpdate();
 					break;
 				case "turn_start":
-					// Clear steered messages — the agent has picked them up
+				case "message_start":
+					// Clear steered messages — the agent has picked them up.
+					// We listen on both turn_start (local agent) and
+					// message_start (RemoteAgent, which never emits
+					// turn_start) so steered messages disappear as soon as
+					// the agent begins responding after the steer.
 					if (this._queuedMessages.some((m) => m.steered)) {
 						this._queuedMessages = this._queuedMessages.filter((m) => !m.steered);
 						this._saveQueuedMessages();
@@ -297,18 +318,23 @@ export class AgentInterface extends LitElement {
 	}
 
 	private _scrollToBottom() {
+		this._stickToBottom = true;
 		this._isAutoScrolling = true;
 		if (this._scrollContainer) {
 			this._scrollContainer.scrollTop = this._scrollContainer.scrollHeight;
 		}
 		// Re-assert after next frame (layout may not have settled yet)
 		requestAnimationFrame(() => {
-			this._stickToBottom = true;
 			if (this._scrollContainer) {
 				this._scrollContainer.scrollTop = this._scrollContainer.scrollHeight;
 			}
-			this._isAutoScrolling = false;
 		});
+		// Clear auto-scroll guard on a timeout that outlasts the browser's
+		// scroll event dispatch (see ResizeObserver comment for rationale).
+		clearTimeout(this._autoScrollTimer);
+		this._autoScrollTimer = setTimeout(() => {
+			this._isAutoScrolling = false;
+		}, 150);
 	}
 
 	/**

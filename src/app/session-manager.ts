@@ -175,6 +175,10 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		remote.onStatusChange = (status: string) => {
 			updateLocalSessionStatus(sessionId, status);
+			const idx = state.gatewaySessions.findIndex((s) => s.id === sessionId);
+			if (idx >= 0) {
+				state.gatewaySessions[idx] = { ...state.gatewaySessions[idx], isAborting: remote.isAborting };
+			}
 			renderApp();
 		};
 
@@ -205,6 +209,8 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		localStorage.setItem(GW_SESSION_KEY, sessionId);
 
 		document.documentElement.style.setProperty("--bobbit-hue-rotate", `${sessionHueRotation(sessionId)}deg`);
+		const sessionForRole = state.gatewaySessions.find((s) => s.id === sessionId);
+		document.documentElement.classList.toggle("bobbit-crowned", sessionForRole?.role === "team-lead");
 		setHashRoute("session", sessionId);
 
 		const modelProvider = remote.state.model?.provider || "anthropic";

@@ -31,6 +31,8 @@ export interface PersistedTask {
 	updatedAt: number;
 	completedAt?: number;
 	dependsOn?: string[];
+	commitSha?: string;
+	resultSummary?: string;
 }
 
 const STORE_DIR = path.join(os.homedir(), ".pi");

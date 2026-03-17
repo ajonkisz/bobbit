@@ -14,6 +14,7 @@ export interface GatewaySession {
 	lastActivity: number;
 	clientCount: number;
 	isCompacting?: boolean;
+	isAborting?: boolean;
 	goalId?: string;
 	goalAssistant?: boolean;
 	colorIndex?: number;
@@ -86,6 +87,9 @@ export const state = {
 	previewWorktree: false,
 	cwdDropdownOpen: false,
 	cwdHighlightIndex: -1,
+
+	/** Currently viewed goal dashboard (null = not on dashboard) */
+	goalDashboardId: null as string | null,
 };
 
 // ============================================================================
