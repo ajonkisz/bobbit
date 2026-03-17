@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { TaskStore, type TaskType, type TaskStatus, type PersistedTask } from "./task-store.js";
 
 /**
  * Run `git rev-parse HEAD` in the given directory to get the current commit SHA.
  */
 export function getGoalBranchHead(goalCwd: string): string {
-	const result = execSync("git rev-parse HEAD", { cwd: goalCwd, shell: true as unknown as string });
-	return result.toString().trim();
+	const result = execFileSync("git", ["rev-parse", "HEAD"], { cwd: goalCwd, encoding: "utf-8" });
+	return result.trim();
 }
 
 /**

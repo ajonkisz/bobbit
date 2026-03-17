@@ -38,6 +38,22 @@ export interface CommitInfo {
 }
 
 // ============================================================================
+// REPORT TYPES
+// ============================================================================
+
+export interface ReportInfo {
+	sessionId: string;
+	workflowId: string;
+	workflowName: string;
+	status: "running" | "completed" | "failed" | "cancelled";
+	startedAt: number;
+	completedAt?: number;
+	artifactCount: number;
+	/** Derived from workflowId */
+	type: "code-review" | "test-suite" | "other";
+}
+
+// ============================================================================
 // DASHBOARD STATE
 // ============================================================================
 
@@ -45,6 +61,7 @@ let currentGoalId: string | null = null;
 let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
 let commits: CommitInfo[] = [];
+let reports: ReportInfo[] = [];
 let loading = true;
 let error = "";
 
@@ -58,8 +75,9 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	error = "";
 	renderApp();
 
-	// Start agent polling (runs independently of the main data load)
+	// Start polling (runs independently of the main data load)
 	startAgentPolling(goalId);
+	startTaskPolling(goalId);
 
 	try {
 		const [goalRes, tasksRes, commitsRes] = await Promise.all([
@@ -86,6 +104,9 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 			commits = [];
 		}
 
+		// Fetch workflow reports for all sessions belonging to this goal
+		reports = await fetchGoalReports(goalId);
+
 		loading = false;
 	} catch (err) {
 		error = err instanceof Error ? err.message : String(err);
@@ -95,14 +116,65 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	renderApp();
 }
 
+async function fetchGoalReports(goalId: string): Promise<ReportInfo[]> {
+	const goalSessions = state.gatewaySessions.filter((s) => s.goalId === goalId);
+	const results: ReportInfo[] = [];
+
+	await Promise.all(
+		goalSessions.map(async (session) => {
+			try {
+				const res = await gatewayFetch(`/api/sessions/${session.id}/workflow`);
+				if (!res.ok) return;
+				const ws = await res.json() as {
+					workflowId: string;
+					status: string;
+					startedAt: number;
+					completedAt?: number;
+					artifacts?: unknown[];
+					context?: Record<string, string>;
+				};
+
+				let type: ReportInfo["type"] = "other";
+				if (ws.workflowId.includes("code-review")) type = "code-review";
+				else if (ws.workflowId.includes("test")) type = "test-suite";
+
+				// Derive a friendly name from the workflow ID
+				const workflowName = ws.workflowId
+					.split("-")
+					.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+					.join(" ");
+
+				results.push({
+					sessionId: session.id,
+					workflowId: ws.workflowId,
+					workflowName,
+					status: ws.status as ReportInfo["status"],
+					startedAt: ws.startedAt,
+					completedAt: ws.completedAt,
+					artifactCount: ws.artifacts?.length ?? 0,
+					type,
+				});
+			} catch {
+				// Session has no workflow — skip
+			}
+		}),
+	);
+
+	// Sort by most recent first
+	results.sort((a, b) => (b.completedAt ?? b.startedAt) - (a.completedAt ?? a.startedAt));
+	return results;
+}
+
 export function clearDashboardState(): void {
 	currentGoalId = null;
 	currentGoal = null;
 	tasks = [];
 	commits = [];
+	reports = [];
 	loading = true;
 	error = "";
 	stopAgentPolling();
+	stopTaskPolling();
 }
 
 // ============================================================================
@@ -165,9 +237,9 @@ function renderTaskCard(task: Task): TemplateResult {
 
 	return html`
 		<div
-			class="kanban-card"
+			class="kanban-card ${isStale ? "kanban-card--stale" : ""}"
 			style="
-				opacity: ${isDone ? "0.75" : "1"};
+				opacity: ${isDone || isStale ? "0.65" : "1"};
 				--card-type-color: ${color};
 			"
 		>
@@ -221,12 +293,12 @@ function renderKanbanBoard(taskList: Task[]): TemplateResult {
 		{ key: "backlog", label: "Backlog", dotColor: "var(--kanban-backlog)", tasks: [] },
 		{ key: "in-progress", label: "In Progress", dotColor: "var(--kanban-in-progress)", tasks: [] },
 		{ key: "done", label: "Done", dotColor: "var(--kanban-done)", tasks: [] },
+		{ key: "stale", label: "Stale", dotColor: "var(--kanban-stale, #9ca3af)", tasks: [] },
 		{ key: "failed", label: "Failed", dotColor: "var(--kanban-failed)", tasks: [] },
 	];
 
 	for (const task of taskList) {
-		const status = task.status === "stale" ? "done" : task.status;
-		const col = columns.find((c) => c.key === status);
+		const col = columns.find((c) => c.key === task.status);
 		if (col) col.tasks.push(task);
 	}
 
@@ -350,6 +422,7 @@ export interface SwarmAgent {
 
 let agents: SwarmAgent[] = [];
 let agentPollTimer: ReturnType<typeof setInterval> | null = null;
+let taskPollTimer: ReturnType<typeof setInterval> | null = null;
 
 async function fetchAgents(goalId: string): Promise<SwarmAgent[]> {
 	try {
@@ -359,6 +432,32 @@ async function fetchAgents(goalId: string): Promise<SwarmAgent[]> {
 		return data.agents ?? [];
 	} catch {
 		return [];
+	}
+}
+
+function startTaskPolling(goalId: string): void {
+	stopTaskPolling();
+	taskPollTimer = setInterval(async () => {
+		if (!currentGoalId || currentGoalId !== goalId) return;
+		try {
+			const res = await gatewayFetch(`/api/goals/${goalId}/tasks`);
+			if (res.ok) {
+				const data = await res.json();
+				const newTasks: Task[] = data.tasks || [];
+				// Only re-render if data actually changed
+				if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
+					tasks = newTasks;
+					renderApp();
+				}
+			}
+		} catch { /* ignore poll errors */ }
+	}, 10_000);
+}
+
+function stopTaskPolling(): void {
+	if (taskPollTimer) {
+		clearInterval(taskPollTimer);
+		taskPollTimer = null;
 	}
 }
 
@@ -469,6 +568,93 @@ export function renderAgentPanel(agentList: SwarmAgent[]): TemplateResult {
 					</div>
 				`;
 			})}
+		</div>
+	`;
+}
+
+// ============================================================================
+// REPORTS PANEL
+// ============================================================================
+
+function reportTypeIcon(type: ReportInfo["type"]): string {
+	switch (type) {
+		case "code-review": return "\uD83D\uDD0D"; // 🔍
+		case "test-suite": return "\uD83E\uDDEA"; // 🧪
+		default: return "\uD83D\uDCCB"; // 📋
+	}
+}
+
+function reportTypeColor(type: ReportInfo["type"], failed: boolean): string {
+	if (failed) return "#ef4444";
+	switch (type) {
+		case "code-review": return "#f59e0b";
+		case "test-suite": return "#22c55e";
+		default: return "#6b7280";
+	}
+}
+
+function reportStatusLabel(status: ReportInfo["status"]): string {
+	switch (status) {
+		case "completed": return "Completed";
+		case "failed": return "Failed";
+		case "running": return "Running";
+		case "cancelled": return "Cancelled";
+	}
+}
+
+function formatReportTime(timestamp: number): string {
+	const diffMs = Date.now() - timestamp;
+	const mins = Math.floor(diffMs / 60_000);
+	if (mins < 1) return "just now";
+	if (mins < 60) return `${mins}m ago`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+}
+
+function openReport(sessionId: string): void {
+	const base = window.location.origin;
+	const token = new URLSearchParams(window.location.search).get("token") || "";
+	const url = `${base}/api/sessions/${sessionId}/workflow/report${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+	window.open(url, "_blank");
+}
+
+function renderReportCard(report: ReportInfo): TemplateResult {
+	const isFailed = report.status === "failed" || report.status === "cancelled";
+	const color = reportTypeColor(report.type, isFailed);
+	const completedTime = report.completedAt
+		? formatReportTime(report.completedAt)
+		: reportStatusLabel(report.status);
+
+	return html`
+		<div
+			class="report-card ${isFailed ? "report-card--failed" : ""}"
+			@click=${() => openReport(report.sessionId)}
+			title="Open ${report.workflowName} report"
+		>
+			<div class="report-icon" style="background: ${color}20; color: ${color};">
+				${reportTypeIcon(report.type)}
+			</div>
+			<div class="report-info">
+				<div class="report-title">${report.workflowName}</div>
+				<div class="report-meta">
+					<span>${completedTime}</span>
+					${report.artifactCount > 0 ? html`<span>\u00B7 ${report.artifactCount} artifact${report.artifactCount !== 1 ? "s" : ""}</span>` : nothing}
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+function renderReportsPanel(reportList: ReportInfo[]): TemplateResult {
+	return html`
+		<div class="reports-panel">
+			<div class="reports-panel-header">Reports</div>
+			${reportList.length > 0
+				? reportList.map(renderReportCard)
+				: html`<div class="reports-panel-empty">No reports yet</div>`
+			}
 		</div>
 	`;
 }
@@ -593,6 +779,7 @@ export function renderGoalDashboard(): TemplateResult {
 				</div>
 				<div class="dashboard-right-panel">
 					${renderAgentPanel(agents)}
+					${renderReportsPanel(reports)}
 				</div>
 			</div>
 		</div>
