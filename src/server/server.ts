@@ -295,6 +295,7 @@ async function handleApiRoute(
 		}
 
 		if (req.method === "DELETE") {
+			sessionManager.taskManager.deleteTasksForGoal(id);
 			sessionManager.goalManager.deleteGoal(id);
 			json({ ok: true });
 			return;

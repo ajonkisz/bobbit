@@ -25,6 +25,8 @@ export interface PersistedSession {
 	worktreePath?: string;
 	/** Whether this is a goal-creation assistant session */
 	goalAssistant?: boolean;
+	/** Task ID this session is working on */
+	taskId?: string;
 }
 
 const STORE_DIR = path.join(os.homedir(), ".pi");
@@ -89,7 +91,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "swarmGoalId" | "worktreePath" | "goalAssistant">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "swarmGoalId" | "worktreePath" | "goalAssistant" | "taskId">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);
