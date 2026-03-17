@@ -1,9 +1,9 @@
 ## Backlog
 
 ## In Progress
-- [x] #13 Create goal dashboard HTML mockup — role:coder, claimed-by:coder-621da054
 
 ## Done
+- [x] #13 Create goal dashboard HTML mockup — role:coder, completed-by:coder-621da054
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
 - [x] #2 Client-side: Create `GoalDraftStore` for IndexedDB persistence
 - [x] #3 Client-side: Integrate `GoalDraftStore` with session-manager.ts and render.ts
