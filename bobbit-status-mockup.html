@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bobbit Hats — Flat Beret, Lowered Crown</title>
+<style>
+  :root { --bg: #1a1a2e; --sidebar-bg: #111827; --text: #e0e0e0; --muted: #888; --border: #2a2a4a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 32px; }
+  h1 { font-size: 20px; margin-bottom: 6px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 32px; line-height: 1.6; max-width: 800px; }
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 40px 0 16px; }
+  .section-title:first-of-type { margin-top: 0; }
+  .row { display: flex; gap: 20px; margin-bottom: 24px; flex-wrap: wrap; align-items: flex-end; }
+  .opt { text-align: center; }
+  .opt .label { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+
+  .big { display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: visible; image-rendering: pixelated; background: var(--sidebar-bg); border-radius: 8px; border: 1px solid var(--border); width: 70px; height: 72px; }
+  .big .body { position: absolute; left: 12px; top: 16px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(5); transform-origin: 0 0; }
+  .big .hat  { position: absolute; left: 12px; top: 16px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(5); transform-origin: 0 0; }
+
+  .sidebar-mock { background: var(--sidebar-bg); border-radius: 8px; padding: 6px 0; font-size: 12px; width: 240px; }
+  .sidebar-row { display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: default; border-radius: 6px; margin: 1px 4px; }
+  .sidebar-row.active { background: #1f2937; }
+  .sidebar-row .title { flex: 1; font-size: 12px; color: #9ca3af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar-row .title.bold { font-weight: 600; color: #e0e0e0; }
+  .sidebar-row .role-tag { font-size: 8px; color: #6b7280; background: #1f2937; padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
+  .group-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; padding: 4px 10px 2px; font-weight: 500; }
+
+  .bw { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; position: relative; overflow: visible; image-rendering: pixelated; }
+  .bw .body { position: absolute; left: 0; top: 2px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0; }
+  .bw .hat  { position: absolute; left: 0; top: 2px; display: block; width: 1px; height: 1px; image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0; }
+
+  .st-active { animation: refined 1.8s cubic-bezier(0.34, 1.2, 0.64, 1) infinite; }
+  @keyframes refined {
+    0%   { transform: scale(1.6) translateY(0) scaleY(1); }
+    12%  { transform: scale(1.6) translateY(0) scaleY(0.96); }
+    38%  { transform: scale(1.6) translateY(-1px) scaleY(1.03); }
+    58%  { transform: scale(1.6) translateY(-0.3px) scaleY(1); }
+    78%  { transform: scale(1.6) translateY(0) scaleY(0.98); }
+    100% { transform: scale(1.6) translateY(0) scaleY(1); }
+  }
+  .st-idle { filter: saturate(0.55); }
+  .hue-100 { filter: hue-rotate(100deg); }
+  .hue-200 { filter: hue-rotate(200deg); }
+
+  .px-base {
+    box-shadow:
+      3px 0 0 #000,4px 0 0 #000,5px 0 0 #000,6px 0 0 #000,7px 0 0 #000,
+      2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,
+      1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,
+      0 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,
+      0 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,
+      0 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,
+      0 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,
+      1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,
+      2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;
+  }
+
+  /*
+   * CROWN — shifted down 1 row from previous.
+   *
+   * y=-1: . . X . X . X . X .   tips outlined
+   * y= 0: . X G G G G G G G X   gold body
+   * y= 1: . X D D D D D D D X   dark band
+   * y= 2: . X X X X X X X X X   bottom outline
+   */
+  .hat-crown-1x { box-shadow:
+    2px -1px 0 #000, 3px -1px 0 #fde047, 4px -1px 0 #000, 5px -1px 0 #fde047, 6px -1px 0 #000, 7px -1px 0 #fde047, 8px -1px 0 #000,
+    1px 0 0 #000, 2px 0 0 #fbbf24, 3px 0 0 #fde047, 4px 0 0 #fbbf24, 5px 0 0 #fde047, 6px 0 0 #fbbf24, 7px 0 0 #fde047, 8px 0 0 #fbbf24, 9px 0 0 #000,
+    1px 1px 0 #000, 2px 1px 0 #b45309, 3px 1px 0 #d97706, 4px 1px 0 #d97706, 5px 1px 0 #d97706, 6px 1px 0 #d97706, 7px 1px 0 #d97706, 8px 1px 0 #b45309, 9px 1px 0 #000,
+    1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000;
+  }
+
+  /*
+   * BERET — nub replaced with black to flatten top.
+   *
+   * y=-1: . . X X X X X . . . . .   flat top outline (x=2..6)
+   * y= 0: . X P P P P P P X . . .   puff wide (x=1..8)
+   * y= 1: . X P P P P P P P P X .   body + droop right (x=1..10)
+   * y= 2: . X X X X X X X X X X X   bottom outline (x=1..11)
+   */
+  .hat-beret-1x { box-shadow:
+    2px -1px 0 #000, 3px -1px 0 #000, 4px -1px 0 #000, 5px -1px 0 #000, 6px -1px 0 #000,
+    1px 0 0 #000, 2px 0 0 #4f46e5, 3px 0 0 #6366f1, 4px 0 0 #818cf8, 5px 0 0 #6366f1, 6px 0 0 #4f46e5, 7px 0 0 #4338ca, 8px 0 0 #000,
+    1px 1px 0 #000, 2px 1px 0 #4338ca, 3px 1px 0 #4f46e5, 4px 1px 0 #6366f1, 5px 1px 0 #4f46e5, 6px 1px 0 #4338ca, 7px 1px 0 #3730a3, 8px 1px 0 #312e81, 9px 1px 0 #1e1b4b, 10px 1px 0 #000,
+    1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000, 10px 2px 0 #000, 11px 2px 0 #000;
+  }
+
+  .finalists { display: grid; grid-template-columns: 240px 240px; gap: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Crown & Beret — Lowered Crown, Flat Beret</h1>
+<p class="subtitle">
+  Crown shifted down 1 row. Beret top flattened — nub replaced with black outline.
+</p>
+
+<div class="section-title">Close-up at 5x</div>
+<div class="row">
+  <div class="opt"><div class="label">Bare</div><div class="big"><span class="body px-base"></span></div></div>
+  <div class="opt"><div class="label">Crown</div><div class="big"><span class="body px-base"></span><span class="hat hat-crown-1x"></span></div></div>
+  <div class="opt"><div class="label">Beret</div><div class="big"><span class="body px-base"></span><span class="hat hat-beret-1x"></span></div></div>
+</div>
+
+<div class="section-title">At sidebar scale — hats bob with body</div>
+<div class="finalists">
+  <div>
+    <div class="sidebar-mock">
+      <div class="group-label">API Redesign</div>
+      <div class="sidebar-row active">
+        <div class="bw"><span class="body px-base st-active"></span><span class="hat hat-crown-1x st-active"></span></div>
+        <span class="title bold">Team Lead</span>
+        <span class="role-tag">lead</span>
+      </div>
+      <div class="sidebar-row">
+        <div class="bw"><span class="body px-base st-active hue-100"></span></div>
+        <span class="title bold">Auth Module</span>
+      </div>
+      <div class="sidebar-row">
+        <div class="bw"><span class="body px-base st-active hue-200"></span></div>
+        <span class="title bold">Database Layer</span>
+      </div>
+      <div class="sidebar-row">
+        <div class="bw"><span class="body px-base st-idle"></span></div>
+        <span class="title">Test Harness</span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="sidebar-mock">
+      <div class="group-label">API Redesign</div>
+      <div class="sidebar-row active">
+        <div class="bw"><span class="body px-base st-active"></span><span class="hat hat-beret-1x st-active"></span></div>
+        <span class="title bold">Team Lead</span>
+        <span class="role-tag">lead</span>
+      </div>
+      <div class="sidebar-row">
+        <div class="bw"><span class="body px-base st-active hue-100"></span></div>
+        <span class="title bold">Auth Module</span>
+      </div>
+      <div class="sidebar-row">
+        <div class="bw"><span class="body px-base st-active hue-200"></span></div>
+        <span class="title bold">Database Layer</span>
+      </div>
+      <div class="sidebar-row">
+        <div class="bw"><span class="body px-base st-idle"></span></div>
+        <span class="title">Test Harness</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

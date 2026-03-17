@@ -94,7 +94,7 @@ export function renderSidebarSession(session: GatewaySession) {
 			<div class="shrink-0 flex items-center justify-center">
 				${connecting
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-					: statusBobbit(session.status, session.isCompacting, session.id, active)}
+					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead")}
 			</div>
 			<div class="flex-1 min-w-0 truncate text-xs ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"}">
 				${displayTitle}
@@ -139,7 +139,7 @@ export function renderSessionCard(session: GatewaySession, index = 0) {
 				<div class="flex items-center gap-2 mb-1">
 					${connecting
 						? html`<svg class="animate-spin shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-						: statusBobbit(session.status, session.isCompacting, session.id, active)}
+						: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead")}
 					<span class="text-sm ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"} text-foreground">${session.title}</span>
 					<span class="text-xs text-muted-foreground">·</span>
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>

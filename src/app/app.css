@@ -69,8 +69,27 @@
  * BOBBIT — bobbing animation for active sessions
  * ============================================================================ */
 @keyframes bobbit-bob {
-	0%, 100% { transform: translateY(0); }
-	50% { transform: translateY(-1.5px); }
+	0%   { transform: translateY(0) scaleY(1); }
+	12%  { transform: translateY(0) scaleY(0.96); }
+	38%  { transform: translateY(-1px) scaleY(1.03); }
+	58%  { transform: translateY(-0.3px) scaleY(1); }
+	78%  { transform: translateY(0) scaleY(0.98); }
+	100% { transform: translateY(0) scaleY(1); }
+}
+
+@keyframes bobbit-breathe {
+	0%, 100% { transform: scaleY(1); }
+	50% { transform: scaleY(1.06); }
+}
+
+@keyframes bobbit-cancel-fade {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.35; }
+}
+
+@keyframes bobbit-squish {
+	0%, 100% { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px); }
+	50% { transform: scale(1.6) scaleX(1.08) scaleY(0.65) translateY(5.5px); }
 }
 
 /* ============================================================================

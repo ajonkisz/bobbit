@@ -1,5 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { execSync } from "node:child_process";
 import { TaskStore, type TaskType, type TaskStatus, type PersistedTask } from "./task-store.js";
+
+/**
+ * Run `git rev-parse HEAD` in the given directory to get the current commit SHA.
+ */
+export function getGoalBranchHead(goalCwd: string): string {
+	const result = execSync("git rev-parse HEAD", { cwd: goalCwd, shell: true as unknown as string });
+	return result.toString().trim();
+}
 
 /**
  * CRUD manager for structured tasks.
@@ -43,5 +52,29 @@ export class TaskManager {
 
 	listAll(): PersistedTask[] {
 		return this.store.getAll();
+	}
+
+	/**
+	 * Mark done test/review tasks as stale when the goal branch HEAD advances.
+	 * A task is stale if it has a commitSha that differs from the new HEAD.
+	 * Returns the list of tasks that were marked stale.
+	 */
+	markStaleIfNeeded(goalId: string, newCommitSha: string): PersistedTask[] {
+		const tasks = this.store.getByGoalId(goalId);
+		const staled: PersistedTask[] = [];
+
+		for (const task of tasks) {
+			if (
+				task.status === "done" &&
+				(task.type === "test" || task.type === "review") &&
+				task.commitSha &&
+				task.commitSha !== newCommitSha
+			) {
+				const updated = this.update(task.id, { status: "stale" });
+				if (updated) staled.push(updated);
+			}
+		}
+
+		return staled;
 	}
 }

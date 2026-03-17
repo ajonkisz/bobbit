@@ -14,6 +14,7 @@ export interface GatewaySession {
 	lastActivity: number;
 	clientCount: number;
 	isCompacting?: boolean;
+	isAborting?: boolean;
 	goalId?: string;
 	goalAssistant?: boolean;
 	colorIndex?: number;
