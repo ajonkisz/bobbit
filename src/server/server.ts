@@ -300,6 +300,72 @@ async function handleApiRoute(
 		}
 	}
 
+	// ── Task endpoints ─────────────────────────────────────────────
+
+	// GET /api/goals/:id/tasks — list tasks for a goal
+	// POST /api/goals/:id/tasks — create a task for a goal
+	const goalTasksMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/tasks$/);
+	if (goalTasksMatch) {
+		const goalId = goalTasksMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		if (req.method === "GET") {
+			json({ tasks: sessionManager.taskManager.getByGoalId(goalId) });
+			return;
+		}
+
+		if (req.method === "POST") {
+			const body = await readBody(req);
+			const title = body?.title;
+			const type = body?.type;
+			if (!title || typeof title !== "string") { json({ error: "Missing title" }, 400); return; }
+			if (!type || !["code", "test", "review"].includes(type)) { json({ error: "Invalid or missing type (code|test|review)" }, 400); return; }
+			const task = sessionManager.taskManager.create(goalId, title, type);
+			sessionManager.broadcastToAll({ type: "task_created", task });
+			json(task, 201);
+			return;
+		}
+	}
+
+	// GET/PUT/DELETE /api/goals/:id/tasks/:taskId
+	const goalTaskMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/tasks\/([^/]+)$/);
+	if (goalTaskMatch) {
+		const goalId = goalTaskMatch[1];
+		const taskId = goalTaskMatch[2];
+		const task = sessionManager.taskManager.getById(taskId);
+		if (!task || task.goalId !== goalId) { json({ error: "Task not found" }, 404); return; }
+
+		if (req.method === "GET") {
+			json(task);
+			return;
+		}
+
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			const updated = sessionManager.taskManager.update(taskId, {
+				title: body.title,
+				type: body.type,
+				status: body.status,
+				assignee: body.assignee,
+				commitSha: body.commitSha,
+				resultSummary: body.resultSummary,
+			});
+			if (!updated) { json({ error: "Task not found" }, 404); return; }
+			sessionManager.broadcastToAll({ type: "task_updated", task: updated });
+			json(updated);
+			return;
+		}
+
+		if (req.method === "DELETE") {
+			sessionManager.taskManager.delete(taskId);
+			sessionManager.broadcastToAll({ type: "task_deleted", taskId, goalId });
+			json({ ok: true });
+			return;
+		}
+	}
+
 	// ── Swarm endpoints ────────────────────────────────────────────
 
 	// POST /api/goals/:id/swarm/start — start a swarm for a goal
