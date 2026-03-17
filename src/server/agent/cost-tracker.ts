@@ -50,7 +50,14 @@ export class CostTracker {
 				if (data && typeof data === "object" && !Array.isArray(data)) {
 					for (const [id, cost] of Object.entries(data)) {
 						if (id && cost && typeof cost === "object") {
-							this.costs.set(id, cost as SessionCost);
+							const c = cost as Record<string, unknown>;
+							this.costs.set(id, {
+								inputTokens: typeof c.inputTokens === "number" ? c.inputTokens : 0,
+								outputTokens: typeof c.outputTokens === "number" ? c.outputTokens : 0,
+								cacheReadTokens: typeof c.cacheReadTokens === "number" ? c.cacheReadTokens : 0,
+								cacheWriteTokens: typeof c.cacheWriteTokens === "number" ? c.cacheWriteTokens : 0,
+								totalCost: typeof c.totalCost === "number" ? c.totalCost : 0,
+							});
 						}
 					}
 				}
@@ -86,13 +93,15 @@ export class CostTracker {
 		existing.cacheReadTokens += usage.cacheReadTokens ?? 0;
 		existing.cacheWriteTokens += usage.cacheWriteTokens ?? 0;
 		existing.totalCost += usage.cost ?? 0;
+		existing.totalCost = Math.round(existing.totalCost * 1_000_000) / 1_000_000;
 		this.costs.set(sessionId, existing);
 		this.save();
 		return { ...existing };
 	}
 
 	getSessionCost(sessionId: string): SessionCost | undefined {
-		return this.costs.get(sessionId);
+		const cost = this.costs.get(sessionId);
+		return cost ? { ...cost } : undefined;
 	}
 
 	/**

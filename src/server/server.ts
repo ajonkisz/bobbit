@@ -790,9 +790,7 @@ async function handleApiRoute(
 			json({ error: "Goal not found" }, 404);
 			return;
 		}
-		const sessionIds = sessionManager.listSessions()
-			.filter((s) => s.goalId === goalId)
-			.map((s) => s.id);
+		const sessionIds = sessionManager.getAllSessionIdsForGoal(goalId);
 		const cost = sessionManager.getCostTracker().getGoalCost(goalId, sessionIds);
 		json(cost);
 		return;
