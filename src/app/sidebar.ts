@@ -190,7 +190,7 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 				@mouseleave=${hideSessionTooltip}
 				@click=${() => { if (!active) connectToSession(s.id, true); }}
 			>
-				${statusBobbit(s.status, s.isCompacting, s.id, active, s.isAborting, s.role === "team-lead")}
+				${statusBobbit(s.status, s.isCompacting, s.id, active, s.isAborting, s.role === "team-lead", s.role === "coder")}
 				<span class="text-[8px] font-bold tracking-wide ${active ? "text-foreground" : "text-muted-foreground"}" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(displayTitle)}</span>
 			</button>
 		`;

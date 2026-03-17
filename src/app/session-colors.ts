@@ -68,7 +68,7 @@ export function sessionAcronym(title: string): string {
  * Same 10×9 pixel grid as the streaming blob, but scaled down and colored
  * per session status. No animation, no blinking — just a little Bobbit.
  */
-export function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false, isAborting = false, isTeamLead = false) {
+export function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false, isAborting = false, isTeamLead = false, isCoder = false) {
 	const hueRotate = sessionId ? sessionHueRotation(sessionId) : 0;
 
 	const canonical = { main: "#8ec63f", light: "#b5d98a", dark: "#6b9930", eye: "#1a3010" };
@@ -141,9 +141,29 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 		? html`<span style="position:absolute;left:0;top:${isTeamLead ? "2px" : "0"};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${crownShadow};${baseTransform}${crownFilter}"></span>`
 		: "";
 
+	// Bandana overlay for coders — red bandana, counter-rotated to stay red
+	const bandanaShadow = `
+		1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,
+		0 3px 0 #000,1px 3px 0 #b91c1c,2px 3px 0 #dc2626,3px 3px 0 #ef4444,4px 3px 0 #ef4444,5px 3px 0 #ef4444,6px 3px 0 #ef4444,7px 3px 0 #ef4444,8px 3px 0 #f87171,9px 3px 0 #000,
+		0 4px 0 #000,1px 4px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,
+		10px 3px 0 #000,10px 4px 0 #b91c1c,11px 4px 0 #000,
+		10px 5px 0 #991b1b,11px 5px 0 #000,10px 6px 0 #000
+	`;
+	const bandanaFilter = hueRotate && status !== "starting" && status !== "terminated"
+		? `filter:hue-rotate(${-hueRotate}deg);`
+		: "";
+	const bandanaTransform = isCompacting
+		? (compactSquish
+			? "transform-origin:0 9px;animation:bobbit-squish 1.5s ease-in-out infinite;"
+			: "transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4px);transform-origin:0 9px;")
+		: "transform:scale(1.6) translateY(-0.5px);transform-origin:0 0;";
+	const bandanaLayer = isCoder
+		? html`<span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${bandanaShadow};${bandanaTransform}${bandanaFilter}"></span>`
+		: "";
+
 	// Shift inner content down 2px when hatted so crown tips aren't clipped
 	const innerTop = isTeamLead ? "4px" : "0";
 	const containerHeight = isTeamLead ? "19px" : "15px";
 
-	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:${containerHeight};flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}${cancelAnim}${idleAnim}"><span style="position:absolute;left:0;top:${innerTop};display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}${crownLayer}</span>`;
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:${containerHeight};flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}${cancelAnim}${idleAnim}"><span style="position:absolute;left:0;top:${innerTop};display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}${crownLayer}${bandanaLayer}</span>`;
 }
