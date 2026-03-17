@@ -615,11 +615,11 @@ export function doRenderApp(): void {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
 				<div class="flex items-center border-b border-border shrink-0">
 					${state.sidebarCollapsed ? html`
-					<div class="w-14 shrink-0 flex items-center justify-center py-1.5 sidebar-edge" style="background: var(--sidebar);">
+					<div class="w-14 shrink-0 flex items-center justify-center" style="background: var(--sidebar);">
 						${bobbitIcon}
 					</div>
 					` : html`
-					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5 sidebar-edge" style="background: var(--sidebar);">
+					<div class="w-[240px] shrink-0 flex items-center justify-between px-3" style="background: var(--sidebar);">
 						<div class="flex items-center gap-2">
 							${bobbitIcon}
 							<span class="text-base font-semibold text-foreground">Bobbit</span>
