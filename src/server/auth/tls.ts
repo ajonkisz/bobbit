@@ -13,7 +13,7 @@ function resolveOpenssl(): string {
 
 	// Check if openssl is already on PATH
 	try {
-		execSync("openssl version", { stdio: "pipe" });
+		execSync("openssl version", { stdio: "pipe", shell: process.env.SHELL || process.env.COMSPEC || "sh" });
 		return "openssl";
 	} catch {}
 
@@ -77,7 +77,7 @@ function generateSelfSignedCert(host: string): void {
 				"-keyout", `"${KEY_PATH}"`,
 				"-out", `"${CERT_PATH}"`,
 			].join(" "),
-			{ stdio: "pipe" },
+			{ stdio: "pipe", shell: process.env.SHELL || process.env.COMSPEC || "sh" },
 		);
 	} catch (err: any) {
 		// Try alternate openssl syntax for older versions that don't support -addext
@@ -109,7 +109,7 @@ function generateSelfSignedCert(host: string): void {
 					"-keyout", `"${KEY_PATH}"`,
 					"-out", `"${CERT_PATH}"`,
 				].join(" "),
-				{ stdio: "pipe" },
+				{ stdio: "pipe", shell: process.env.SHELL || process.env.COMSPEC || "sh" },
 			);
 			fs.unlinkSync(cnfPath);
 		} catch (err2: any) {
@@ -136,7 +136,7 @@ function certCoversHost(certPath: string, host: string): boolean {
 		const openssl = resolveOpenssl();
 		const out = execSync(
 			`${openssl} x509 -in "${certPath}" -noout -ext subjectAltName`,
-			{ encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+			{ encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], shell: process.env.SHELL || process.env.COMSPEC || "sh" },
 		);
 		// Output looks like: "IP Address:100.64.x.x, IP Address:127.0.0.1, DNS:localhost"
 		return out.includes(`IP Address:${host}`);
