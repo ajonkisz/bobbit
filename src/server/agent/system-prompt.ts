@@ -78,6 +78,14 @@ export interface PromptParts {
 	goalState?: string;
 	/** Goal spec markdown content */
 	goalSpec?: string;
+	/** Task title */
+	taskTitle?: string;
+	/** Task type (e.g., 'implementation', 'code-review') */
+	taskType?: string;
+	/** Task spec markdown content */
+	taskSpec?: string;
+	/** Human-readable titles of tasks this task depends on */
+	taskDependsOn?: string[];
 }
 
 /**
@@ -112,6 +120,21 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 			? `# Goal\n\n**${parts.goalTitle}** (Status: ${parts.goalState || "unknown"})`
 			: "# Goal";
 		sections.push(header + "\n\n" + parts.goalSpec.trim());
+	}
+
+	// 4. Task context
+	if (parts.taskTitle) {
+		let taskSection = `# Current Task\n\n**${parts.taskTitle}** (Type: ${parts.taskType || "custom"})`;
+		if (parts.taskSpec?.trim()) {
+			taskSection += "\n\n" + parts.taskSpec.trim();
+		}
+		if (parts.taskDependsOn && parts.taskDependsOn.length > 0) {
+			taskSection += "\n\n## Dependencies\n\nThis task depends on the completion of:\n";
+			for (const dep of parts.taskDependsOn) {
+				taskSection += `- ${dep}\n`;
+			}
+		}
+		sections.push(taskSection);
 	}
 
 	if (sections.length === 0) return undefined;
