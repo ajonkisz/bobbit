@@ -12,6 +12,7 @@ import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
 import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
 import { SwarmManager } from "./agent/swarm-manager.js";
+import type { TaskType, TaskState } from "./agent/task-store.js";
 
 export interface TlsConfig {
 	cert: string;  // path to PEM certificate
@@ -298,6 +299,122 @@ async function handleApiRoute(
 			json({ ok: true });
 			return;
 		}
+	}
+
+	// ── Task endpoints ─────────────────────────────────────────────
+
+	// GET /api/goals/:goalId/tasks — list tasks for a goal
+	const goalTasksMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/tasks$/);
+	if (goalTasksMatch && req.method === "GET") {
+		const tasks = sessionManager.taskManager.getTasksForGoal(goalTasksMatch[1]);
+		json({ tasks });
+		return;
+	}
+
+	// POST /api/goals/:goalId/tasks — create a task
+	if (goalTasksMatch && req.method === "POST") {
+		const body = await readBody(req);
+		const title = body?.title;
+		const type = body?.type;
+		if (!title || typeof title !== "string") {
+			json({ error: "Missing title" }, 400);
+			return;
+		}
+		if (!type || typeof type !== "string") {
+			json({ error: "Missing type" }, 400);
+			return;
+		}
+		try {
+			const task = sessionManager.taskManager.createTask(goalTasksMatch[1], title, type as TaskType, {
+				parentTaskId: body.parentTaskId,
+				spec: body.spec,
+				dependsOn: body.dependsOn,
+			});
+			json(task, 201);
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
+	}
+
+	// Routes with task :id parameter
+	const taskMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)$/);
+	if (taskMatch) {
+		const id = taskMatch[1];
+
+		// GET /api/tasks/:id
+		if (req.method === "GET") {
+			const task = sessionManager.taskManager.getTask(id);
+			if (!task) { json({ error: "Task not found" }, 404); return; }
+			json(task);
+			return;
+		}
+
+		// PUT /api/tasks/:id
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			try {
+				const ok = sessionManager.taskManager.updateTask(id, {
+					title: body.title,
+					spec: body.spec,
+					state: body.state,
+					assignedSessionId: body.assignedSessionId,
+					dependsOn: body.dependsOn,
+				});
+				if (!ok) { json({ error: "Task not found" }, 404); return; }
+				json({ ok: true });
+			} catch (err: any) {
+				json({ error: err.message }, 400);
+			}
+			return;
+		}
+
+		// DELETE /api/tasks/:id
+		if (req.method === "DELETE") {
+			const ok = sessionManager.taskManager.deleteTask(id);
+			if (!ok) { json({ error: "Task not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
+	}
+
+	// POST /api/tasks/:id/assign — assign task to session
+	const taskAssignMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/assign$/);
+	if (taskAssignMatch && req.method === "POST") {
+		const body = await readBody(req);
+		const sessionId = body?.sessionId;
+		if (!sessionId || typeof sessionId !== "string") {
+			json({ error: "Missing sessionId" }, 400);
+			return;
+		}
+		try {
+			const ok = sessionManager.taskManager.assignTask(taskAssignMatch[1], sessionId);
+			if (!ok) { json({ error: "Task not found" }, 400); return; }
+			json({ ok: true });
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
+	}
+
+	// POST /api/tasks/:id/transition — state transition
+	const taskTransitionMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/transition$/);
+	if (taskTransitionMatch && req.method === "POST") {
+		const body = await readBody(req);
+		const state = body?.state;
+		if (!state || typeof state !== "string") {
+			json({ error: "Missing state" }, 400);
+			return;
+		}
+		try {
+			const ok = sessionManager.taskManager.transitionTask(taskTransitionMatch[1], state as TaskState);
+			if (!ok) { json({ error: "Task not found" }, 400); return; }
+			json({ ok: true });
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
 	}
 
 	// ── Swarm endpoints ────────────────────────────────────────────

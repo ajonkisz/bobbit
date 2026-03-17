@@ -4,6 +4,7 @@ import type { WebSocket } from "ws";
 import type { ServerMessage } from "../ws/protocol.js";
 import { EventBuffer } from "./event-buffer.js";
 import { GoalManager } from "./goal-manager.js";
+import { TaskManager } from "./task-manager.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
@@ -60,11 +61,13 @@ export class SessionManager {
 	private systemPromptPath?: string;
 	private store = new SessionStore();
 	goalManager: GoalManager;
+	taskManager: TaskManager;
 
 	constructor(options?: SessionManagerOptions) {
 		this.agentCliPath = options?.agentCliPath;
 		this.systemPromptPath = options?.systemPromptPath;
 		this.goalManager = new GoalManager();
+		this.taskManager = new TaskManager();
 	}
 
 	/**
