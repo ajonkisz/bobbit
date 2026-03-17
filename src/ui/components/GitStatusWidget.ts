@@ -96,7 +96,7 @@ export class GitStatusWidget extends LitElement {
         const summaryColor = this.clean ? 'text-green-400' : 'text-amber-400';
 
         return html`
-            <div class="relative inline-block">
+            <div class="relative inline-block max-w-full">
                 <button
                     class="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-[11px] leading-tight"
                     @click=${this._toggle}
@@ -114,7 +114,7 @@ export class GitStatusWidget extends LitElement {
                 ${this.expanded
                     ? html`
                           <div
-                              class="absolute right-0 bottom-full mb-1 z-50 min-w-[260px] max-w-[360px] bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
+                              class="absolute right-0 bottom-full mb-1 z-50 min-w-[200px] max-w-[calc(100vw-2rem)] sm:max-w-[360px] bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
                           >
                               <div class="flex items-center gap-1.5 mb-2 text-foreground font-medium text-sm">
                                   <span>⎇</span>
