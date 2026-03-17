@@ -1,7 +1,7 @@
 ## Backlog
 - [ ] #18 Sidebar simplification: replace 3-button cluster on goal group headers with single dashboard-link icon, move edit/delete/create-session to dashboard — role:coder, depends:#15
 - [ ] #19 Goal dashboard route: add /goal/:id route in main.ts, create GoalDashboard Lit component shell with nav bar (goal title, branch, action buttons, back link) — role:coder, depends:#18
-- [ ] #21 Dashboard agent activity panel: show active agents with role, current task, status, session links — role:coder, depends:#19
+
 - [ ] #23 Dashboard reports viewer: embedded full-screen view of workflow HTML reports linked from commit timeline and task cards — role:coder, depends:#19
 - [ ] #26 Fix: validate type/status on PUT /api/goals/:id/tasks/:taskId — role:coder, depends:#24
 - [ ] #27 Fix: cascade-delete tasks when a goal is deleted — role:coder, depends:#24
@@ -12,10 +12,13 @@
 - [ ] #31 Test commit timeline (#22) — role:tester, depends:#22
 - [ ] #32 Review dashboard kanban board (#20) — role:reviewer, depends:#20, branch:task-20-kanban-board
 - [ ] #33 Test dashboard kanban board (#20) — role:tester, depends:#20
+- [ ] #34 Review dashboard agent activity panel (#21) — role:reviewer, depends:#21
+- [ ] #35 Test dashboard agent activity panel (#21) — role:tester, depends:#21
 
 ## In Progress
 
 ## Done
+- [x] #21 Dashboard agent activity panel: show active agents with role, current task, status, session links — role:coder, depends:#19, completed-by:coder-29e822fb
 - [x] #20 Dashboard kanban board: render tasks in Backlog/In Progress/Done/Failed columns with type icons, assigned agent, elapsed time — role:coder, completed-by:coder-4463feee
 - [x] #22 Dashboard commit timeline: linear commit history on goal branch with status badges derived from task completions — role:coder, completed-by:coder-ec3592d1
 - [x] #24 Review Phase 1 (TaskStore + API + WS events) — role:reviewer, completed-by:reviewer-c71341a9
