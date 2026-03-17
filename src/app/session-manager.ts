@@ -1,4 +1,5 @@
 import { ChatPanel } from "../ui/index.js";
+import type { GoalDraft } from "../ui/storage/stores/goal-draft-store.js";
 import type { ConnectionStatus } from "./remote-agent.js";
 import { RemoteAgent } from "./remote-agent.js";
 import {
@@ -16,6 +17,67 @@ import { sessionHueRotation } from "./session-colors.js";
 import { showConnectionError, confirmAction, checkOAuthStatus, openOAuthDialog } from "./dialogs.js";
 import { teardownMobileScrollTracking } from "./mobile-header.js";
 import { storage } from "./storage.js";
+
+// ============================================================================
+// GOAL DRAFT PERSISTENCE HELPERS
+// ============================================================================
+
+/** Debounce timer for draft saves. */
+let _draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Save the current goal assistant preview state to IndexedDB (debounced 300ms). */
+export function saveGoalDraft(sessionId: string): void {
+	if (_draftSaveTimer) clearTimeout(_draftSaveTimer);
+	_draftSaveTimer = setTimeout(() => {
+		_draftSaveTimer = null;
+		const draft: GoalDraft = {
+			sessionId,
+			activeGoalProposal: state.activeGoalProposal ?? undefined,
+			previewTitle: state.previewTitle,
+			previewSpec: state.previewSpec,
+			previewCwd: state.previewCwd,
+			previewTitleEdited: state.previewTitleEdited,
+			previewSpecEdited: state.previewSpecEdited,
+			previewCwdEdited: state.previewCwdEdited,
+			hasReceivedProposal: state.hasReceivedProposal,
+			goalAssistantTab: state.goalAssistantTab,
+			previewSwarmMode: state.previewSwarmMode,
+		};
+		storage.goalDrafts.saveDraft(draft).catch((err) => {
+			console.error("[goal-draft] Failed to save draft:", err);
+		});
+	}, 300);
+}
+
+/** Restore goal assistant preview state from IndexedDB. Returns true if a draft was found. */
+async function restoreGoalDraft(sessionId: string): Promise<boolean> {
+	try {
+		const draft = await storage.goalDrafts.getDraft(sessionId);
+		if (!draft) return false;
+
+		state.activeGoalProposal = draft.activeGoalProposal ?? null;
+		state.previewTitle = draft.previewTitle ?? "";
+		state.previewSpec = draft.previewSpec ?? "";
+		state.previewCwd = draft.previewCwd ?? "";
+		state.previewTitleEdited = draft.previewTitleEdited ?? false;
+		state.previewSpecEdited = draft.previewSpecEdited ?? false;
+		state.previewCwdEdited = draft.previewCwdEdited ?? false;
+		state.hasReceivedProposal = draft.hasReceivedProposal ?? false;
+		state.goalAssistantTab = draft.goalAssistantTab ?? "chat";
+		state.previewSwarmMode = draft.previewSwarmMode ?? false;
+		return true;
+	} catch (err) {
+		console.error("[goal-draft] Failed to restore draft:", err);
+		return false;
+	}
+}
+
+/** Delete goal draft from IndexedDB. */
+export function deleteGoalDraft(sessionId: string): void {
+	storage.goalDrafts.deleteDraft(sessionId).catch((err) => {
+		console.error("[goal-draft] Failed to delete draft:", err);
+	});
+}
 
 // ============================================================================
 // AUTHENTICATE GATEWAY
@@ -129,6 +191,8 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			if (state.goalAssistantTab === "chat" && !isDesktop()) {
 				state.goalAssistantTab = "preview";
 			}
+			// Persist draft to IndexedDB
+			saveGoalDraft(sessionId);
 			renderApp();
 		};
 
@@ -169,14 +233,19 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
 
 		if (state.isGoalAssistantSession) {
-			state.goalAssistantTab = "chat";
-			state.previewTitle = "";
-			state.previewCwd = "";
-			state.previewSpec = "";
-			state.previewTitleEdited = false;
-			state.previewCwdEdited = false;
-			state.previewSpecEdited = false;
-			state.hasReceivedProposal = false;
+			// Try to restore persisted draft state; fall back to fresh defaults
+			const restored = await restoreGoalDraft(sessionId);
+			if (!restored) {
+				state.goalAssistantTab = "chat";
+				state.previewTitle = "";
+				state.previewCwd = "";
+				state.previewSpec = "";
+				state.previewTitleEdited = false;
+				state.previewCwdEdited = false;
+				state.previewSpecEdited = false;
+				state.hasReceivedProposal = false;
+				state.previewSwarmMode = false;
+			}
 			state.previewSpecEditMode = false;
 		}
 
@@ -268,6 +337,7 @@ export async function terminateSession(sessionId: string): Promise<void> {
 		throw new Error(`Failed to terminate session: ${res.status}`);
 	}
 	clearSessionModel(sessionId);
+	deleteGoalDraft(sessionId);
 	await refreshSessions();
 }
 

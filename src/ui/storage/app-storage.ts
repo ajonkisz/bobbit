@@ -1,4 +1,5 @@
 import type { CustomProvidersStore } from "./stores/custom-providers-store.js";
+import type { GoalDraftStore } from "./stores/goal-draft-store.js";
 import type { ProviderKeysStore } from "./stores/provider-keys-store.js";
 import type { SessionsStore } from "./stores/sessions-store.js";
 import type { SettingsStore } from "./stores/settings-store.js";
@@ -14,18 +15,21 @@ export class AppStorage {
 	readonly providerKeys: ProviderKeysStore;
 	readonly sessions: SessionsStore;
 	readonly customProviders: CustomProvidersStore;
+	readonly goalDrafts: GoalDraftStore;
 
 	constructor(
 		settings: SettingsStore,
 		providerKeys: ProviderKeysStore,
 		sessions: SessionsStore,
 		customProviders: CustomProvidersStore,
+		goalDrafts: GoalDraftStore,
 		backend: StorageBackend,
 	) {
 		this.settings = settings;
 		this.providerKeys = providerKeys;
 		this.sessions = sessions;
 		this.customProviders = customProviders;
+		this.goalDrafts = goalDrafts;
 		this.backend = backend;
 	}
 
