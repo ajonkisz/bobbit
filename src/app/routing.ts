@@ -17,7 +17,7 @@ export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalI
 	return { view: "landing" };
 }
 
-export function setHashRoute(view: RouteView, id?: string): void {
+export function setHashRoute(view: RouteView, id?: string, replace?: boolean): void {
 	let newHash: string;
 	if (view === "session" && id) {
 		newHash = `#/session/${id}`;
@@ -27,7 +27,13 @@ export function setHashRoute(view: RouteView, id?: string): void {
 		newHash = "#/";
 	}
 	if (window.location.hash !== newHash) {
-		window.location.hash = newHash;
+		if (replace) {
+			history.replaceState({}, "", newHash);
+			// Manually dispatch hashchange since replaceState doesn't trigger it
+			window.dispatchEvent(new HashChangeEvent("hashchange"));
+		} else {
+			window.location.hash = newHash;
+		}
 	}
 }
 

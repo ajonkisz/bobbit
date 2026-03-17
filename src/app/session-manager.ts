@@ -216,7 +216,11 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		const sessionForRole = state.gatewaySessions.find((s) => s.id === sessionId);
 		document.documentElement.classList.toggle("bobbit-crowned", sessionForRole?.role === "team-lead");
 		document.documentElement.classList.toggle("bobbit-bandana", sessionForRole?.role === "coder");
-		setHashRoute("session", sessionId);
+		// Replace history entry when navigating from goal dashboard so browser-back
+		// goes to the landing page instead of back to the goal dashboard.
+		const currentRoute = getRouteFromHash();
+		const replaceHistory = currentRoute.view === "goal-dashboard";
+		setHashRoute("session", sessionId, replaceHistory);
 
 		const modelProvider = remote.state.model?.provider || "anthropic";
 		await storage.providerKeys.set(modelProvider, "gateway-managed");

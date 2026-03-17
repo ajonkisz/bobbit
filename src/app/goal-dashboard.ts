@@ -268,7 +268,7 @@ function renderTaskCard(task: Task): TemplateResult {
 					${assignee ? html`
 						<span class="kanban-assignee" title="${assignee.title}" @click=${(e: Event) => {
 							e.stopPropagation();
-							setHashRoute("session", assignee.id);
+							setHashRoute("session", assignee.id, true);
 						}}>
 							${statusBobbit(assignee.status, assignee.isCompacting, assignee.id, false, assignee.isAborting, assignee.role === "team-lead")}
 							<span class="kanban-assignee-name">${assignee.title || assignee.id.slice(0, 8)}</span>

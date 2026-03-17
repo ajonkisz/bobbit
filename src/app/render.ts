@@ -105,7 +105,7 @@ function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; st
 				})}
 			</div>
 			${goalSessions.length > 0 ? html`
-				<div class="mt-3 flex flex-col gap-1.5">
+				<div class="mt-3 flex flex-col gap-1.5" @click=${(e: Event) => e.stopPropagation()}>
 					${goalSessions.map((s, i) => renderSessionCard(s, i))}
 				</div>
 			` : ""}
