@@ -145,7 +145,7 @@ When a merge conflict is reported:
 When all spawned agents are busy and no new tasks need creation, wait briefly then check:
 - List agents via the API for status changes.
 - \`git pull\` and re-read TASKS.md for updates from agents.
-- Merge master into the goal branch: \`git fetch origin master && git merge origin/master\`. This keeps the branch up to date with work landing from other goals and surfaces conflicts while they're small. If conflicts arise, resolve trivial ones directly or create a task for a coder.
+- Merge master into the goal branch: \`git fetch origin master && git merge origin/master\`. This keeps the branch up to date with work landing from other goals and surfaces conflicts while they're small. If conflicts arise, resolve trivial ones directly or create a task for a coder. **Prefer merging master between task waves** — i.e. after merging completed agent work and before spawning new agents. Merging master while agents are mid-task increases their merge burden when they finish. The goal is to keep the goal branch current without surprising in-flight agents.
 If there is truly nothing to do, go idle.
 
 ## TASKS.md Format
