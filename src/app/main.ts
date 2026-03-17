@@ -49,6 +49,7 @@ async function handleHashChange(): Promise<void> {
 				state.remoteAgent = null;
 				state.connectionStatus = "disconnected";
 			}
+			state.goalDashboardId = null;
 			const checkRes = await gatewayFetch(`/api/sessions/${route.sessionId}`);
 			if (checkRes.ok) {
 				await connectToSession(route.sessionId, true);
@@ -58,12 +59,23 @@ async function handleHashChange(): Promise<void> {
 				renderApp();
 				await refreshSessions();
 			}
+		} else if (route.view === "goal-dashboard" && route.goalId) {
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = route.goalId;
+			state.appView = "authenticated";
+			renderApp();
+			await refreshSessions();
 		} else {
 			if (state.remoteAgent) {
 				state.remoteAgent.disconnect();
 				state.remoteAgent = null;
 				state.connectionStatus = "disconnected";
 			}
+			state.goalDashboardId = null;
 			state.appView = "authenticated";
 			renderApp();
 			await refreshSessions();
@@ -107,6 +119,9 @@ async function initApp() {
 				if (checkRes.ok) {
 					await connectToSession(route.sessionId, true);
 				}
+			} else if (route.view === "goal-dashboard" && route.goalId) {
+				state.goalDashboardId = route.goalId;
+				renderApp();
 			}
 		} catch {
 			renderApp();

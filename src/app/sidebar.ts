@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Crosshair, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Trash2 } from "lucide";
+import { Crosshair, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Trash2 } from "lucide";
 import {
 	state,
 	renderApp,
@@ -16,6 +16,7 @@ import { createAndConnectSession, connectToSession } from "./session-manager.js"
 import { deleteGoal, startSwarm } from "./api.js";
 import { refreshSessions } from "./api.js";
 import { showGoalDialog } from "./dialogs.js";
+import { navigateToGoalDashboard } from "./goal-dashboard.js";
 import { statusBobbit, sessionAcronym, sessionColorMap } from "./session-colors.js";
 import { renderSidebarSession, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
@@ -49,19 +50,9 @@ function renderSidebarGoal(goal: Goal) {
 				<span class="flex-1 min-w-0 truncate text-[10px] text-muted-foreground uppercase tracking-wider font-medium ${goal.state === "shelved" ? "opacity-60" : ""}">${goal.title}</span>
 				<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
 					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
-						@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(goal.id); }}
-						title="New session">
-						${icon(Plus, "xs")}
-					</button>
-					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
-						@click=${(e: Event) => { e.stopPropagation(); showGoalDialog(goal); }}
-						title="Edit goal">
-						${icon(Pencil, "xs")}
-					</button>
-					<button class="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-						@click=${(e: Event) => { e.stopPropagation(); deleteGoal(goal.id); }}
-						title="Delete goal">
-						${icon(Trash2, "xs")}
+						@click=${(e: Event) => { e.stopPropagation(); navigateToGoalDashboard(goal.id); }}
+						title="Goal dashboard">
+						${icon(LayoutDashboard, "xs")}
 					</button>
 				</div>
 			</div>
