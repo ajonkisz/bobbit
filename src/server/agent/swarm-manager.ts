@@ -6,6 +6,7 @@ import { getRolePrompt, VALID_ROLES } from "./swarm-prompts.js";
 import { SwarmStore } from "./swarm-store.js";
 import type { PersistedSwarmEntry } from "./swarm-store.js";
 import { generateSwarmName } from "./swarm-names.js";
+import type { ColorStore } from "./color-store.js";
 
 
 export interface SwarmAgent {
@@ -53,6 +54,8 @@ export interface SwarmManagerConfig {
 	gatewayUrl: string;
 	/** Auth token for the gateway REST API */
 	authToken: string;
+	/** Color store for assigning unique palette indices to swarm sessions */
+	colorStore: ColorStore;
 }
 
 export class SwarmManager {
@@ -69,6 +72,24 @@ export class SwarmManager {
 		this.config = config;
 		this.store = new SwarmStore();
 		this.restoreSwarms();
+	}
+
+	/** Pick a palette index (0-19) not already used by any session, with randomisation. */
+	private assignUniqueColor(sessionId: string): void {
+		const PALETTE_SIZE = 20;
+		const used = new Set<number>();
+		for (const [, idx] of Object.entries(this.config.colorStore.getAll())) {
+			used.add(idx);
+		}
+		// Collect available indices and pick one at random
+		const available: number[] = [];
+		for (let i = 0; i < PALETTE_SIZE; i++) {
+			if (!used.has(i)) available.push(i);
+		}
+		const idx = available.length > 0
+			? available[Math.floor(Math.random() * available.length)]
+			: Math.floor(Math.random() * PALETTE_SIZE);
+		this.config.colorStore.set(sessionId, idx);
 	}
 
 	/**
@@ -175,7 +196,8 @@ export class SwarmManager {
 			},
 		});
 
-		// Update the session metadata to indicate team lead
+		// Assign a unique color and title
+		this.assignUniqueColor(session.id);
 		const teamLeadName = await generateSwarmName("team-lead");
 		this.sessionManager.setTitle(session.id, `Team Lead: ${teamLeadName}`);
 		session.titleGenerated = true;
@@ -267,7 +289,8 @@ export class SwarmManager {
 				{ rolePrompt },
 			);
 
-			// Update session metadata with role info
+			// Assign a unique color and title
+			this.assignUniqueColor(session.id);
 			const roleName = await generateSwarmName(role);
 			const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 			this.sessionManager.setTitle(session.id, `${roleLabel}: ${roleName}`);

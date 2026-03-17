@@ -43,11 +43,12 @@ export function createGateway(config: GatewayConfig) {
 	});
 	const protocol = config.tls ? "https" : "http";
 	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
+	const colorStore = new ColorStore();
 	const swarmManager = new SwarmManager(sessionManager, {
 		gatewayUrl,
 		authToken: config.authToken,
+		colorStore,
 	});
-	const colorStore = new ColorStore();
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
 
