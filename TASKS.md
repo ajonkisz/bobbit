@@ -3,7 +3,6 @@
 - [ ] #12 Type-check: `npm run check` passes — role:tester, depends:#9
 
 ## In Progress
-- [x] #6 Add Task + Cost WebSocket protocol messages to `protocol.ts` and handle in `handler.ts` — role:coder, claimed-by:6585203b
 - [x] #9 Session ↔ Task integration — auto-assign task on session creation with `taskId`, goal deletion cascades to tasks — role:coder, claimed-by:21957dc2
 - [x] #11 Review cost tracking code — role:reviewer, claimed-by:3bc5977e
 
@@ -15,5 +14,6 @@
 - [x] #5 Add Cost REST API endpoints to `server.ts` — role:coder, completed-by:98a6a0c2
 - [x] #4 Add Task REST API endpoints to `server.ts` — role:coder, completed-by:4eb358a5
 - [x] #7 Integrate tasks into system prompt assembly (`system-prompt.ts`) — role:coder, completed-by:36216a90
+- [x] #6 Add Task + Cost WebSocket protocol messages to `protocol.ts` and handle in `handler.ts` — role:coder, completed-by:coder-11932ace
 
 ## Findings
