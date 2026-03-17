@@ -2,17 +2,28 @@
 // URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected)
 // ============================================================================
 
-export function getRouteFromHash(): { view: "landing" | "session"; sessionId?: string } {
+export function getRouteFromHash(): { view: "landing" | "session" | "goal-dashboard"; sessionId?: string; goalId?: string } {
 	const hash = window.location.hash || "";
 	const sessionMatch = hash.match(/^#\/session\/([a-f0-9-]+)$/i);
 	if (sessionMatch) {
 		return { view: "session", sessionId: sessionMatch[1] };
 	}
+	const goalMatch = hash.match(/^#\/goal\/([a-f0-9-]+)$/i);
+	if (goalMatch) {
+		return { view: "goal-dashboard", goalId: goalMatch[1] };
+	}
 	return { view: "landing" };
 }
 
-export function setHashRoute(view: "landing" | "session", sessionId?: string): void {
-	const newHash = view === "session" && sessionId ? `#/session/${sessionId}` : "#/";
+export function setHashRoute(view: "landing" | "session" | "goal-dashboard", sessionId?: string, goalId?: string): void {
+	let newHash: string;
+	if (view === "session" && sessionId) {
+		newHash = `#/session/${sessionId}`;
+	} else if (view === "goal-dashboard" && goalId) {
+		newHash = `#/goal/${goalId}`;
+	} else {
+		newHash = "#/";
+	}
 	if (window.location.hash !== newHash) {
 		window.location.hash = newHash;
 	}
