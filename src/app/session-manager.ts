@@ -126,6 +126,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		state.remoteAgent = null;
 		state.connectionStatus = "disconnected";
 	}
+	state.cwdDropdownOpen = false;
 
 	renderApp();
 
@@ -353,6 +354,7 @@ export function backToSessions(): void {
 	state.connectionStatus = "disconnected";
 	state.activeGoalProposal = null;
 	state.isGoalAssistantSession = false;
+	state.cwdDropdownOpen = false;
 	localStorage.removeItem(GW_SESSION_KEY);
 	state.appView = "authenticated";
 	teardownMobileScrollTracking();

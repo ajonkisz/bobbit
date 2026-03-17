@@ -259,7 +259,7 @@ async function handleApiRoute(
 			json({ error: "Missing title" }, 400);
 			return;
 		}
-		const goal = sessionManager.goalManager.createGoal(title, cwd, spec, swarm, worktree);
+		const goal = sessionManager.goalManager.createGoal(title, cwd, { spec, swarm, worktree });
 		json(goal, 201);
 		return;
 	}

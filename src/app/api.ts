@@ -119,11 +119,12 @@ export async function refreshSessions(): Promise<void> {
 // GOAL API
 // ============================================================================
 
-export async function createGoal(title: string, cwd: string, spec = "", worktree = false): Promise<Goal | null> {
+export async function createGoal(title: string, cwd: string, opts?: { spec?: string; swarm?: boolean; worktree?: boolean }): Promise<Goal | null> {
+	const { spec = "", swarm = false, worktree = false } = opts ?? {};
 	try {
 		const res = await gatewayFetch("/api/goals", {
 			method: "POST",
-			body: JSON.stringify({ title, cwd, spec, worktree }),
+			body: JSON.stringify({ title, cwd, spec, swarm, worktree }),
 		});
 		if (!res.ok) throw new Error(`Failed to create goal: ${res.status}`);
 		const goal = await res.json();
@@ -189,22 +190,9 @@ export function patchSession(sessionId: string, updates: Record<string, unknown>
 // SWARM API
 // ============================================================================
 
+/** @deprecated Use createGoal with { swarm: true, worktree } instead */
 export async function createSwarmGoal(title: string, cwd: string, spec = "", worktree = true): Promise<Goal | null> {
-	try {
-		const res = await gatewayFetch("/api/goals", {
-			method: "POST",
-			body: JSON.stringify({ title, cwd, spec, swarm: true, worktree }),
-		});
-		if (!res.ok) throw new Error(`Failed to create swarm goal: ${res.status}`);
-		const goal = await res.json();
-		await refreshSessions();
-		expandedGoals.add(goal.id);
-		saveExpandedGoals();
-		return goal;
-	} catch (err) {
-		showConnectionError("Failed to create swarm goal", err instanceof Error ? err.message : String(err));
-		return null;
-	}
+	return createGoal(title, cwd, { spec, swarm: true, worktree });
 }
 
 export async function startSwarm(goalId: string): Promise<string | null> {

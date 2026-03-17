@@ -182,12 +182,7 @@ function goalPreviewPanel() {
 		setHashRoute("landing");
 		state.appView = "authenticated";
 
-		if (swarmMode) {
-			const { createSwarmGoal } = await import("./api.js");
-			await createSwarmGoal(trimmedTitle, state.previewCwd.trim(), state.previewSpec, worktree);
-		} else {
-			await createGoal(trimmedTitle, state.previewCwd.trim(), state.previewSpec, worktree);
-		}
+		await createGoal(trimmedTitle, state.previewCwd.trim(), { spec: state.previewSpec, swarm: swarmMode, worktree });
 		if (sessionId) {
 			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
 			clearSessionModel(sessionId);
@@ -252,11 +247,13 @@ function goalPreviewPanel() {
 						},
 						dropdownOpen: state.cwdDropdownOpen,
 						onToggle: (open) => { state.cwdDropdownOpen = open; renderApp(); },
+						highlightedIndex: state.cwdHighlightIndex,
+						onHighlight: (i) => { state.cwdHighlightIndex = i; renderApp(); },
 					})}
-					${worktreeToggle({
+					<div class="mt-2">${worktreeToggle({
 						checked: state.previewWorktree,
 						onChange: (v) => { state.previewWorktree = v; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); },
-					})}
+					})}</div>
 				</div>
 				<div class="flex-1 flex flex-col min-h-0">
 					<div class="flex items-center justify-between mb-1.5">
@@ -289,7 +286,7 @@ function goalPreviewPanel() {
 				<label class="flex items-center gap-2.5 cursor-pointer">
 					<input type="checkbox"
 						.checked=${state.previewSwarmMode}
-						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
+						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; if (state.previewSwarmMode) state.previewWorktree = true; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
 						class="toggle-switch" />
 					<span class="text-xs text-muted-foreground">🐝 Swarm mode — Team Lead auto-spawns role agents</span>
 				</label>
@@ -513,7 +510,7 @@ export function doRenderApp(): void {
 							size: "sm",
 							onClick: async () => {
 								const sessionId = activeSessionId();
-								await createGoal(p.title, p.cwd || "", p.spec);
+								await createGoal(p.title, p.cwd || "", { spec: p.spec });
 								state.activeGoalProposal = null;
 								if (sessionId) {
 									await terminateSession(sessionId);

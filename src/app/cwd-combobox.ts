@@ -39,6 +39,8 @@ export interface CwdComboboxProps {
 	onSelect: (value: string) => void;
 	dropdownOpen: boolean;
 	onToggle: (open: boolean) => void;
+	highlightedIndex?: number;
+	onHighlight?: (index: number) => void;
 }
 
 /**
@@ -56,25 +58,65 @@ export function cwdCombobox(opts: CwdComboboxProps) {
 		opts.onToggle(false);
 	};
 
-	// Close dropdown on blur (delay lets click fire first)
+	// Close dropdown on blur. Dropdown items and the chevron use mousedown+preventDefault,
+	// so blur only fires for outside clicks or tab — safe to close on next frame.
 	const handleBlur = () => {
-		setTimeout(() => opts.onToggle(false), 200);
+		requestAnimationFrame(() => {
+			opts.onToggle(false);
+			opts.onHighlight?.(-1);
+		});
 	};
+
+	const handleKeyDown = (e: KeyboardEvent) => {
+		if (!opts.dropdownOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+			e.preventDefault();
+			opts.onToggle(true);
+			return;
+		}
+		if (!opts.dropdownOpen) return;
+
+		const items = filtered;
+		const idx = opts.highlightedIndex ?? -1;
+
+		if (e.key === "ArrowDown") {
+			e.preventDefault();
+			opts.onHighlight?.(Math.min(idx + 1, items.length - 1));
+		} else if (e.key === "ArrowUp") {
+			e.preventDefault();
+			opts.onHighlight?.(Math.max(idx - 1, 0));
+		} else if (e.key === "Enter" && idx >= 0 && idx < items.length) {
+			e.preventDefault();
+			selectItem(items[idx].path);
+			opts.onHighlight?.(-1);
+		} else if (e.key === "Escape") {
+			e.preventDefault();
+			opts.onToggle(false);
+			opts.onHighlight?.(-1);
+		}
+	};
+
+	const highlightedIdx = opts.highlightedIndex ?? -1;
 
 	return html`
 		<div class="cwd-combobox">
 			<div class="relative flex items-center">
 				<input
 					type="text"
+					role="combobox"
+					aria-expanded=${opts.dropdownOpen}
+					aria-autocomplete="list"
+					aria-controls="cwd-listbox"
 					class="flex w-full min-w-0 rounded-md border border-input bg-transparent text-foreground shadow-xs h-9 px-3 py-1 text-sm pr-8 placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none dark:bg-input/30"
 					.value=${opts.value}
 					placeholder=${opts.placeholder || "(server default)"}
 					@input=${(e: Event) => {
 						opts.onInput((e.target as HTMLInputElement).value);
 						if (!opts.dropdownOpen) opts.onToggle(true);
+						opts.onHighlight?.(-1);
 					}}
 					@focus=${() => { if (allCwds.length > 0) opts.onToggle(true); }}
 					@blur=${handleBlur}
+					@keydown=${handleKeyDown}
 				/>
 				${allCwds.length > 0 ? html`
 					<button
@@ -88,9 +130,13 @@ export function cwdCombobox(opts: CwdComboboxProps) {
 				` : ""}
 			</div>
 			${opts.dropdownOpen && allCwds.length > 0 ? html`
-				<div class="cwd-combobox-dropdown">
-					${filtered.length > 0 ? filtered.map((c) => html`
-						<div class="cwd-combobox-item" @mousedown=${(e: Event) => { e.preventDefault(); selectItem(c.path); }}>
+				<div class="cwd-combobox-dropdown" role="listbox" id="cwd-listbox">
+					${filtered.length > 0 ? filtered.map((c, i) => html`
+						<div class="cwd-combobox-item"
+							role="option"
+							aria-selected=${i === highlightedIdx}
+							?data-highlighted=${i === highlightedIdx}
+							@mousedown=${(e: Event) => { e.preventDefault(); selectItem(c.path); }}>
 							<span class="cwd-path" title=${c.path}>${c.path}</span>
 							<span class="cwd-source">${c.source}</span>
 						</div>

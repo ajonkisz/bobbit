@@ -659,6 +659,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let swarmValue = false;
 	let worktreeValue = false;
 	let cwdDropdownOpen = false;
+	let cwdHighlightIndex = -1;
 
 	const cleanup = () => {
 		render(html``, container);
@@ -672,12 +673,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 		renderProposalDialog();
 
 		const sessionId = activeSessionId();
-		if (swarmValue) {
-			const { createSwarmGoal } = await import("./api.js");
-			await createSwarmGoal(trimmedTitle, cwdValue.trim(), specValue, worktreeValue);
-		} else {
-			await createGoal(trimmedTitle, cwdValue.trim(), specValue, worktreeValue);
-		}
+		await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, swarm: swarmValue, worktree: worktreeValue });
 		state.activeGoalProposal = null;
 		if (sessionId) {
 			const { terminateSession } = await import("./session-manager.js");
@@ -719,6 +715,8 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 										onSelect: (v) => { cwdValue = v; renderProposalDialog(); },
 										dropdownOpen: cwdDropdownOpen,
 										onToggle: (open) => { cwdDropdownOpen = open; renderProposalDialog(); },
+										highlightedIndex: cwdHighlightIndex,
+										onHighlight: (i) => { cwdHighlightIndex = i; renderProposalDialog(); },
 									})}
 									<div class="mt-2">
 										${worktreeToggle({
@@ -739,7 +737,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 								<div class="flex items-center gap-2.5">
 									<input type="checkbox" id="swarm-toggle"
 										.checked=${swarmValue}
-										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; renderProposalDialog(); }}
+										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; if (swarmValue) worktreeValue = true; renderProposalDialog(); }}
 										class="toggle-switch" />
 									<label for="swarm-toggle" class="text-xs text-muted-foreground cursor-pointer">
 										🐝 Swarm mode — Team Lead auto-spawns role agents
@@ -782,6 +780,7 @@ function showGoalEditDialog(existingGoal: Goal): void {
 	let saving = false;
 	let swarmValue = (existingGoal as any).swarm || false;
 	let cwdDropdownOpenEdit = false;
+	let cwdHighlightIndexEdit = -1;
 
 	const cleanup = () => {
 		render(html``, container);
@@ -845,6 +844,8 @@ function showGoalEditDialog(existingGoal: Goal): void {
 										onSelect: (v) => { cwdValue = v; renderDialog(); },
 										dropdownOpen: cwdDropdownOpenEdit,
 										onToggle: (open) => { cwdDropdownOpenEdit = open; renderDialog(); },
+										highlightedIndex: cwdHighlightIndexEdit,
+										onHighlight: (i) => { cwdHighlightIndexEdit = i; renderDialog(); },
 									})}
 								</div>
 								<div>

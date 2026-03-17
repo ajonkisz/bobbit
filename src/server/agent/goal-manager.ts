@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { GoalStore, type GoalState, type PersistedGoal } from "./goal-store.js";
 import { createWorktree, cleanupWorktree } from "../workflows/git.js";
 
@@ -18,7 +18,7 @@ function toBranchName(title: string): string {
 /** Check if a directory is inside a git repository. */
 function isGitRepo(cwd: string): boolean {
 	try {
-		execSync("git rev-parse --is-inside-work-tree", { cwd, stdio: "pipe", shell: true as unknown as string });
+		execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd, stdio: "pipe" });
 		return true;
 	} catch {
 		return false;
@@ -27,13 +27,14 @@ function isGitRepo(cwd: string): boolean {
 
 /** Get the git repo root for a directory. */
 function getRepoRoot(cwd: string): string {
-	return execSync("git rev-parse --show-toplevel", { cwd, stdio: "pipe", shell: true as unknown as string }).toString().trim();
+	return execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd, stdio: "pipe" }).toString().trim();
 }
 
 export class GoalManager {
 	private store = new GoalStore();
 
-	createGoal(title: string, cwd: string, spec = "", swarm = false, worktree = false): PersistedGoal {
+	createGoal(title: string, cwd: string, opts?: { spec?: string; swarm?: boolean; worktree?: boolean }): PersistedGoal {
+		const { spec = "", swarm = false, worktree = false } = opts ?? {};
 		const now = Date.now();
 		const id = randomUUID();
 

@@ -85,6 +85,7 @@ export const state = {
 	previewSwarmMode: false,
 	previewWorktree: false,
 	cwdDropdownOpen: false,
+	cwdHighlightIndex: -1,
 };
 
 // ============================================================================
