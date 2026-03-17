@@ -98,7 +98,7 @@ export class GitStatusWidget extends LitElement {
         return html`
             <div class="relative inline-block max-w-full">
                 <button
-                    class="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-[11px] leading-tight"
+                    class="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-card border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-[11px] leading-tight max-w-full overflow-hidden"
                     @click=${this._toggle}
                 >
                     ${this.loading
