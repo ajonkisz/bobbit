@@ -23,6 +23,9 @@ import { backToSessions, disconnectGateway, createAndConnectSession, connectToSe
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { renderSidebar, toggleSidebar } from "./sidebar.js";
 import { renderSessionCard, goalStateIcon } from "./render-helpers.js";
+
+const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:18px;image-rendering:pixelated;" />`;
+
 import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
 import { mobileHeaderVisible, teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
 import { setHashRoute } from "./routing.js";
@@ -321,6 +324,7 @@ export function doRenderApp(): void {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
 				<div class="flex items-center justify-between border-b border-border shrink-0">
 					<div class="flex items-center gap-2 px-4 py-1">
+						${bobbitIcon}
 						<span class="text-base font-semibold text-foreground">Bobbit</span>
 					</div>
 					<div class="flex items-center gap-1 px-2">
@@ -414,6 +418,7 @@ export function doRenderApp(): void {
 
 		if (!desktop) {
 			return html`<div class="flex items-center gap-2 px-4 py-1">
+				${bobbitIcon}
 				<span class="text-base font-semibold text-foreground">Bobbit</span>
 			</div>`;
 		}
@@ -617,7 +622,8 @@ export function doRenderApp(): void {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden">
 				<div class="flex items-center border-b border-border shrink-0">
 					${state.sidebarCollapsed ? html`
-					<div class="w-14 shrink-0 flex items-center justify-center py-1.5" style="background: var(--sidebar);">
+					<div class="w-14 shrink-0 flex items-center justify-center gap-1 py-1.5" style="background: var(--sidebar);">
+						${bobbitIcon}
 						<button
 							class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
 							@click=${toggleSidebar}
@@ -628,7 +634,10 @@ export function doRenderApp(): void {
 					</div>
 					` : html`
 					<div class="w-[240px] shrink-0 flex items-center justify-between px-3 py-1.5" style="background: var(--sidebar);">
-						<span class="text-base font-semibold text-foreground">Bobbit</span>
+						<div class="flex items-center gap-2">
+							${bobbitIcon}
+							<span class="text-base font-semibold text-foreground">Bobbit</span>
+						</div>
 						<div class="flex items-center gap-0.5">
 							<button
 								class="inline-flex items-center gap-1 p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"

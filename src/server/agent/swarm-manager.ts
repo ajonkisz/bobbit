@@ -41,13 +41,7 @@ interface SwarmEntry {
 	maxConcurrent: number;
 }
 
-const ROLE_EMOJI: Record<string, string> = {
-	coder: "🤖",
-	reviewer: "🔍",
-	architect: "📐",
-	tester: "🧪",
-	researcher: "📚",
-};
+
 
 /**
  * Manages swarm goal lifecycles — team lead sessions and role agent sessions
@@ -181,7 +175,7 @@ export class SwarmManager {
 		});
 
 		// Update the session metadata to indicate team lead
-		this.sessionManager.setTitle(session.id, `👑 Team Lead — ${goal.title}`);
+		this.sessionManager.setTitle(session.id, `Team Lead — ${goal.title}`);
 		session.titleGenerated = true;
 		this.sessionManager.updateSessionMeta(session.id, {
 			role: "team-lead",
@@ -272,8 +266,7 @@ export class SwarmManager {
 			);
 
 			// Update session metadata with role info
-			const emoji = ROLE_EMOJI[role] || "🤖";
-			this.sessionManager.setTitle(session.id, `${emoji} ${role.charAt(0).toUpperCase() + role.slice(1)} — ${goal.title}`);
+			this.sessionManager.setTitle(session.id, `${role.charAt(0).toUpperCase() + role.slice(1)} — ${goal.title}`);
 			session.titleGenerated = true;
 			this.sessionManager.updateSessionMeta(session.id, {
 				role,
