@@ -2,13 +2,16 @@
 - [ ] #10 Review all task tracking code — role:reviewer, depends:#4,#5,#6,#7,#8,#9
 - [ ] #13 Fix: Goal cost endpoint should include terminated sessions — role:coder, depends:#11
 - [ ] #14 Fix: `getSessionCost()` should return a defensive copy, `load()` should validate numeric fields — role:coder, depends:#11
+- [ ] #16 Review fix for review findings — role:reviewer, depends:#15, branch:fix/task-13-review-findings
 
 ## In Progress
 - [x] #6 Add Task + Cost WebSocket protocol messages to `protocol.ts` and handle in `handler.ts` — role:coder, claimed-by:6585203b
 - [x] #9 Session ↔ Task integration — auto-assign task on session creation with `taskId`, goal deletion cascades to tasks — role:coder, claimed-by:21957dc2
 
 
+
 ## Done
+- [x] #15 Fix critical and major review findings (C1, M4, M5, m2, cleanup) — role:coder, completed-by:coder-0c1f35e8
 - [x] #12 Type-check: `npm run check` passes — role:tester, completed-by:tester-55f3ffd8
 - [x] #11 Review cost tracking code — role:reviewer, completed-by:reviewer-af572498
 - [x] #1 Implement TaskStore (`src/server/agent/task-store.ts`) — role:coder, completed-by:6bebd675
