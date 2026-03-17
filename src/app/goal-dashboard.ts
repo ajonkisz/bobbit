@@ -1,9 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
+import { ArrowLeft, Pencil, Play, Plus, Square, Trash2 } from "lucide";
 import { state, renderApp, type Goal } from "./state.js";
-import { gatewayFetch, deleteGoal } from "./api.js";
+import { gatewayFetch, deleteGoal, startSwarm, teardownSwarm, getSwarmState } from "./api.js";
 import { setHashRoute } from "./routing.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
@@ -65,6 +65,9 @@ let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
 let commits: CommitInfo[] = [];
 let reports: ReportInfo[] = [];
+let swarmActive = false;
+let swarmStarting = false;
+let swarmStopping = false;
 let loading = true;
 let error = "";
 
@@ -109,6 +112,10 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 
 		// Fetch workflow reports for all sessions belonging to this goal
 		reports = await fetchGoalReports(goalId);
+
+		// Check if a swarm is active
+		const swarmState = await getSwarmState(goalId);
+		swarmActive = swarmState != null;
 
 		loading = false;
 	} catch (err) {
@@ -174,6 +181,9 @@ export function clearDashboardState(): void {
 	tasks = [];
 	commits = [];
 	reports = [];
+	swarmActive = false;
+	swarmStarting = false;
+	swarmStopping = false;
 	loading = true;
 	error = "";
 	stopAgentPolling();
@@ -476,6 +486,9 @@ function startAgentPolling(goalId: string): void {
 	// Poll every 5 seconds
 	agentPollTimer = setInterval(async () => {
 		agents = await fetchAgents(goalId);
+		// Also refresh swarm active state
+		const swarmState = await getSwarmState(goalId);
+		swarmActive = swarmState != null;
 		renderApp();
 	}, 5000);
 }
@@ -668,7 +681,35 @@ function renderReportsPanel(reportList: ReportInfo[]): TemplateResult {
 // DASHBOARD LAYOUT
 // ============================================================================
 
+async function handleStartSwarm(goalId: string): Promise<void> {
+	swarmStarting = true;
+	renderApp();
+	const sessionId = await startSwarm(goalId);
+	swarmStarting = false;
+	if (sessionId) {
+		swarmActive = true;
+		renderApp();
+		connectToSession(sessionId, false);
+	} else {
+		renderApp();
+	}
+}
+
+async function handleEndSwarm(goalId: string): Promise<void> {
+	swarmStopping = true;
+	renderApp();
+	const ok = await teardownSwarm(goalId);
+	swarmStopping = false;
+	if (ok) {
+		swarmActive = false;
+		agents = [];
+	}
+	renderApp();
+}
+
 function renderNavBar(goal: Goal): TemplateResult {
+	const isSwarmGoal = !!goal.swarm;
+
 	return html`
 		<div class="dashboard-nav">
 			<div class="dashboard-nav-left">
@@ -693,6 +734,22 @@ function renderNavBar(goal: Goal): TemplateResult {
 					onClick: () => deleteGoal(goal.id),
 					children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Trash2, "sm")} Delete</span>`,
 				})}
+				${isSwarmGoal ? (swarmActive
+					? Button({
+						variant: "ghost",
+						size: "sm",
+						disabled: swarmStopping,
+						onClick: () => handleEndSwarm(goal.id),
+						children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Square, "sm")} ${swarmStopping ? "Stopping\u2026" : "End Swarm"}</span>`,
+					})
+					: Button({
+						variant: "default",
+						size: "sm",
+						disabled: swarmStarting,
+						onClick: () => handleStartSwarm(goal.id),
+						children: html`<span class="inline-flex items-center gap-1">${icon(Play, "sm")} ${swarmStarting ? "Starting\u2026" : "Start Swarm"}</span>`,
+					})
+				) : nothing}
 				${Button({
 					variant: "default",
 					size: "sm",

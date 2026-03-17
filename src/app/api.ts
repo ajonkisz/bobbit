@@ -266,3 +266,17 @@ export async function completeSwarm(goalId: string): Promise<boolean> {
 		return false;
 	}
 }
+
+export async function teardownSwarm(goalId: string): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/swarm/teardown`, {
+			method: "POST",
+		});
+		if (!res.ok) throw new Error(`Failed: ${res.status}`);
+		await refreshSessions();
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to tear down swarm", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
