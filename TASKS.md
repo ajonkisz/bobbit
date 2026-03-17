@@ -5,7 +5,6 @@
 
 - [ ] #26 Fix: validate type/status on PUT /api/goals/:id/tasks/:taskId — role:coder, depends:#24
 - [ ] #27 Fix: cascade-delete tasks when a goal is deleted — role:coder, depends:#24
-- [ ] #25 Test Phase 1 (TaskStore + API) — role:tester, depends:#24
 - [ ] #29 Test stale detection (#17) — role:tester, depends:#17
 - [ ] #31 Test commit timeline (#22) — role:tester, depends:#22
 - [ ] #33 Test dashboard kanban board (#20) — role:tester, depends:#20
@@ -19,6 +18,7 @@
 
 ## Done
 - [x] #23 Dashboard reports viewer: embedded full-screen view of workflow HTML reports linked from commit timeline and task cards — role:coder, depends:#19, completed-by:coder-4c3415a0
+- [x] #25 Test Phase 1 (TaskStore + API) — role:tester, depends:#24, completed-by:tester-7db03d04
 - [x] #28 Review stale detection (#17) — role:reviewer, completed-by:reviewer-25e4d241
 - [x] #30 Review commit timeline (#22) — role:reviewer, completed-by:reviewer-25e4d241
 - [x] #32 Review dashboard kanban board (#20) — role:reviewer, completed-by:reviewer-25e4d241
