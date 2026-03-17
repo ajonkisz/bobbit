@@ -316,6 +316,264 @@
 }
 
 /* ============================================================================
+ * TWO-COLUMN BODY LAYOUT
+ * ============================================================================ */
+
+.dashboard-body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.dashboard-main-content {
+	flex: 1;
+	min-width: 0;
+	overflow-y: auto;
+}
+
+.dashboard-right-panel {
+	width: 320px;
+	flex-shrink: 0;
+	border-left: 1px solid hsl(var(--border));
+	overflow-y: auto;
+	padding: 16px;
+}
+
+/* ============================================================================
+ * AGENT ACTIVITY PANEL
+ * ============================================================================ */
+
+.agent-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.agent-panel-header {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: hsl(var(--muted-foreground));
+	padding: 0 4px 8px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.agent-count {
+	font-size: 10px;
+	font-weight: 500;
+	background: hsl(var(--secondary));
+	color: hsl(var(--muted-foreground));
+	padding: 1px 6px;
+	border-radius: 10px;
+}
+
+.agent-panel-empty {
+	font-size: 13px;
+	color: hsl(var(--muted-foreground));
+	padding: 12px 4px;
+}
+
+.agent-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: background 150ms;
+}
+
+.agent-row:hover {
+	background: hsl(var(--secondary));
+}
+
+.agent-avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	font-weight: 600;
+	color: #fff;
+	flex-shrink: 0;
+}
+
+.agent-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.agent-name-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.agent-name {
+	font-size: 13px;
+	font-weight: 500;
+	color: hsl(var(--foreground));
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.role-badge {
+	font-size: 9px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	padding: 1px 5px;
+	border-radius: 3px;
+	flex-shrink: 0;
+}
+
+.agent-task {
+	font-size: 12px;
+	color: hsl(var(--muted-foreground));
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-top: 2px;
+}
+
+.agent-status-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+
+.agent-status-working {
+	background: #22c55e;
+	animation: agent-pulse 2s ease-in-out infinite;
+}
+
+.agent-status-idle {
+	background: #6b7280;
+}
+
+.agent-status-blocked {
+	background: #f97316;
+}
+
+@keyframes agent-pulse {
+	0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+	50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+}
+
+/* ============================================================================
+ * COMMIT TIMELINE
+ * ============================================================================ */
+
+.commit-timeline {
+	position: relative;
+	padding-left: 20px;
+}
+
+.commit-timeline::before {
+	content: "";
+	position: absolute;
+	left: 5px;
+	top: 4px;
+	bottom: 4px;
+	width: 2px;
+	background: hsl(var(--border));
+}
+
+.commit-item {
+	position: relative;
+	padding: 8px 0 16px 0;
+}
+
+.commit-dot {
+	position: absolute;
+	left: -20px;
+	top: 12px;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: #52525b;
+	border: 2px solid hsl(var(--background));
+	z-index: 1;
+}
+
+.commit-dot--head {
+	background: #3b82f6;
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.commit-content {
+	padding-left: 4px;
+}
+
+.commit-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.commit-sha {
+	font-family: var(--font-mono, monospace);
+	font-size: 12px;
+	color: #3b82f6;
+	background: rgba(59, 130, 246, 0.1);
+	padding: 1px 6px;
+	border-radius: 3px;
+}
+
+.commit-time {
+	font-size: 11px;
+	color: hsl(var(--muted-foreground));
+	margin-left: auto;
+}
+
+.commit-message {
+	font-size: 13px;
+	margin-top: 4px;
+	line-height: 1.4;
+	color: hsl(var(--foreground));
+}
+
+.commit-author {
+	font-size: 11px;
+	color: hsl(var(--muted-foreground));
+	margin-top: 2px;
+}
+
+.commit-badges {
+	display: flex;
+	gap: 4px;
+}
+
+.commit-badge {
+	font-size: 10px;
+	font-weight: 600;
+	padding: 1px 6px;
+	border-radius: 3px;
+	white-space: nowrap;
+}
+
+.commit-badge--pass { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.commit-badge--fail { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.commit-badge--stale { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.commit-badge--pending { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
+
+.commit-timeline-empty {
+	color: hsl(var(--muted-foreground));
+	font-size: 13px;
+	padding: 20px 0;
+	text-align: center;
+}
+
+/* ============================================================================
  * LOADING / ERROR STATES
  * ============================================================================ */
 
@@ -362,5 +620,13 @@
 	}
 	.kanban-column {
 		max-width: none;
+	}
+	.dashboard-body {
+		flex-direction: column;
+	}
+	.dashboard-right-panel {
+		width: auto;
+		border-left: none;
+		border-top: 1px solid hsl(var(--border));
 	}
 }

@@ -5,7 +5,7 @@ import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
 import { state, renderApp, type Goal } from "./state.js";
 import { gatewayFetch, deleteGoal } from "./api.js";
 import { setHashRoute } from "./routing.js";
-import { createAndConnectSession } from "./session-manager.js";
+import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
 import { statusBobbit } from "./session-colors.js";
 
@@ -58,6 +58,9 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	error = "";
 	renderApp();
 
+	// Start agent polling (runs independently of the main data load)
+	startAgentPolling(goalId);
+
 	try {
 		const [goalRes, tasksRes, commitsRes] = await Promise.all([
 			gatewayFetch(`/api/goals/${goalId}`),
@@ -99,6 +102,7 @@ export function clearDashboardState(): void {
 	commits = [];
 	loading = true;
 	error = "";
+	stopAgentPolling();
 }
 
 // ============================================================================
@@ -331,6 +335,145 @@ function renderCommitTimeline(commitList: CommitInfo[], taskList: Task[]): Templ
 }
 
 // ============================================================================
+// AGENT ACTIVITY PANEL
+// ============================================================================
+
+export interface SwarmAgent {
+	sessionId: string;
+	role: string;
+	status: string; // "starting" | "idle" | "streaming" | "terminated"
+	worktreePath: string;
+	branch: string;
+	task: string;
+	createdAt: number;
+}
+
+let agents: SwarmAgent[] = [];
+let agentPollTimer: ReturnType<typeof setInterval> | null = null;
+
+async function fetchAgents(goalId: string): Promise<SwarmAgent[]> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/swarm/agents`);
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.agents ?? [];
+	} catch {
+		return [];
+	}
+}
+
+function startAgentPolling(goalId: string): void {
+	stopAgentPolling();
+	// Initial fetch
+	fetchAgents(goalId).then((a) => {
+		agents = a;
+		renderApp();
+	});
+	// Poll every 5 seconds
+	agentPollTimer = setInterval(async () => {
+		agents = await fetchAgents(goalId);
+		renderApp();
+	}, 5000);
+}
+
+function stopAgentPolling(): void {
+	if (agentPollTimer) {
+		clearInterval(agentPollTimer);
+		agentPollTimer = null;
+	}
+	agents = [];
+}
+
+function agentStatusLabel(status: string): "working" | "idle" | "blocked" {
+	if (status === "streaming") return "working";
+	if (status === "idle") return "idle";
+	return "blocked";
+}
+
+const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
+	coder: { bg: "rgba(59, 130, 246, 0.15)", text: "#3b82f6" },
+	tester: { bg: "rgba(34, 197, 94, 0.15)", text: "#22c55e" },
+	reviewer: { bg: "rgba(245, 158, 11, 0.15)", text: "#f59e0b" },
+	lead: { bg: "rgba(168, 85, 247, 0.15)", text: "#a855f7" },
+	"team-lead": { bg: "rgba(168, 85, 247, 0.15)", text: "#a855f7" },
+};
+
+function getRoleColor(role: string): { bg: string; text: string } {
+	return ROLE_COLORS[role] ?? ROLE_COLORS["coder"];
+}
+
+function getRoleLabel(role: string): string {
+	if (role === "team-lead") return "LEAD";
+	return role.toUpperCase();
+}
+
+const AVATAR_COLORS = [
+	"#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ef4444",
+	"#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#8b5cf6",
+];
+
+function getAvatarColor(sessionId: string): string {
+	let hash = 0;
+	for (let i = 0; i < sessionId.length; i++) {
+		hash = ((hash << 5) - hash + sessionId.charCodeAt(i)) | 0;
+	}
+	return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(role: string): string {
+	if (role === "team-lead") return "TL";
+	return role.charAt(0).toUpperCase();
+}
+
+function formatAgentName(agent: SwarmAgent): string {
+	const session = state.gatewaySessions.find((s) => s.id === agent.sessionId);
+	if (session?.title) return session.title;
+	if (agent.role === "team-lead") return "Team Lead";
+	return agent.role.charAt(0).toUpperCase() + agent.role.slice(1);
+}
+
+export function renderAgentPanel(agentList: SwarmAgent[]): TemplateResult {
+	if (agentList.length === 0) {
+		return html`
+			<div class="agent-panel">
+				<div class="agent-panel-header">Agents</div>
+				<div class="agent-panel-empty">No active agents</div>
+			</div>
+		`;
+	}
+
+	return html`
+		<div class="agent-panel">
+			<div class="agent-panel-header">Agents <span class="agent-count">${agentList.length}</span></div>
+			${agentList.map((agent) => {
+				const statusLabel = agentStatusLabel(agent.status);
+				const roleColor = getRoleColor(agent.role);
+				const avatarColor = getAvatarColor(agent.sessionId);
+				const initials = getInitials(agent.role);
+
+				return html`
+					<div class="agent-row" @click=${() => connectToSession(agent.sessionId, true)} title="Open session">
+						<div class="agent-avatar" style="background: ${avatarColor}">
+							${initials}
+						</div>
+						<div class="agent-info">
+							<div class="agent-name-row">
+								<span class="agent-name">${formatAgentName(agent)}</span>
+								<span class="role-badge" style="background: ${roleColor.bg}; color: ${roleColor.text}">
+									${getRoleLabel(agent.role)}
+								</span>
+							</div>
+							<div class="agent-task">${agent.task || "No active task"}</div>
+						</div>
+						<div class="agent-status-dot agent-status-${statusLabel}" title="${statusLabel}"></div>
+					</div>
+				`;
+			})}
+		</div>
+	`;
+}
+
+// ============================================================================
 // DASHBOARD LAYOUT
 // ============================================================================
 
@@ -435,16 +578,23 @@ export function renderGoalDashboard(): TemplateResult {
 		<div class="dashboard-container">
 			${renderNavBar(currentGoal)}
 			${renderSummaryHeader(currentGoal, tasks)}
-			<div class="dashboard-section">
-				<h2 class="dashboard-section-title">Tasks</h2>
-				${renderKanbanBoard(tasks)}
-			</div>
-			${commits.length > 0 ? html`
-				<div class="dashboard-section">
-					<h2 class="dashboard-section-title">Commit Timeline</h2>
-					${renderCommitTimeline(commits, tasks)}
+			<div class="dashboard-body">
+				<div class="dashboard-main-content">
+					<div class="dashboard-section">
+						<h2 class="dashboard-section-title">Tasks</h2>
+						${renderKanbanBoard(tasks)}
+					</div>
+					${commits.length > 0 ? html`
+						<div class="dashboard-section">
+							<h2 class="dashboard-section-title">Commit Timeline</h2>
+							${renderCommitTimeline(commits, tasks)}
+						</div>
+					` : nothing}
 				</div>
-			` : nothing}
+				<div class="dashboard-right-panel">
+					${renderAgentPanel(agents)}
+				</div>
+			</div>
 		</div>
 	`;
 }
