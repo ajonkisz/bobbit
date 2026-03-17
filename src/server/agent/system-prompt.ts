@@ -78,6 +78,14 @@ export interface PromptParts {
 	goalState?: string;
 	/** Goal spec markdown content */
 	goalSpec?: string;
+	/** Task title */
+	taskTitle?: string;
+	/** Task type (e.g. 'implementation', 'code-review', etc.) */
+	taskType?: string;
+	/** Task spec markdown content */
+	taskSpec?: string;
+	/** Human-readable descriptions of dependency tasks */
+	taskDependsOn?: string[];
 }
 
 /**
@@ -112,6 +120,26 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 			? `# Goal\n\n**${parts.goalTitle}** (Status: ${parts.goalState || "unknown"})`
 			: "# Goal";
 		sections.push(header + "\n\n" + parts.goalSpec.trim());
+	}
+
+	// 4. Task context
+	if (parts.taskTitle || parts.taskType) {
+		const taskLines: string[] = ["# Current Task"];
+		if (parts.taskType) taskLines.push(`\n**Type**: ${parts.taskType}`);
+		if (parts.taskTitle) taskLines.push(`**Title**: ${parts.taskTitle}`);
+
+		if (parts.taskSpec?.trim()) {
+			taskLines.push(`\n## Task Specification\n${parts.taskSpec.trim()}`);
+		}
+
+		if (parts.taskDependsOn && parts.taskDependsOn.length > 0) {
+			taskLines.push("\n## Dependencies\nThis task depends on the following completed tasks:");
+			for (const dep of parts.taskDependsOn) {
+				taskLines.push(`- ${dep}`);
+			}
+		}
+
+		sections.push(taskLines.join("\n"));
 	}
 
 	if (sections.length === 0) return undefined;
