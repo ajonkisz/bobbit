@@ -176,7 +176,7 @@ export class SwarmManager {
 		});
 
 		// Update the session metadata to indicate team lead
-		const teamLeadName = generateSwarmName("team-lead");
+		const teamLeadName = await generateSwarmName("team-lead");
 		this.sessionManager.setTitle(session.id, `Team Lead: ${teamLeadName}`);
 		session.titleGenerated = true;
 		this.sessionManager.updateSessionMeta(session.id, {
@@ -268,7 +268,7 @@ export class SwarmManager {
 			);
 
 			// Update session metadata with role info
-			const roleName = generateSwarmName(role);
+			const roleName = await generateSwarmName(role);
 			const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 			this.sessionManager.setTitle(session.id, `${roleLabel}: ${roleName}`);
 			session.titleGenerated = true;
