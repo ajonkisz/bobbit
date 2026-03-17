@@ -12,6 +12,8 @@ import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
 import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
 import { SwarmManager } from "./agent/swarm-manager.js";
+import { CostTracker } from "./agent/cost-tracker.js";
+import { TaskStore } from "./agent/task-store.js";
 
 export interface TlsConfig {
 	cert: string;  // path to PEM certificate
@@ -630,6 +632,64 @@ async function handleApiRoute(
 		const mimeType = MIME_TYPES[`.${ext}`] || "application/octet-stream";
 		res.writeHead(200, { "Content-Type": mimeType });
 		res.end(content);
+		return;
+	}
+
+	// ── Cost endpoints ─────────────────────────────────────────────
+
+	// GET /api/sessions/:id/cost — cost for a single session
+	const sessionCostMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/cost$/);
+	if (sessionCostMatch && req.method === "GET") {
+		const id = sessionCostMatch[1];
+		// TODO: wire costTracker as a property on sessionManager instead of creating a new instance
+		const costTracker = new CostTracker();
+		const cost = costTracker.getSessionCost(id);
+		if (!cost) {
+			json({ error: "No cost data for this session" }, 404);
+			return;
+		}
+		json(cost);
+		return;
+	}
+
+	// GET /api/goals/:goalId/cost — aggregate cost across all sessions linked to a goal
+	const goalCostMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/cost$/);
+	if (goalCostMatch && req.method === "GET") {
+		const goalId = goalCostMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) {
+			json({ error: "Goal not found" }, 404);
+			return;
+		}
+		const sessionIds = sessionManager.listSessions()
+			.filter((s) => s.goalId === goalId)
+			.map((s) => s.id);
+		// TODO: wire costTracker as a property on sessionManager instead of creating a new instance
+		const costTracker = new CostTracker();
+		const cost = costTracker.getGoalCost(goalId, sessionIds);
+		json(cost);
+		return;
+	}
+
+	// GET /api/tasks/:id/cost — cost for the session(s) assigned to a task
+	const taskCostMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/cost$/);
+	if (taskCostMatch && req.method === "GET") {
+		const taskId = taskCostMatch[1];
+		// TODO: wire taskStore as a property on sessionManager instead of creating a new instance
+		const taskStore = new TaskStore();
+		const task = taskStore.get(taskId);
+		if (!task) {
+			json({ error: "Task not found" }, 404);
+			return;
+		}
+		// TODO: wire costTracker as a property on sessionManager instead of creating a new instance
+		const costTracker = new CostTracker();
+		if (!task.assignedSessionId) {
+			json({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalCost: 0 });
+			return;
+		}
+		const cost = costTracker.getSessionCost(task.assignedSessionId);
+		json(cost ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalCost: 0 });
 		return;
 	}
 
