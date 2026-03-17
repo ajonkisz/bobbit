@@ -102,6 +102,15 @@ export class TaskManager {
 			if (!this.isValidTransition(task.state, updates.state)) {
 				throw new Error(`Invalid state transition: ${task.state} → ${updates.state}`);
 			}
+
+			// For completion, validate all sub-tasks are complete or skipped
+			if (updates.state === "complete") {
+				const subTasks = this.store.getByParentTaskId(id);
+				const incomplete = subTasks.filter(st => st.state !== "complete" && st.state !== "skipped");
+				if (incomplete.length > 0) {
+					throw new Error(`Cannot complete task: ${incomplete.length} sub-task(s) still incomplete`);
+				}
+			}
 		}
 
 		// Validate dependsOn: references must exist and no cycles

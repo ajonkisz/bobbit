@@ -99,7 +99,7 @@ export class CostTracker {
 	 * Aggregate cost across multiple sessions (caller provides session IDs).
 	 * Returns a combined SessionCost. Sessions without cost data are skipped.
 	 */
-	getGoalCost(goalId: string, sessionIds: string[]): SessionCost {
+	getGoalCost(_goalId: string, sessionIds: string[]): SessionCost {
 		const total = emptyCost();
 		for (const sid of sessionIds) {
 			const c = this.costs.get(sid);
