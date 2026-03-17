@@ -477,10 +477,10 @@ html {
 	animation-iteration-count: infinite, infinite, infinite;
 }
 
-/* Bandana vertical shift: moves up 1 extra bobbit pixel when eyes look up (60-65%) */
+/* Bandana vertical shift: half-pixel up when eyes look up (60-65%) */
 @keyframes blob-bandana-adjust {
 	0%  { translate: 0 -1.75px; }  /* baseline half-pixel up */
-	60% { translate: 0 -5.25px; }  /* +1 bobbit pixel: (0.5+1) × 3.5 = 5.25 */
+	60% { translate: 0 -3.5px; }   /* half-pixel shift: 1 × 3.5 = 3.5 */
 	65% { translate: 0 -1.75px; }  /* back to baseline */
 }
 
@@ -515,12 +515,13 @@ html {
 		10px 3px 0 #000, 10px 4px 0 #b91c1c, 11px 4px 0 #000,
 		10px 5px 0 #991b1b, 11px 5px 0 #000, 10px 6px 0 #000;
 	}
-	/* Eyes up — thin bandana (top outline + red only, no bottom outline/tail) */
+	/* Eyes up — bandana without tail but keeping bottom outline */
 	60% { box-shadow:
 		1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000,
-		0 3px 0 #000, 1px 3px 0 #b91c1c, 2px 3px 0 #dc2626, 3px 3px 0 #ef4444, 4px 3px 0 #ef4444, 5px 3px 0 #ef4444, 6px 3px 0 #ef4444, 7px 3px 0 #ef4444, 8px 3px 0 #f87171, 9px 3px 0 #000;
+		0 3px 0 #000, 1px 3px 0 #b91c1c, 2px 3px 0 #dc2626, 3px 3px 0 #ef4444, 4px 3px 0 #ef4444, 5px 3px 0 #ef4444, 6px 3px 0 #ef4444, 7px 3px 0 #ef4444, 8px 3px 0 #f87171, 9px 3px 0 #000,
+		0 4px 0 #000, 1px 4px 0 #000, 2px 4px 0 #000, 3px 4px 0 #000, 4px 4px 0 #000, 5px 4px 0 #000, 6px 4px 0 #000, 7px 4px 0 #000, 8px 4px 0 #000, 9px 4px 0 #000;
 	}
-	/* Eyes back to center — restore full bandana */
+	/* Eyes back to center — restore full bandana with tail */
 	65% { box-shadow:
 		1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000,
 		0 3px 0 #000, 1px 3px 0 #b91c1c, 2px 3px 0 #dc2626, 3px 3px 0 #ef4444, 4px 3px 0 #ef4444, 5px 3px 0 #ef4444, 6px 3px 0 #ef4444, 7px 3px 0 #ef4444, 8px 3px 0 #f87171, 9px 3px 0 #000,
