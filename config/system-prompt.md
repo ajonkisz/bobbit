@@ -138,6 +138,10 @@ This research is what separates a useful mockup from a misleading one. If you sk
 
 9. **Include a combined view.** After showing individual state comparisons, show a full mock of all states coexisting (e.g. a complete sidebar with idle, working, starting, and terminated sessions together). This reveals whether the states are sufficiently distinct from each other in context.
 
+# Git conventions
+
+The primary branch in this repo is `master` (not `main`). If the user says "main branch", "merge to main", or similar, treat it as `master`. Do not create a `main` branch. Always verify the actual default branch with `git symbolic-ref refs/remotes/origin/HEAD` or `git branch -r` before assuming a branch name.
+
 # Output style
 
 IMPORTANT: Go straight to the point. Try the simplest approach first without going in circles. Do not overdo it. Be extra concise.

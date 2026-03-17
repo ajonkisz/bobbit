@@ -25,9 +25,11 @@ function getTooltipEl(): HTMLDivElement {
 export function showSessionTooltip(e: MouseEvent, session: GatewaySession, displayTitle: string): void {
 	if (_tooltipTimer) clearTimeout(_tooltipTimer);
 	const el = getTooltipEl();
+	const roleLabel = session.goalAssistant ? "Goal Assistant" : session.role || "";
 	el.innerHTML = `
 		<div class="tt-title">${escapeHtml(displayTitle)}</div>
 		<div class="tt-cwd">${escapeHtml(session.cwd)}</div>
+		${roleLabel ? `<div class="tt-meta" style="color:var(--primary);opacity:0.8">${escapeHtml(roleLabel)}</div>` : ""}
 		<div class="tt-meta">${escapeHtml(formatSessionAge(session.lastActivity))}</div>
 	`;
 	const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -145,8 +147,11 @@ export function renderSessionCard(session: GatewaySession, index = 0) {
 					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
 				</div>
 				<div class="text-xs text-muted-foreground font-mono truncate" title=${session.cwd}>${session.cwd}</div>
-				<div class="mt-1.5 text-xs text-muted-foreground">
+				<div class="mt-1.5 text-xs text-muted-foreground flex items-center gap-2">
 					<span class="font-mono text-[10px] opacity-60" title=${session.id}>${session.id.slice(0, 8)}…</span>
+					${(session.goalAssistant || session.role)
+						? html`<span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">${session.goalAssistant ? "Goal Assistant" : session.role}</span>`
+						: ""}
 				</div>
 			</div>
 			<div class="flex flex-col gap-1 shrink-0">

@@ -280,6 +280,10 @@ All persistent state lives under `~/.pi/`:
 | `agent/auth.json` | (external) | API auth credentials (read by title-generator) |
 | `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
 
+## Git conventions
+
+The primary branch is **`master`** (not `main`). If the user refers to "main", treat it as `master`. Never create a `main` branch.
+
 ## Development workflow
 
 See [docs/dev-workflow.md](docs/dev-workflow.md) for the full guide on running modes, when to restart the server, and how to make changes safely.

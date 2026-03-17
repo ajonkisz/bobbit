@@ -585,6 +585,17 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 										})}
 									</div>
 								</div>
+								<!-- Role info -->
+								${(() => {
+									const session = state.gatewaySessions.find((s) => s.id === sessionId);
+									const roleLabel = session?.goalAssistant ? "Goal Assistant" : session?.role || "";
+									return roleLabel
+										? html`<div>
+												<div class="text-xs text-muted-foreground mb-1">Role</div>
+												<div class="text-sm text-foreground/80 font-mono px-2 py-1 rounded bg-secondary/50">${roleLabel}</div>
+											</div>`
+										: "";
+								})()}
 							</div>
 						`,
 					})}
