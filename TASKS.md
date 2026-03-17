@@ -1,8 +1,12 @@
 ## Backlog
+- [ ] #20 Review sidebar simplification + goal dashboard — role:reviewer, depends:#18 #19, branch:task-18-19-sidebar-dashboard
+- [ ] #21 Test sidebar simplification + goal dashboard — role:tester, depends:#18 #19
 
 ## In Progress
 
 ## Done
+- [x] #18 Sidebar simplification — replace 3-button cluster with dashboard icon — role:coder, completed-by:coder-5cc090b7
+- [x] #19 Goal Dashboard route shell — full-screen dashboard with nav, summary, kanban placeholder, agents panel — role:coder, completed-by:coder-5cc090b7
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
 - [x] #2 Client-side: Create `GoalDraftStore` for IndexedDB persistence
 - [x] #3 Client-side: Integrate `GoalDraftStore` with session-manager.ts and render.ts
