@@ -5,6 +5,7 @@ import { createWorktree, cleanupWorktree } from "../workflows/git.js";
 import { getRolePrompt, VALID_ROLES } from "./swarm-prompts.js";
 import { SwarmStore } from "./swarm-store.js";
 import type { PersistedSwarmEntry } from "./swarm-store.js";
+import { generateSwarmName } from "./swarm-names.js";
 
 
 export interface SwarmAgent {
@@ -175,7 +176,8 @@ export class SwarmManager {
 		});
 
 		// Update the session metadata to indicate team lead
-		this.sessionManager.setTitle(session.id, `Team Lead — ${goal.title}`);
+		const teamLeadName = generateSwarmName("team-lead");
+		this.sessionManager.setTitle(session.id, `Team Lead: ${teamLeadName}`);
 		session.titleGenerated = true;
 		this.sessionManager.updateSessionMeta(session.id, {
 			role: "team-lead",
@@ -266,7 +268,9 @@ export class SwarmManager {
 			);
 
 			// Update session metadata with role info
-			this.sessionManager.setTitle(session.id, `${role.charAt(0).toUpperCase() + role.slice(1)} — ${goal.title}`);
+			const roleName = generateSwarmName(role);
+			const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+			this.sessionManager.setTitle(session.id, `${roleLabel}: ${roleName}`);
 			session.titleGenerated = true;
 			this.sessionManager.updateSessionMeta(session.id, {
 				role,
