@@ -6,9 +6,10 @@
 ## In Progress
 - [x] #6 Add Task + Cost WebSocket protocol messages to `protocol.ts` and handle in `handler.ts` — role:coder, claimed-by:6585203b
 - [x] #9 Session ↔ Task integration — auto-assign task on session creation with `taskId`, goal deletion cascades to tasks — role:coder, claimed-by:21957dc2
-- [x] #12 Type-check: `npm run check` passes — role:tester, depends:#9, claimed-by:tester-55f3ffd8
+
 
 ## Done
+- [x] #12 Type-check: `npm run check` passes — role:tester, completed-by:tester-55f3ffd8
 - [x] #11 Review cost tracking code — role:reviewer, completed-by:reviewer-af572498
 - [x] #1 Implement TaskStore (`src/server/agent/task-store.ts`) — role:coder, completed-by:6bebd675
 - [x] #3 Implement CostTracker (`src/server/agent/cost-tracker.ts`) — role:coder, completed-by:37bc6bcb
