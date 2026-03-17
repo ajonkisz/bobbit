@@ -384,6 +384,7 @@ body {
 }
 .bobbit-crowned .bobbit-blob__crown {
 	display: block;
+	position: absolute;
 	width: 1px;
 	height: 1px;
 	overflow: visible;
