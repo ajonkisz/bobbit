@@ -3,6 +3,7 @@
 ## In Progress
 
 ## Done
+- [x] #13 Integrate cost tracking into SessionManager — role:coder, completed-by:coder-95c5c110
 - [x] #1 Server-side: Add `goalAssistant` to `PersistedSession`
 - [x] #2 Client-side: Create `GoalDraftStore` for IndexedDB persistence
 - [x] #3 Client-side: Integrate `GoalDraftStore` with session-manager.ts and render.ts
