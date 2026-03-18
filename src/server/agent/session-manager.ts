@@ -264,8 +264,12 @@ export class SessionManager {
 			// Fresh response error — re-send the original prompt
 			await session.rpcClient.prompt(session.lastPromptText, session.lastPromptImages);
 		} else {
-			// Fallback — ask the agent to retry
-			await session.rpcClient.followUp("Please retry the last request.");
+			// Fallback (e.g. session predates error tracking) — use prompt, not followUp,
+			// because followUp may not be accepted when the agent is idle.
+			await session.rpcClient.prompt(
+				"[SYSTEM: The model API returned an error on your last response. " +
+				"Please review your conversation history and retry what you were doing.]"
+			);
 		}
 	}
 
