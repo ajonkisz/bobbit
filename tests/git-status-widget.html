@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #1a1a2e; color: #e0e0e0; font-family: system-ui, sans-serif; }
+
+  /* Tailwind-equivalent utility classes used by GitStatusWidget */
+  .inline-flex { display: inline-flex; }
+  .flex { display: flex; }
+  .flex-col { flex-direction: column; }
+  .items-center { align-items: center; }
+  .gap-0\.5 { gap: 0.125rem; }
+  .gap-1 { gap: 0.25rem; }
+  .gap-1\.5 { gap: 0.375rem; }
+  .gap-2 { gap: 0.5rem; }
+  .py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+  .px-1\.5 { padding-left: 0.375rem; padding-right: 0.375rem; }
+  .py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+  .p-3 { padding: 0.75rem; }
+  .pt-2 { padding-top: 0.5rem; }
+  .mt-2 { margin-top: 0.5rem; }
+  .mb-1 { margin-bottom: 0.25rem; }
+  .mb-2 { margin-bottom: 0.5rem; }
+  .rounded-full { border-radius: 9999px; }
+  .rounded-lg { border-radius: 0.5rem; }
+  .text-xs { font-size: 0.75rem; line-height: 1rem; }
+  .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+  .text-\[11px\] { font-size: 11px; }
+  .text-\[9px\] { font-size: 9px; }
+  .leading-tight { line-height: 1.25; }
+  .font-medium { font-weight: 500; }
+  .font-mono { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace; }
+  .shrink-0 { flex-shrink: 0; }
+  .min-w-0 { min-width: 0; }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .break-all { word-break: break-all; }
+  .cursor-pointer { cursor: pointer; }
+  .transition-colors { transition-property: color, background-color, border-color; transition-duration: 150ms; }
+  .fixed { position: fixed; }
+  .z-50 { z-index: 50; }
+  .border { border-width: 1px; border-style: solid; }
+  .border-t { border-top-width: 1px; border-top-style: solid; }
+  .shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+  .max-h-\[200px\] { max-height: 200px; }
+  .overflow-y-auto { overflow-y: auto; }
+  .text-right { text-align: right; }
+  .w-\[70px\] { width: 70px; }
+  .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+
+  /* Color tokens */
+  .text-foreground { color: #e0e0e0; }
+  .text-muted-foreground { color: #888; }
+  .text-amber-400 { color: #fbbf24; }
+  .text-green-400 { color: #4ade80; }
+  .text-red-400 { color: #f87171; }
+  .text-blue-400 { color: #60a5fa; }
+  .text-red-500 { color: #ef4444; }
+  .bg-card { background: #1e1e30; }
+  .border-border { border-color: #333; }
+
+  /* Test layout */
+  .test-container {
+    padding: 2rem;
+  }
+  .test-case {
+    margin-bottom: 2rem;
+    border: 1px solid #333;
+    padding: 1rem;
+    border-radius: 8px;
+  }
+  .test-case h3 {
+    margin-bottom: 0.5rem;
+    font-size: 14px;
+    color: #aaa;
+  }
+
+  /* Simulate the status bar area at the bottom of the viewport */
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 4px 8px;
+    background: #1e1e30;
+    border-top: 1px solid #333;
+    gap: 8px;
+  }
+
+  /* For the widget wrapper — simulates the real layout context */
+  .widget-host {
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Test Case 1: Dropdown rendered INLINE (not fixed-position) ===== -->
+<div class="test-container">
+  <h2 style="color:#ccc;margin-bottom:1rem;">GitStatusWidget — File Path Rendering Tests</h2>
+
+  <div class="test-case" id="test-inline-dropdown">
+    <h3>Test: File paths render completely (inline dropdown)</h3>
+    <div id="inline-dropdown-mount"></div>
+  </div>
+
+  <div class="test-case" id="test-long-paths">
+    <h3>Test: Long file paths truncate from the RIGHT with ellipsis</h3>
+    <div id="long-paths-mount"></div>
+  </div>
+
+  <div class="test-case" id="test-various-statuses">
+    <h3>Test: Various git statuses render correctly</h3>
+    <div id="various-mount"></div>
+  </div>
+</div>
+
+<!-- ===== Test Case 4: Fixed-position dropdown (simulates real widget) ===== -->
+<div class="status-bar">
+  <div class="widget-host" id="fixed-widget-host"></div>
+</div>
+
+<script>
+// === Replicate the exact rendering logic from GitStatusWidget ===
+
+function statusColor(status) {
+  switch (status) {
+    case 'M': return 'text-amber-400';
+    case 'A': return 'text-green-400';
+    case 'D': return 'text-red-400';
+    case '?': return 'text-muted-foreground';
+    case 'R': return 'text-blue-400';
+    case 'U': return 'text-red-500';
+    default: return 'text-muted-foreground';
+  }
+}
+
+function statusLabel(status) {
+  switch (status) {
+    case 'M': return 'modified';
+    case 'A': return 'added';
+    case 'D': return 'deleted';
+    case '?': return 'untracked';
+    case 'R': return 'renamed';
+    case 'U': return 'unmerged';
+    default: return status;
+  }
+}
+
+/**
+ * Renders the dropdown HTML for a list of status files.
+ * This replicates the exact markup from GitStatusWidget.render()
+ */
+function renderDropdown(files, opts = {}) {
+  const { branch = 'master', isOnPrimary = true, maxWidth } = opts;
+
+  const fileRows = files.map(f => `
+    <div class="flex items-center gap-2 py-0.5 min-w-0">
+      <span
+        class="${statusColor(f.status)} font-mono w-[70px] shrink-0 text-right"
+        title="${statusLabel(f.status)}"
+      >${statusLabel(f.status)}</span>
+      <span class="text-foreground truncate" title="${f.file}">${f.file}</span>
+    </div>
+  `).join('');
+
+  const style = maxWidth ? `max-width:${maxWidth}` : `max-width:min(420px, calc(100vw - 1rem))`;
+
+  return `
+    <div
+      class="bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
+      style="${style}"
+      data-dropdown
+    >
+      <div class="flex items-center gap-1.5 mb-2 text-foreground font-medium text-sm">
+        <span>⎇</span>
+        <span class="break-all">${branch}</span>
+        ${!isOnPrimary ? '<span class="text-[11px] text-muted-foreground font-normal">(feature)</span>' : ''}
+      </div>
+
+      <div class="flex flex-col gap-1 mb-2">
+        <div class="text-muted-foreground">
+          Remote: <span class="text-green-400">up to date with remote</span>
+        </div>
+      </div>
+
+      <div class="border-t border-border pt-2 mt-2">
+        <div class="text-muted-foreground mb-1 font-medium">Changes</div>
+        <div class="flex flex-col gap-0.5 max-h-[200px] overflow-y-auto" data-file-list>
+          ${fileRows}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Simulate the OLD (buggy) server-side git status parsing.
+ * Bug: .trim() strips the leading space from the first line's status code.
+ */
+function parseGitStatusPorcelainBuggy(raw) {
+  const trimmed = raw.trim();
+  const lines = trimmed ? trimmed.split('\n') : [];
+  return lines.map(line => ({
+    file: line.substring(3),
+    status: line.substring(0, 2).trim(),
+  }));
+}
+
+/**
+ * Simulate the FIXED server-side git status parsing.
+ * Only trims trailing whitespace; strips \r from each line for Windows CRLF.
+ */
+function parseGitStatusPorcelain(raw) {
+  const trimmed = raw.replace(/\s+$/, '');
+  const lines = trimmed ? trimmed.split('\n') : [];
+  return lines.map(line => {
+    const l = line.endsWith('\r') ? line.slice(0, -1) : line;
+    return {
+      file: l.substring(3),
+      status: l.substring(0, 2).trim(),
+    };
+  });
+}
+
+// ============================================================
+// Test data — the exact output from `git status --porcelain`
+// for the files shown in the screenshot
+// ============================================================
+const PORCELAIN_OUTPUT = ` M src/app/api.ts
+ M src/app/render-helpers.ts
+ M src/app/sidebar.ts
+ M src/app/state.ts`;
+
+const PARSED_FILES = parseGitStatusPorcelain(PORCELAIN_OUTPUT);
+const PARSED_FILES_BUGGY = parseGitStatusPorcelainBuggy(PORCELAIN_OUTPUT);
+
+// Expose for test assertions
+window.__testData = {
+  porcelainOutput: PORCELAIN_OUTPUT,
+  parsedFiles: PARSED_FILES,
+  parsedFilesBuggy: PARSED_FILES_BUGGY,
+};
+
+// ============================================================
+// Render Test 1: Inline dropdown with real screenshot data
+// ============================================================
+document.getElementById('inline-dropdown-mount').innerHTML = renderDropdown(PARSED_FILES);
+
+// ============================================================
+// Render Test 2: Long file paths (should truncate from RIGHT)
+// ============================================================
+const longPathFiles = [
+  { file: 'src/server/workflows/definitions/code-review.ts', status: 'M' },
+  { file: 'src/ui/components/very/deeply/nested/component/SomeWidget.ts', status: 'A' },
+  { file: 'src/app/api.ts', status: 'M' },
+];
+document.getElementById('long-paths-mount').innerHTML = renderDropdown(longPathFiles, { maxWidth: '300px' });
+
+// ============================================================
+// Render Test 3: Various statuses
+// ============================================================
+const variousFiles = [
+  { file: 'src/new-file.ts', status: 'A' },
+  { file: 'src/modified.ts', status: 'M' },
+  { file: 'src/deleted.ts', status: 'D' },
+  { file: 'src/renamed.ts', status: 'R' },
+  { file: 'src/untracked.ts', status: '?' },
+];
+document.getElementById('various-mount').innerHTML = renderDropdown(variousFiles);
+
+// ============================================================
+// Render Test 4: Fixed-position dropdown (simulates real widget)
+// Uses the exact positioning logic from _positionDropdown()
+// ============================================================
+const fixedHost = document.getElementById('fixed-widget-host');
+
+// Render a pill button (like the real widget)
+fixedHost.innerHTML = `
+  <button
+    class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-card border border-border text-muted-foreground text-[11px] leading-tight"
+    style="max-width:100%"
+    id="fixed-pill-btn"
+  >
+    <span class="shrink-0">⎇</span>
+    <span class="truncate">master</span>
+    <span class="text-amber-400 font-medium shrink-0">4M</span>
+  </button>
+  <div
+    class="fixed z-50 bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
+    style="max-width:min(420px, calc(100vw - 1rem));display:none;"
+    id="fixed-dropdown"
+    data-dropdown
+  >
+    <div class="flex items-center gap-1.5 mb-2 text-foreground font-medium text-sm">
+      <span>⎇</span>
+      <span class="break-all">master</span>
+    </div>
+    <div class="flex flex-col gap-1 mb-2">
+      <div class="text-muted-foreground">
+        Remote: <span class="text-green-400">up to date with remote</span>
+      </div>
+    </div>
+    <div class="border-t border-border pt-2 mt-2">
+      <div class="text-muted-foreground mb-1 font-medium">Changes</div>
+      <div class="flex flex-col gap-0.5 max-h-[200px] overflow-y-auto" data-file-list>
+        ${PARSED_FILES.map(f => `
+          <div class="flex items-center gap-2 py-0.5 min-w-0">
+            <span class="${statusColor(f.status)} font-mono w-[70px] shrink-0 text-right" title="${statusLabel(f.status)}">${statusLabel(f.status)}</span>
+            <span class="text-foreground truncate" title="${f.file}">${f.file}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </div>
+`;
+
+// Position the dropdown exactly like _positionDropdown() does
+window.__showFixedDropdown = function() {
+  const btn = document.getElementById('fixed-pill-btn');
+  const dropdown = document.getElementById('fixed-dropdown');
+  const rect = btn.getBoundingClientRect();
+  dropdown.style.display = '';
+  dropdown.style.right = `${window.innerWidth - rect.right}px`;
+  dropdown.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+};
+
+// Also expose a version that positions dropdown with left edge near viewport edge
+// to test clipping
+window.__showFixedDropdownNearLeftEdge = function() {
+  const dropdown = document.getElementById('fixed-dropdown');
+  dropdown.style.display = '';
+  // Position so right edge is far right, pushing left edge potentially off-screen
+  dropdown.style.right = '0px';
+  dropdown.style.bottom = '40px';
+  dropdown.style.maxWidth = `${window.innerWidth + 20}px`; // wider than viewport
+};
+</script>
+</body>
+</html>

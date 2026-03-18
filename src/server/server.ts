@@ -799,14 +799,20 @@ async function handleApiRoute(
 			// Get status
 			let statusRaw = '';
 			try {
-				statusRaw = execSync('git status --porcelain', execOpts).trim();
+				// Only trim trailing whitespace — leading spaces are significant
+				// in porcelain format (they encode index vs working-tree status)
+				statusRaw = execSync('git status --porcelain', execOpts).replace(/\s+$/, '');
 			} catch { /* empty */ }
 
 			const statusLines = statusRaw ? statusRaw.split('\n') : [];
-			const status = statusLines.map(line => ({
-				file: line.substring(3),
-				status: line.substring(0, 2).trim(),
-			}));
+			const status = statusLines.map(line => {
+				// Strip trailing \r from Windows CRLF line endings
+				const l = line.endsWith('\r') ? line.slice(0, -1) : line;
+				return {
+					file: l.substring(3),
+					status: l.substring(0, 2).trim(),
+				};
+			});
 
 			// Check if branch has an upstream tracking branch
 			let hasUpstream = false;
