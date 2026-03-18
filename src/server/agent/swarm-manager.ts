@@ -51,10 +51,6 @@ interface SwarmEntry {
  * with isolated git worktrees.
  */
 export interface SwarmManagerConfig {
-	/** Base URL of the gateway (e.g. "https://10.5.0.2:3000") */
-	gatewayUrl: string;
-	/** Auth token for the gateway REST API */
-	authToken: string;
 	/** Color store for assigning unique palette indices to swarm sessions */
 	colorStore: ColorStore;
 	/** Task manager for looking up tasks assigned to sessions */
@@ -194,11 +190,6 @@ export class SwarmManager {
 		// Create the team lead session under the goal, with role prompt appended to goal spec
 		const session = await this.sessionManager.createSession(cwd, undefined, goalId, false, {
 			rolePrompt: teamLeadPrompt,
-			env: {
-				BOBBIT_GATEWAY_URL: this.config.gatewayUrl,
-				BOBBIT_AUTH_TOKEN: this.config.authToken,
-				BOBBIT_GOAL_ID: goalId,
-			},
 		});
 
 		// Assign a unique color and title
@@ -296,14 +287,7 @@ export class SwarmManager {
 				undefined,
 				goalId,
 				false,
-				{
-					rolePrompt,
-					env: {
-						BOBBIT_GATEWAY_URL: this.config.gatewayUrl,
-						BOBBIT_AUTH_TOKEN: this.config.authToken,
-						BOBBIT_GOAL_ID: goalId,
-					},
-				},
+				{ rolePrompt },
 			);
 
 			// Assign a unique color and title

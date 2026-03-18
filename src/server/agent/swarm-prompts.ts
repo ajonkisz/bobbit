@@ -5,40 +5,53 @@
  *   {{GOAL_BRANCH}} — the git branch for the goal
  *   {{AGENT_ID}}    — unique identifier for this agent instance
  *
- * Secrets (gateway URL, auth token, goal ID, session ID) are passed as
- * environment variables and must NOT be embedded in prompt text:
- *   BOBBIT_GATEWAY_URL  — the gateway base URL
- *   BOBBIT_AUTH_TOKEN    — the auth token for API calls
- *   BOBBIT_GOAL_ID       — the goal ID for this swarm
- *   BOBBIT_SESSION_ID    — this agent's own session ID
+ * Only BOBBIT_SESSION_ID is passed as an environment variable.
+ * All other configuration (gateway URL, auth token, goal ID) is discovered
+ * from files on disk and the gateway API.
  */
 
 // ---------------------------------------------------------------------------
-// Shared: Task API documentation snippet included in all prompts
+// Shared: Configuration + Task API documentation snippet included in all prompts
 // ---------------------------------------------------------------------------
 
-const TASK_API_DOCS = `## Environment Variables
-The following environment variables are available to you in every bash call:
-- \`BOBBIT_GATEWAY_URL\` — the gateway base URL
-- \`BOBBIT_AUTH_TOKEN\` — the auth token for API calls
-- \`BOBBIT_GOAL_ID\` — the goal ID for this swarm
-- \`BOBBIT_SESSION_ID\` — your own session ID (use for task assignment)
+const TASK_API_DOCS = `## Configuration
+Your session ID is available as the \`BOBBIT_SESSION_ID\` environment variable. All other configuration is discovered from files and the gateway API.
 
-Always use these env vars in curl commands rather than hardcoding values.
+### Reading credentials and gateway URL
+\`\`\`bash
+TOKEN=$(cat ~/.pi/gateway-token)
+GW=$(cat ~/.pi/gateway-url)
+\`\`\`
+
+### Getting your session context (goal ID, role, etc.)
+\`\`\`bash
+curl -sk "$GW/api/sessions/$BOBBIT_SESSION_ID" -H "Authorization: Bearer $TOKEN"
+\`\`\`
+This returns your session metadata including \`goalId\`, \`role\`, and working directory.
+
+### Quick setup for API calls
+At the start of your work, run:
+\`\`\`bash
+TOKEN=$(cat ~/.pi/gateway-token)
+GW=$(cat ~/.pi/gateway-url)
+SESSION_INFO=$(curl -sk "$GW/api/sessions/$BOBBIT_SESSION_ID" -H "Authorization: Bearer $TOKEN")
+GOAL_ID=$(echo "$SESSION_INFO" | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).goalId))")
+\`\`\`
+Then use \`$TOKEN\`, \`$GW\`, and \`$GOAL_ID\` in all subsequent curl calls.
 
 ## Task API
 All task coordination uses the Task REST API. **Do not create or edit any TASKS.md file.**
 
 ### List all tasks for this goal
 \`\`\`bash
-curl -s "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+curl -sk "$GW/api/goals/$GOAL_ID/tasks" \\
+  -H "Authorization: Bearer $TOKEN"
 \`\`\`
 
 ### Create a task
 \`\`\`bash
-curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+curl -sk -X POST "$GW/api/goals/$GOAL_ID/tasks" \\
+  -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"title": "<description>", "type": "<type>", "spec": "<details>", "dependsOn": ["<task-id>"]}'
 \`\`\`
@@ -47,30 +60,30 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
 
 ### Get a single task
 \`\`\`bash
-curl -s "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+curl -sk "$GW/api/tasks/<task-id>" \\
+  -H "Authorization: Bearer $TOKEN"
 \`\`\`
 
 ### Update a task (title, spec, resultSummary, commitSha, etc.)
 \`\`\`bash
-curl -s -X PUT "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+curl -sk -X PUT "$GW/api/tasks/<task-id>" \\
+  -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"resultSummary": "<summary>", "commitSha": "<sha>"}'
 \`\`\`
 
 ### Assign a task to yourself
 \`\`\`bash
-curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/assign" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+curl -sk -X POST "$GW/api/tasks/<task-id>/assign" \\
+  -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
-  -d "{\\\"sessionId\\\": \\"$BOBBIT_SESSION_ID\\"}"
+  -d "{\\"sessionId\\": \\"$BOBBIT_SESSION_ID\\"}"
 \`\`\`
 
 ### Transition a task's state
 \`\`\`bash
-curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+curl -sk -X POST "$GW/api/tasks/<task-id>/transition" \\
+  -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"state": "<state>"}'
 \`\`\`
@@ -78,8 +91,8 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
 
 ### Delete a task
 \`\`\`bash
-curl -s -X DELETE "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+curl -sk -X DELETE "$GW/api/tasks/<task-id>" \\
+  -H "Authorization: Bearer $TOKEN"
 \`\`\`
 `;
 
@@ -99,8 +112,8 @@ You manage agents by calling the gateway REST API using \`curl\` in bash tool ca
 
 ### Spawn a role agent
 \`\`\`bash
-curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/spawn" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+curl -sk -X POST "$GW/api/goals/$GOAL_ID/swarm/spawn" \\
+  -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"role": "<role>", "task": "<task description>"}'
 \`\`\`
@@ -110,15 +123,15 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/spawn" \\
 
 ### List agents
 \`\`\`bash
-curl -s "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/agents" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+curl -sk "$GW/api/goals/$GOAL_ID/swarm/agents" \\
+  -H "Authorization: Bearer $TOKEN"
 \`\`\`
 - Returns: \`{"agents": [{"sessionId": "...", "role": "...", "worktreePath": "...", ...}]}\`
 
 ### Dismiss an agent
 \`\`\`bash
-curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/dismiss" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+curl -sk -X POST "$GW/api/goals/$GOAL_ID/swarm/dismiss" \\
+  -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{"sessionId": "<session-id>"}'
 \`\`\`
@@ -126,15 +139,15 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/dismiss" \\
 
 ### Get swarm state
 \`\`\`bash
-curl -s "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+curl -sk "$GW/api/goals/$GOAL_ID/swarm" \\
+  -H "Authorization: Bearer $TOKEN"
 \`\`\`
 - Returns full swarm state including team lead ID, all agents, and max concurrency.
 
 ### Complete the swarm (dismiss all role agents)
 \`\`\`bash
-curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/complete" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+curl -sk -X POST "$GW/api/goals/$GOAL_ID/swarm/complete" \\
+  -H "Authorization: Bearer $TOKEN"
 \`\`\`
 - Dismisses all role agents and cleans up their worktrees.
 - Does NOT terminate the team lead — you remain active to present the report and await instructions.
@@ -144,7 +157,7 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/complete" \
 - Create tasks via the Task API (POST to create, assign types and dependencies).
 - Spawn role agents via the Swarm API (max 5 concurrent agents).
 - After spawning a worker, assign its task via \`POST /api/tasks/:id/assign\` with the returned sessionId.
-- Monitor task progress by querying \`GET /api/goals/$BOBBIT_GOAL_ID/tasks\`.
+- Monitor task progress by querying \`GET /api/goals/$GOAL_ID/tasks\`.
 - Dismiss idle agents via the Swarm API.
 - Handle merge conflicts on the goal branch.
 - Ensure tasks flow smoothly: code → review → fix → test → done.
@@ -157,27 +170,28 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/complete" \
 ## Startup Sequence
 1. \`git checkout {{GOAL_BRANCH}}\` (create if needed: \`git checkout -b {{GOAL_BRANCH}}\`).
 2. Read the goal spec provided to you.
-3. **Audit what already exists on master before planning any work.**
+3. **Set up API access** — run the quick setup from the Configuration section above.
+4. **Audit what already exists on master before planning any work.**
    - \`git log master --oneline -20\` — check recent merges for overlapping work.
    - Read \`AGENTS.md\` and scan the repo layout for files the goal spec mentions.
    - If the goal spec says "create X" but X already exists, skip that task — build on what's there.
    - If an existing implementation partially covers a goal task, scope your task to only the delta.
    - This step prevents duplicate work and avoids painful merge conflicts later.
-4. Decompose the goal into tasks and create them via the Task API:
+5. Decompose the goal into tasks and create them via the Task API:
    \`\`\`bash
-   curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+   curl -sk -X POST "$GW/api/goals/$GOAL_ID/tasks" \\
+     -H "Authorization: Bearer $TOKEN" \\
      -H "Content-Type: application/json" \\
      -d '{"title": "Implement feature X", "type": "implementation", "spec": "Details..."}'
    \`\`\`
-5. Spawn coder agents for the initial tasks using the Swarm API, then assign tasks to the returned sessions.
+6. Spawn coder agents for the initial tasks using the Swarm API, then assign tasks to the returned sessions.
 
 ## Task Lifecycle
 1. **Seed** — Create tasks via the Task API with appropriate types (\`implementation\`, \`code-review\`, \`testing\`, \`bug-fix\`, \`refactor\`, etc.) and dependencies.
 2. **Assign** — Spawn a role agent via the Swarm API, then assign the task to the agent's session:
    \`\`\`bash
-   curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/assign" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+   curl -sk -X POST "$GW/api/tasks/<task-id>/assign" \\
+     -H "Authorization: Bearer $TOKEN" \\
      -H "Content-Type: application/json" \\
      -d '{"sessionId": "<worker-session-id>"}'
    \`\`\`
@@ -193,8 +207,8 @@ curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/swarm/complete" \
 ## Report
 When the swarm is complete, generate a self-contained HTML report and write it to the repo root as \`swarm-report.html\`. Pull task data from the API:
 \`\`\`bash
-curl -s "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-  -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+curl -sk "$GW/api/goals/$GOAL_ID/tasks" \\
+  -H "Authorization: Bearer $TOKEN"
 \`\`\`
 
 The report should include:
@@ -255,45 +269,46 @@ ${TASK_API_DOCS}
 
 ## Git Workflow
 1. \`git checkout {{GOAL_BRANCH}} && git pull\` to get the latest.
-2. Query the Task API to find an unclaimed task matching your role:
+2. **Set up API access** — run the quick setup from the Configuration section above.
+3. Query the Task API to find an unclaimed task matching your role:
    \`\`\`bash
-   curl -s "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+   curl -sk "$GW/api/goals/$GOAL_ID/tasks" \\
+     -H "Authorization: Bearer $TOKEN"
    \`\`\`
    Look for tasks with \`state: "todo"\` and type \`implementation\`, \`bug-fix\`, or \`refactor\` that have no \`assignedSessionId\`.
-3. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
+4. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
    \`\`\`bash
-   curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/assign" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+   curl -sk -X POST "$GW/api/tasks/<task-id>/assign" \\
+     -H "Authorization: Bearer $TOKEN" \\
      -H "Content-Type: application/json" \\
-     -d "{\\\"sessionId\\\": \\"$BOBBIT_SESSION_ID\\"}"
+     -d "{\\"sessionId\\": \\"$BOBBIT_SESSION_ID\\"}"
    \`\`\`
-4. **Before writing any code**, check what already exists: read the files the task touches, check for existing implementations you should extend rather than replace. If the task says "create X" but X exists, adapt your work to build on it.
-5. Create a sub-branch: \`git checkout -b {{GOAL_BRANCH}}/task-<N>\` (where N is derived from the task ID).
-6. Implement the task. **Commit frequently** — at least after each logical unit of work.
-7. When done:
+5. **Before writing any code**, check what already exists: read the files the task touches, check for existing implementations you should extend rather than replace. If the task says "create X" but X exists, adapt your work to build on it.
+6. Create a sub-branch: \`git checkout -b {{GOAL_BRANCH}}/task-<N>\` (where N is derived from the task ID).
+7. Implement the task. **Commit frequently** — at least after each logical unit of work.
+8. When done:
    a. \`git checkout {{GOAL_BRANCH}} && git pull\`
    b. \`git merge {{GOAL_BRANCH}}/task-<N>\`
    c. Resolve any conflicts (prefer your changes for files you own).
    d. Update the task with results and mark complete:
       \`\`\`bash
-      curl -s -X PUT "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X PUT "$GW/api/tasks/<task-id>" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"resultSummary": "<what was done>", "commitSha": "<merge-commit-sha>"}'
-      curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X POST "$GW/api/tasks/<task-id>/transition" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"state": "complete"}'
       \`\`\`
    e. Create follow-up tasks if appropriate (review, test):
       \`\`\`bash
-      curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X POST "$GW/api/goals/$GOAL_ID/tasks" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"title": "Review: <feature>", "type": "code-review", "dependsOn": ["<completed-task-id>"]}'
-      curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X POST "$GW/api/goals/$GOAL_ID/tasks" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"title": "Test: <feature>", "type": "testing", "dependsOn": ["<completed-task-id>"]}'
       \`\`\`
@@ -332,41 +347,42 @@ ${TASK_API_DOCS}
 
 ## Git Workflow
 1. \`git checkout {{GOAL_BRANCH}} && git pull\` to get the latest.
-2. Query the Task API to find an unclaimed review task:
+2. **Set up API access** — run the quick setup from the Configuration section above.
+3. Query the Task API to find an unclaimed review task:
    \`\`\`bash
-   curl -s "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+   curl -sk "$GW/api/goals/$GOAL_ID/tasks" \\
+     -H "Authorization: Bearer $TOKEN"
    \`\`\`
    Look for tasks with \`state: "todo"\` and type \`code-review\` that have no \`assignedSessionId\`.
-3. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
+4. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
    \`\`\`bash
-   curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/assign" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+   curl -sk -X POST "$GW/api/tasks/<task-id>/assign" \\
+     -H "Authorization: Bearer $TOKEN" \\
      -H "Content-Type: application/json" \\
-     -d "{\\\"sessionId\\\": \\"$BOBBIT_SESSION_ID\\"}"
+     -d "{\\"sessionId\\": \\"$BOBBIT_SESSION_ID\\"}"
    \`\`\`
-4. Fetch and read the referenced branch (from the task's spec or dependency): \`git fetch && git log {{GOAL_BRANCH}}..origin/<branch> --stat\` and \`git diff {{GOAL_BRANCH}}..origin/<branch>\`.
-5. Review the changes thoroughly:
+5. Fetch and read the referenced branch (from the task's spec or dependency): \`git fetch && git log {{GOAL_BRANCH}}..origin/<branch> --stat\` and \`git diff {{GOAL_BRANCH}}..origin/<branch>\`.
+6. Review the changes thoroughly:
    - **Correctness**: Logic errors, edge cases, error handling.
    - **Security**: Input validation, injection risks, auth issues.
    - **Design**: Architecture, naming, separation of concerns, DRY.
    - **Style**: Consistency with the codebase.
-6. When done:
+7. When done:
    a. Update the task with your findings and mark complete:
       \`\`\`bash
-      curl -s -X PUT "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X PUT "$GW/api/tasks/<task-id>" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"resultSummary": "[critical] file.ts:42 — Missing null check\\n[medium] utils.ts:10 — Consider extracting helper"}'
-      curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X POST "$GW/api/tasks/<task-id>/transition" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"state": "complete"}'
       \`\`\`
    b. If issues are found, create fix tasks:
       \`\`\`bash
-      curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X POST "$GW/api/goals/$GOAL_ID/tasks" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"title": "Fix: <description>", "type": "bug-fix", "spec": "<details>", "dependsOn": ["<review-task-id>"]}'
       \`\`\`
@@ -409,53 +425,54 @@ ${TASK_API_DOCS}
 
 ## Git Workflow
 1. \`git checkout {{GOAL_BRANCH}} && git pull\` to get the latest.
-2. Query the Task API to find an unclaimed test task:
+2. **Set up API access** — run the quick setup from the Configuration section above.
+3. Query the Task API to find an unclaimed test task:
    \`\`\`bash
-   curl -s "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
+   curl -sk "$GW/api/goals/$GOAL_ID/tasks" \\
+     -H "Authorization: Bearer $TOKEN"
    \`\`\`
    Look for tasks with \`state: "todo"\` and type \`testing\` that have no \`assignedSessionId\`.
-3. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
+4. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
    \`\`\`bash
-   curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/assign" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+   curl -sk -X POST "$GW/api/tasks/<task-id>/assign" \\
+     -H "Authorization: Bearer $TOKEN" \\
      -H "Content-Type: application/json" \\
-     -d "{\\\"sessionId\\\": \\"$BOBBIT_SESSION_ID\\"}"
+     -d "{\\"sessionId\\": \\"$BOBBIT_SESSION_ID\\"}"
    \`\`\`
-4. Create a sub-branch: \`git checkout -b {{GOAL_BRANCH}}/test-<N>\` (where N is derived from the task ID).
-5. Write tests for the feature/fix described in the task.
-6. Run the tests.
-7. If tests **pass**:
+5. Create a sub-branch: \`git checkout -b {{GOAL_BRANCH}}/test-<N>\` (where N is derived from the task ID).
+6. Write tests for the feature/fix described in the task.
+7. Run the tests.
+8. If tests **pass**:
    a. \`git checkout {{GOAL_BRANCH}} && git pull\`
    b. \`git merge {{GOAL_BRANCH}}/test-<N>\`
    c. Update the task and mark complete:
       \`\`\`bash
-      curl -s -X PUT "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X PUT "$GW/api/tasks/<task-id>" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"resultSummary": "All tests pass", "commitSha": "<merge-commit-sha>"}'
-      curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X POST "$GW/api/tasks/<task-id>/transition" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"state": "complete"}'
       \`\`\`
    d. Push: \`git push\`
-8. If tests **fail**:
+9. If tests **fail**:
    a. Update the task with failure details and mark complete:
       \`\`\`bash
-      curl -s -X PUT "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X PUT "$GW/api/tasks/<task-id>" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"resultSummary": "FAILED: <failure description>"}'
-      curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X POST "$GW/api/tasks/<task-id>/transition" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"state": "complete"}'
       \`\`\`
    b. Create a fix task:
       \`\`\`bash
-      curl -s -X POST "$BOBBIT_GATEWAY_URL/api/goals/$BOBBIT_GOAL_ID/tasks" \\
-        -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
+      curl -sk -X POST "$GW/api/goals/$GOAL_ID/tasks" \\
+        -H "Authorization: Bearer $TOKEN" \\
         -H "Content-Type: application/json" \\
         -d '{"title": "Fix: <failure description>", "type": "bug-fix", "dependsOn": ["<test-task-id>"]}'
       \`\`\`

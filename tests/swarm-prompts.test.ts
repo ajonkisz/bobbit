@@ -41,11 +41,17 @@ describe('TEAM_LEAD_PROMPT', () => {
   it('contains all required placeholders', () => {
     assert.ok(TEAM_LEAD_PROMPT.includes('{{GOAL_BRANCH}}'), 'Missing {{GOAL_BRANCH}}');
     assert.ok(TEAM_LEAD_PROMPT.includes('{{AGENT_ID}}'), 'Missing {{AGENT_ID}}');
-    // Secrets are passed as env vars, not embedded in prompt text
-    assert.ok(TEAM_LEAD_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Should reference BOBBIT_GATEWAY_URL env var');
-    assert.ok(TEAM_LEAD_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Should reference BOBBIT_AUTH_TOKEN env var');
-    assert.ok(TEAM_LEAD_PROMPT.includes('BOBBIT_GOAL_ID'), 'Should reference BOBBIT_GOAL_ID env var');
+  });
+
+  it('uses file-based discovery instead of env vars', () => {
+    assert.ok(TEAM_LEAD_PROMPT.includes('~/.pi/gateway-token'), 'Should reference ~/.pi/gateway-token');
+    assert.ok(TEAM_LEAD_PROMPT.includes('~/.pi/gateway-url'), 'Should reference ~/.pi/gateway-url');
     assert.ok(TEAM_LEAD_PROMPT.includes('BOBBIT_SESSION_ID'), 'Should reference BOBBIT_SESSION_ID env var');
+    assert.ok(TEAM_LEAD_PROMPT.includes('/api/sessions/$BOBBIT_SESSION_ID'), 'Should discover goal ID via session API');
+    // Should NOT have the old env var docs section
+    assert.ok(!TEAM_LEAD_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Should not reference BOBBIT_GATEWAY_URL env var');
+    assert.ok(!TEAM_LEAD_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Should not reference BOBBIT_AUTH_TOKEN env var');
+    assert.ok(!TEAM_LEAD_PROMPT.includes('BOBBIT_GOAL_ID'), 'Should not reference BOBBIT_GOAL_ID env var');
   });
 
   it('contains curl examples', () => {
@@ -53,7 +59,7 @@ describe('TEAM_LEAD_PROMPT', () => {
   });
 
   it('uses Task API instead of TASKS.md', () => {
-    assert.ok(TEAM_LEAD_PROMPT.includes('/api/goals/$BOBBIT_GOAL_ID/tasks'), 'Expected Task API endpoint');
+    assert.ok(TEAM_LEAD_PROMPT.includes('/api/goals/$GOAL_ID/tasks'), 'Expected Task API endpoint');
     assert.ok(TEAM_LEAD_PROMPT.includes('/api/tasks/'), 'Expected task operations endpoint');
     // Should not instruct to create/edit TASKS.md
     assert.ok(!TEAM_LEAD_PROMPT.includes('Create and maintain TASKS.md'), 'Should not reference creating TASKS.md');
@@ -105,11 +111,13 @@ describe('CODER_PROMPT', () => {
     assert.ok(CODER_PROMPT.includes('Coder'), 'Expected Coder role description');
   });
 
-  it('includes all four env vars', () => {
-    assert.ok(CODER_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Missing BOBBIT_GATEWAY_URL');
-    assert.ok(CODER_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Missing BOBBIT_AUTH_TOKEN');
-    assert.ok(CODER_PROMPT.includes('BOBBIT_GOAL_ID'), 'Missing BOBBIT_GOAL_ID');
-    assert.ok(CODER_PROMPT.includes('BOBBIT_SESSION_ID'), 'Missing BOBBIT_SESSION_ID');
+  it('uses file-based discovery for gateway URL and token', () => {
+    assert.ok(CODER_PROMPT.includes('~/.pi/gateway-url'), 'Should reference ~/.pi/gateway-url');
+    assert.ok(CODER_PROMPT.includes('~/.pi/gateway-token'), 'Should reference ~/.pi/gateway-token');
+    assert.ok(CODER_PROMPT.includes('BOBBIT_SESSION_ID'), 'Should reference BOBBIT_SESSION_ID');
+    assert.ok(!CODER_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Should not reference BOBBIT_GATEWAY_URL');
+    assert.ok(!CODER_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Should not reference BOBBIT_AUTH_TOKEN');
+    assert.ok(!CODER_PROMPT.includes('BOBBIT_GOAL_ID'), 'Should not reference BOBBIT_GOAL_ID');
   });
 });
 
@@ -139,11 +147,13 @@ describe('REVIEWER_PROMPT', () => {
     assert.ok(REVIEWER_PROMPT.includes('Reviewer'), 'Expected Reviewer role description');
   });
 
-  it('includes all four env vars', () => {
-    assert.ok(REVIEWER_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Missing BOBBIT_GATEWAY_URL');
-    assert.ok(REVIEWER_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Missing BOBBIT_AUTH_TOKEN');
-    assert.ok(REVIEWER_PROMPT.includes('BOBBIT_GOAL_ID'), 'Missing BOBBIT_GOAL_ID');
-    assert.ok(REVIEWER_PROMPT.includes('BOBBIT_SESSION_ID'), 'Missing BOBBIT_SESSION_ID');
+  it('uses file-based discovery for gateway URL and token', () => {
+    assert.ok(REVIEWER_PROMPT.includes('~/.pi/gateway-url'), 'Should reference ~/.pi/gateway-url');
+    assert.ok(REVIEWER_PROMPT.includes('~/.pi/gateway-token'), 'Should reference ~/.pi/gateway-token');
+    assert.ok(REVIEWER_PROMPT.includes('BOBBIT_SESSION_ID'), 'Should reference BOBBIT_SESSION_ID');
+    assert.ok(!REVIEWER_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Should not reference BOBBIT_GATEWAY_URL');
+    assert.ok(!REVIEWER_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Should not reference BOBBIT_AUTH_TOKEN');
+    assert.ok(!REVIEWER_PROMPT.includes('BOBBIT_GOAL_ID'), 'Should not reference BOBBIT_GOAL_ID');
   });
 });
 
@@ -171,11 +181,13 @@ describe('TESTER_PROMPT', () => {
     assert.ok(TESTER_PROMPT.includes('Tester'), 'Expected Tester role description');
   });
 
-  it('includes all four env vars', () => {
-    assert.ok(TESTER_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Missing BOBBIT_GATEWAY_URL');
-    assert.ok(TESTER_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Missing BOBBIT_AUTH_TOKEN');
-    assert.ok(TESTER_PROMPT.includes('BOBBIT_GOAL_ID'), 'Missing BOBBIT_GOAL_ID');
-    assert.ok(TESTER_PROMPT.includes('BOBBIT_SESSION_ID'), 'Missing BOBBIT_SESSION_ID');
+  it('uses file-based discovery for gateway URL and token', () => {
+    assert.ok(TESTER_PROMPT.includes('~/.pi/gateway-url'), 'Should reference ~/.pi/gateway-url');
+    assert.ok(TESTER_PROMPT.includes('~/.pi/gateway-token'), 'Should reference ~/.pi/gateway-token');
+    assert.ok(TESTER_PROMPT.includes('BOBBIT_SESSION_ID'), 'Should reference BOBBIT_SESSION_ID');
+    assert.ok(!TESTER_PROMPT.includes('BOBBIT_GATEWAY_URL'), 'Should not reference BOBBIT_GATEWAY_URL');
+    assert.ok(!TESTER_PROMPT.includes('BOBBIT_AUTH_TOKEN'), 'Should not reference BOBBIT_AUTH_TOKEN');
+    assert.ok(!TESTER_PROMPT.includes('BOBBIT_GOAL_ID'), 'Should not reference BOBBIT_GOAL_ID');
   });
 });
 
@@ -217,8 +229,9 @@ describe('Placeholder substitution', () => {
     const result = substitutePlaceholders(TEAM_LEAD_PROMPT);
     assert.ok(result.includes('goal/feature-123'), 'Expected GOAL_BRANCH value');
     assert.ok(result.includes('agent-abc-456'), 'Expected AGENT_ID value');
-    // GATEWAY_URL, AUTH_TOKEN, GOAL_ID, SESSION_ID are env vars — not substituted in prompt text
-    assert.ok(result.includes('$BOBBIT_GATEWAY_URL'), 'Should reference env var in curl examples');
+    // Uses $GW and $TOKEN (from file reads), not env var references
+    assert.ok(result.includes('$GW'), 'Should use $GW variable in curl examples');
+    assert.ok(result.includes('$TOKEN'), 'Should use $TOKEN variable in curl examples');
   });
 });
 
