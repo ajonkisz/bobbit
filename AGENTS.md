@@ -84,7 +84,7 @@ npm run restart-server # Signal the harness to rebuild & restart the server
 npm start              # Run built gateway (serves embedded UI)
 npm run check          # Type-check both server and web without emitting
 npm test               # Mobile header Playwright tests
-npm run test:e2e       # E2E tests (requires running gateway + vite)
+npm run test:e2e       # E2E tests (auto-starts sandboxed gateway via Playwright webServer)
 ```
 
 ### Dev server harness
@@ -294,11 +294,32 @@ See [docs/dev-workflow.md](docs/dev-workflow.md) for the full guide on running m
 
 **Unit-style tests** (`npm test`): Use Playwright with `file://` fixtures — plain HTML/JS files that test logic without a build step or dev server. See `tests/mobile-header.spec.ts` and `tests/mobile-header.html` for the pattern.
 
-**Do not start background dev servers** (Vite, gateway, etc.) from agent sessions — they make the agent unresponsive. If a test needs real Lit components rendered, run `npm run build:ui` first and reference the built bundle from a static HTML fixture via `file://`. Never use Playwright's `webServer` config or background `&` processes.
+**E2E tests with Playwright `webServer`** (`npm run test:e2e`): Agents **can and should** run E2E tests that need a live gateway. Use Playwright's `webServer` config to start a sandboxed server automatically — Playwright manages the server lifecycle internally, so the bash tool returns normally when tests finish. See `playwright-e2e.config.ts` for the pattern:
 
-**E2E tests** (`npm run test:e2e`): Require a running gateway + vite started by the user (not the agent). These test full WebSocket flows.
+```typescript
+// playwright-e2e.config.ts
+import { defineConfig } from '@playwright/test';
+export default defineConfig({
+  testDir: './tests/e2e',
+  webServer: {
+    command: 'node dist/server/cli.js --host 127.0.0.1 --port 3099 --no-tls --no-ui',
+    url: 'http://127.0.0.1:3099/api/sessions',
+    reuseExistingServer: false,
+    timeout: 30_000,
+    stdout: 'ignore',
+    stderr: 'pipe',
+  },
+  use: { baseURL: 'http://127.0.0.1:3099' },
+});
+```
 
-**Writing new tests**: Prefer `file://` fixtures with plain HTML/JS that simulate the logic under test. Extract state machine logic into testable functions where possible. Only involve real Lit components when the bug is specifically about rendering behavior.
+Run with: `npm run build:server && npx playwright test --config playwright-e2e.config.ts`
+
+The server starts on port 3099 (not 3001) to avoid conflicting with the running dev server. Build the server first since the E2E config runs the compiled JS directly.
+
+**Do NOT start background servers manually** from bash (`node server.js &`, `nohup`, etc.) — the bash tool waits for all stdout/stderr pipes to close, so backgrounded processes that inherit those FDs cause the bash tool to hang forever and crash the agent session. Always use Playwright's `webServer` config instead, which manages server FDs internally.
+
+**Writing new tests**: Prefer `file://` fixtures with plain HTML/JS that simulate the logic under test. Extract state machine logic into testable functions where possible. Only involve real Lit components when the bug is specifically about rendering behavior. For tests that need a real server (WebSocket flows, API integration), use the `webServer` pattern above.
 
 ## Common tasks
 
