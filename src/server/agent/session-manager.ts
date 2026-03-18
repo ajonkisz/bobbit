@@ -9,6 +9,7 @@ import { PromptQueue } from "./prompt-queue.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
+import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 import { CostTracker } from "./cost-tracker.js";
@@ -31,6 +32,8 @@ export interface SessionInfo {
 	goalId?: string;
 	/** True if this is a goal-creation assistant session */
 	goalAssistant?: boolean;
+	/** True if this is a role-creation assistant session */
+	roleAssistant?: boolean;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
 	/** Role in a swarm goal (e.g., 'coder', 'reviewer', 'tester', 'team-lead') */
@@ -411,6 +414,7 @@ export class SessionManager {
 			titleGenerated: ps.title !== "New session",
 			goalId: ps.goalId,
 			goalAssistant: ps.goalAssistant,
+			roleAssistant: ps.roleAssistant,
 			role: ps.role,
 			swarmGoalId: ps.swarmGoalId,
 			worktreePath: ps.worktreePath,
@@ -461,7 +465,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -480,6 +484,16 @@ export class SessionManager {
 				cwd,
 				goalSpec: GOAL_ASSISTANT_PROMPT,
 				goalTitle: "Goal Creation Assistant",
+				goalState: "active",
+			});
+			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		} else if (opts?.roleAssistant) {
+			// Role assistant sessions get a special system prompt
+			const promptPath = assembleSystemPrompt(id, {
+				baseSystemPromptPath: undefined,
+				cwd,
+				goalSpec: ROLE_ASSISTANT_PROMPT,
+				goalTitle: "Role Creation Assistant",
 				goalState: "active",
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
@@ -532,7 +546,7 @@ export class SessionManager {
 		const now = Date.now();
 		const session: SessionInfo = {
 			id,
-			title: goalAssistant ? "Goal Assistant" : "New session",
+			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : "New session",
 			cwd,
 			status: "starting",
 			createdAt: now,
@@ -542,9 +556,10 @@ export class SessionManager {
 			eventBuffer,
 			unsubscribe: () => {},
 			isCompacting: false,
-			titleGenerated: goalAssistant ? true : false,
+			titleGenerated: (goalAssistant || opts?.roleAssistant) ? true : false,
 			goalId,
 			goalAssistant,
+			roleAssistant: opts?.roleAssistant,
 			taskId: opts?.taskId,
 			promptQueue: new PromptQueue(),
 		};
@@ -778,6 +793,7 @@ export class SessionManager {
 			lastActivity: session.lastActivity,
 			goalId: session.goalId,
 			goalAssistant: session.goalAssistant,
+			roleAssistant: session.roleAssistant,
 			role: session.role,
 			swarmGoalId: session.swarmGoalId,
 			worktreePath: session.worktreePath,
@@ -819,6 +835,7 @@ export class SessionManager {
 			isCompacting: s.isCompacting,
 			goalId: s.goalId,
 			goalAssistant: s.goalAssistant,
+			roleAssistant: s.roleAssistant,
 			delegateOf: s.delegateOf,
 			role: s.role,
 			swarmGoalId: s.swarmGoalId,
