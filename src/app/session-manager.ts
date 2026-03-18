@@ -221,6 +221,20 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		const sessionForRole = state.gatewaySessions.find((s) => s.id === sessionId);
 		document.documentElement.classList.toggle("bobbit-crowned", sessionForRole?.role === "team-lead");
 		document.documentElement.classList.toggle("bobbit-bandana", sessionForRole?.role === "coder");
+
+		// Detect goal assistant state early — before async work and before
+		// the first renderApp() — so the mobile header (which depends on
+		// isGoalAssistantSession) renders correctly on the first pass.
+		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
+		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
+
+		// Render immediately so the mobile header appears without waiting
+		// for ChatPanel setup or other async work below.  This fixes a race
+		// where the first render after connect still saw `hasActiveSession()
+		// === false` because renderApp() hadn't been called since
+		// `state.remoteAgent` was set.
+		renderApp();
+
 		// Replace history entry when navigating from goal dashboard so browser-back
 		// goes to the landing page instead of back to the goal dashboard.
 		// Also replace if the hash changed during the async connect (e.g. event bubbling
@@ -238,7 +252,6 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		});
 
 		// Set cwd and branch on the AgentInterface stats bar
-		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
 		if (state.chatPanel.agentInterface && sessionData?.cwd) {
 			state.chatPanel.agentInterface.cwd = sessionData.cwd;
 			// Look up branch from the goal if this session belongs to one
@@ -256,9 +269,6 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		if (isExisting) {
 			remote.requestMessages();
 		}
-
-		// Track goal assistant state
-		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
 
 		// Clear goal proposal when connecting to a non-goal-assistant session
 		// to prevent stale proposals from showing in unrelated sessions

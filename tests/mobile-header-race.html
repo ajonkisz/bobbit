@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+
+  .app {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  #app-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    background: rgba(255,255,255,0.95);
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+    transition: transform 200ms ease;
+    transform: translateY(0);
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    min-height: 40px;
+  }
+
+  .goal-tab-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px 8px;
+    border-top: 1px solid #eee;
+  }
+
+  .goal-tab-pill {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    border: 1px solid #ccc;
+    background: transparent;
+    cursor: pointer;
+  }
+  .goal-tab-pill--active {
+    background: #333;
+    color: #fff;
+    border-color: #333;
+  }
+
+  #app-main {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .landing-page {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/**
+ * Minimal simulation of the render race from src/app/render.ts.
+ *
+ * Replicates the key logic:
+ *   - doRenderApp() branches on hasActiveSession() (connected flag)
+ *   - Mobile+connected renders #app-header (with optional goal-tab-bar)
+ *   - Mobile+not-connected renders the landing page (no header)
+ *
+ * The test can drive state transitions and verify that the header appears
+ * after the "connection" completes.
+ */
+
+// ── Simulated state (mirrors src/app/state.ts) ──────────────────────
+const state = {
+  remoteAgent: null,          // { connected: true } when "connected"
+  isGoalAssistantSession: false,
+  goalAssistantTab: "chat",
+  connectionStatus: "disconnected",
+  chatPanel: null,            // non-null when chat is set up
+};
+
+function hasActiveSession() {
+  return state.remoteAgent !== null && state.remoteAgent.connected;
+}
+
+function isDesktop() {
+  return window.innerWidth >= 768;
+}
+
+// ── Render function (simplified doRenderApp) ─────────────────────────
+let renderCount = 0;
+
+function doRenderApp() {
+  renderCount++;
+  const app = document.getElementById("app");
+  if (!app) return;
+
+  const connected = hasActiveSession();
+
+  if (isDesktop()) {
+    // Desktop — not tested here
+    app.innerHTML = `<div class="app"><div>Desktop layout (connected=${connected})</div></div>`;
+    return;
+  }
+
+  if (connected) {
+    // Mobile + connected: render header with optional goal tab bar
+    const goalTabBar = state.isGoalAssistantSession
+      ? `<div class="goal-tab-bar">
+           <button class="goal-tab-pill ${state.goalAssistantTab === 'chat' ? 'goal-tab-pill--active' : ''}">Chat</button>
+           <button class="goal-tab-pill ${state.goalAssistantTab === 'preview' ? 'goal-tab-pill--active' : ''}">Preview</button>
+         </div>`
+      : "";
+
+    app.innerHTML = `
+      <div class="app" data-mobile-header>
+        <div id="app-header" class="header-visible"
+             style="transform: translateY(0);">
+          <div class="header-row">
+            <span>← Back</span>
+            <span>Session Title</span>
+          </div>
+          ${goalTabBar}
+        </div>
+        <div id="app-main">
+          <div style="padding: 60px 16px 16px;">Chat content here</div>
+        </div>
+      </div>
+    `;
+  } else {
+    // Mobile + not connected: landing page (no header)
+    app.innerHTML = `
+      <div class="app">
+        <div class="header-row" style="border-bottom: 1px solid #ccc;">
+          <span>Bobbit</span>
+        </div>
+        <div class="landing-page">
+          <span>Select or create a session</span>
+        </div>
+      </div>
+    `;
+  }
+}
+
+// ── Simulate connectToSession flow ───────────────────────────────────
+// Mirrors the FIXED flow in session-manager.ts:
+//   1. renderApp() while disconnected (shows landing)
+//   2. await remote.connect() resolves
+//   3. Set state.remoteAgent and isGoalAssistantSession
+//   4. renderApp() immediately (shows header)
+//   5. Async ChatPanel setup...
+//   6. finally: renderApp()
+
+async function simulateConnect(opts) {
+  const { isGoalAssistant, connectDelayMs } = opts || {};
+
+  // Step 1: initial render while disconnected
+  state.remoteAgent = null;
+  state.isGoalAssistantSession = false;
+  doRenderApp();
+
+  // Step 2: simulate WebSocket connect delay
+  await new Promise(r => setTimeout(r, connectDelayMs || 10));
+
+  // Step 3: connection established — set state
+  state.remoteAgent = { connected: true };
+  state.isGoalAssistantSession = !!isGoalAssistant;
+  state.connectionStatus = "connected";
+
+  // Step 4: immediate render (the fix)
+  doRenderApp();
+
+  // Step 5: simulate async ChatPanel setup
+  await new Promise(r => setTimeout(r, 5));
+
+  // Step 6: finally block render
+  doRenderApp();
+}
+
+// ── Simulate the OLD (broken) flow for comparison ────────────────────
+async function simulateConnectBroken(opts) {
+  const { isGoalAssistant, connectDelayMs } = opts || {};
+
+  // Step 1: initial render while disconnected
+  state.remoteAgent = null;
+  state.isGoalAssistantSession = false;
+  doRenderApp();
+
+  // Step 2: simulate WebSocket connect delay
+  await new Promise(r => setTimeout(r, connectDelayMs || 10));
+
+  // BUG: set remoteAgent but DON'T render yet, and set isGoalAssistant late
+  state.remoteAgent = { connected: true };
+  state.connectionStatus = "connected";
+
+  // Async ChatPanel setup (isGoalAssistantSession not yet set)
+  await new Promise(r => setTimeout(r, 5));
+
+  // isGoalAssistantSession set late
+  state.isGoalAssistantSession = !!isGoalAssistant;
+
+  // finally: render
+  doRenderApp();
+}
+
+// ── Expose for tests ─────────────────────────────────────────────────
+window.__state = state;
+window.__hasActiveSession = hasActiveSession;
+window.__doRenderApp = doRenderApp;
+window.__simulateConnect = simulateConnect;
+window.__simulateConnectBroken = simulateConnectBroken;
+window.__getRenderCount = () => renderCount;
+window.__resetRenderCount = () => { renderCount = 0; };
+
+// Initial render
+doRenderApp();
+</script>
+</body>
+</html>

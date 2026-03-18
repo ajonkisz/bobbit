@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
 	testDir: './tests/e2e',
+	testIgnore: ['**/mobile-header-race-e2e*'],
 	timeout: 30_000,
 	webServer: {
 		command: 'node dist/server/cli.js --host 127.0.0.1 --port 3099 --no-tls --no-ui',

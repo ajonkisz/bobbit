@@ -17,6 +17,7 @@
     "check": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "playwright test tests/mobile-header.spec.ts --config tests/playwright.config.ts",
     "test:e2e": "npm run build:server && npx playwright test --config playwright-e2e.config.ts",
+    "test:e2e:ui": "npm run build && npx playwright test --config tests/playwright-e2e-ui.config.ts",
     "clean": "shx rm -rf dist"
   },
   "dependencies": {
