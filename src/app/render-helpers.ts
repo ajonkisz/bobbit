@@ -274,13 +274,7 @@ export function renderGoalGroup(goal: Goal) {
 		</div>
 	`;
 
-	const swarmControls = goalSessions.length > 0 && isSwarmGoal ? html`
-		<div class="pl-3 py-0.5 text-[10px] text-muted-foreground">
-			${hasActiveSwarm
-				? html`<button class="text-destructive/80 ${mobile ? "" : "hover:underline"}" @click=${handleEndSwarm} ?disabled=${isLoading}>${isLoading ? "stopping\u2026" : "end swarm"}</button>`
-				: html`<button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${handleStartSwarm} ?disabled=${isLoading}>${isLoading ? "starting\u2026" : "start swarm"}</button>`}
-		</div>
-	` : "";
+	const swarmControls = "";
 
 	// Separate team lead from swarm children for nested rendering
 	const teamLead = isSwarmGoal ? goalSessions.find(s => s.role === "team-lead") : null;

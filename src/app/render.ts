@@ -81,7 +81,7 @@ function renderMobileLanding() {
 									${i > 0 ? html`<div class="border-t border-border/30 my-1 mx-2"></div>` : ""}
 									${renderGoalGroup(goal)}
 								`)}
-								${sortedGoals.length > 0 && ungroupedSessions.length > 0 ? html`
+								${sortedGoals.length > 0 ? html`
 									<div class="border-t border-border/30 my-1 mx-2"></div>
 									<div class="flex flex-col gap-0.5">
 										<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer active:bg-secondary/50 transition-colors"
@@ -98,7 +98,7 @@ function renderMobileLanding() {
 										</div>
 										${isUngroupedExpanded ? ungroupedSessions.map(renderSessionRow) : ""}
 									</div>
-								` : sortedGoals.length === 0 && ungroupedSessions.length > 0 ? html`
+								` : ungroupedSessions.length > 0 ? html`
 									<div class="flex flex-col gap-0.5">
 										<div class="flex items-center gap-1.5 px-2 py-1.5">
 											<span class="flex-1 text-xs text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:15px;">Sessions</span>

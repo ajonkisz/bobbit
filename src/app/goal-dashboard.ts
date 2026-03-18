@@ -734,22 +734,7 @@ function renderNavBar(goal: Goal): TemplateResult {
 					onClick: () => deleteGoal(goal.id),
 					children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Trash2, "sm")} Delete</span>`,
 				})}
-				${isSwarmGoal ? (swarmActive
-					? Button({
-						variant: "ghost",
-						size: "sm",
-						disabled: swarmStopping,
-						onClick: () => handleEndSwarm(goal.id),
-						children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Square, "sm")} ${swarmStopping ? "Stopping\u2026" : "End Swarm"}</span>`,
-					})
-					: Button({
-						variant: "default",
-						size: "sm",
-						disabled: swarmStarting,
-						onClick: () => handleStartSwarm(goal.id),
-						children: html`<span class="inline-flex items-center gap-1">${icon(Play, "sm")} ${swarmStarting ? "Starting\u2026" : "Start Swarm"}</span>`,
-					})
-				) : nothing}
+	
 				${Button({
 					variant: "default",
 					size: "sm",
