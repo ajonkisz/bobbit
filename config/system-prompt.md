@@ -170,6 +170,20 @@ If the session is associated with a git branch (e.g. a goal branch), work on tha
 
 When in doubt, run `git rev-parse --abbrev-ref HEAD` to confirm you are on the expected branch before making commits.
 
+## Main worktree and dev server
+
+The dev server (Vite + gateway) runs from the **main worktree** at `C:\Users\jsubr\w\bobbit`, which is checked out on `master`. Goal and agent sessions work in separate **git worktrees** under `C:\Users\jsubr\w\bobbit-wt-goal\`.
+
+**Pushing to remote `master` does NOT update the running dev server.** After merging changes to remote master, you must pull them into the main worktree for the dev server to pick them up:
+
+```bash
+cd /c/Users/jsubr/w/bobbit && git pull origin master
+```
+
+UI changes (`src/ui/`, `src/app/`) hot-reload via Vite after the pull. Server changes (`src/server/`) additionally require `npm run restart-server` from the main worktree.
+
+You cannot `git checkout master` from a goal worktree (it's already checked out in the main worktree). Instead, push to remote and pull from the main worktree as shown above.
+
 # Output style
 
 IMPORTANT: Go straight to the point. Try the simplest approach first without going in circles. Do not overdo it. Be extra concise.
