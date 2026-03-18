@@ -129,6 +129,7 @@ export function handleWebSocketConnection(
 
 			send(ws, { type: "session_status", status: session.status });
 			send(ws, { type: "session_title", sessionId, title: session.title });
+			send(ws, { type: "queue_update", sessionId, queue: session.promptQueue.toArray() });
 			return;
 		}
 
@@ -143,14 +144,29 @@ export function handleWebSocketConnection(
 			switch (msg.type) {
 				case "prompt":
 					console.log(`[ws-handler] Prompt received: text="${msg.text?.substring(0, 50)}...", images=${msg.images?.length ?? 0}`);
-					sessionManager.tryGenerateTitleFromPrompt(sessionId, msg.text);
-					await session.rpcClient.prompt(msg.text, msg.images);
+					await sessionManager.enqueuePrompt(sessionId, msg.text, {
+						images: msg.images,
+						attachments: msg.attachments,
+					});
 					break;
 				case "steer":
-					await session.rpcClient.steer(msg.text);
+					// Live steer: if agent is streaming, send directly via RPC
+					// (real-time interrupt, bypasses queue intentionally).
+					// Otherwise enqueue as a steered message and drain if idle.
+					if (session.status === "streaming") {
+						await session.rpcClient.steer(msg.text);
+					} else {
+						await sessionManager.enqueuePrompt(sessionId, msg.text, { isSteered: true });
+					}
 					break;
 				case "follow_up":
-					await session.rpcClient.followUp(msg.text);
+					await sessionManager.enqueuePrompt(sessionId, msg.text, { isFollowUp: true });
+					break;
+				case "steer_queued":
+					sessionManager.steerQueued(sessionId, msg.messageId);
+					break;
+				case "remove_queued":
+					sessionManager.removeQueued(sessionId, msg.messageId);
 					break;
 				case "abort":
 					sessionManager.forceAbort(sessionId).catch((err) => {

@@ -7,6 +7,7 @@ import {
 	SettingsStore,
 	setAppStorage,
 } from "../ui/index.js";
+import { CommandHistoryStore } from "../ui/storage/stores/command-history-store.js";
 import { GoalDraftStore } from "../ui/storage/stores/goal-draft-store.js";
 
 const settings = new SettingsStore();
@@ -14,10 +15,11 @@ const providerKeys = new ProviderKeysStore();
 const sessions = new SessionsStore();
 const customProviders = new CustomProvidersStore();
 const goalDrafts = new GoalDraftStore();
+const commandHistory = new CommandHistoryStore();
 
 const backend = new IndexedDBStorageBackend({
 	dbName: "pi-gateway-ui",
-	version: 2,
+	version: 3,
 	stores: [
 		settings.getConfig(),
 		SessionsStore.getMetadataConfig(),
@@ -25,6 +27,7 @@ const backend = new IndexedDBStorageBackend({
 		customProviders.getConfig(),
 		sessions.getConfig(),
 		goalDrafts.getConfig(),
+		commandHistory.getConfig(),
 	],
 });
 
@@ -33,6 +36,7 @@ providerKeys.setBackend(backend);
 customProviders.setBackend(backend);
 sessions.setBackend(backend);
 goalDrafts.setBackend(backend);
+commandHistory.setBackend(backend);
 
-export const storage = new AppStorage(settings, providerKeys, sessions, customProviders, goalDrafts, backend);
+export const storage = new AppStorage(settings, providerKeys, sessions, customProviders, goalDrafts, commandHistory, backend);
 setAppStorage(storage);

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import type { QueuedMessage } from "../ws/protocol.js";
 
 /** Persisted metadata for a single gateway session */
 export interface PersistedSession {
@@ -27,6 +28,8 @@ export interface PersistedSession {
 	goalAssistant?: boolean;
 	/** Task ID this session is working on */
 	taskId?: string;
+	/** Persisted prompt queue */
+	messageQueue?: QueuedMessage[];
 }
 
 const STORE_DIR = path.join(os.homedir(), ".pi");
@@ -91,7 +94,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "swarmGoalId" | "worktreePath" | "goalAssistant" | "taskId">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "swarmGoalId" | "worktreePath" | "goalAssistant" | "taskId" | "messageQueue">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);

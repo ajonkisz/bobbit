@@ -7,7 +7,6 @@ import { customElement, property, query } from "lit/decorators.js";
 import { Brain, Sparkles } from "lucide";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
 import type { MessageEditor } from "./MessageEditor.js";
-import type { QueuedMessage } from "./MessageEditor.js";
 import "./MessageEditor.js";
 import "./MessageList.js";
 import "./GitStatusWidget.js";
@@ -70,45 +69,8 @@ export class AgentInterface extends LitElement {
 	private _scrollContainer?: HTMLElement;
 	private _resizeObserver?: ResizeObserver;
 	private _unsubscribeSession?: () => void;
-	private _queuedMessages: QueuedMessage[] = [];
-	private _queueIdCounter = 0;
-
-	private _queueStorageKey(): string | undefined {
-		const id = this.session?.sessionId;
-		return id ? `bobbit_queue_${id}` : undefined;
-	}
-
-	private _saveQueuedMessages() {
-		const key = this._queueStorageKey();
-		if (!key) return;
-		try {
-			const serializable = this._queuedMessages.map(({ id, text, steered }) => ({ id, text, steered }));
-			if (serializable.length > 0) {
-				sessionStorage.setItem(key, JSON.stringify(serializable));
-			} else {
-				sessionStorage.removeItem(key);
-			}
-		} catch { /* quota exceeded — ignore */ }
-	}
-
-	private _restoreQueuedMessages() {
-		const key = this._queueStorageKey();
-		if (!key) return;
-		try {
-			const raw = sessionStorage.getItem(key);
-			if (raw) {
-				const restored: QueuedMessage[] = JSON.parse(raw);
-				if (Array.isArray(restored) && restored.length > 0) {
-					this._queuedMessages = restored;
-					this._queueIdCounter = Math.max(this._queueIdCounter, ...restored.map(m => {
-						const n = parseInt(m.id.replace("q_", ""), 10);
-						return isNaN(n) ? 0 : n;
-					}));
-					this.requestUpdate();
-				}
-			}
-		} catch { /* parse error — ignore */ }
-	}
+	// Server-authoritative queue state, updated via onQueueUpdate callback
+	private _serverQueue: Array<{ id: string; text: string; isSteered: boolean; createdAt: number; images?: any[]; attachments?: any[] }> = [];
 
 	public setInput(text: string, attachments?: Attachment[]) {
 		const update = () => {
@@ -232,8 +194,25 @@ export class AgentInterface extends LitElement {
 			};
 		}
 
-		// Restore any queued messages from a previous page load
-		this._restoreQueuedMessages();
+		// One-time cleanup: remove old client-side queue keys from sessionStorage
+		try {
+			for (let i = sessionStorage.length - 1; i >= 0; i--) {
+				const key = sessionStorage.key(i);
+				if (key?.startsWith("bobbit_queue_")) sessionStorage.removeItem(key);
+			}
+		} catch { /* ignore */ }
+
+		// Listen for server-authoritative queue updates
+		if ((this.session as any).onQueueUpdate !== undefined || 'getQueue' in this.session) {
+			(this.session as any).onQueueUpdate = (queue: any[]) => {
+				this._serverQueue = queue;
+				this.requestUpdate();
+			};
+			// Initialize from current queue state
+			if (typeof (this.session as any).getQueue === 'function') {
+				this._serverQueue = (this.session as any).getQueue() || [];
+			}
+		}
 
 		// If the session is already compacting (e.g. page refresh mid-compaction),
 		// start the animation once the DOM is ready — we missed the compaction_start event.
@@ -283,11 +262,6 @@ export class AgentInterface extends LitElement {
 					break;
 				case "turn_start":
 				case "message_start":
-					// Steered messages are kept visible until agent_end
-					// (cleaned up by drainQueue). No mid-turn cleanup here —
-					// message_start fires too early (before the steer text
-					// appears in chat) and turn_start is never emitted by
-					// RemoteAgent.
 					this.requestUpdate();
 					break;
 				case "message_end":
@@ -311,8 +285,7 @@ export class AgentInterface extends LitElement {
 						this._streamingContainer.isStreaming = false;
 						this._streamingContainer.setMessage(null, true);
 					}
-					// Drain queued messages — send the first as a prompt, rest as follow-ups
-					this.drainQueue();
+					// Queue draining is handled server-side now
 					this.requestUpdate();
 					break;
 				case "message_update":
@@ -432,100 +405,21 @@ export class AgentInterface extends LitElement {
 		this._stickToBottom = true;
 		this._scrollToBottom();
 
-		if (isStreaming) {
-			// Agent is busy — add to local queue, will be sent on agent_end
-			this._queuedMessages = [...this._queuedMessages, {
-				id: `q_${++this._queueIdCounter}`,
-				text: input,
-				attachments: attachments?.length ? attachments : undefined,
-			}];
-			this._saveQueuedMessages();
-			this.requestUpdate();
-		} else {
-			// Agent is idle — send as regular prompt
-			if (attachments && attachments.length > 0) {
-				const message: UserMessageWithAttachments = {
-					role: "user-with-attachments",
-					content: input,
-					attachments,
-					timestamp: Date.now(),
-				};
-				await session.prompt(message);
-			} else {
-				await session.prompt(input);
-			}
-		}
-	}
-
-	/** Send queued messages to the agent now that it's idle */
-	private async drainQueue() {
-		if (this._queuedMessages.length === 0 || !this.session) return;
-		// Filter out steered messages — they were already sent
-		const queue = this._queuedMessages.filter((m) => !m.steered);
-		this._queuedMessages = [];
-		this._saveQueuedMessages();
-		this.requestUpdate();
-
-		if (queue.length === 0) return;
-
-		// Send the first message as a prompt (starts a new turn)
-		const first = queue[0];
-		if (first.attachments?.length) {
-			const msg: UserMessageWithAttachments = {
+		// Always send to the server — it handles queuing when the agent is busy
+		if (attachments && attachments.length > 0) {
+			const message: UserMessageWithAttachments = {
 				role: "user-with-attachments",
-				content: first.text,
-				attachments: first.attachments,
+				content: input,
+				attachments,
 				timestamp: Date.now(),
 			};
-			await this.session.prompt(msg);
+			await session.prompt(message);
 		} else {
-			await this.session.prompt(first.text);
-		}
-
-		// Queue the rest as follow-ups
-		for (let i = 1; i < queue.length; i++) {
-			const q = queue[i];
-			if (q.attachments?.length) {
-				this.session.followUp({
-					role: "user-with-attachments",
-					content: q.text,
-					attachments: q.attachments,
-					timestamp: Date.now(),
-				} as any);
-			} else {
-				this.session.followUp({ role: "user", content: q.text, timestamp: Date.now() });
-			}
+			await session.prompt(input);
 		}
 	}
 
-	/** Promote a queued message to a steer — interrupts the current turn */
-	private steerMessage(msg: QueuedMessage) {
-		if (!this.session) return;
-		// Mark as steered — stays visible with "Sent" indicator until agent_end
-		this._queuedMessages = this._queuedMessages.map((m) =>
-			m.id === msg.id ? { ...m, steered: true } : m,
-		);
-		this._saveQueuedMessages();
-		this.requestUpdate();
 
-		if (msg.attachments?.length) {
-			this.session.steer({
-				role: "user-with-attachments",
-				content: msg.text,
-				attachments: msg.attachments,
-				timestamp: Date.now(),
-			} as any);
-		} else {
-			this.session.steer({ role: "user", content: msg.text, timestamp: Date.now() });
-		}
-	}
-
-	/** Remove a message from the queue without sending */
-	private removeQueuedMessage(id: string) {
-		this._queuedMessages = this._queuedMessages.filter((m) => m.id !== id);
-		this._saveQueuedMessages();
-		this.requestUpdate();
-	}
 
 	private renderMessages() {
 		if (!this.session)
@@ -752,19 +646,28 @@ export class AgentInterface extends LitElement {
 						</div>
 						` : ''}
 						<message-editor
+							.sessionId=${this.session?.sessionId}
 							.isStreaming=${state.isStreaming}
 							.currentModel=${state.model}
 							.thinkingLevel=${state.thinkingLevel}
 							.showAttachmentButton=${this.enableAttachments}
 							.showModelSelector=${this.enableModelSelector}
 							.showThinkingSelector=${this.enableThinkingSelector}
-							.queuedMessages=${this._queuedMessages}
+							.queuedMessages=${this._serverQueue}
 							.onSend=${(input: string, attachments: Attachment[]) => {
 								this.sendMessage(input, attachments);
 							}}
 							.onAbort=${() => session.abort()}
-							.onSteer=${(msg: QueuedMessage) => this.steerMessage(msg)}
-							.onRemoveQueued=${(id: string) => this.removeQueuedMessage(id)}
+							.onSteer=${(msg: any) => {
+								if (typeof (session as any).steerQueued === 'function') {
+									(session as any).steerQueued(msg.id);
+								}
+							}}
+							.onRemoveQueued=${(id: string) => {
+								if (typeof (session as any).removeQueued === 'function') {
+									(session as any).removeQueued(id);
+								}
+							}}
 							.onModelSelect=${() => {
 								ModelSelector.open(state.model, (model) => session.setModel(model));
 							}}

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Command History Test Fixture</title>
+</head>
+<body>
+<textarea id="editor" rows="4" cols="40"></textarea>
+<div id="state-display"></div>
+
+<script>
+// Replicates MessageEditor command history state machine (in-memory, no IndexedDB)
+let history = [];
+let historyIndex = -1; // -1 = not browsing
+let savedDraft = '';
+
+function setHistory(entries) {
+  history = entries.slice();
+  historyIndex = -1;
+  savedDraft = '';
+}
+
+function getState() {
+  return {
+    historyIndex: historyIndex,
+    savedDraft: savedDraft,
+    textareaValue: document.getElementById('editor').value
+  };
+}
+
+function isCursorOnFirstLine() {
+  const ta = document.getElementById('editor');
+  const pos = ta.selectionStart;
+  return ta.value.lastIndexOf('\n', pos - 1) === -1;
+}
+
+document.getElementById('editor').addEventListener('keydown', function(e) {
+  const ta = document.getElementById('editor');
+
+  if (e.key === 'ArrowUp' && history.length > 0 && isCursorOnFirstLine()) {
+    e.preventDefault();
+    if (historyIndex === -1) {
+      // First press — save current text as draft, show newest entry
+      savedDraft = ta.value;
+      historyIndex = history.length - 1;
+    } else if (historyIndex > 0) {
+      historyIndex--;
+    } else {
+      // Already at oldest — stay
+      return;
+    }
+    ta.value = history[historyIndex];
+    ta.setSelectionRange(0, 0);
+  } else if (e.key === 'ArrowDown' && historyIndex !== -1) {
+    e.preventDefault();
+    if (historyIndex < history.length - 1) {
+      historyIndex++;
+      ta.value = history[historyIndex];
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    } else {
+      // Past the end — restore saved draft
+      historyIndex = -1;
+      ta.value = savedDraft;
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  }
+});
+
+// Expose for Playwright
+window.setHistory = setHistory;
+window.getState = getState;
+</script>
+</body>
+</html>

@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import type { WebSocket } from "ws";
-import type { ServerMessage } from "../ws/protocol.js";
+import type { ServerMessage, QueuedMessage } from "../ws/protocol.js";
 import { EventBuffer } from "./event-buffer.js";
 import { GoalManager } from "./goal-manager.js";
 import { TaskManager } from "./task-manager.js";
+import { PromptQueue } from "./prompt-queue.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
@@ -40,6 +41,8 @@ export interface SessionInfo {
 	worktreePath?: string;
 	/** Task ID this session is working on */
 	taskId?: string;
+	/** Server-side prompt queue */
+	promptQueue: PromptQueue;
 }
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
@@ -76,6 +79,112 @@ export class SessionManager {
 
 	getCostTracker(): CostTracker {
 		return this.costTracker;
+	}
+
+	// ── Prompt queue helpers ──────────────────────────────────────────
+
+	/** Broadcast queue state to all clients and persist. */
+	broadcastQueueUpdate(sessionId: string): void {
+		const session = this.sessions.get(sessionId);
+		if (session) this.broadcastQueue(session);
+	}
+
+	private broadcastQueue(session: SessionInfo): void {
+		broadcast(session.clients, {
+			type: "queue_update",
+			sessionId: session.id,
+			queue: session.promptQueue.toArray(),
+		});
+		this.store.update(session.id, { messageQueue: session.promptQueue.toArray() });
+	}
+
+	/**
+	 * Enqueue a prompt (or follow_up). If the agent is idle and queue was empty,
+	 * dispatch immediately. Otherwise add to queue and broadcast.
+	 * If the agent is idle but queue has items, enqueue and drain.
+	 */
+	async enqueuePrompt(sessionId: string, text: string, opts?: {
+		images?: Array<{ type: "image"; data: string; mimeType: string }>;
+		attachments?: unknown[];
+		isFollowUp?: boolean;
+		isSteered?: boolean;
+	}): Promise<void> {
+		const session = this.sessions.get(sessionId);
+		if (!session) return;
+
+		// If agent is idle and queue is empty, dispatch directly
+		if (session.status === "idle" && session.promptQueue.isEmpty) {
+			this.tryGenerateTitleFromPrompt(sessionId, text);
+			if (opts?.isFollowUp) {
+				await session.rpcClient.followUp(text);
+			} else {
+				await session.rpcClient.prompt(text, opts?.images);
+			}
+			return;
+		}
+
+		// Agent is busy or queue has items — enqueue
+		session.promptQueue.enqueue(text, {
+			images: opts?.images,
+			attachments: opts?.attachments,
+			isSteered: opts?.isSteered,
+		});
+		this.broadcastQueue(session);
+
+		// If agent is idle, start draining the queue (bug fix: idle + non-empty queue)
+		if (session.status === "idle") {
+			this.drainQueue(session);
+		}
+	}
+
+	/** Promote a queued message to steered and reorder. */
+	steerQueued(sessionId: string, messageId: string): boolean {
+		const session = this.sessions.get(sessionId);
+		if (!session) return false;
+		const ok = session.promptQueue.steer(messageId);
+		if (ok) this.broadcastQueue(session);
+		return ok;
+	}
+
+	/** Remove a queued message. */
+	removeQueued(sessionId: string, messageId: string): boolean {
+		const session = this.sessions.get(sessionId);
+		if (!session) return false;
+		const ok = session.promptQueue.remove(messageId);
+		if (ok) this.broadcastQueue(session);
+		return ok;
+	}
+
+	/**
+	 * Called when the agent becomes idle (agent_end) or when a new message is
+	 * enqueued while idle. Dequeue and dispatch the next message if any exist.
+	 *
+	 * Always dispatches via `prompt` RPC (not `steer`) because the agent is
+	 * idle at this point — `steer` is only meaningful mid-turn.
+	 *
+	 * Sets status to "streaming" optimistically to prevent a race where another
+	 * enqueuePrompt call sees idle+empty and dispatches a second concurrent prompt.
+	 */
+	private drainQueue(session: SessionInfo): void {
+		if (session.promptQueue.isEmpty) return;
+
+		const next = session.promptQueue.dequeue()!;
+		this.broadcastQueue(session);
+
+		// Title generation for the first real prompt
+		this.tryGenerateTitleFromPrompt(session.id, next.text);
+
+		// Optimistic status update to prevent double-dispatch race
+		session.status = "streaming";
+		broadcast(session.clients, { type: "session_status", status: "streaming" });
+
+		// Always dispatch as prompt — agent is idle, steer is only for mid-turn
+		session.rpcClient.prompt(next.text, next.images).catch((err: any) => {
+			console.error(`[session-manager] Failed to dispatch queued prompt for ${session.id}:`, err);
+			// Revert optimistic status on failure
+			session.status = "idle";
+			broadcast(session.clients, { type: "session_status", status: "idle" });
+		});
 	}
 
 	/**
@@ -165,6 +274,7 @@ export class SessionManager {
 			titleGenerated: true,
 			goalId: ps.goalId,
 			delegateOf: ps.delegateOf,
+			promptQueue: new PromptQueue(ps.messageQueue),
 		});
 	}
 
@@ -217,6 +327,7 @@ export class SessionManager {
 			swarmGoalId: ps.swarmGoalId,
 			worktreePath: ps.worktreePath,
 			taskId: ps.taskId,
+			promptQueue: new PromptQueue(ps.messageQueue),
 		};
 
 		const unsub = rpcClient.onEvent((event: any) => {
@@ -231,6 +342,7 @@ export class SessionManager {
 				session.status = "idle";
 				this.store.update(ps.id, { wasStreaming: false });
 				broadcast(session.clients, { type: "session_status", status: "idle" });
+				this.drainQueue(session);
 			}
 
 			eventBuffer.push(event);
@@ -354,6 +466,7 @@ export class SessionManager {
 			goalId,
 			goalAssistant,
 			taskId: opts?.taskId,
+			promptQueue: new PromptQueue(),
 		};
 
 		// Auto-assign task to this session
@@ -378,6 +491,7 @@ export class SessionManager {
 				session.status = "idle";
 				this.store.update(id, { wasStreaming: false });
 				broadcast(session.clients, { type: "session_status", status: "idle" });
+				this.drainQueue(session);
 			} else if (event.type === "auto_compaction_start") {
 				session.isCompacting = true;
 			} else if (event.type === "auto_compaction_end") {
@@ -463,6 +577,7 @@ export class SessionManager {
 			isCompacting: false,
 			titleGenerated: true,
 			delegateOf: parentSessionId,
+			promptQueue: new PromptQueue(),
 		};
 
 		const unsub = rpcClient.onEvent((event: any) => {
@@ -477,6 +592,7 @@ export class SessionManager {
 				session.status = "idle";
 				this.store.update(id, { wasStreaming: false });
 				broadcast(session.clients, { type: "session_status", status: "idle" });
+				this.drainQueue(session);
 			} else if (event.type === "auto_compaction_start") {
 				session.isCompacting = true;
 			} else if (event.type === "auto_compaction_end") {
@@ -897,6 +1013,7 @@ export class SessionManager {
 					session.status = "idle";
 					this.store.update(id, { wasStreaming: false });
 					broadcast(session.clients, { type: "session_status", status: "idle" });
+					this.drainQueue(session);
 				}
 
 				session.eventBuffer.push(event);

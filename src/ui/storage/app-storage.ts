@@ -1,3 +1,4 @@
+import type { CommandHistoryStore } from "./stores/command-history-store.js";
 import type { CustomProvidersStore } from "./stores/custom-providers-store.js";
 import type { GoalDraftStore } from "./stores/goal-draft-store.js";
 import type { ProviderKeysStore } from "./stores/provider-keys-store.js";
@@ -16,6 +17,7 @@ export class AppStorage {
 	readonly sessions: SessionsStore;
 	readonly customProviders: CustomProvidersStore;
 	readonly goalDrafts: GoalDraftStore;
+	readonly commandHistory: CommandHistoryStore;
 
 	constructor(
 		settings: SettingsStore,
@@ -23,6 +25,7 @@ export class AppStorage {
 		sessions: SessionsStore,
 		customProviders: CustomProvidersStore,
 		goalDrafts: GoalDraftStore,
+		commandHistory: CommandHistoryStore,
 		backend: StorageBackend,
 	) {
 		this.settings = settings;
@@ -30,6 +33,7 @@ export class AppStorage {
 		this.sessions = sessions;
 		this.customProviders = customProviders;
 		this.goalDrafts = goalDrafts;
+		this.commandHistory = commandHistory;
 		this.backend = backend;
 	}
 

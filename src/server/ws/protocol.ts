@@ -1,9 +1,21 @@
+/** A message waiting in the server-side prompt queue */
+export interface QueuedMessage {
+	id: string;
+	text: string;
+	images?: Array<{ type: "image"; data: string; mimeType: string }>;
+	attachments?: unknown[];
+	isSteered: boolean;
+	createdAt: number;
+}
+
 /** Client → Server messages over WebSocket */
 export type ClientMessage =
 	| { type: "auth"; token: string }
 	| { type: "prompt"; text: string; images?: Array<{ type: "image"; data: string; mimeType: string }>; attachments?: unknown[] }
 	| { type: "steer"; text: string }
 	| { type: "follow_up"; text: string }
+	| { type: "steer_queued"; messageId: string }
+	| { type: "remove_queued"; messageId: string }
 	| { type: "abort" }
 	| { type: "set_model"; provider: string; modelId: string }
 	| { type: "compact" }
@@ -50,5 +62,6 @@ export type ServerMessage =
 	| { type: "workflow_completed"; data: unknown }
 	| { type: "workflow_report"; reportUrl: string }
 	| { type: "cost_update"; sessionId: string; goalId?: string; taskId?: string; cost: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; totalCost: number } }
+	| { type: "queue_update"; sessionId: string; queue: QueuedMessage[] }
 	| { type: "task_changed"; task: unknown }
 	| { type: "tasks_list"; tasks: unknown[] };

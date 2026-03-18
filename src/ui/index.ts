@@ -79,6 +79,8 @@ export type {
 	CustomProviderType,
 } from "./storage/stores/custom-providers-store.js";
 export { CustomProvidersStore } from "./storage/stores/custom-providers-store.js";
+export { CommandHistoryStore } from "./storage/stores/command-history-store.js";
+export type { CommandHistoryEntry } from "./storage/stores/command-history-store.js";
 export { GoalDraftStore } from "./storage/stores/goal-draft-store.js";
 export type { GoalDraft } from "./storage/stores/goal-draft-store.js";
 export { ProviderKeysStore } from "./storage/stores/provider-keys-store.js";

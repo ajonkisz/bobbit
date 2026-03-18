@@ -7,6 +7,16 @@ import { getModel } from "@mariozechner/pi-ai";
  */
 export type ConnectionStatus = "connected" | "reconnecting" | "disconnected";
 
+/** A message waiting in the server-side prompt queue (mirrors server QueuedMessage) */
+export interface QueuedMessage {
+	id: string;
+	text: string;
+	images?: Array<{ type: "image"; data: string; mimeType: string }>;
+	attachments?: unknown[];
+	isSteered: boolean;
+	createdAt: number;
+}
+
 export class RemoteAgent {
 	private ws: WebSocket | null = null;
 	private subscribers: Array<(event: any) => void> = [];
@@ -14,6 +24,8 @@ export class RemoteAgent {
 	private _gatewayUrl = "";
 	private _authToken = "";
 	private _sessionId = "";
+	// Server-authoritative prompt queue
+	private _serverQueue: QueuedMessage[] = [];
 	// Assistant message deferred until tool execution completes to avoid
 	// showing it simultaneously in both message-list and streaming-container.
 	private _deferredAssistantMessage: any = null;
@@ -62,6 +74,8 @@ export class RemoteAgent {
 	onGoalProposal?: (proposal: { title: string; spec: string; cwd?: string }) => void;
 	/** Callback fired when workflow tool execution updates (for real-time progress). */
 	onWorkflowUpdate?: () => void;
+	/** Callback fired when the server-side prompt queue changes. */
+	onQueueUpdate?: (queue: QueuedMessage[]) => void;
 	private _title = "New session";
 
 	constructor() {
@@ -515,7 +529,22 @@ export class RemoteAgent {
 	clearFollowUpQueue(): void {}
 	clearAllQueues(): void {}
 	hasQueuedMessages(): boolean {
-		return false;
+		return this._serverQueue.length > 0;
+	}
+
+	/** Get the current server-authoritative prompt queue. */
+	getQueue(): QueuedMessage[] {
+		return this._serverQueue;
+	}
+
+	/** Ask the server to promote a queued message to a steer. */
+	steerQueued(messageId: string): void {
+		this.send({ type: "steer_queued", messageId });
+	}
+
+	/** Ask the server to remove a message from the queue. */
+	removeQueued(messageId: string): void {
+		this.send({ type: "remove_queued", messageId });
 	}
 
 	// ── Internal ─────────────────────────────────────────────────────
@@ -587,6 +616,11 @@ export class RemoteAgent {
 			case "session_title":
 				this._title = msg.title;
 				this.onTitleChange?.(msg.title);
+				break;
+
+			case "queue_update":
+				this._serverQueue = Array.isArray(msg.queue) ? msg.queue : [];
+				this.onQueueUpdate?.(this._serverQueue);
 				break;
 
 			case "error":

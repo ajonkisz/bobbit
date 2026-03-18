@@ -9,21 +9,26 @@ import { live } from "lit/directives/live.js";
 import { Brain, Loader2, Mic, MicOff, Paperclip, Send, Sparkles, Square, Zap, X } from "lucide";
 import { type Attachment, loadAttachment } from "../utils/attachment-utils.js";
 import { i18n } from "../utils/i18n.js";
+import { getAppStorage } from "../storage/app-storage.js";
 import "./AttachmentTile.js";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 
+/** Server-authoritative queued message (mirrors server QueuedMessage from protocol.ts) */
 export interface QueuedMessage {
 	id: string;
 	text: string;
-	attachments?: Attachment[];
-	/** Set to true after the user clicks Steer — shows "Sent" indicator until agent picks it up */
-	steered?: boolean;
+	images?: Array<{ type: "image"; data: string; mimeType: string }>;
+	attachments?: unknown[];
+	isSteered: boolean;
+	createdAt: number;
 }
 
 @customElement("message-editor")
 export class MessageEditor extends LitElement {
 	private _value = "";
 	private textareaRef = createRef<HTMLTextAreaElement>();
+	private _draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	private _restoredSessionId: string | undefined;
 
 	@property()
 	get value() {
@@ -36,6 +41,7 @@ export class MessageEditor extends LitElement {
 		this.requestUpdate("value", oldValue);
 	}
 
+	@property() sessionId?: string;
 	@property() isStreaming = false;
 	@property() currentModel?: Model<any>;
 	@property() thinkingLevel: ThinkingLevel = "off";
@@ -62,6 +68,57 @@ export class MessageEditor extends LitElement {
 	@state() private isRecording = false;
 	private fileInputRef = createRef<HTMLInputElement>();
 
+	// -- Draft persistence --
+
+	private _draftKey(): string | undefined {
+		return this.sessionId ? `bobbit_draft_${this.sessionId}` : undefined;
+	}
+
+	private _saveDraftDebounced() {
+		if (this._draftSaveTimer) clearTimeout(this._draftSaveTimer);
+		this._draftSaveTimer = setTimeout(() => {
+			const key = this._draftKey();
+			if (!key) return;
+			try {
+				if (this._value) {
+					sessionStorage.setItem(key, this._value);
+				} else {
+					sessionStorage.removeItem(key);
+				}
+			} catch { /* quota exceeded — ignore */ }
+		}, 500);
+	}
+
+	private _restoreDraft() {
+		const key = this._draftKey();
+		if (!key) return;
+		try {
+			const draft = sessionStorage.getItem(key);
+			if (draft && !this._value) {
+				this._value = draft;
+				this.requestUpdate();
+				const textarea = this.textareaRef.value;
+				if (textarea) textarea.value = draft;
+			}
+		} catch { /* ignore */ }
+	}
+
+	private _clearDraft() {
+		if (this._draftSaveTimer) {
+			clearTimeout(this._draftSaveTimer);
+			this._draftSaveTimer = null;
+		}
+		const key = this._draftKey();
+		if (!key) return;
+		try { sessionStorage.removeItem(key); } catch { /* ignore */ }
+	}
+
+	// Command history state
+	private _history: string[] = [];
+	private _historyIndex = -1; // -1 = not browsing history
+	private _savedDraft = ""; // draft saved when entering history mode
+	private _historyLoaded = false;
+
 	// Speech recognition
 	private speechRecognition: SpeechRecognition | null = null;
 	private speechSupported = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -74,10 +131,51 @@ export class MessageEditor extends LitElement {
 		return this;
 	}
 
+	// Note: history loading is handled in the updated() override near connectedCallback
+
+	private async _loadHistory() {
+		if (!this.sessionId) return;
+		try {
+			const store = getAppStorage().commandHistory;
+			this._history = await store.getHistory(this.sessionId);
+			this._historyIndex = -1;
+			this._historyLoaded = true;
+		} catch {
+			// Storage not available — history won't work but that's fine
+			this._history = [];
+			this._historyLoaded = true;
+		}
+	}
+
+	/**
+	 * Add a sent message to command history.
+	 * Called externally after a message is sent.
+	 */
+	async addToHistory(text: string): Promise<void> {
+		if (!this.sessionId || !text.trim()) return;
+		try {
+			const store = getAppStorage().commandHistory;
+			await store.addEntry(this.sessionId, text);
+			this._history = await store.getHistory(this.sessionId);
+		} catch {
+			// Best effort — don't break sending
+		}
+		this._historyIndex = -1;
+	}
+
+	private _isCursorOnFirstLine(): boolean {
+		const textarea = this.textareaRef.value;
+		if (!textarea) return true;
+		const pos = textarea.selectionStart;
+		// On first line if no newline before cursor position
+		return textarea.value.lastIndexOf("\n", pos - 1) === -1;
+	}
+
 	private handleTextareaInput = (e: Event) => {
 		const textarea = e.target as HTMLTextAreaElement;
 		this.value = textarea.value;
 		this.onInput?.(this.value);
+		this._saveDraftDebounced();
 	};
 
 	private handleKeyDown = (e: KeyboardEvent) => {
@@ -89,8 +187,39 @@ export class MessageEditor extends LitElement {
 		} else if (e.key === "Escape" && this.isStreaming) {
 			e.preventDefault();
 			this.onAbort?.();
+		} else if (e.key === "ArrowUp" && this._history.length > 0 && this._isCursorOnFirstLine()) {
+			// Enter history browsing or go further back
+			if (this._historyIndex === -1) {
+				// First press — save current draft and show newest history entry
+				this._savedDraft = this.value;
+				this._historyIndex = this._history.length - 1;
+			} else if (this._historyIndex > 0) {
+				this._historyIndex--;
+			} else {
+				return; // Already at oldest entry, let default behavior through
+			}
+			e.preventDefault();
+			this._applyHistoryEntry();
+		} else if (e.key === "ArrowDown" && this._historyIndex !== -1) {
+			e.preventDefault();
+			if (this._historyIndex < this._history.length - 1) {
+				this._historyIndex++;
+				this._applyHistoryEntry();
+			} else {
+				// Past newest entry — restore draft
+				this._historyIndex = -1;
+				this.value = this._savedDraft;
+				this.onInput?.(this.value);
+			}
 		}
 	};
+
+	private _applyHistoryEntry() {
+		if (this._historyIndex >= 0 && this._historyIndex < this._history.length) {
+			this.value = this._history[this._historyIndex];
+			this.onInput?.(this.value);
+		}
+	}
 
 	private handlePaste = async (e: ClipboardEvent) => {
 		const items = e.clipboardData?.items;
@@ -143,7 +272,14 @@ export class MessageEditor extends LitElement {
 	};
 
 	private handleSend = () => {
-		this.onSend?.(this.value, this.attachments);
+		const text = this.value;
+		this._clearDraft();
+		this.onSend?.(text, this.attachments);
+		// Reset history browsing state after send
+		this._historyIndex = -1;
+		this._savedDraft = "";
+		// Add to history (fire and forget)
+		this.addToHistory(text);
 	};
 
 	private handleAttachmentClick = () => {
@@ -380,6 +516,8 @@ export class MessageEditor extends LitElement {
 		super.connectedCallback();
 		document.addEventListener("keydown", this.handleGlobalKeyDown);
 		document.addEventListener("keyup", this.handleGlobalKeyUp);
+		this._restoredSessionId = this.sessionId;
+		this._restoreDraft();
 	}
 
 	override disconnectedCallback() {
@@ -387,12 +525,33 @@ export class MessageEditor extends LitElement {
 		document.removeEventListener("keydown", this.handleGlobalKeyDown);
 		document.removeEventListener("keyup", this.handleGlobalKeyUp);
 		this.stopSpeechRecognition();
+		if (this._draftSaveTimer) {
+			clearTimeout(this._draftSaveTimer);
+			this._draftSaveTimer = null;
+		}
 	}
 
 	override firstUpdated() {
 		const textarea = this.textareaRef.value;
 		if (textarea) {
 			textarea.focus();
+		}
+		// Restore draft after first render when textarea ref is available
+		this._restoreDraft();
+	}
+
+	protected override updated(changed: Map<string, unknown>) {
+		super.updated(changed);
+		if (changed.has("sessionId")) {
+			if (this.sessionId !== this._restoredSessionId) {
+				this._restoredSessionId = this.sessionId;
+				// Session changed — restore draft for the new session
+				this._value = "";
+				this._restoreDraft();
+			}
+			if (this.sessionId) {
+				this._loadHistory();
+			}
 		}
 	}
 
@@ -482,10 +641,10 @@ export class MessageEditor extends LitElement {
 				<!-- Queued messages -->
 				${this.queuedMessages.length > 0 ? html`
 					<div class="px-3 pt-2 pb-1 flex flex-col gap-1.5">
-						${[...this.queuedMessages].sort((a, b) => (b.steered ? 1 : 0) - (a.steered ? 1 : 0)).map((msg) => html`
-							<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${msg.steered ? "bg-amber-500/10 border border-amber-500/30" : "bg-muted/50 border border-border/50"} text-xs text-muted-foreground">
+						${this.queuedMessages.map((msg) => html`
+							<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${msg.isSteered ? "bg-amber-500/10 border border-amber-500/30" : "bg-muted/50 border border-border/50"} text-xs text-muted-foreground">
 								<span class="flex-1 truncate font-mono">${msg.text}</span>
-								${msg.steered
+								${msg.isSteered
 									? html`<span class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[0.65rem] font-medium text-amber-600 dark:text-amber-400">${icon(Zap, "xs")} Sent</span>`
 									: html`
 										<button

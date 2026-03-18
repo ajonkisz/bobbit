@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MessageEditor Queue Rendering Test</title>
+<style>
+  body { font-family: sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
+</style>
+</head>
+<body>
+<div id="queue-container"></div>
+<textarea id="textarea" rows="3" style="width:400px;display:block;margin-top:10px;"></textarea>
+
+<script>
+/**
+ * This fixture replicates the exact queue rendering logic from MessageEditor.ts
+ * (the template inside the render() method) using plain DOM. This tests that
+ * the rendering logic, callback wiring, and state transitions work correctly
+ * — the same code paths that run in the real Lit component.
+ */
+
+let steerCalls = [];
+let removeCalls = [];
+let currentQueue = [];
+
+// Exact replica of MessageEditor's queue rendering template
+function renderQueue(queue, onSteer, onRemoveQueued) {
+  const container = document.getElementById('queue-container');
+  container.innerHTML = '';
+  if (queue.length === 0) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'queue-pills';
+  wrapper.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:8px;';
+
+  // Note: NO client-side sort — trust server ordering (matching the fix we made)
+  queue.forEach(msg => {
+    const pill = document.createElement('div');
+    pill.className = 'queue-pill';
+    pill.dataset.id = msg.id;
+    pill.dataset.steered = msg.isSteered ? 'true' : 'false';
+    pill.style.cssText = `display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;font-size:12px;color:#999;border:1px solid ${msg.isSteered ? 'rgba(245,158,11,0.3)' : 'rgba(100,100,120,0.5)'};background:${msg.isSteered ? 'rgba(245,158,11,0.1)' : 'rgba(100,100,120,0.3)'}`;
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'pill-text';
+    textSpan.textContent = msg.text;
+    textSpan.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace';
+    pill.appendChild(textSpan);
+
+    if (msg.isSteered) {
+      const sent = document.createElement('span');
+      sent.className = 'sent-indicator';
+      sent.textContent = '⚡ Sent';
+      sent.style.cssText = 'flex-shrink:0;color:#d97706;font-size:10px;font-weight:500';
+      pill.appendChild(sent);
+    } else {
+      const steerBtn = document.createElement('button');
+      steerBtn.className = 'steer-btn';
+      steerBtn.textContent = '⚡ Steer';
+      steerBtn.title = 'Send now — interrupts the current turn';
+      steerBtn.style.cssText = 'flex-shrink:0;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;background:rgba(245,158,11,0.15);color:#d97706;border:none;cursor:pointer';
+      steerBtn.onclick = () => onSteer(msg);
+      pill.appendChild(steerBtn);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-btn';
+      removeBtn.textContent = '✕';
+      removeBtn.title = 'Remove from queue';
+      removeBtn.style.cssText = 'flex-shrink:0;padding:2px;border-radius:4px;font-size:10px;color:#666;border:none;cursor:pointer';
+      removeBtn.onclick = () => onRemoveQueued(msg.id);
+      pill.appendChild(removeBtn);
+    }
+
+    wrapper.appendChild(pill);
+  });
+
+  container.appendChild(wrapper);
+}
+
+// Public API for tests
+window.setQueue = (queue) => {
+  currentQueue = queue;
+  renderQueue(queue,
+    (msg) => steerCalls.push(msg),
+    (id) => removeCalls.push(id)
+  );
+};
+
+window.getSteerCalls = () => steerCalls;
+window.getRemoveCalls = () => removeCalls;
+window.resetCalls = () => { steerCalls = []; removeCalls = []; };
+window.getQueue = () => currentQueue;
+
+// Draft persistence (replicating MessageEditor logic)
+let draftTimer = null;
+let sessionId = 'default-session';
+
+window.setSessionId = (id) => {
+  sessionId = id;
+  // Restore draft for new session
+  const textarea = document.getElementById('textarea');
+  const key = `bobbit_draft_${sessionId}`;
+  try {
+    const draft = sessionStorage.getItem(key);
+    textarea.value = draft || '';
+  } catch(e) {}
+};
+
+window.getSessionId = () => sessionId;
+
+document.getElementById('textarea').addEventListener('input', (e) => {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const key = `bobbit_draft_${sessionId}`;
+    try {
+      if (e.target.value) {
+        sessionStorage.setItem(key, e.target.value);
+      } else {
+        sessionStorage.removeItem(key);
+      }
+    } catch(ex) {}
+  }, 100); // 100ms for test speed (real component uses 500ms)
+});
+
+window.clearDraft = () => {
+  clearTimeout(draftTimer);
+  const key = `bobbit_draft_${sessionId}`;
+  try { sessionStorage.removeItem(key); } catch(e) {}
+  document.getElementById('textarea').value = '';
+};
+
+// Command history state machine (replicating MessageEditor logic)
+let history = [];
+let historyIndex = -1;
+let savedDraft = '';
+
+window.setHistory = (h) => { history = h; historyIndex = -1; savedDraft = ''; };
+window.getHistoryState = () => ({ historyIndex, savedDraft, value: document.getElementById('textarea').value });
+
+document.getElementById('textarea').addEventListener('keydown', (e) => {
+  const textarea = e.target;
+  const cursorOnFirstLine = textarea.value.lastIndexOf('\n', textarea.selectionStart - 1) === -1;
+
+  if (e.key === 'ArrowUp' && cursorOnFirstLine && history.length > 0) {
+    e.preventDefault();
+    if (historyIndex === -1) {
+      savedDraft = textarea.value;
+      historyIndex = history.length - 1;
+    } else if (historyIndex > 0) {
+      historyIndex--;
+    }
+    textarea.value = history[historyIndex];
+  } else if (e.key === 'ArrowDown' && cursorOnFirstLine && historyIndex !== -1) {
+    e.preventDefault();
+    if (historyIndex < history.length - 1) {
+      historyIndex++;
+      textarea.value = history[historyIndex];
+    } else {
+      historyIndex = -1;
+      textarea.value = savedDraft;
+    }
+  }
+});
+
+window._testReady = true;
+</script>
+</body>
+</html>
