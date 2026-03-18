@@ -102,6 +102,7 @@ export class AssistantMessage extends LitElement {
 	@property({ type: Boolean }) isStreaming: boolean = false;
 	@property({ type: Boolean }) hidePendingToolCalls = false;
 	@property({ attribute: false }) onCostClick?: () => void;
+	@property({ attribute: false }) onRetry?: () => void;
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
 		return this;
@@ -222,7 +223,22 @@ export class AssistantMessage extends LitElement {
 					this.message.stopReason === "error" && this.message.errorMessage
 						? html`
 							<div class="mx-2 sm:mx-4 mt-3 p-3 bg-destructive/10 text-destructive rounded-lg text-sm overflow-hidden">
-								<strong>${i18n("Error:")}</strong> ${this.message.errorMessage}
+								<div class="flex items-start justify-between gap-3">
+									<div class="min-w-0">
+										<strong>${i18n("Error:")}</strong> ${this.message.errorMessage}
+									</div>
+									${this.onRetry ? html`
+										<button
+											class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-destructive/15 hover:bg-destructive/25 text-destructive transition-colors cursor-pointer"
+											@click=${this.onRetry}
+										>
+											<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M20.015 4.356v4.992" />
+											</svg>
+											Retry
+										</button>
+									` : ""}
+								</div>
 							</div>
 						`
 						: ""

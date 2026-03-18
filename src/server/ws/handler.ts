@@ -173,6 +173,11 @@ export function handleWebSocketConnection(
 						send(ws, { type: "error", message: `Abort failed: ${err}`, code: "ABORT_ERROR" });
 					});
 					break;
+				case "retry":
+					sessionManager.retryLastPrompt(sessionId).catch((err) => {
+						send(ws, { type: "error", message: `Retry failed: ${err}`, code: "RETRY_ERROR" });
+					});
+					break;
 				case "set_model":
 					await session.rpcClient.setModel(msg.provider, msg.modelId);
 					break;

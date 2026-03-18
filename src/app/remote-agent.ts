@@ -446,6 +446,11 @@ export class RemoteAgent {
 		this.send({ type: "abort" });
 	}
 
+	/** Retry after a model/API error. */
+	retry(): void {
+		this.send({ type: "retry" });
+	}
+
 	compact(): void {
 		this.send({ type: "compact" });
 	}

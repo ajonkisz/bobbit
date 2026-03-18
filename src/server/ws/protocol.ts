@@ -17,6 +17,7 @@ export type ClientMessage =
 	| { type: "steer_queued"; messageId: string }
 	| { type: "remove_queued"; messageId: string }
 	| { type: "abort" }
+	| { type: "retry" }
 	| { type: "set_model"; provider: string; modelId: string }
 	| { type: "compact" }
 	| { type: "get_state" }

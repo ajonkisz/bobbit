@@ -48,6 +48,7 @@ export class MessageList extends LitElement {
 	@property({ type: Object }) toolPartialResults?: Record<string, any>;
 	@property({ attribute: false }) onCostClick?: () => void;
 	@property({ attribute: false }) onDismissError?: (id: string) => void;
+	@property({ attribute: false }) onRetry?: () => void;
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
 		return this;
@@ -149,6 +150,13 @@ export class MessageList extends LitElement {
 				}
 
 				// Single assistant message — render normally
+				// Only show the retry button on the very last errored assistant message
+				// (check that no further assistant messages follow, skipping toolResult/artifact)
+				let isLastAssistant = true;
+				for (let k = i + 1; k < msgs.length; k++) {
+					if (msgs[k].role === "assistant") { isLastAssistant = false; break; }
+				}
+				const showRetry = isLastAssistant && amsg.stopReason === "error" && this.onRetry;
 				items.push({
 					key: `msg:${i}`,
 					template: html`<assistant-message
@@ -161,6 +169,7 @@ export class MessageList extends LitElement {
 						.hideToolCalls=${false}
 						.hidePendingToolCalls=${this.isStreaming && this.hasStreamMessage}
 						.onCostClick=${this.onCostClick}
+						.onRetry=${showRetry ? this.onRetry : undefined}
 					></assistant-message>`,
 				});
 				i++;

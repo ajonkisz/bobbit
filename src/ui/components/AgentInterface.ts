@@ -450,6 +450,9 @@ export class AgentInterface extends LitElement {
 						);
 						this.requestUpdate();
 					}}
+					.onRetry=${!state.isStreaming && typeof (this.session as any)?.retry === 'function'
+						? () => (this.session as any).retry()
+						: undefined}
 				></message-list>
 
 				<!-- Streaming message container - manages its own updates -->

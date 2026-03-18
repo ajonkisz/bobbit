@@ -43,6 +43,14 @@ export interface SessionInfo {
 	taskId?: string;
 	/** Server-side prompt queue */
 	promptQueue: PromptQueue;
+	/** True if the last agent turn ended due to a model/API error */
+	lastTurnErrored?: boolean;
+	/** Whether tool calls were executed during the current/last turn */
+	turnHadToolCalls?: boolean;
+	/** Last user prompt text, for retry on fresh-response errors */
+	lastPromptText?: string;
+	/** Last user prompt images, for retry on fresh-response errors */
+	lastPromptImages?: Array<{ type: "image"; data: string; mimeType: string }>;
 }
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
@@ -115,6 +123,8 @@ export class SessionManager {
 		// If agent is idle and queue is empty, dispatch directly
 		if (session.status === "idle" && session.promptQueue.isEmpty) {
 			this.tryGenerateTitleFromPrompt(sessionId, text);
+			session.lastPromptText = text;
+			session.lastPromptImages = opts?.images;
 			if (opts?.isFollowUp) {
 				await session.rpcClient.followUp(text);
 			} else {
@@ -174,6 +184,10 @@ export class SessionManager {
 		// Title generation for the first real prompt
 		this.tryGenerateTitleFromPrompt(session.id, next.text);
 
+		// Track for retry
+		session.lastPromptText = next.text;
+		session.lastPromptImages = next.images;
+
 		// Optimistic status update to prevent double-dispatch race
 		session.status = "streaming";
 		broadcast(session.clients, { type: "session_status", status: "streaming" });
@@ -185,6 +199,74 @@ export class SessionManager {
 			session.status = "idle";
 			broadcast(session.clients, { type: "session_status", status: "idle" });
 		});
+	}
+
+	/**
+	 * Handle agent events that track error state and control queue draining.
+	 * Called from every event listener before broadcasting.
+	 * - Tracks message_end with stopReason "error" so we can suppress queue draining.
+	 * - On agent_end, skips drainQueue if the turn ended with an error.
+	 */
+	private handleAgentLifecycle(session: SessionInfo, event: any): void {
+		// Track tool execution during this turn
+		if (event.type === "tool_execution_start") {
+			session.turnHadToolCalls = true;
+		}
+
+		if (event.type === "message_end" && event.message?.role === "assistant") {
+			session.lastTurnErrored = event.message.stopReason === "error";
+		}
+
+		if (event.type === "agent_start") {
+			session.status = "streaming";
+			session.lastTurnErrored = false;
+			session.turnHadToolCalls = false;
+			this.store.update(session.id, { wasStreaming: true });
+			broadcast(session.clients, { type: "session_status", status: "streaming" });
+		} else if (event.type === "agent_end") {
+			session.status = "idle";
+			this.store.update(session.id, { wasStreaming: false });
+			broadcast(session.clients, { type: "session_status", status: "idle" });
+			// Don't drain the queue if the turn ended with a model error —
+			// queued/steered messages should wait for a retry.
+			if (!session.lastTurnErrored) {
+				this.drainQueue(session);
+			}
+		} else if (event.type === "auto_compaction_start") {
+			session.isCompacting = true;
+		} else if (event.type === "auto_compaction_end") {
+			session.isCompacting = false;
+			if (!event.aborted) this.refreshAfterCompaction(session);
+		}
+	}
+
+	/**
+	 * Retry after a model/API error. Behaviour depends on context:
+	 * - Fresh response error (no tool calls): re-sends the original user prompt
+	 * - Mid-work error (tool calls already executed): sends a system continuation
+	 */
+	async retryLastPrompt(sessionId: string): Promise<void> {
+		const session = this.sessions.get(sessionId);
+		if (!session) throw new Error("Session not found");
+
+		const hadToolCalls = session.turnHadToolCalls;
+		session.lastTurnErrored = false;
+		session.turnHadToolCalls = false;
+
+		if (hadToolCalls) {
+			// Agent was mid-work — send a system continuation prompt
+			await session.rpcClient.prompt(
+				"[SYSTEM: The model API returned an error while you were mid-turn. " +
+				"Your previous work has been preserved. Please continue where you left off. " +
+				"Do NOT start over — review your recent messages and resume from the exact point of interruption.]"
+			);
+		} else if (session.lastPromptText) {
+			// Fresh response error — re-send the original prompt
+			await session.rpcClient.prompt(session.lastPromptText, session.lastPromptImages);
+		} else {
+			// Fallback — ask the agent to retry
+			await session.rpcClient.followUp("Please retry the last request.");
+		}
 	}
 
 	/**
@@ -334,16 +416,7 @@ export class SessionManager {
 			session.lastActivity = Date.now();
 			this.store.update(ps.id, { lastActivity: session.lastActivity });
 
-			if (event.type === "agent_start") {
-				session.status = "streaming";
-				this.store.update(ps.id, { wasStreaming: true });
-				broadcast(session.clients, { type: "session_status", status: "streaming" });
-			} else if (event.type === "agent_end") {
-				session.status = "idle";
-				this.store.update(ps.id, { wasStreaming: false });
-				broadcast(session.clients, { type: "session_status", status: "idle" });
-				this.drainQueue(session);
-			}
+			this.handleAgentLifecycle(session, event);
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
@@ -483,24 +556,7 @@ export class SessionManager {
 			session.lastActivity = Date.now();
 			this.store.update(id, { lastActivity: session.lastActivity });
 
-			if (event.type === "agent_start") {
-				session.status = "streaming";
-				this.store.update(id, { wasStreaming: true });
-				broadcast(session.clients, { type: "session_status", status: "streaming" });
-			} else if (event.type === "agent_end") {
-				session.status = "idle";
-				this.store.update(id, { wasStreaming: false });
-				broadcast(session.clients, { type: "session_status", status: "idle" });
-				this.drainQueue(session);
-			} else if (event.type === "auto_compaction_start") {
-				session.isCompacting = true;
-			} else if (event.type === "auto_compaction_end") {
-				session.isCompacting = false;
-				// Refresh messages and state for clients after auto-compaction
-				if (!event.aborted) {
-					this.refreshAfterCompaction(session);
-				}
-			}
+			this.handleAgentLifecycle(session, event);
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
@@ -584,21 +640,7 @@ export class SessionManager {
 			session.lastActivity = Date.now();
 			this.store.update(id, { lastActivity: session.lastActivity });
 
-			if (event.type === "agent_start") {
-				session.status = "streaming";
-				this.store.update(id, { wasStreaming: true });
-				broadcast(session.clients, { type: "session_status", status: "streaming" });
-			} else if (event.type === "agent_end") {
-				session.status = "idle";
-				this.store.update(id, { wasStreaming: false });
-				broadcast(session.clients, { type: "session_status", status: "idle" });
-				this.drainQueue(session);
-			} else if (event.type === "auto_compaction_start") {
-				session.isCompacting = true;
-			} else if (event.type === "auto_compaction_end") {
-				session.isCompacting = false;
-				if (!event.aborted) this.refreshAfterCompaction(session);
-			}
+			this.handleAgentLifecycle(session, event);
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
@@ -1005,16 +1047,7 @@ export class SessionManager {
 				session.lastActivity = Date.now();
 				this.store.update(id, { lastActivity: session.lastActivity });
 
-				if (event.type === "agent_start") {
-					session.status = "streaming";
-					this.store.update(id, { wasStreaming: true });
-					broadcast(session.clients, { type: "session_status", status: "streaming" });
-				} else if (event.type === "agent_end") {
-					session.status = "idle";
-					this.store.update(id, { wasStreaming: false });
-					broadcast(session.clients, { type: "session_status", status: "idle" });
-					this.drainQueue(session);
-				}
+				this.handleAgentLifecycle(session, event);
 
 				session.eventBuffer.push(event);
 				broadcast(session.clients, { type: "event", data: event });
