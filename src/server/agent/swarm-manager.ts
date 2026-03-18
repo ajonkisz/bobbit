@@ -368,11 +368,41 @@ export class SwarmManager {
 		}
 
 		try {
-			await teamLeadSession.rpcClient.steer(message);
-			console.log(`[swarm-manager] Steered team lead for goal ${goalId}: ${message}`);
+			if (teamLeadSession.status === "streaming") {
+				// Mid-turn: inject directly as a real-time steer interrupt
+				await teamLeadSession.rpcClient.steer(message);
+			} else {
+				// Idle: enqueue as a steered prompt so it drains immediately
+				this.sessionManager.enqueuePrompt(entry.teamLeadSessionId, message, { isSteered: true });
+			}
+			console.log(`[swarm-manager] Notified team lead for goal ${goalId} (status=${teamLeadSession.status}): ${message}`);
 		} catch (err) {
-			console.error(`[swarm-manager] Failed to steer team lead for goal ${goalId}:`, err);
+			console.error(`[swarm-manager] Failed to notify team lead for goal ${goalId}:`, err);
 		}
+	}
+
+	/**
+	 * Notify the team lead when a task transitions to a terminal state.
+	 * Called from the task transition REST endpoint so the team lead wakes up
+	 * even if the worker continues with another task without going idle.
+	 */
+	notifyTeamLeadOfTaskCompletion(goalId: string, taskTitle: string, taskState: string): void {
+		const entry = this.swarms.get(goalId);
+		if (!entry?.teamLeadSessionId) return;
+
+		const teamLeadSession = this.sessionManager.getSession(entry.teamLeadSessionId);
+		if (!teamLeadSession || teamLeadSession.status === "terminated") return;
+
+		const message = `Task "${taskTitle}" transitioned to ${taskState}. Check tasks and decide next steps.`;
+
+		if (teamLeadSession.status === "streaming") {
+			teamLeadSession.rpcClient.steer(message).catch((err: any) => {
+				console.error(`[swarm-manager] Failed to steer team lead on task completion for goal ${goalId}:`, err);
+			});
+		} else {
+			this.sessionManager.enqueuePrompt(entry.teamLeadSessionId, message, { isSteered: true });
+		}
+		console.log(`[swarm-manager] Notified team lead of task completion for goal ${goalId}: ${taskTitle} → ${taskState}`);
 	}
 
 	/**

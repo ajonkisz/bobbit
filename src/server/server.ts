@@ -405,6 +405,8 @@ async function handleApiRoute(
 			const body = await readBody(req);
 			if (!body) { json({ error: "Missing body" }, 400); return; }
 			try {
+				const task = sessionManager.taskManager.getTask(id);
+				const prevState = task?.state;
 				const ok = sessionManager.taskManager.updateTask(id, {
 					title: body.title,
 					spec: body.spec,
@@ -413,6 +415,12 @@ async function handleApiRoute(
 					dependsOn: body.dependsOn,
 				});
 				if (!ok) { json({ error: "Task not found" }, 404); return; }
+
+				// Notify team lead when state transitions to terminal via PUT
+				if (body.state && body.state !== prevState && (body.state === "complete" || body.state === "skipped") && task?.goalId) {
+					swarmManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, body.state);
+				}
+
 				json({ ok: true });
 			} catch (err: any) {
 				json({ error: err.message }, 400);
@@ -462,8 +470,16 @@ async function handleApiRoute(
 			return;
 		}
 		try {
-			const ok = sessionManager.taskManager.transitionTask(taskTransitionMatch[1], state as TaskState);
+			const taskId = taskTransitionMatch[1];
+			const task = sessionManager.taskManager.getTask(taskId);
+			const ok = sessionManager.taskManager.transitionTask(taskId, state as TaskState);
 			if (!ok) { json({ error: "Task not found" }, 400); return; }
+
+			// Notify team lead when a task reaches a terminal state
+			if ((state === "complete" || state === "skipped") && task?.goalId) {
+				swarmManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, state);
+			}
+
 			json({ ok: true });
 		} catch (err: any) {
 			json({ error: err.message }, 400);
