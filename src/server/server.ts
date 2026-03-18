@@ -49,6 +49,7 @@ export function createGateway(config: GatewayConfig) {
 		gatewayUrl,
 		authToken: config.authToken,
 		colorStore,
+		taskManager: sessionManager.taskManager,
 	});
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);

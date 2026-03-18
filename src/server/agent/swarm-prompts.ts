@@ -261,16 +261,12 @@ ${TASK_API_DOCS}
      -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
    \`\`\`
    Look for tasks with \`state: "todo"\` and type \`implementation\`, \`bug-fix\`, or \`refactor\` that have no \`assignedSessionId\`.
-3. **Claim the task**: Assign it to yourself and transition to in-progress:
+3. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
    \`\`\`bash
    curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/assign" \\
      -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
      -H "Content-Type: application/json" \\
      -d "{\\\"sessionId\\\": \\"$BOBBIT_SESSION_ID\\"}"
-   curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
-     -H "Content-Type: application/json" \\
-     -d '{"state": "in-progress"}'
    \`\`\`
 4. **Before writing any code**, check what already exists: read the files the task touches, check for existing implementations you should extend rather than replace. If the task says "create X" but X exists, adapt your work to build on it.
 5. Create a sub-branch: \`git checkout -b {{GOAL_BRANCH}}/task-<N>\` (where N is derived from the task ID).
@@ -342,16 +338,12 @@ ${TASK_API_DOCS}
      -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
    \`\`\`
    Look for tasks with \`state: "todo"\` and type \`code-review\` that have no \`assignedSessionId\`.
-3. **Claim the task**: Assign it to yourself and transition to in-progress:
+3. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
    \`\`\`bash
    curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/assign" \\
      -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
      -H "Content-Type: application/json" \\
      -d "{\\\"sessionId\\\": \\"$BOBBIT_SESSION_ID\\"}"
-   curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
-     -H "Content-Type: application/json" \\
-     -d '{"state": "in-progress"}'
    \`\`\`
 4. Fetch and read the referenced branch (from the task's spec or dependency): \`git fetch && git log {{GOAL_BRANCH}}..origin/<branch> --stat\` and \`git diff {{GOAL_BRANCH}}..origin/<branch>\`.
 5. Review the changes thoroughly:
@@ -423,16 +415,12 @@ ${TASK_API_DOCS}
      -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN"
    \`\`\`
    Look for tasks with \`state: "todo"\` and type \`testing\` that have no \`assignedSessionId\`.
-3. **Claim the task**: Assign it to yourself and transition to in-progress:
+3. **Claim the task**: Assign it to yourself (this automatically transitions it to in-progress):
    \`\`\`bash
    curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/assign" \\
      -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
      -H "Content-Type: application/json" \\
      -d "{\\\"sessionId\\\": \\"$BOBBIT_SESSION_ID\\"}"
-   curl -s -X POST "$BOBBIT_GATEWAY_URL/api/tasks/<task-id>/transition" \\
-     -H "Authorization: Bearer $BOBBIT_AUTH_TOKEN" \\
-     -H "Content-Type: application/json" \\
-     -d '{"state": "in-progress"}'
    \`\`\`
 4. Create a sub-branch: \`git checkout -b {{GOAL_BRANCH}}/test-<N>\` (where N is derived from the task ID).
 5. Write tests for the feature/fix described in the task.

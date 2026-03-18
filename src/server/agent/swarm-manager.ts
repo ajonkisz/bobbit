@@ -7,6 +7,7 @@ import { SwarmStore } from "./swarm-store.js";
 import type { PersistedSwarmEntry } from "./swarm-store.js";
 import { generateSwarmName } from "./swarm-names.js";
 import type { ColorStore } from "./color-store.js";
+import type { TaskManager } from "./task-manager.js";
 
 
 export interface SwarmAgent {
@@ -56,11 +57,14 @@ export interface SwarmManagerConfig {
 	authToken: string;
 	/** Color store for assigning unique palette indices to swarm sessions */
 	colorStore: ColorStore;
+	/** Task manager for looking up tasks assigned to sessions */
+	taskManager: TaskManager;
 }
 
 export class SwarmManager {
 	private sessionManager: SessionManager;
 	private config: SwarmManagerConfig;
+	private taskManager: TaskManager;
 	private swarms = new Map<string, SwarmEntry>();
 	private store: SwarmStore;
 
@@ -70,6 +74,7 @@ export class SwarmManager {
 	constructor(sessionManager: SessionManager, config: SwarmManagerConfig) {
 		this.sessionManager = sessionManager;
 		this.config = config;
+		this.taskManager = config.taskManager;
 		this.store = new SwarmStore();
 		this.restoreSwarms();
 	}
@@ -368,7 +373,7 @@ export class SwarmManager {
 		if (!teamLeadSession || teamLeadSession.status === "terminated") return;
 
 		// Look up tasks assigned to the worker
-		const tasks = this.sessionManager.taskManager.getTasksForSession(workerSessionId);
+		const tasks = this.taskManager.getTasksForSession(workerSessionId);
 
 		let message: string;
 		if (tasks.length > 0) {
