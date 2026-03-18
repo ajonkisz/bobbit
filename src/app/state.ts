@@ -105,6 +105,11 @@ export let expandedGoals: Set<string> = new Set(
 export let ungroupedExpanded =
 	localStorage.getItem(UNGROUPED_EXPANDED_KEY) !== "false";
 
+const COLLAPSED_TEAM_LEADS_KEY = "bobbit-collapsed-team-leads";
+export let collapsedTeamLeadSessions: Set<string> = new Set(
+	JSON.parse(localStorage.getItem(COLLAPSED_TEAM_LEADS_KEY) || "[]"),
+);
+
 export function saveExpandedGoals(): void {
 	localStorage.setItem(EXPANDED_GOALS_KEY, JSON.stringify([...expandedGoals]));
 }
@@ -112,6 +117,19 @@ export function saveExpandedGoals(): void {
 export function setUngroupedExpanded(value: boolean): void {
 	ungroupedExpanded = value;
 	localStorage.setItem(UNGROUPED_EXPANDED_KEY, String(value));
+}
+
+export function toggleTeamLeadExpanded(sessionId: string): void {
+	if (collapsedTeamLeadSessions.has(sessionId)) {
+		collapsedTeamLeadSessions.delete(sessionId);
+	} else {
+		collapsedTeamLeadSessions.add(sessionId);
+	}
+	localStorage.setItem(COLLAPSED_TEAM_LEADS_KEY, JSON.stringify([...collapsedTeamLeadSessions]));
+}
+
+export function isTeamLeadExpanded(sessionId: string): boolean {
+	return !collapsedTeamLeadSessions.has(sessionId);
 }
 
 // ============================================================================

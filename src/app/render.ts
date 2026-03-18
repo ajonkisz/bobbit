@@ -86,8 +86,8 @@ function renderMobileLanding() {
 									<div class="flex flex-col gap-0.5">
 										<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer active:bg-secondary/50 transition-colors"
 											@click=${() => { setUngroupedExpanded(!ungroupedExpanded); renderApp(); }}>
-											<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:14px;text-align:center;">${isUngroupedExpanded ? "▾" : "▸"}</span>
-											<span class="flex-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
+											<span class="text-xs text-muted-foreground shrink-0 select-none" style="width:14px;text-align:center;">${isUngroupedExpanded ? "▾" : "▸"}</span>
+											<span class="flex-1 text-xs text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
 											<button
 												class="p-1 rounded text-muted-foreground active:bg-secondary/50 transition-colors"
 												@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(); }}
@@ -101,7 +101,7 @@ function renderMobileLanding() {
 								` : sortedGoals.length === 0 && ungroupedSessions.length > 0 ? html`
 									<div class="flex flex-col gap-0.5">
 										<div class="flex items-center gap-1.5 px-2 py-1.5">
-											<span class="flex-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:15px;">Sessions</span>
+											<span class="flex-1 text-xs text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:15px;">Sessions</span>
 											<button
 												class="p-1 rounded text-muted-foreground active:bg-secondary/50 transition-colors"
 												@click=${() => createAndConnectSession()}
@@ -115,7 +115,7 @@ function renderMobileLanding() {
 								` : ""}
 
 								<div class="flex items-center gap-1 px-2 pt-2">
-									<button class="text-[10px] text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center gap-1"
+									<button class="text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center gap-1"
 										@click=${() => showGoalDialog()}>
 										${icon(Crosshair, "xs")} New Goal
 									</button>

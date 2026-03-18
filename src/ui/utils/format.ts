@@ -12,9 +12,12 @@ export function formatModelCost(cost: any): string {
 	const output = cost.output || 0;
 	if (input === 0 && output === 0) return i18n("Free");
 
+	// Format numbers with appropriate precision
 	const formatNum = (num: number): string => {
-		if (num < 1) return num.toFixed(1).replace(/\.0$/, "");
-		return Math.round(num).toString();
+		if (num >= 100) return num.toFixed(0);
+		if (num >= 10) return num.toFixed(1).replace(/\.0$/, "");
+		if (num >= 1) return num.toFixed(2).replace(/\.?0+$/, "");
+		return num.toFixed(3).replace(/\.?0+$/, "");
 	};
 
 	return `$${formatNum(input)}/$${formatNum(output)}`;

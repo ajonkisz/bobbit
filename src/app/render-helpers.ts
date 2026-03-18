@@ -8,6 +8,8 @@ import {
 	expandedGoals,
 	saveExpandedGoals,
 	isDesktop,
+	toggleTeamLeadExpanded,
+	isTeamLeadExpanded,
 	type GatewaySession,
 	type Goal,
 	type GoalState,
@@ -132,7 +134,7 @@ export function renderSessionRow(session: GatewaySession) {
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead", session.role === "coder")}
 			</div>
-			<div class="flex-1 min-w-0 truncate text-xs ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			<div class="flex-1 min-w-0 truncate ${mobile ? "text-sm" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
 			${mobile
 				? buttons
 				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
@@ -144,6 +146,67 @@ export function renderSessionRow(session: GatewaySession) {
 
 // Back-compat alias used by sidebar.ts
 export { renderSessionRow as renderSidebarSession };
+
+// ============================================================================
+// TEAM LEAD ROW (with collapsible swarm children)
+// ============================================================================
+
+/**
+ * Renders the team-lead session as a collapsible parent row.
+ * Shows a collapse/expand chevron and child count badge.
+ */
+function renderTeamLeadRow(session: GatewaySession, childCount: number, expanded: boolean) {
+	const mobile = !isDesktop();
+	const active = activeSessionId() === session.id;
+	const connecting = state.connectingSessionId === session.id;
+	const displayTitle = active && state.remoteAgent ? state.remoteAgent.title : session.title;
+	const isActive = session.status === "streaming" || session.status === "busy" || session.isCompacting;
+
+	const rowPy = mobile ? "py-1" : SESSION_ROW_PY;
+	const btnPad = mobile ? "p-1.5" : "p-0.5";
+
+	const buttons = html`
+		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
+			@click=${(e: Event) => { e.stopPropagation(); showRenameDialog(session.id, displayTitle); }}
+			title="Rename">${icon(Pencil, "xs")}</button>
+		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-destructive/10" : "hover:bg-destructive/10 text-muted-foreground hover:text-destructive"}"
+			@click=${(e: Event) => { e.stopPropagation(); terminateSession(session.id); }}
+			title="Terminate">${icon(Trash2, "xs")}</button>
+	`;
+
+	const chevron = html`<span
+		class="text-[11px] text-muted-foreground shrink-0 select-none cursor-pointer"
+		style="width:12px;text-align:center;"
+		@click=${(e: Event) => { e.stopPropagation(); toggleTeamLeadExpanded(session.id); renderApp(); }}
+		title="${expanded ? "Collapse agents" : "Expand agents"}"
+	>${expanded ? "▾" : "▸"}</span>`;
+
+	const childBadge = childCount > 0 ? html`<span class="text-[9px] text-muted-foreground/70 tabular-nums shrink-0" title="${childCount} agent${childCount !== 1 ? "s" : ""}">${childCount}</span>` : "";
+
+	return html`
+		<div
+			class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-2 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors text-sm
+				${active ? "bg-secondary text-foreground sidebar-session-active" : connecting ? "bg-secondary/30 text-muted-foreground" : mobile ? "text-muted-foreground active:bg-secondary/50" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
+			@mouseenter=${mobile ? null : (e: MouseEvent) => showSessionTooltip(e, session, displayTitle)}
+			@mouseleave=${mobile ? null : hideSessionTooltip}
+			@click=${() => { if (!active && !connecting) connectToSession(session.id, true); }}
+		>
+			${chevron}
+			<div class="shrink-0 flex items-center justify-center">
+				${connecting
+					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, true, false)}
+			</div>
+			<div class="flex-1 min-w-0 truncate ${mobile ? "text-sm" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			${childBadge}
+			${mobile
+				? buttons
+				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
+					${buttons}
+				</div>`}
+		</div>
+	`;
+}
 
 // ============================================================================
 // UNIFIED GOAL GROUP
@@ -219,13 +282,32 @@ export function renderGoalGroup(goal: Goal) {
 		</div>
 	` : "";
 
+	// Separate team lead from swarm children for nested rendering
+	const teamLead = isSwarmGoal ? goalSessions.find(s => s.role === "team-lead") : null;
+	const swarmChildren = isSwarmGoal && teamLead ? goalSessions.filter(s => s.id !== teamLead.id) : [];
+	const nonSwarmSessions = isSwarmGoal ? goalSessions.filter(s => !teamLead || (s.id !== teamLead.id && !swarmChildren.includes(s))) : goalSessions;
+
+	const renderSwarmGroup = () => {
+		if (!teamLead) return goalSessions.map(renderSessionRow);
+		const tlExpanded = isTeamLeadExpanded(teamLead.id);
+		return html`
+			${renderTeamLeadRow(teamLead, swarmChildren.length, tlExpanded)}
+			${tlExpanded ? html`
+				<div class="flex flex-col gap-0.5" style="padding-left:12px;">
+					${swarmChildren.map(renderSessionRow)}
+				</div>
+			` : ""}
+			${nonSwarmSessions.map(renderSessionRow)}
+		`;
+	};
+
 	return html`
 		<div class="flex flex-col ${goal.state === "shelved" ? "opacity-60" : ""}">
 			<div class="${mobile ? "" : "group relative"} flex items-center gap-1 px-1 ${mobile ? "py-1" : "py-0.5"} rounded-md cursor-pointer ${mobile ? "active:bg-secondary/50" : "hover:bg-secondary/50"} transition-colors"
 				@click=${toggleExpand}
 				@dblclick=${!mobile ? () => { if (goal.swarm) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } } : null}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
-				<span class="flex-1 min-w-0 truncate text-[10px] text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
+				<span class="flex-1 min-w-0 truncate ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
 				${mobile
 					? dashboardBtn
 					: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
@@ -234,7 +316,7 @@ export function renderGoalGroup(goal: Goal) {
 			</div>
 			${isExpanded ? html`
 				<div class="flex flex-col gap-0.5">
-					${goalSessions.length === 0 && !isCreatingHere ? emptyState : goalSessions.map(renderSessionRow)}
+					${goalSessions.length === 0 && !isCreatingHere ? emptyState : (isSwarmGoal ? renderSwarmGroup() : goalSessions.map(renderSessionRow))}
 					${isCreatingHere ? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground flex items-center gap-1">
 						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
 						Creating…

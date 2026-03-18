@@ -9,6 +9,8 @@ import {
 	ungroupedExpanded,
 	setUngroupedExpanded,
 	saveExpandedGoals,
+	toggleTeamLeadExpanded,
+	isTeamLeadExpanded,
 	type Goal,
 	type GoalState,
 } from "./state.js";
@@ -144,11 +146,38 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 		`;
 	};
 
+	const renderCollapsedGoalSessions = (goalSessions: GatewaySession[], goal: Goal) => {
+		const isSwarm = !!(goal as any).swarm;
+		const teamLead = isSwarm ? goalSessions.find(s => s.role === "team-lead") : null;
+		if (!teamLead) return goalSessions.map(s => renderCollapsedSession(s));
+
+		const children = goalSessions.filter(s => s.id !== teamLead.id);
+		const tlExpanded = isTeamLeadExpanded(teamLead.id);
+		const tlActive = activeSessionId() === teamLead.id;
+		const tlTitle = tlActive && state.remoteAgent ? state.remoteAgent.title : teamLead.title;
+
+		return html`
+			<button
+				class="flex items-center gap-0.5 ${SESSION_ROW_PY} px-1 rounded-md transition-colors w-full ${tlActive ? "bg-secondary" : "hover:bg-secondary/50"}"
+				@mouseenter=${(e: MouseEvent) => showSessionTooltip(e, teamLead, tlTitle)}
+				@mouseleave=${hideSessionTooltip}
+				@click=${() => { if (!tlActive) connectToSession(teamLead.id, true); }}
+			>
+				<span class="text-[9px] text-muted-foreground shrink-0 select-none" style="width:8px;text-align:center;cursor:pointer;"
+					@click=${(e: Event) => { e.stopPropagation(); toggleTeamLeadExpanded(teamLead.id); renderApp(); }}
+				>${children.length > 0 ? (tlExpanded ? "▾" : "▸") : ""}</span>
+				${statusBobbit(teamLead.status, teamLead.isCompacting, teamLead.id, tlActive, teamLead.isAborting, true, false)}
+				<span class="text-[8px] font-bold tracking-wide ${tlActive ? "text-foreground" : "text-muted-foreground"}" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(tlTitle)}</span>
+			</button>
+			${tlExpanded ? children.map(s => html`<div style="padding-left:6px;">${renderCollapsedSession(s)}</div>`) : ""}
+		`;
+	};
+
 	return html`
 		<div class="w-14 shrink-0 h-full flex flex-col items-center sidebar-edge" style="background: var(--sidebar);">
 			<div class="flex-1 overflow-y-auto flex flex-col items-center gap-0.5 py-2 px-0.5">
 				${sortedGoals.map((goal, i) => {
-					const goalSessions = allSessions.filter((s) => s.goalId === goal.id || s.swarmGoalId === goal.id);
+					const goalSessions = allSessions.filter((s) => (s.goalId === goal.id || s.swarmGoalId === goal.id) && !s.delegateOf);
 					const expanded = expandedGoals.has(goal.id);
 					return html`
 						${i > 0 ? html`<div class="w-7 border-t border-border/50 my-1.5"></div>` : ""}
@@ -160,7 +189,7 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 							<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${expanded ? "▾" : "▸"}</span>
 							<span class="text-[10px] font-extrabold tracking-wider text-muted-foreground" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(goal.title)}</span>
 						</button>
-						${expanded ? goalSessions.map(renderCollapsedSession) : ""}
+						${expanded ? renderCollapsedGoalSessions(goalSessions, goal) : ""}
 					`;
 				})}
 				${sortedGoals.length > 0 ? html`

@@ -95,10 +95,14 @@ export async function refreshSessions(): Promise<void> {
 
 		if (goalsRes.ok) {
 			const goalsData = await goalsRes.json();
+			const prevGoalIds = new Set(state.goals.map((g) => g.id));
 			state.goals = goalsData.goals || [];
+			// Auto-expand only newly discovered goals that have sessions — never
+			// re-expand a goal the user has already seen (and may have collapsed).
 			for (const g of state.goals) {
-				if (state.gatewaySessions.some((s) => s.goalId === g.id)) {
+				if (!prevGoalIds.has(g.id) && state.gatewaySessions.some((s) => s.goalId === g.id)) {
 					expandedGoals.add(g.id);
+					saveExpandedGoals();
 				}
 			}
 		}
