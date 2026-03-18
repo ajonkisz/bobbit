@@ -44,11 +44,16 @@ export function createGateway(config: GatewayConfig) {
 	});
 	const protocol = config.tls ? "https" : "http";
 	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
+
+	// Write gateway URL to disk so agents can discover it without env vars
+	const piDir = path.join(os.homedir(), ".pi");
+	fs.mkdirSync(piDir, { recursive: true });
+	fs.writeFileSync(path.join(piDir, "gateway-url"), gatewayUrl, "utf-8");
+
 	const colorStore = new ColorStore();
 	const swarmManager = new SwarmManager(sessionManager, {
-		gatewayUrl,
-		authToken: config.authToken,
 		colorStore,
+		taskManager: sessionManager.taskManager,
 	});
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
@@ -182,6 +187,37 @@ async function handleApiRoute(
 			colorIndex: colorStore.get(s.id),
 		}));
 		json({ sessions });
+		return;
+	}
+
+	// GET /api/sessions/:id (exact match — not /api/sessions/:id/output etc.)
+	const singleSessionMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)$/);
+	if (singleSessionMatch && req.method === "GET") {
+		const id = singleSessionMatch[1];
+		const session = sessionManager.getSession(id);
+		if (!session) {
+			res.writeHead(404);
+			res.end(JSON.stringify({ error: "Session not found" }));
+			return;
+		}
+		json({
+			id: session.id,
+			title: session.title,
+			cwd: session.cwd,
+			status: session.status,
+			createdAt: session.createdAt,
+			lastActivity: session.lastActivity,
+			clientCount: session.clients.size,
+			isCompacting: session.isCompacting,
+			goalId: session.goalId,
+			goalAssistant: session.goalAssistant,
+			delegateOf: session.delegateOf,
+			role: session.role,
+			swarmGoalId: session.swarmGoalId,
+			worktreePath: session.worktreePath,
+			taskId: session.taskId,
+			colorIndex: colorStore.get(session.id),
+		});
 		return;
 	}
 

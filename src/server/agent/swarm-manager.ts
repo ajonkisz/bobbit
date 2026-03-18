@@ -7,6 +7,7 @@ import { SwarmStore } from "./swarm-store.js";
 import type { PersistedSwarmEntry } from "./swarm-store.js";
 import { generateSwarmName } from "./swarm-names.js";
 import type { ColorStore } from "./color-store.js";
+import type { TaskManager } from "./task-manager.js";
 
 
 export interface SwarmAgent {
@@ -50,17 +51,16 @@ interface SwarmEntry {
  * with isolated git worktrees.
  */
 export interface SwarmManagerConfig {
-	/** Base URL of the gateway (e.g. "https://10.5.0.2:3000") */
-	gatewayUrl: string;
-	/** Auth token for the gateway REST API */
-	authToken: string;
 	/** Color store for assigning unique palette indices to swarm sessions */
 	colorStore: ColorStore;
+	/** Task manager for looking up tasks assigned to sessions */
+	taskManager: TaskManager;
 }
 
 export class SwarmManager {
 	private sessionManager: SessionManager;
 	private config: SwarmManagerConfig;
+	private taskManager: TaskManager;
 	private swarms = new Map<string, SwarmEntry>();
 	private store: SwarmStore;
 
@@ -70,6 +70,7 @@ export class SwarmManager {
 	constructor(sessionManager: SessionManager, config: SwarmManagerConfig) {
 		this.sessionManager = sessionManager;
 		this.config = config;
+		this.taskManager = config.taskManager;
 		this.store = new SwarmStore();
 		this.restoreSwarms();
 	}
@@ -189,11 +190,6 @@ export class SwarmManager {
 		// Create the team lead session under the goal, with role prompt appended to goal spec
 		const session = await this.sessionManager.createSession(cwd, undefined, goalId, false, {
 			rolePrompt: teamLeadPrompt,
-			env: {
-				BOBBIT_GATEWAY_URL: this.config.gatewayUrl,
-				BOBBIT_AUTH_TOKEN: this.config.authToken,
-				BOBBIT_GOAL_ID: goalId,
-			},
 		});
 
 		// Assign a unique color and title
@@ -324,6 +320,14 @@ export class SwarmManager {
 				console.error('[swarm-manager] Failed to send task prompt:', err);
 			});
 
+			// Subscribe to worker events to steer the team lead when the worker goes idle
+			session.rpcClient.onEvent((event: any) => {
+				if (event.type !== "agent_end") return;
+				this.notifyTeamLead(goalId, session.id, role, agentId).catch((err) => {
+					console.error("[swarm-manager] Failed to notify team lead:", err);
+				});
+			});
+
 			console.log(
 				`[swarm-manager] Spawned ${role} agent (${session.id}) for goal "${goal.title}" — worktree: ${worktreeResult.worktreePath}`,
 			);
@@ -338,6 +342,36 @@ export class SwarmManager {
 				console.error(`[swarm-manager] Failed to clean up orphaned worktree ${worktreeResult.worktreePath}:`, cleanupErr);
 			}
 			throw err;
+		}
+	}
+
+	/**
+	 * Notify the team lead that a worker agent has gone idle.
+	 * Sends a steer message with task context so the team lead can decide next steps.
+	 */
+	private async notifyTeamLead(goalId: string, workerSessionId: string, role: string, agentId: string): Promise<void> {
+		const entry = this.swarms.get(goalId);
+		if (!entry?.teamLeadSessionId) return;
+
+		const teamLeadSession = this.sessionManager.getSession(entry.teamLeadSessionId);
+		if (!teamLeadSession || teamLeadSession.status === "terminated") return;
+
+		// Look up tasks assigned to the worker
+		const tasks = this.taskManager.getTasksForSession(workerSessionId);
+
+		let message: string;
+		if (tasks.length > 0) {
+			const taskSummaries = tasks.map(t => `"${t.title}" (state: ${t.state})`).join(", ");
+			message = `Agent ${agentId} (${role}) has finished. Tasks: ${taskSummaries}. Check tasks and decide next steps.`;
+		} else {
+			message = `Agent ${agentId} (${role}) has finished with no assigned tasks. Check tasks and decide next steps.`;
+		}
+
+		try {
+			await teamLeadSession.rpcClient.steer(message);
+			console.log(`[swarm-manager] Steered team lead for goal ${goalId}: ${message}`);
+		} catch (err) {
+			console.error(`[swarm-manager] Failed to steer team lead for goal ${goalId}:`, err);
 		}
 	}
 

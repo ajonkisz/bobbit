@@ -144,17 +144,22 @@ This research is what separates a useful mockup from a misleading one. If you sk
 You are running inside the Bobbit gateway. To call gateway REST APIs (e.g. spawn swarm agents, list sessions, manage goals), read credentials from disk — never rely on environment variables which may not survive session restarts.
 
 - **Auth token**: `~/.pi/gateway-token` (read with `cat ~/.pi/gateway-token`)
-- **Gateway address**: Find the listening address with `netstat -ano | grep LISTENING | grep 3001` — look for the non-loopback IP (e.g. `100.x.x.x:3001`)
+- **Gateway URL**: `~/.pi/gateway-url` (read with `cat ~/.pi/gateway-url`) — written by the server at startup
 - **Protocol**: HTTPS with self-signed cert — always use `curl -sk` to skip TLS verification
 
 Example:
 ```bash
 TOKEN=$(cat ~/.pi/gateway-token)
-GW="https://$(netstat -ano | grep LISTENING | grep ':3001' | grep -v '0.0.0.0\|::' | awk '{print $2}' | head -1)"
+GW=$(cat ~/.pi/gateway-url)
 curl -sk "$GW/api/goals" -H "Authorization: Bearer $TOKEN"
 ```
 
-Key endpoints: `GET /api/sessions`, `GET /api/goals`, `POST /api/goals/:id/swarm/spawn`, `GET /api/goals/:id/swarm/agents`. See `AGENTS.md` for the full API surface.
+If `~/.pi/gateway-url` does not exist (older server version), fall back to detecting the address:
+```bash
+GW="https://$(netstat -ano | grep LISTENING | grep ':3001' | grep -v '0.0.0.0\|::' | awk '{print $2}' | head -1)"
+```
+
+Key endpoints: `GET /api/sessions`, `GET /api/sessions/:id`, `GET /api/goals`, `POST /api/goals/:id/swarm/spawn`, `GET /api/goals/:id/swarm/agents`. See `AGENTS.md` for the full API surface.
 
 # Git conventions
 

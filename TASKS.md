@@ -1,11 +1,12 @@
 ## Backlog
 
 ## In Progress
-- [ ] #4 Fix back button: navigate to all sessions on back from goal-dashboard sessions — role:coder, claimed-by:coder-18e43ca2
 
 ## Done
-- [x] #1 Sleep for 120 seconds and report completion — role:coder, completed-by:coder-461f871f
-- [x] #2 Sleep for 120 seconds and report completion — role:coder, completed-by:coder-6e32f263
-- [x] #3 Sleep for 120 seconds and report completion — role:coder, completed-by:coder-cc011e83
+- [x] #1 Pass env vars to worker sessions in spawnRole() — role:coder, completed-by:coder-09fee49e
+- [x] #2 Rewrite swarm prompts to use Task REST API instead of TASKS.md — role:coder, completed-by:coder-d7bd2c6b
+- [x] #3 Add event-driven steer notifications in SwarmManager — role:coder, completed-by:coder-38c1d000
+- [x] #4 Review all changes — role:reviewer, completed-by:reviewer-f0f4c0c8
 
 ## Findings
+- No critical issues found. All verification criteria met.
