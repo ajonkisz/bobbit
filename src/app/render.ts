@@ -17,8 +17,6 @@ import {
 	saveExpandedGoals,
 	ungroupedExpanded,
 	setUngroupedExpanded,
-	GOAL_STATE_LABELS,
-	GOAL_STATE_COLORS,
 	type GoalState,
 } from "./state.js";
 import { createGoal, gatewayFetch, refreshSessions, startSwarm, teardownSwarm } from "./api.js";
@@ -26,7 +24,7 @@ import { clearSessionModel } from "./routing.js";
 import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { renderSidebar } from "./sidebar.js";
-import { goalStateIcon, formatSessionAge } from "./render-helpers.js";
+
 import type { GatewaySession } from "./state.js";
 import { statusBobbit } from "./session-colors.js";
 
@@ -48,7 +46,7 @@ import "./goal-dashboard.css";
 /** Track which goals have a swarm start/stop in flight (mobile landing). */
 const mobileSwarmLoading = new Set<string>();
 
-/** Compact session row for mobile — mirrors sidebar row, touch-friendly size */
+/** Compact session row for mobile — mirrors sidebar row with always-visible buttons */
 function renderMobileSessionRow(session: GatewaySession) {
 	const active = activeSessionId() === session.id;
 	const connecting = state.connectingSessionId === session.id;
@@ -56,17 +54,22 @@ function renderMobileSessionRow(session: GatewaySession) {
 	const isActive = session.status === "streaming" || session.status === "busy" || session.isCompacting;
 	return html`
 		<div
-			class="flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors
+			class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md cursor-pointer transition-colors
 				${active ? "bg-secondary text-foreground" : connecting ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground active:bg-secondary/50"}"
 			@click=${() => { if (!active && !connecting) connectToSession(session.id, true); }}
 		>
-			<div class="shrink-0">
+			<div class="shrink-0 flex items-center justify-center">
 				${connecting
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead", session.role === "coder")}
 			</div>
-			<span class="flex-1 min-w-0 truncate text-xs ${isActive ? "font-semibold text-foreground" : ""}">${displayTitle}</span>
-			<span class="shrink-0 text-[10px] text-muted-foreground/60">${formatSessionAge(session.lastActivity)}</span>
+			<div class="flex-1 min-w-0 truncate text-xs ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			<button class="shrink-0 p-1.5 rounded text-muted-foreground active:bg-secondary/80"
+				@click=${(e: Event) => { e.stopPropagation(); showRenameDialog(session.id, displayTitle); }}
+				title="Rename">${icon(Pencil, "xs")}</button>
+			<button class="shrink-0 p-1.5 rounded text-muted-foreground active:bg-destructive/10"
+				@click=${(e: Event) => { e.stopPropagation(); terminateSession(session.id); }}
+				title="Terminate">${icon(Trash2, "xs")}</button>
 		</div>
 	`;
 }
@@ -110,44 +113,29 @@ function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; st
 
 	return html`
 		<div class="flex flex-col ${goal.state === "shelved" ? "opacity-60" : ""}">
-			<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer active:bg-secondary/50 transition-colors" @click=${toggleExpand}>
-				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:14px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
-				<span class="shrink-0">${goalStateIcon(goal.state, 14)}</span>
+			<div class="flex items-center gap-1 px-1 py-1 rounded-md cursor-pointer active:bg-secondary/50 transition-colors" @click=${toggleExpand}>
+				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
 				<span class="flex-1 min-w-0 truncate text-[10px] text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
-				${activeSessions.length > 0 ? html`<span class="shrink-0 text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary font-medium">${activeSessions.length}</span>` : ""}
+				<button class="shrink-0 p-1.5 rounded text-muted-foreground active:bg-secondary/80"
+					@click=${(e: Event) => { e.stopPropagation(); setHashRoute("goal-dashboard", goal.id); }}
+					title="Goal dashboard">${icon(LayoutDashboard, "xs")}</button>
 			</div>
 			${isExpanded ? html`
-				<div class="flex flex-col gap-0.5 mt-0.5">
-					${goalSessions.length > 0
-						? goalSessions.map(renderMobileSessionRow)
-						: html`<div class="px-8 py-1.5 text-[11px] text-muted-foreground">
+				<div class="flex flex-col gap-0.5">
+					${goalSessions.length === 0
+						? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground">
 								${isSwarmGoal
-									? html`No agents — <button class="text-primary" @click=${handleStartSwarm}>start swarm</button>`
+									? html`No agents — <button class="text-primary" @click=${handleStartSwarm}>${isLoading ? "starting\u2026" : "start swarm"}</button>`
 									: html`No sessions — <button class="text-primary" @click=${() => createAndConnectSession(goal.id)}>start one</button>`}
-							</div>`}
-					<div class="flex items-center gap-1 px-3 py-1">
-						${isSwarmGoal ? (hasActiveSwarm
-							? html`<button class="text-[10px] text-destructive/80 px-1.5 py-0.5 rounded active:bg-destructive/10 transition-colors"
-								@click=${handleEndSwarm} ?disabled=${isLoading}>
-								${isLoading ? "Stopping\u2026" : "End Swarm"}
-							</button>`
-							: html`<button class="text-[10px] text-primary px-1.5 py-0.5 rounded active:bg-primary/10 transition-colors"
-								@click=${handleStartSwarm} ?disabled=${isLoading}>
-								${isLoading ? "Starting\u2026" : "Start Swarm"}
-							</button>`
-						) : ""}
-						<button class="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded active:bg-secondary/50 transition-colors"
-							@click=${() => createAndConnectSession(goal.id)}>+ Session</button>
-						<button class="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded active:bg-secondary/50 transition-colors"
-							@click=${() => setHashRoute("goal-dashboard", goal.id)}>${icon(LayoutDashboard, "xs")}</button>
-					</div>
-				</div>
-			` : goalSessions.length > 0 ? html`
-				<div class="flex items-center gap-1 px-8 pb-1 -mt-0.5">
-					${goalSessions.slice(0, 8).map(s => html`
-						<span class="shrink-0">${statusBobbit(s.status, s.isCompacting, s.id, activeSessionId() === s.id, s.isAborting, s.role === "team-lead", s.role === "coder")}</span>
-					`)}
-					${goalSessions.length > 8 ? html`<span class="text-[9px] text-muted-foreground">+${goalSessions.length - 8}</span>` : ""}
+							</div>`
+						: goalSessions.map(renderMobileSessionRow)}
+					${goalSessions.length > 0 && isSwarmGoal ? html`
+						<div class="pl-3 py-0.5 text-[10px] text-muted-foreground">
+							${hasActiveSwarm
+								? html`<button class="text-destructive/80" @click=${handleEndSwarm} ?disabled=${isLoading}>${isLoading ? "stopping\u2026" : "end swarm"}</button>`
+								: html`<button class="text-primary" @click=${handleStartSwarm} ?disabled=${isLoading}>${isLoading ? "starting\u2026" : "start swarm"}</button>`}
+						</div>
+					` : ""}
 				</div>
 			` : ""}
 		</div>
