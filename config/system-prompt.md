@@ -159,6 +159,8 @@ Key endpoints: `GET /api/sessions`, `GET /api/goals`, `POST /api/goals/:id/swarm
 
 The primary branch in this repo is `master` (not `main`). If the user says "main branch", "merge to main", or similar, treat it as `master`. Do not create a `main` branch. Always verify the actual default branch with `git symbolic-ref refs/remotes/origin/HEAD` or `git branch -r` before assuming a branch name.
 
+**Never use the word "main" when referring to the primary branch or primary worktree.** Say `master` for the branch and "primary worktree" (or "root worktree") for the worktree checked out on `master`. The word "main" is reserved for repos whose primary branch is literally called `main` — using it loosely when the branch is `master` causes real confusion.
+
 ## Working directory and branch discipline
 
 Your session has a designated working directory (shown in the stats bar). Stay in this directory for all file operations and git commands. Do not `cd` into unrelated directories or operate on other local repositories unless the user explicitly asks you to.
@@ -170,19 +172,19 @@ If the session is associated with a git branch (e.g. a goal branch), work on tha
 
 When in doubt, run `git rev-parse --abbrev-ref HEAD` to confirm you are on the expected branch before making commits.
 
-## Main worktree and dev server
+## Primary worktree and dev server
 
-The dev server (Vite + gateway) runs from the **main worktree** at `C:\Users\jsubr\w\bobbit`, which is checked out on `master`. Goal and agent sessions work in separate **git worktrees** under `C:\Users\jsubr\w\bobbit-wt-goal\`.
+The dev server (Vite + gateway) runs from the **primary worktree** at `C:\Users\jsubr\w\bobbit`, which is checked out on `master`. Goal and agent sessions work in separate **git worktrees** under `C:\Users\jsubr\w\bobbit-wt-goal\`.
 
-**Pushing to remote `master` does NOT update the running dev server.** After merging changes to remote master, you must pull them into the main worktree for the dev server to pick them up:
+**Pushing to remote `master` does NOT update the running dev server.** After merging changes to remote master, you must pull them into the primary worktree for the dev server to pick them up:
 
 ```bash
 cd /c/Users/jsubr/w/bobbit && git pull origin master
 ```
 
-UI changes (`src/ui/`, `src/app/`) hot-reload via Vite after the pull. Server changes (`src/server/`) additionally require `npm run restart-server` from the main worktree.
+UI changes (`src/ui/`, `src/app/`) hot-reload via Vite after the pull. Server changes (`src/server/`) additionally require `npm run restart-server` from the primary worktree.
 
-You cannot `git checkout master` from a goal worktree (it's already checked out in the main worktree). Instead, push to remote and pull from the main worktree as shown above.
+You cannot `git checkout master` from a goal worktree (it's already checked out in the primary worktree). Instead, push to remote and pull from the primary worktree as shown above.
 
 # Output style
 
