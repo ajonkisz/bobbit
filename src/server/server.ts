@@ -13,6 +13,8 @@ import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
 import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
 import { SwarmManager } from "./agent/swarm-manager.js";
+import { RoleStore } from "./agent/role-store.js";
+import { RoleManager } from "./agent/role-manager.js";
 import type { TaskType, TaskState } from "./agent/task-store.js";
 
 const VALID_TASK_TYPES = new Set<string>(["architecture", "design-review", "mock-generation", "tdd-tests", "implementation", "code-review", "security-review", "documentation", "testing", "bug-fix", "refactor", "custom"]);
@@ -51,9 +53,12 @@ export function createGateway(config: GatewayConfig) {
 	fs.writeFileSync(path.join(piDir, "gateway-url"), gatewayUrl, "utf-8");
 
 	const colorStore = new ColorStore();
+	const roleStore = new RoleStore();
+	const roleManager = new RoleManager(roleStore);
 	const swarmManager = new SwarmManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
+		roleStore,
 	});
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
@@ -66,7 +71,7 @@ export function createGateway(config: GatewayConfig) {
 			// When serving the UI (same-origin), reflect the request origin; otherwise allow any
 			const corsOrigin = config.staticDir ? (req.headers.origin || "*") : "*";
 			res.setHeader("Access-Control-Allow-Origin", corsOrigin);
-			res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+			res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
 			res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 
 			if (req.method === "OPTIONS") {
@@ -94,7 +99,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, swarmManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, swarmManager, roleManager);
 			return;
 		}
 
@@ -168,6 +173,7 @@ async function handleApiRoute(
 	config: GatewayConfig,
 	colorStore: ColorStore,
 	swarmManager: SwarmManager,
+	roleManager: RoleManager,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -250,6 +256,7 @@ async function handleApiRoute(
 		// ── Normal session creation ──
 		const goalId = body?.goalId;
 		const goalAssistant = body?.goalAssistant === true;
+		const roleAssistant = body?.roleAssistant === true;
 
 		// If creating under a goal, use the goal's cwd as default
 		let cwd = body?.cwd || config.defaultCwd;
@@ -267,13 +274,14 @@ async function handleApiRoute(
 		const args = body?.args;
 
 		try {
-			const session = await sessionManager.createSession(cwd, args, goalId, goalAssistant);
+			const session = await sessionManager.createSession(cwd, args, goalId, goalAssistant, roleAssistant ? { roleAssistant: true } : undefined);
 			json({
 				id: session.id,
 				cwd: session.cwd,
 				status: session.status,
 				goalId: session.goalId,
 				goalAssistant: session.goalAssistant,
+				roleAssistant: session.roleAssistant,
 			}, 201);
 		} catch (err) {
 			json({ error: String(err) }, 500);
@@ -338,6 +346,72 @@ async function handleApiRoute(
 		if (req.method === "DELETE") {
 			sessionManager.taskManager.deleteTasksForGoal(id);
 			sessionManager.goalManager.deleteGoal(id);
+			json({ ok: true });
+			return;
+		}
+	}
+
+	// ── Role endpoints ─────────────────────────────────────────────
+
+	// GET /api/tools — list available agent tools
+	if (url.pathname === "/api/tools" && req.method === "GET") {
+		json({ tools: roleManager.getAvailableTools() });
+		return;
+	}
+
+	// GET /api/roles
+	if (url.pathname === "/api/roles" && req.method === "GET") {
+		json({ roles: roleManager.listRoles() });
+		return;
+	}
+
+	// POST /api/roles
+	if (url.pathname === "/api/roles" && req.method === "POST") {
+		const body = await readBody(req);
+		try {
+			const role = roleManager.createRole({
+				name: body?.name,
+				label: body?.label,
+				promptTemplate: body?.promptTemplate || "",
+				allowedTools: body?.allowedTools,
+				accessory: body?.accessory,
+			});
+			json(role, 201);
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
+	}
+
+	// Routes with role :name parameter
+	const roleMatch = url.pathname.match(/^\/api\/roles\/([^/]+)$/);
+	if (roleMatch) {
+		const name = decodeURIComponent(roleMatch[1]);
+
+		if (req.method === "GET") {
+			const role = roleManager.getRole(name);
+			if (!role) { json({ error: "Role not found" }, 404); return; }
+			json(role);
+			return;
+		}
+
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			const ok = roleManager.updateRole(name, {
+				label: body.label,
+				promptTemplate: body.promptTemplate,
+				allowedTools: body.allowedTools,
+				accessory: body.accessory,
+			});
+			if (!ok) { json({ error: "Role not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
+
+		if (req.method === "DELETE") {
+			const ok = roleManager.deleteRole(name);
+			if (!ok) { json({ error: "Role not found" }, 404); return; }
 			json({ ok: true });
 			return;
 		}

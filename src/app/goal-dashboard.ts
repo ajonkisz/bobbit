@@ -270,7 +270,7 @@ function renderTaskCard(task: Task): TemplateResult {
 							e.stopPropagation();
 							setHashRoute("session", assignee.id, true);
 						}}>
-							${statusBobbit(assignee.status, assignee.isCompacting, assignee.id, false, assignee.isAborting, assignee.role === "team-lead")}
+							${statusBobbit(assignee.status, assignee.isCompacting, assignee.id, false, assignee.isAborting, assignee.role === "team-lead", assignee.role === "coder", assignee.accessory)}
 							<span class="kanban-assignee-name">${assignee.title || assignee.id.slice(0, 8)}</span>
 						</span>
 					` : nothing}

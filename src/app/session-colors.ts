@@ -3,6 +3,173 @@ import { patchSession } from "./api.js";
 import { activeSessionId, renderApp } from "./state.js";
 
 // ============================================================================
+// ACCESSORY REGISTRY
+// ============================================================================
+
+/** Definition for a pixel-art accessory overlay rendered on the Bobbit sprite. */
+export interface AccessoryDefinition {
+	/** Unique identifier (e.g. "crown", "bandana") */
+	id: string;
+	/** Human-readable label */
+	label: string;
+	/** CSS box-shadow pixel string (at 1px scale, rendered at 1.6× via transform) */
+	shadow: string;
+	/** Vertical offset in px for positioning on the Bobbit head */
+	yOffset: number;
+	/** Whether this accessory adds height above the sprite (like crown) */
+	addsHeight: boolean;
+}
+
+/**
+ * All available pixel-art accessories for Bobbit sprites.
+ * Each is a CSS box-shadow grid counter-hue-rotated to keep fixed colours
+ * across session identity hues.
+ */
+export const ACCESSORIES: Record<string, AccessoryDefinition> = {
+	none: {
+		id: "none",
+		label: "None",
+		shadow: "",
+		yOffset: 0,
+		addsHeight: false,
+	},
+	crown: {
+		id: "crown",
+		label: "Crown",
+		shadow: `
+			3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,
+			2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,
+			1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,
+			1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,
+			1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000
+		`,
+		yOffset: 2,
+		addsHeight: true,
+	},
+	bandana: {
+		id: "bandana",
+		label: "Bandana",
+		shadow: `
+			1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,
+			0 3px 0 #000,1px 3px 0 #b91c1c,2px 3px 0 #dc2626,3px 3px 0 #ef4444,4px 3px 0 #ef4444,5px 3px 0 #ef4444,6px 3px 0 #ef4444,7px 3px 0 #ef4444,8px 3px 0 #f87171,9px 3px 0 #000,
+			0 4px 0 #000,1px 4px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,
+			10px 3px 0 #000,10px 4px 0 #b91c1c,11px 4px 0 #000,
+			10px 5px 0 #991b1b,11px 5px 0 #000,10px 6px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
+	magnifier: {
+		id: "magnifier",
+		label: "Magnifying Glass",
+		shadow: `
+			4px -2px 0 #000,5px -2px 0 #000,6px -2px 0 #000,
+			3px -1px 0 #000,4px -1px 0 #87ceeb,5px -1px 0 #b0e0f0,6px -1px 0 #87ceeb,7px -1px 0 #000,
+			3px 0 0 #000,4px 0 0 #b0e0f0,5px 0 0 #e0f4ff,6px 0 0 #87ceeb,7px 0 0 #000,
+			3px 1px 0 #000,4px 1px 0 #87ceeb,5px 1px 0 #b0e0f0,6px 1px 0 #87ceeb,7px 1px 0 #000,
+			4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,
+			8px 3px 0 #8b4513,9px 3px 0 #000,
+			9px 4px 0 #8b4513,10px 4px 0 #000,
+			10px 5px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
+	goggles: {
+		id: "goggles",
+		label: "Goggles",
+		shadow: `
+			1px 1px 0 #000,2px 1px 0 #000,3px 1px 0 #000,4px 1px 0 #000,5px 1px 0 #000,6px 1px 0 #000,7px 1px 0 #000,8px 1px 0 #000,9px 1px 0 #000,
+			1px 2px 0 #000,2px 2px 0 #60a5fa,3px 2px 0 #93c5fd,4px 2px 0 #000,5px 2px 0 #6b7280,6px 2px 0 #000,7px 2px 0 #60a5fa,8px 2px 0 #93c5fd,9px 2px 0 #000,
+			1px 3px 0 #000,2px 3px 0 #3b82f6,3px 3px 0 #60a5fa,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #3b82f6,8px 3px 0 #60a5fa,9px 3px 0 #000,
+			2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,
+			0 2px 0 #000,0 3px 0 #6b7280,10px 2px 0 #000,10px 3px 0 #6b7280,11px 2px 0 #000,11px 3px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
+	headphones: {
+		id: "headphones",
+		label: "Headphones",
+		shadow: `
+			3px -1px 0 #000,4px -1px 0 #000,5px -1px 0 #000,6px -1px 0 #000,7px -1px 0 #000,
+			2px 0 0 #000,3px 0 0 #6b7280,4px 0 0 #9ca3af,5px 0 0 #9ca3af,6px 0 0 #9ca3af,7px 0 0 #6b7280,8px 0 0 #000,
+			1px 1px 0 #000,2px 1px 0 #000,8px 1px 0 #000,9px 1px 0 #000,
+			0 2px 0 #000,1px 2px 0 #4b5563,2px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #4b5563,10px 2px 0 #000,
+			0 3px 0 #000,1px 3px 0 #ef4444,2px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #ef4444,10px 3px 0 #000,
+			0 4px 0 #000,1px 4px 0 #dc2626,2px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #dc2626,10px 4px 0 #000,
+			1px 5px 0 #000,2px 5px 0 #000,8px 5px 0 #000,9px 5px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
+	pencil: {
+		id: "pencil",
+		label: "Pencil",
+		shadow: `
+			9px -2px 0 #000,10px -2px 0 #000,
+			8px -1px 0 #000,9px -1px 0 #fde047,10px -1px 0 #fbbf24,11px -1px 0 #000,
+			7px 0 0 #000,8px 0 0 #fde047,9px 0 0 #fbbf24,10px 0 0 #000,
+			6px 1px 0 #000,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,
+			5px 2px 0 #000,6px 2px 0 #fde047,7px 2px 0 #000,
+			4px 3px 0 #000,5px 3px 0 #f4a460,6px 3px 0 #000,
+			3px 4px 0 #000,4px 4px 0 #2d2d2d,5px 4px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
+	book: {
+		id: "book",
+		label: "Book",
+		shadow: `
+			2px 0 0 #000,3px 0 0 #000,4px 0 0 #000,5px 0 0 #000,6px 0 0 #000,7px 0 0 #000,
+			1px 1px 0 #000,2px 1px 0 #3b82f6,3px 1px 0 #60a5fa,4px 1px 0 #60a5fa,5px 1px 0 #60a5fa,6px 1px 0 #60a5fa,7px 1px 0 #3b82f6,8px 1px 0 #000,
+			1px 2px 0 #000,2px 2px 0 #2563eb,3px 2px 0 #f5f5f5,4px 2px 0 #d4d4d4,5px 2px 0 #f5f5f5,6px 2px 0 #d4d4d4,7px 2px 0 #2563eb,8px 2px 0 #000,
+			1px 3px 0 #000,2px 3px 0 #3b82f6,3px 3px 0 #60a5fa,4px 3px 0 #60a5fa,5px 3px 0 #60a5fa,6px 3px 0 #60a5fa,7px 3px 0 #3b82f6,8px 3px 0 #000,
+			2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
+	glasses: {
+		id: "glasses",
+		label: "Glasses",
+		shadow: `
+			2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,
+			1px 3px 0 #000,2px 3px 0 #e0e7ff,3px 3px 0 #c7d2fe,4px 3px 0 #000,5px 3px 0 #4b5563,6px 3px 0 #000,7px 3px 0 #e0e7ff,8px 3px 0 #c7d2fe,9px 3px 0 #000,
+			1px 4px 0 #000,2px 4px 0 #c7d2fe,3px 4px 0 #e0e7ff,4px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #c7d2fe,8px 4px 0 #e0e7ff,9px 4px 0 #000,
+			2px 5px 0 #000,3px 5px 0 #000,4px 5px 0 #000,7px 5px 0 #000,8px 5px 0 #000,9px 5px 0 #000,
+			0 3px 0 #000,10px 3px 0 #000,0 4px 0 #4b5563,10px 4px 0 #4b5563,11px 4px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
+	shield: {
+		id: "shield",
+		label: "Shield",
+		shadow: `
+			3px -1px 0 #000,4px -1px 0 #000,5px -1px 0 #000,6px -1px 0 #000,7px -1px 0 #000,
+			2px 0 0 #000,3px 0 0 #6b7280,4px 0 0 #9ca3af,5px 0 0 #d1d5db,6px 0 0 #9ca3af,7px 0 0 #6b7280,8px 0 0 #000,
+			2px 1px 0 #000,3px 1px 0 #9ca3af,4px 1px 0 #d1d5db,5px 1px 0 #f3f4f6,6px 1px 0 #d1d5db,7px 1px 0 #9ca3af,8px 1px 0 #000,
+			2px 2px 0 #000,3px 2px 0 #6b7280,4px 2px 0 #9ca3af,5px 2px 0 #d1d5db,6px 2px 0 #9ca3af,7px 2px 0 #6b7280,8px 2px 0 #000,
+			3px 3px 0 #000,4px 3px 0 #6b7280,5px 3px 0 #9ca3af,6px 3px 0 #6b7280,7px 3px 0 #000,
+			4px 4px 0 #000,5px 4px 0 #6b7280,6px 4px 0 #000,
+			5px 5px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
+};
+
+/** List of all accessory IDs (for iteration/UI selectors) */
+export const ACCESSORY_IDS = Object.keys(ACCESSORIES) as string[];
+
+/** Resolve an accessory ID, falling back to "none" */
+export function getAccessory(id: string | undefined): AccessoryDefinition {
+	return (id && ACCESSORIES[id]) || ACCESSORIES.none;
+}
+
+// ============================================================================
 // AURORA BOREALIS PALETTE
 // ============================================================================
 
@@ -67,9 +234,21 @@ export function sessionAcronym(title: string): string {
  * Tiny static Bobbit pixel-art icon used as a session status indicator.
  * Same 10×9 pixel grid as the streaming blob, but scaled down and colored
  * per session status. No animation, no blinking — just a little Bobbit.
+ *
+ * @param accessory - Accessory ID from the registry (e.g. "crown", "bandana").
+ *   When provided, overrides isTeamLead/isCoder. When absent, falls back to
+ *   the legacy booleans for backward compatibility.
  */
-export function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false, isAborting = false, isTeamLead = false, isCoder = false) {
+export function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false, isAborting = false, isTeamLead = false, isCoder = false, accessory?: string) {
 	const hueRotate = sessionId ? sessionHueRotation(sessionId) : 0;
+
+	// Resolve which accessory to render: explicit param > legacy booleans > none
+	const resolvedAccessoryId = accessory
+		?? (isTeamLead ? "crown" : isCoder ? "bandana" : "none");
+	const acc = getAccessory(resolvedAccessoryId);
+	const hasAccessory = acc.id !== "none" && acc.shadow !== "";
+	// Crown is the only accessory that adds height above the sprite
+	const addsHeight = acc.addsHeight;
 
 	const canonical = { main: "#8ec63f", light: "#b5d98a", dark: "#6b9930", eye: "#1a3010" };
 	let p: typeof canonical;
@@ -120,50 +299,30 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 		? `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 ${isCompacting ? "9px" : "0"};`
 		: baseTransform;
 
-	const eyeTop = isTeamLead ? "4px" : "0";
+	const eyeTop = addsHeight ? "4px" : "0";
 	const eyeLayer = isSelected
 		? html`<span style="position:absolute;left:0;top:${eyeTop};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
 		: "";
 
-	// Crown overlay for team leads — same pixel grid, not hue-rotated
-	const crownShadow = `
-		3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,
-		2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,
-		1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,
-		1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,
-		1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000
-	`;
-	// Counter-rotate crown so it keeps fixed gold colour regardless of identity hue
-	const crownFilter = hueRotate && status !== "starting" && status !== "terminated"
+	// Accessory overlay layer — counter-hue-rotated to keep fixed colours
+	const accFilter = hueRotate && status !== "starting" && status !== "terminated"
 		? `filter:hue-rotate(${-hueRotate}deg);`
 		: "";
-	const crownLayer = isTeamLead
-		? html`<span style="position:absolute;left:0;top:${isTeamLead ? "2px" : "0"};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${crownShadow};${baseTransform}${crownFilter}"></span>`
-		: "";
-
-	// Bandana overlay for coders — red bandana, counter-rotated to stay red
-	const bandanaShadow = `
-		1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,
-		0 3px 0 #000,1px 3px 0 #b91c1c,2px 3px 0 #dc2626,3px 3px 0 #ef4444,4px 3px 0 #ef4444,5px 3px 0 #ef4444,6px 3px 0 #ef4444,7px 3px 0 #ef4444,8px 3px 0 #f87171,9px 3px 0 #000,
-		0 4px 0 #000,1px 4px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,
-		10px 3px 0 #000,10px 4px 0 #b91c1c,11px 4px 0 #000,
-		10px 5px 0 #991b1b,11px 5px 0 #000,10px 6px 0 #000
-	`;
-	const bandanaFilter = hueRotate && status !== "starting" && status !== "terminated"
-		? `filter:hue-rotate(${-hueRotate}deg);`
-		: "";
-	const bandanaTransform = isCompacting
+	// Bandana needs a slight translateY adjustment; crown uses yOffset for top positioning
+	const isBandanaStyle = acc.id === "bandana";
+	const accTransform = isCompacting
 		? (compactSquish
 			? "transform-origin:0 9px;animation:bobbit-squish 1.5s ease-in-out infinite;"
-			: "transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4px);transform-origin:0 9px;")
-		: "transform:scale(1.6) translateY(-0.5px);transform-origin:0 0;";
-	const bandanaLayer = isCoder
-		? html`<span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${bandanaShadow};${bandanaTransform}${bandanaFilter}"></span>`
+			: `transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(${isBandanaStyle ? "4px" : "4.5px"});transform-origin:0 9px;`)
+		: `transform:scale(1.6)${isBandanaStyle ? " translateY(-0.5px)" : ""};transform-origin:0 0;`;
+	const accTop = addsHeight ? `${acc.yOffset}px` : "0";
+	const accessoryLayer = hasAccessory
+		? html`<span style="position:absolute;left:0;top:${accTop};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${acc.shadow};${accTransform}${accFilter}"></span>`
 		: "";
 
-	// Shift inner content down 2px when hatted so crown tips aren't clipped
-	const innerTop = isTeamLead ? "4px" : "0";
-	const containerHeight = isTeamLead ? "19px" : "15px";
+	// Shift inner content down when accessory adds height so tips aren't clipped
+	const innerTop = addsHeight ? "4px" : "0";
+	const containerHeight = addsHeight ? "19px" : "15px";
 
-	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:${containerHeight};flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}${cancelAnim}${idleAnim}"><span style="position:absolute;left:0;top:${innerTop};display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}${crownLayer}${bandanaLayer}</span>`;
+	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:${containerHeight};flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}${cancelAnim}${idleAnim}"><span style="position:absolute;left:0;top:${innerTop};display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}${accessoryLayer}</span>`;
 }

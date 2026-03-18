@@ -9,6 +9,7 @@ import { PromptQueue } from "./prompt-queue.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
+import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 import { CostTracker } from "./cost-tracker.js";
@@ -31,6 +32,8 @@ export interface SessionInfo {
 	goalId?: string;
 	/** True if this is a goal-creation assistant session */
 	goalAssistant?: boolean;
+	/** True if this is a role-creation assistant session */
+	roleAssistant?: boolean;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
 	/** Role in a swarm goal (e.g., 'coder', 'reviewer', 'tester', 'team-lead') */
@@ -41,6 +44,10 @@ export interface SessionInfo {
 	worktreePath?: string;
 	/** Task ID this session is working on */
 	taskId?: string;
+	/** Pixel-art accessory ID for the Bobbit sprite overlay */
+	accessory?: string;
+	/** Allowed tools for this session (empty array = all tools allowed) */
+	allowedTools?: string[];
 	/** Server-side prompt queue */
 	promptQueue: PromptQueue;
 	/** True if the last agent turn ended due to a model/API error */
@@ -211,6 +218,16 @@ export class SessionManager {
 		// Track tool execution during this turn
 		if (event.type === "tool_execution_start") {
 			session.turnHadToolCalls = true;
+
+			// Enforce allowedTools — warn when a disallowed tool is used
+			if (session.allowedTools && session.allowedTools.length > 0 && event.toolName) {
+				if (!session.allowedTools.includes(event.toolName)) {
+					console.warn(
+						`[session-manager] Session ${session.id} used disallowed tool "${event.toolName}". ` +
+						`Allowed: [${session.allowedTools.join(", ")}]`
+					);
+				}
+			}
 		}
 
 		if (event.type === "message_end" && event.message?.role === "assistant") {
@@ -409,10 +426,12 @@ export class SessionManager {
 			titleGenerated: ps.title !== "New session",
 			goalId: ps.goalId,
 			goalAssistant: ps.goalAssistant,
+			roleAssistant: ps.roleAssistant,
 			role: ps.role,
 			swarmGoalId: ps.swarmGoalId,
 			worktreePath: ps.worktreePath,
 			taskId: ps.taskId,
+			accessory: ps.accessory,
 			promptQueue: new PromptQueue(ps.messageQueue),
 		};
 
@@ -458,7 +477,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; allowedTools?: string[] }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -480,6 +499,16 @@ export class SessionManager {
 				goalState: "active",
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		} else if (opts?.roleAssistant) {
+			// Role assistant sessions get a special system prompt
+			const promptPath = assembleSystemPrompt(id, {
+				baseSystemPromptPath: undefined,
+				cwd,
+				goalSpec: ROLE_ASSISTANT_PROMPT,
+				goalTitle: "Role Creation Assistant",
+				goalState: "active",
+			});
+			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		} else {
 			// Normal sessions: global base + AGENTS.md from cwd + goal spec
 			const goal = goalId ? this.goalManager.getGoal(goalId) : undefined;
@@ -487,6 +516,12 @@ export class SessionManager {
 			// Append role prompt for swarm agents (role instructions after goal spec)
 			if (opts?.rolePrompt) {
 				goalSpec = (goalSpec ? goalSpec + "\n\n---\n\n" : "") + opts.rolePrompt;
+			}
+
+			// Append tool restrictions if allowedTools is specified and non-empty
+			if (opts?.allowedTools && opts.allowedTools.length > 0) {
+				const toolList = opts.allowedTools.join(", ");
+				goalSpec = (goalSpec || "") + `\n\n---\n\n## Tool Restrictions\n\nYou are ONLY allowed to use the following tools: ${toolList}\n\nDo NOT use any other tools. If a task requires a tool you don't have access to, explain what you need and ask for help instead of attempting to use the restricted tool.`;
 			}
 
 			// Build task context if taskId is provided
@@ -529,7 +564,7 @@ export class SessionManager {
 		const now = Date.now();
 		const session: SessionInfo = {
 			id,
-			title: goalAssistant ? "Goal Assistant" : "New session",
+			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : "New session",
 			cwd,
 			status: "starting",
 			createdAt: now,
@@ -539,10 +574,12 @@ export class SessionManager {
 			eventBuffer,
 			unsubscribe: () => {},
 			isCompacting: false,
-			titleGenerated: goalAssistant ? true : false,
+			titleGenerated: (goalAssistant || opts?.roleAssistant) ? true : false,
 			goalId,
 			goalAssistant,
+			roleAssistant: opts?.roleAssistant,
 			taskId: opts?.taskId,
+			allowedTools: opts?.allowedTools,
 			promptQueue: new PromptQueue(),
 		};
 
@@ -775,10 +812,12 @@ export class SessionManager {
 			lastActivity: session.lastActivity,
 			goalId: session.goalId,
 			goalAssistant: session.goalAssistant,
+			roleAssistant: session.roleAssistant,
 			role: session.role,
 			swarmGoalId: session.swarmGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
+			accessory: session.accessory,
 		});
 	}
 
@@ -802,6 +841,7 @@ export class SessionManager {
 		swarmGoalId?: string;
 		worktreePath?: string;
 		taskId?: string;
+		accessory?: string;
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -814,11 +854,13 @@ export class SessionManager {
 			isCompacting: s.isCompacting,
 			goalId: s.goalId,
 			goalAssistant: s.goalAssistant,
+			roleAssistant: s.roleAssistant,
 			delegateOf: s.delegateOf,
 			role: s.role,
 			swarmGoalId: s.swarmGoalId,
 			worktreePath: s.worktreePath,
 			taskId: s.taskId,
+			accessory: s.accessory,
 		}));
 	}
 
@@ -847,13 +889,14 @@ export class SessionManager {
 		return true;
 	}
 
-	/** Update session metadata fields (role, swarmGoalId, worktreePath) and persist. */
-	updateSessionMeta(id: string, updates: { role?: string; swarmGoalId?: string; worktreePath?: string }): boolean {
+	/** Update session metadata fields (role, swarmGoalId, worktreePath, accessory) and persist. */
+	updateSessionMeta(id: string, updates: { role?: string; swarmGoalId?: string; worktreePath?: string; accessory?: string }): boolean {
 		const session = this.sessions.get(id);
 		if (!session) return false;
 		if (updates.role !== undefined) session.role = updates.role;
 		if (updates.swarmGoalId !== undefined) session.swarmGoalId = updates.swarmGoalId;
 		if (updates.worktreePath !== undefined) session.worktreePath = updates.worktreePath;
+		if (updates.accessory !== undefined) session.accessory = updates.accessory;
 		this.store.update(id, updates);
 		return true;
 	}
