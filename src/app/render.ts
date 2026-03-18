@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, Crosshair, LayoutDashboard, Pencil, Play, Plus, QrCode, Server, Square, Trash2, Unplug } from "lucide";
+import { ArrowLeft, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug } from "lucide";
 import "../ui/components/WorkflowStatusBar.js";
 import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 import {
@@ -13,20 +13,17 @@ import {
 	isDesktop,
 	hasActiveSession,
 	activeSessionId,
-	expandedGoals,
-	saveExpandedGoals,
 	ungroupedExpanded,
 	setUngroupedExpanded,
 	type GoalState,
 } from "./state.js";
-import { createGoal, gatewayFetch, refreshSessions, startSwarm, teardownSwarm } from "./api.js";
+import { createGoal, gatewayFetch, refreshSessions } from "./api.js";
 import { clearSessionModel } from "./routing.js";
 import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { renderSidebar } from "./sidebar.js";
 
-import type { GatewaySession } from "./state.js";
-import { statusBobbit } from "./session-colors.js";
+import { renderGoalGroup, renderSessionRow } from "./render-helpers.js";
 
 const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:18px;image-rendering:pixelated;" />`;
 
@@ -43,104 +40,7 @@ import "./goal-dashboard.css";
 // MOBILE LANDING PAGE
 // ============================================================================
 
-/** Track which goals have a swarm start/stop in flight (mobile landing). */
-const mobileSwarmLoading = new Set<string>();
-
 /** Compact session row for mobile — mirrors sidebar row with always-visible buttons */
-function renderMobileSessionRow(session: GatewaySession) {
-	const active = activeSessionId() === session.id;
-	const connecting = state.connectingSessionId === session.id;
-	const displayTitle = active && state.remoteAgent ? state.remoteAgent.title : session.title;
-	const isActive = session.status === "streaming" || session.status === "busy" || session.isCompacting;
-	return html`
-		<div
-			class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md cursor-pointer transition-colors
-				${active ? "bg-secondary text-foreground" : connecting ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground active:bg-secondary/50"}"
-			@click=${() => { if (!active && !connecting) connectToSession(session.id, true); }}
-		>
-			<div class="shrink-0 flex items-center justify-center">
-				${connecting
-					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead", session.role === "coder")}
-			</div>
-			<div class="flex-1 min-w-0 truncate text-xs ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
-			<button class="shrink-0 p-1.5 rounded text-muted-foreground active:bg-secondary/80"
-				@click=${(e: Event) => { e.stopPropagation(); showRenameDialog(session.id, displayTitle); }}
-				title="Rename">${icon(Pencil, "xs")}</button>
-			<button class="shrink-0 p-1.5 rounded text-muted-foreground active:bg-destructive/10"
-				@click=${(e: Event) => { e.stopPropagation(); terminateSession(session.id); }}
-				title="Terminate">${icon(Trash2, "xs")}</button>
-		</div>
-	`;
-}
-
-function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; state: GoalState; spec: string; swarm?: boolean }) {
-	const goalSessions = state.gatewaySessions.filter((s) => s.goalId === goal.id && !s.delegateOf);
-	const isSwarmGoal = !!(goal as any).swarm;
-	const hasActiveSwarm = isSwarmGoal && goalSessions.some((s) => s.role === "team-lead" && s.status !== "terminated");
-	const isLoading = mobileSwarmLoading.has(goal.id);
-	const isExpanded = expandedGoals.has(goal.id);
-	const activeSessions = goalSessions.filter((s) => s.status === "streaming" || s.status === "busy");
-
-	const toggleExpand = () => {
-		if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id);
-		saveExpandedGoals();
-		renderApp();
-	};
-
-	const handleStartSwarm = async (e: Event) => {
-		e.stopPropagation();
-		mobileSwarmLoading.add(goal.id);
-		renderApp();
-		const sid = await startSwarm(goal.id);
-		mobileSwarmLoading.delete(goal.id);
-		if (sid) {
-			connectToSession(sid, false);
-		} else {
-			renderApp();
-		}
-	};
-
-	const handleEndSwarm = async (e: Event) => {
-		e.stopPropagation();
-		mobileSwarmLoading.add(goal.id);
-		renderApp();
-		await teardownSwarm(goal.id);
-		mobileSwarmLoading.delete(goal.id);
-		await refreshSessions();
-		renderApp();
-	};
-
-	return html`
-		<div class="flex flex-col ${goal.state === "shelved" ? "opacity-60" : ""}">
-			<div class="flex items-center gap-1 px-1 py-1 rounded-md cursor-pointer active:bg-secondary/50 transition-colors" @click=${toggleExpand}>
-				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
-				<span class="flex-1 min-w-0 truncate text-[10px] text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
-				<button class="shrink-0 p-1.5 rounded text-muted-foreground active:bg-secondary/80"
-					@click=${(e: Event) => { e.stopPropagation(); setHashRoute("goal-dashboard", goal.id); }}
-					title="Goal dashboard">${icon(LayoutDashboard, "xs")}</button>
-			</div>
-			${isExpanded ? html`
-				<div class="flex flex-col gap-0.5">
-					${goalSessions.length === 0
-						? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground">
-								${isSwarmGoal
-									? html`No agents — <button class="text-primary" @click=${handleStartSwarm}>${isLoading ? "starting\u2026" : "start swarm"}</button>`
-									: html`No sessions — <button class="text-primary" @click=${() => createAndConnectSession(goal.id)}>start one</button>`}
-							</div>`
-						: goalSessions.map(renderMobileSessionRow)}
-					${goalSessions.length > 0 && isSwarmGoal ? html`
-						<div class="pl-3 py-0.5 text-[10px] text-muted-foreground">
-							${hasActiveSwarm
-								? html`<button class="text-destructive/80" @click=${handleEndSwarm} ?disabled=${isLoading}>${isLoading ? "stopping\u2026" : "end swarm"}</button>`
-								: html`<button class="text-primary" @click=${handleStartSwarm} ?disabled=${isLoading}>${isLoading ? "starting\u2026" : "start swarm"}</button>`}
-						</div>
-					` : ""}
-				</div>
-			` : ""}
-		</div>
-	`;
-}
 
 function renderMobileLanding() {
 	const ungroupedSessions = state.gatewaySessions.filter((s) => !s.goalId && !s.delegateOf);
@@ -179,7 +79,7 @@ function renderMobileLanding() {
 							: html`
 								${sortedGoals.map((goal, i) => html`
 									${i > 0 ? html`<div class="border-t border-border/30 my-1 mx-2"></div>` : ""}
-									${renderMobileGoalCard(goal)}
+									${renderGoalGroup(goal)}
 								`)}
 								${sortedGoals.length > 0 && ungroupedSessions.length > 0 ? html`
 									<div class="border-t border-border/30 my-1 mx-2"></div>
@@ -196,7 +96,7 @@ function renderMobileLanding() {
 												? html`<svg class="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 												: icon(Plus, "xs")}</button>
 										</div>
-										${isUngroupedExpanded ? ungroupedSessions.map(renderMobileSessionRow) : ""}
+										${isUngroupedExpanded ? ungroupedSessions.map(renderSessionRow) : ""}
 									</div>
 								` : sortedGoals.length === 0 && ungroupedSessions.length > 0 ? html`
 									<div class="flex flex-col gap-0.5">
@@ -210,7 +110,7 @@ function renderMobileLanding() {
 												? html`<svg class="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 												: icon(Plus, "xs")}</button>
 										</div>
-										${ungroupedSessions.map(renderMobileSessionRow)}
+										${ungroupedSessions.map(renderSessionRow)}
 									</div>
 								` : ""}
 

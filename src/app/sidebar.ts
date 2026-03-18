@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Crosshair, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Trash2 } from "lucide";
+import { PanelLeftClose, PanelLeftOpen, Plus } from "lucide";
 import {
 	state,
 	renderApp,
@@ -13,12 +13,9 @@ import {
 	type GoalState,
 } from "./state.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
-import { deleteGoal, startSwarm } from "./api.js";
 import { refreshSessions } from "./api.js";
-import { showGoalDialog } from "./dialogs.js";
-import { setHashRoute } from "./routing.js";
-import { statusBobbit, sessionAcronym, sessionColorMap } from "./session-colors.js";
-import { renderSidebarSession, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
+import { statusBobbit, sessionAcronym } from "./session-colors.js";
+import { renderGoalGroup, renderSessionRow, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
 
 // ============================================================================
@@ -32,48 +29,8 @@ export function toggleSidebar(): void {
 }
 
 // ============================================================================
-// SIDEBAR GOAL
+// SIDEBAR GOAL — uses unified renderGoalGroup from render-helpers.ts
 // ============================================================================
-
-function renderSidebarGoal(goal: Goal) {
-	const isExpanded = expandedGoals.has(goal.id);
-	const goalSessions = state.gatewaySessions.filter((s) => (s.goalId === goal.id || s.swarmGoalId === goal.id) && !s.delegateOf);
-	const isCreatingHere = state.creatingSessionForGoalId === goal.id;
-
-	return html`
-		<div class="flex flex-col gap-0.5">
-			<div class="group relative flex items-center gap-1 px-1 py-0.5 rounded-md cursor-pointer hover:bg-secondary/50 transition-colors"
-				@click=${() => { if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id); saveExpandedGoals(); renderApp(); }}
-				@dblclick=${() => { if (goal.swarm) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } }}>
-				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
-
-				<span class="flex-1 min-w-0 truncate text-[10px] text-muted-foreground uppercase tracking-wider font-medium ${goal.state === "shelved" ? "opacity-60" : ""}">${goal.title}</span>
-				<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
-					<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
-						@click=${(e: Event) => { e.stopPropagation(); setHashRoute("goal-dashboard", goal.id); }}
-						title="Goal dashboard">
-						${icon(LayoutDashboard, "xs")}
-					</button>
-				</div>
-			</div>
-			${isExpanded ? html`
-				<div class="flex flex-col gap-0.5">
-					${goalSessions.length === 0 && !isCreatingHere
-						? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground">
-								${goal.swarm
-									? html`No agents — <button class="text-primary hover:underline" @click=${async () => { const sid = await startSwarm(goal.id); if (sid) connectToSession(sid, false); }}>start swarm</button>`
-									: html`No sessions — <button class="text-primary hover:underline" @click=${() => createAndConnectSession(goal.id)}>start one</button>`}
-							</div>`
-						: goalSessions.map(renderSidebarSession)}
-					${isCreatingHere ? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground flex items-center gap-1">
-						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-						Creating…
-					</div>` : ""}
-				</div>
-			` : ""}
-		</div>
-	`;
-}
 
 // ============================================================================
 // RENDER SIDEBAR
@@ -101,7 +58,7 @@ export function renderSidebar() {
 						: html`
 							${sortedGoals.map((goal, i) => html`
 								${i > 0 ? html`<div class="border-t border-border/50 my-1.5 mx-1"></div>` : ""}
-								${renderSidebarGoal(goal)}
+								${renderGoalGroup(goal)}
 							`)}
 							${sortedGoals.length > 0 ? html`
 								<div class="border-t border-border/50 my-1.5 mx-1"></div>
@@ -123,7 +80,7 @@ export function renderSidebar() {
 												: icon(Plus, "xs")}
 										</button>
 									</div>
-									${ungroupedExpanded ? ungroupedSessions.map(renderSidebarSession) : ""}
+									${ungroupedExpanded ? ungroupedSessions.map(renderSessionRow) : ""}
 								</div>
 							` : html`
 								<div class="flex flex-col gap-0.5">
@@ -145,7 +102,7 @@ export function renderSidebar() {
 												<p class="text-xs text-muted-foreground mb-2">No sessions</p>
 												<button class="text-xs text-primary hover:underline" @click=${() => createAndConnectSession()}>Create one</button>
 											</div>`
-										: ungroupedSessions.map(renderSidebarSession)}
+										: ungroupedSessions.map(renderSessionRow)}
 								</div>
 							`}
 						`

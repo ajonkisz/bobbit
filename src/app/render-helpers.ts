@@ -1,13 +1,25 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html, svg } from "lit";
-import { Pencil, Trash2 } from "lucide";
-import { state, activeSessionId, type GatewaySession, type GoalState } from "./state.js";
+import { LayoutDashboard, Pencil, Trash2 } from "lucide";
+import {
+	state,
+	renderApp,
+	activeSessionId,
+	expandedGoals,
+	saveExpandedGoals,
+	isDesktop,
+	type GatewaySession,
+	type Goal,
+	type GoalState,
+} from "./state.js";
 import { statusBobbit } from "./session-colors.js";
-import { connectToSession, terminateSession } from "./session-manager.js";
+import { connectToSession, terminateSession, createAndConnectSession } from "./session-manager.js";
 import { showRenameDialog } from "./dialogs.js";
+import { setHashRoute } from "./routing.js";
+import { startSwarm, teardownSwarm, refreshSessions } from "./api.js";
 
 // ============================================================================
-// TOOLTIP
+// TOOLTIP (desktop only — mouse hover)
 // ============================================================================
 
 let _tooltipEl: HTMLDivElement | null = null;
@@ -73,109 +85,163 @@ export function formatSessionAge(timestamp: number): string {
 }
 
 // ============================================================================
-// SESSION ROW & CARD RENDERERS
+// UNIFIED SESSION ROW
 // ============================================================================
 
+/**
+ * Compact one-line session row used by both desktop sidebar and mobile landing.
+ *
+ * Layout: [bobbit] [title] [rename] [terminate]
+ *
+ * Desktop: buttons hidden until hover (via group-hover), tooltip on mouseenter.
+ * Mobile:  buttons always visible, no tooltip, slightly taller touch targets.
+ */
 export const SESSION_ROW_PY = "py-0.5";
 
-/** Compact session row for sidebar */
-export function renderSidebarSession(session: GatewaySession) {
+export function renderSessionRow(session: GatewaySession) {
+	const mobile = !isDesktop();
 	const active = activeSessionId() === session.id;
 	const connecting = state.connectingSessionId === session.id;
 	const displayTitle = active && state.remoteAgent ? state.remoteAgent.title : session.title;
+	const isActive = session.status === "streaming" || session.status === "busy" || session.isCompacting;
+
+	const rowPy = mobile ? "py-1" : SESSION_ROW_PY;
+	const btnPad = mobile ? "p-1.5" : "p-0.5";
+
+	// Desktop: hover-revealed gradient overlay. Mobile: always-visible inline buttons.
+	const buttons = html`
+		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
+			@click=${(e: Event) => { e.stopPropagation(); showRenameDialog(session.id, displayTitle); }}
+			title="Rename">${icon(Pencil, "xs")}</button>
+		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-destructive/10" : "hover:bg-destructive/10 text-muted-foreground hover:text-destructive"}"
+			@click=${(e: Event) => { e.stopPropagation(); terminateSession(session.id); }}
+			title="Terminate">${icon(Trash2, "xs")}</button>
+	`;
+
 	return html`
 		<div
-			class="group relative flex items-center gap-1 pl-3 pr-1 ${SESSION_ROW_PY} rounded-md cursor-pointer transition-colors text-sm
-				${active ? "bg-secondary text-foreground sidebar-session-active" : connecting ? "bg-secondary/30 text-muted-foreground" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
-			@mouseenter=${(e: MouseEvent) => showSessionTooltip(e, session, displayTitle)}
-			@mouseleave=${hideSessionTooltip}
-			@click=${() => {
-				if (!active && !connecting) connectToSession(session.id, true);
-			}}
+			class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-3 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors text-sm
+				${active ? "bg-secondary text-foreground sidebar-session-active" : connecting ? "bg-secondary/30 text-muted-foreground" : mobile ? "text-muted-foreground active:bg-secondary/50" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
+			${mobile ? "" : html``}
+			@mouseenter=${mobile ? null : (e: MouseEvent) => showSessionTooltip(e, session, displayTitle)}
+			@mouseleave=${mobile ? null : hideSessionTooltip}
+			@click=${() => { if (!active && !connecting) connectToSession(session.id, true); }}
 		>
 			<div class="shrink-0 flex items-center justify-center">
 				${connecting
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead", session.role === "coder")}
 			</div>
-			<div class="flex-1 min-w-0 truncate text-xs ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"}">
-				${displayTitle}
-			</div>
-			<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
-				<button
-					class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
-					@click=${(e: Event) => {
-						e.stopPropagation();
-						showRenameDialog(session.id, displayTitle);
-					}}
-					title="Rename"
-				>
-					${icon(Pencil, "xs")}
-				</button>
-				<button
-					class="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-					@click=${(e: Event) => {
-						e.stopPropagation();
-						terminateSession(session.id);
-					}}
-					title="Terminate"
-				>
-					${icon(Trash2, "xs")}
-				</button>
-			</div>
+			<div class="flex-1 min-w-0 truncate text-xs ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			${mobile
+				? buttons
+				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
+					${buttons}
+				</div>`}
 		</div>
 	`;
 }
 
-/** Full-size session card for mobile landing page */
-export function renderSessionCard(session: GatewaySession, index = 0) {
-	const active = activeSessionId() === session.id;
-	const connecting = state.connectingSessionId === session.id;
+// Back-compat alias used by sidebar.ts
+export { renderSessionRow as renderSidebarSession };
+
+// ============================================================================
+// UNIFIED GOAL GROUP
+// ============================================================================
+
+/** Track in-flight swarm start/stop (shared across desktop and mobile). */
+const swarmLoading = new Set<string>();
+
+/**
+ * Expandable goal group used by both desktop sidebar and mobile landing.
+ *
+ * Layout: [▾/▸] [TITLE] [dashboard btn]
+ * Expanded: child session rows + empty state + swarm controls
+ *
+ * Desktop: dashboard button hidden until hover. Double-click opens team-lead.
+ * Mobile:  dashboard button always visible. No double-click (no hover hint).
+ */
+export function renderGoalGroup(goal: Goal) {
+	const mobile = !isDesktop();
+	const isExpanded = expandedGoals.has(goal.id);
+	const goalSessions = state.gatewaySessions.filter((s) => (s.goalId === goal.id || s.swarmGoalId === goal.id) && !s.delegateOf);
+	const isCreatingHere = state.creatingSessionForGoalId === goal.id;
+	const isSwarmGoal = !!(goal as any).swarm;
+	const hasActiveSwarm = isSwarmGoal && goalSessions.some((s) => s.role === "team-lead" && s.status !== "terminated");
+	const isLoading = swarmLoading.has(goal.id);
+
+	const toggleExpand = () => {
+		if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id);
+		saveExpandedGoals();
+		renderApp();
+	};
+
+	const handleStartSwarm = async (e?: Event) => {
+		e?.stopPropagation();
+		swarmLoading.add(goal.id);
+		renderApp();
+		const sid = await startSwarm(goal.id);
+		swarmLoading.delete(goal.id);
+		if (sid) connectToSession(sid, false); else renderApp();
+	};
+
+	const handleEndSwarm = async (e?: Event) => {
+		e?.stopPropagation();
+		swarmLoading.add(goal.id);
+		renderApp();
+		await teardownSwarm(goal.id);
+		swarmLoading.delete(goal.id);
+		await refreshSessions();
+		renderApp();
+	};
+
+	const btnPad = mobile ? "p-1.5" : "p-0.5";
+
+	const dashboardBtn = html`
+		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
+			@click=${(e: Event) => { e.stopPropagation(); setHashRoute("goal-dashboard", goal.id); }}
+			title="Goal dashboard">${icon(LayoutDashboard, "xs")}</button>
+	`;
+
+	const emptyState = html`
+		<div class="pl-3 py-1 text-[10px] text-muted-foreground">
+			${isSwarmGoal
+				? html`No agents — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${handleStartSwarm}>${isLoading ? "starting\u2026" : "start swarm"}</button>`
+				: html`No sessions — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${() => createAndConnectSession(goal.id)}>start one</button>`}
+		</div>
+	`;
+
+	const swarmControls = goalSessions.length > 0 && isSwarmGoal ? html`
+		<div class="pl-3 py-0.5 text-[10px] text-muted-foreground">
+			${hasActiveSwarm
+				? html`<button class="text-destructive/80 ${mobile ? "" : "hover:underline"}" @click=${handleEndSwarm} ?disabled=${isLoading}>${isLoading ? "stopping\u2026" : "end swarm"}</button>`
+				: html`<button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${handleStartSwarm} ?disabled=${isLoading}>${isLoading ? "starting\u2026" : "start swarm"}</button>`}
+		</div>
+	` : "";
+
 	return html`
-		<div
-			class="group session-card-enter flex items-center gap-4 p-4 rounded-lg border ${connecting ? "border-primary/40 bg-secondary/30" : "border-border hover:border-foreground/20 hover:bg-secondary/50"} cursor-pointer transition-all"
-			style="animation-delay: ${index * 50}ms"
-			@click=${() => { if (!connecting) connectToSession(session.id, true); }}
-		>
-			<div class="flex-1 min-w-0">
-				<div class="flex items-center gap-2 mb-1">
-					${connecting
-						? html`<svg class="animate-spin shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-						: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead", session.role === "coder")}
-					<span class="text-sm ${session.status === "streaming" || session.status === "busy" || session.isCompacting ? "font-semibold" : "font-normal"} text-foreground">${session.title}</span>
-					<span class="text-xs text-muted-foreground">·</span>
-					<span class="text-xs text-muted-foreground">${formatSessionAge(session.lastActivity)}</span>
-				</div>
-				<div class="text-xs text-muted-foreground font-mono truncate" title=${session.cwd}>${session.cwd}</div>
-				<div class="mt-1.5 text-xs text-muted-foreground flex items-center gap-2">
-					<span class="font-mono text-[10px] opacity-60" title=${session.id}>${session.id.slice(0, 8)}…</span>
-					${(session.goalAssistant || session.role)
-						? html`<span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">${session.goalAssistant ? "Goal Assistant" : session.role}</span>`
-						: ""}
-				</div>
+		<div class="flex flex-col ${goal.state === "shelved" ? "opacity-60" : ""}">
+			<div class="${mobile ? "" : "group relative"} flex items-center gap-1 px-1 ${mobile ? "py-1" : "py-0.5"} rounded-md cursor-pointer ${mobile ? "active:bg-secondary/50" : "hover:bg-secondary/50"} transition-colors"
+				@click=${toggleExpand}
+				@dblclick=${!mobile ? () => { if (goal.swarm) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } } : null}>
+				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
+				<span class="flex-1 min-w-0 truncate text-[10px] text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
+				${mobile
+					? dashboardBtn
+					: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
+						${dashboardBtn}
+					</div>`}
 			</div>
-			<div class="flex flex-col gap-1 shrink-0">
-				<button
-					class="p-2 rounded-md hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all"
-					@click=${(e: Event) => {
-						e.stopPropagation();
-						showRenameDialog(session.id, session.title);
-					}}
-					title="Rename session"
-				>
-					${icon(Pencil, "sm")}
-				</button>
-				<button
-					class="p-2 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all"
-					@click=${(e: Event) => {
-						e.stopPropagation();
-						terminateSession(session.id);
-					}}
-					title="Terminate session"
-				>
-					${icon(Trash2, "sm")}
-				</button>
-			</div>
+			${isExpanded ? html`
+				<div class="flex flex-col gap-0.5">
+					${goalSessions.length === 0 && !isCreatingHere ? emptyState : goalSessions.map(renderSessionRow)}
+					${isCreatingHere ? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground flex items-center gap-1">
+						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+						Creating…
+					</div>` : ""}
+					${swarmControls}
+				</div>
+			` : ""}
 		</div>
 	`;
 }
