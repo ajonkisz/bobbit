@@ -292,13 +292,16 @@ export class SwarmManager {
 				.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
 				.replace(/\{\{AGENT_ID\}\}/g, agentId);
 
+			// Read allowed tools from role definition (empty = all tools allowed)
+			const allowedTools = storedRoleDef?.allowedTools ?? [];
+
 			// Create the session with the role's worktree as cwd, role prompt appended to goal spec
 			const session = await this.sessionManager.createSession(
 				worktreeResult.worktreePath,
 				undefined,
 				goalId,
 				false,
-				{ rolePrompt },
+				{ rolePrompt, allowedTools },
 			);
 
 			// Assign a unique color and title

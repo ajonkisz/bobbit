@@ -46,6 +46,8 @@ export interface SessionInfo {
 	taskId?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory?: string;
+	/** Allowed tools for this session (empty array = all tools allowed) */
+	allowedTools?: string[];
 	/** Server-side prompt queue */
 	promptQueue: PromptQueue;
 	/** True if the last agent turn ended due to a model/API error */
@@ -216,6 +218,16 @@ export class SessionManager {
 		// Track tool execution during this turn
 		if (event.type === "tool_execution_start") {
 			session.turnHadToolCalls = true;
+
+			// Enforce allowedTools — warn when a disallowed tool is used
+			if (session.allowedTools && session.allowedTools.length > 0 && event.toolName) {
+				if (!session.allowedTools.includes(event.toolName)) {
+					console.warn(
+						`[session-manager] Session ${session.id} used disallowed tool "${event.toolName}". ` +
+						`Allowed: [${session.allowedTools.join(", ")}]`
+					);
+				}
+			}
 		}
 
 		if (event.type === "message_end" && event.message?.role === "assistant") {
@@ -465,7 +477,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; allowedTools?: string[] }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -504,6 +516,12 @@ export class SessionManager {
 			// Append role prompt for swarm agents (role instructions after goal spec)
 			if (opts?.rolePrompt) {
 				goalSpec = (goalSpec ? goalSpec + "\n\n---\n\n" : "") + opts.rolePrompt;
+			}
+
+			// Append tool restrictions if allowedTools is specified and non-empty
+			if (opts?.allowedTools && opts.allowedTools.length > 0) {
+				const toolList = opts.allowedTools.join(", ");
+				goalSpec = (goalSpec || "") + `\n\n---\n\n## Tool Restrictions\n\nYou are ONLY allowed to use the following tools: ${toolList}\n\nDo NOT use any other tools. If a task requires a tool you don't have access to, explain what you need and ask for help instead of attempting to use the restricted tool.`;
 			}
 
 			// Build task context if taskId is provided
@@ -561,6 +579,7 @@ export class SessionManager {
 			goalAssistant,
 			roleAssistant: opts?.roleAssistant,
 			taskId: opts?.taskId,
+			allowedTools: opts?.allowedTools,
 			promptQueue: new PromptQueue(),
 		};
 
