@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, Crosshair, Pencil, Play, Plus, QrCode, Server, Square, Trash2, Unplug } from "lucide";
+import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, LayoutDashboard, Pencil, Play, Plus, QrCode, Server, Square, Trash2, Unplug } from "lucide";
 import "../ui/components/WorkflowStatusBar.js";
 import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 import {
@@ -13,6 +13,8 @@ import {
 	isDesktop,
 	hasActiveSession,
 	activeSessionId,
+	expandedGoals,
+	saveExpandedGoals,
 	GOAL_STATE_LABELS,
 	GOAL_STATE_COLORS,
 	type GoalState,
@@ -23,6 +25,7 @@ import { backToSessions, disconnectGateway, createAndConnectSession, connectToSe
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { renderSidebar } from "./sidebar.js";
 import { renderSessionCard, goalStateIcon } from "./render-helpers.js";
+import { statusBobbit } from "./session-colors.js";
 
 const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:18px;image-rendering:pixelated;" />`;
 
@@ -47,8 +50,17 @@ function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; st
 	const isSwarmGoal = !!(goal as any).swarm;
 	const hasActiveSwarm = isSwarmGoal && goalSessions.some((s) => s.role === "team-lead" && s.status !== "terminated");
 	const isLoading = mobileSwarmLoading.has(goal.id);
+	const isExpanded = expandedGoals.has(goal.id);
+	const activeSessions = goalSessions.filter((s) => s.status === "streaming" || s.status === "busy");
 
-	const handleStartSwarm = async () => {
+	const toggleExpand = () => {
+		if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id);
+		saveExpandedGoals();
+		renderApp();
+	};
+
+	const handleStartSwarm = async (e: Event) => {
+		e.stopPropagation();
 		mobileSwarmLoading.add(goal.id);
 		renderApp();
 		const sid = await startSwarm(goal.id);
@@ -60,7 +72,8 @@ function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; st
 		}
 	};
 
-	const handleEndSwarm = async () => {
+	const handleEndSwarm = async (e: Event) => {
+		e.stopPropagation();
 		mobileSwarmLoading.add(goal.id);
 		renderApp();
 		await teardownSwarm(goal.id);
@@ -70,43 +83,71 @@ function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; st
 	};
 
 	return html`
-		<div class="rounded-lg border border-border p-4 ${goal.state === "shelved" ? "opacity-60" : ""}"
-			@click=${() => { if (!state.connectingSessionId) setHashRoute("goal-dashboard", goal.id); }}>
-			<div class="flex items-center justify-between mb-2">
-				<div class="flex items-center gap-2">
-					<span class="shrink-0">${goalStateIcon(goal.state, 16)}</span>
-					<span class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">${goal.title}</span>
+		<div class="rounded-lg border border-border ${goal.state === "shelved" ? "opacity-60" : ""}">
+			<div class="flex items-center gap-2 p-3 cursor-pointer" @click=${toggleExpand}>
+				<span class="shrink-0 text-muted-foreground">${icon(isExpanded ? ChevronDown : ChevronRight, "sm")}</span>
+				<span class="shrink-0">${goalStateIcon(goal.state, 16)}</span>
+				<span class="flex-1 min-w-0 text-sm font-medium text-foreground truncate">${goal.title}</span>
+				${activeSessions.length > 0 ? html`<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">${activeSessions.length} active</span>` : ""}
+				<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full border border-border ${GOAL_STATE_COLORS[goal.state]}">${GOAL_STATE_LABELS[goal.state]}</span>
+			</div>
+			${isExpanded ? html`
+				<div class="border-t border-border">
+					<div class="flex items-center justify-between px-3 py-2">
+						<span class="text-xs text-muted-foreground font-mono truncate" title=${goal.cwd}>${goal.cwd}</span>
+						<div class="flex items-center gap-1 shrink-0">
+							${Button({
+								variant: "ghost",
+								size: "sm",
+								onClick: () => setHashRoute("goal-dashboard", goal.id),
+								children: html`<span class="inline-flex items-center gap-1">${icon(LayoutDashboard, "xs")} Dashboard</span>`,
+								className: "h-7 text-xs",
+							})}
+							${isSwarmGoal ? (hasActiveSwarm
+								? Button({
+									variant: "ghost",
+									size: "sm",
+									disabled: isLoading,
+									onClick: handleEndSwarm,
+									children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Square, "xs")} ${isLoading ? "Stopping\u2026" : "End Swarm"}</span>`,
+									className: "h-7 text-xs",
+								})
+								: Button({
+									variant: "default",
+									size: "sm",
+									disabled: isLoading,
+									onClick: handleStartSwarm,
+									children: html`<span class="inline-flex items-center gap-1">${icon(Play, "xs")} ${isLoading ? "Starting\u2026" : "Start Swarm"}</span>`,
+									className: "h-7 text-xs",
+								})
+							) : ""}
+							${Button({
+								variant: "ghost",
+								size: "sm",
+								onClick: () => createAndConnectSession(goal.id),
+								children: html`<span class="inline-flex items-center gap-1">${icon(Plus, "xs")} Session</span>`,
+								className: "h-7 text-xs",
+							})}
+						</div>
+					</div>
+					${goalSessions.length > 0 ? html`
+						<div class="flex flex-col gap-1 px-3 pb-3">
+							${goalSessions.map((s, i) => renderSessionCard(s, i))}
+						</div>
+					` : html`
+						<div class="px-3 pb-3 text-xs text-muted-foreground">
+							${isSwarmGoal
+								? html`No agents yet`
+								: html`No sessions yet`}
+						</div>
+					`}
 				</div>
-				<span class="text-xs px-2 py-0.5 rounded-full border border-border ${GOAL_STATE_COLORS[goal.state]}">${GOAL_STATE_LABELS[goal.state]}</span>
-			</div>
-			<div class="text-xs text-muted-foreground font-mono truncate mb-3" title=${goal.cwd}>${goal.cwd}</div>
-			<div class="flex items-center justify-end gap-1.5" @click=${(e: Event) => e.stopPropagation()}>
-				${isSwarmGoal ? (hasActiveSwarm
-					? Button({
-						variant: "ghost",
-						size: "sm",
-						disabled: isLoading,
-						onClick: handleEndSwarm,
-						children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Square, "xs")} ${isLoading ? "Stopping\u2026" : "End Swarm"}</span>`,
-					})
-					: Button({
-						variant: "default",
-						size: "sm",
-						disabled: isLoading,
-						onClick: handleStartSwarm,
-						children: html`<span class="inline-flex items-center gap-1">${icon(Play, "xs")} ${isLoading ? "Starting\u2026" : "Start Swarm"}</span>`,
-					})
-				) : ""}
-				${Button({
-					variant: "ghost",
-					size: "sm",
-					onClick: () => createAndConnectSession(goal.id),
-					children: html`<span class="inline-flex items-center gap-1">${icon(Plus, "xs")} Session</span>`,
-				})}
-			</div>
-			${goalSessions.length > 0 ? html`
-				<div class="mt-3 flex flex-col gap-1.5" @click=${(e: Event) => e.stopPropagation()}>
-					${goalSessions.map((s, i) => renderSessionCard(s, i))}
+			` : goalSessions.length > 0 ? html`
+				<div class="flex items-center gap-1.5 px-3 pb-2.5 -mt-0.5 overflow-x-auto">
+					${goalSessions.slice(0, 6).map(s => html`
+						<span class="shrink-0">${statusBobbit(s.status, s.isCompacting, s.id, activeSessionId() === s.id, s.isAborting, s.role === "team-lead", s.role === "coder")}</span>
+					`)}
+					${goalSessions.length > 6 ? html`<span class="text-[10px] text-muted-foreground">+${goalSessions.length - 6}</span>` : ""}
 				</div>
 			` : ""}
 		</div>

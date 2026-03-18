@@ -7,28 +7,18 @@
 <style>
 body { margin: 0; font-family: sans-serif; background: #0a0a0a; color: #e4e4e7; }
 .landing { padding: 16px; }
-.goal-card {
-  border: 1px solid #333;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
-  cursor: pointer;
-}
-.goal-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-.sessions-wrapper { margin-top: 8px; }
-.session-card {
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 6px;
-  cursor: pointer;
-}
+.goal-card { border: 1px solid #333; border-radius: 8px; margin-bottom: 12px; }
+.goal-header { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.goal-title { font-size: 14px; font-weight: 600; flex: 1; }
+.goal-body { border-top: 1px solid #333; padding: 8px 16px 16px; }
+.session-card { border: 1px solid #444; border-radius: 6px; padding: 12px; margin-bottom: 6px; cursor: pointer; }
 .session-card:hover { border-color: #666; }
-.session-title { font-size: 13px; }
-.session-status { font-size: 11px; color: #888; }
+.chevron { font-size: 12px; color: #888; }
+.hidden { display: none; }
 #current-view { position: fixed; top: 0; left: 0; right: 0; background: #1a1a1a; padding: 8px 16px; font-size: 12px; z-index: 10; border-bottom: 1px solid #333; }
 .view { display: none; }
 .view.active { display: block; }
+.dashboard-btn { font-size: 11px; color: #888; background: none; border: 1px solid #444; border-radius: 4px; padding: 2px 8px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -39,22 +29,37 @@ body { margin: 0; font-family: sans-serif; background: #0a0a0a; color: #e4e4e7; 
   <div class="landing">
     <h2>Goals &amp; Sessions</h2>
 
-    <div class="goal-card" id="goal-card-1" data-goal-id="goal-1">
-      <div class="goal-title">Test Goal Alpha</div>
-      <div class="sessions-wrapper" id="sessions-wrapper-1">
+    <div class="goal-card" id="goal-card-1">
+      <div class="goal-header" id="goal-header-1" data-goal-id="goal-1">
+        <span class="chevron" id="chevron-1">▸</span>
+        <span class="goal-title">Test Goal Alpha</span>
+      </div>
+      <div class="goal-body hidden" id="goal-body-1">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button class="dashboard-btn" id="dashboard-btn-1">Dashboard</button>
+        </div>
         <div class="session-card" id="session-card-tl" data-session-id="session-tl-1">
-          <div class="session-title">Team Lead: Petra</div>
-          <div class="session-status">streaming</div>
+          <div>Team Lead: Petra</div>
+          <div style="font-size:11px;color:#888">streaming</div>
         </div>
         <div class="session-card" id="session-card-c1" data-session-id="session-c1">
-          <div class="session-title">Coder: Ziggy</div>
-          <div class="session-status">idle</div>
+          <div>Coder: Ziggy</div>
+          <div style="font-size:11px;color:#888">idle</div>
         </div>
       </div>
     </div>
 
-    <div class="goal-card" id="goal-card-2" data-goal-id="goal-2">
-      <div class="goal-title">Test Goal Beta</div>
+    <div class="goal-card" id="goal-card-2">
+      <div class="goal-header" id="goal-header-2" data-goal-id="goal-2">
+        <span class="chevron" id="chevron-2">▸</span>
+        <span class="goal-title">Test Goal Beta</span>
+      </div>
+      <div class="goal-body hidden" id="goal-body-2">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button class="dashboard-btn" id="dashboard-btn-2">Dashboard</button>
+        </div>
+        <p style="font-size:12px;color:#888">No sessions yet</p>
+      </div>
     </div>
   </div>
 </div>
@@ -63,8 +68,8 @@ body { margin: 0; font-family: sans-serif; background: #0a0a0a; color: #e4e4e7; 
   <div class="landing">
     <h2 id="dashboard-title">Goal Dashboard</h2>
     <div class="session-card" id="dashboard-session-tl" data-session-id="session-tl-1">
-      <div class="session-title">Team Lead: Petra</div>
-      <div class="session-status">streaming</div>
+      <div>Team Lead: Petra</div>
+      <div style="font-size:11px;color:#888">streaming</div>
     </div>
   </div>
 </div>
@@ -78,7 +83,7 @@ body { margin: 0; font-family: sans-serif; background: #0a0a0a; color: #e4e4e7; 
 
 <script>
 // ============================================================
-// Routing — mirrors src/app/routing.ts exactly
+// Routing
 // ============================================================
 function getRouteFromHash() {
   const hash = window.location.hash || "";
@@ -105,9 +110,10 @@ function setHashRoute(view, id, replace) {
 }
 
 // ============================================================
-// View switching — mirrors renderApp logic
+// View switching
 // ============================================================
 let connectedSessionId = null;
+let connectingSessionId = null;
 
 function showView(viewName) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
@@ -138,50 +144,55 @@ function handleHashChange() {
 window.addEventListener("hashchange", handleHashChange);
 
 // ============================================================
-// connectToSession — mirrors async behavior of real function
+// connectToSession
 // ============================================================
-let connectingSessionId = null;
-
 async function connectToSession(sessionId) {
   if (connectingSessionId) return;
   connectingSessionId = sessionId;
-
-  // Capture route BEFORE async gap (mirrors real fix)
   const startingRoute = getRouteFromHash();
 
-  // Simulate async connection delay (real code does await remote.connect())
   await new Promise(r => setTimeout(r, 50));
 
   connectedSessionId = sessionId;
   connectingSessionId = null;
 
-  // Check both starting route and current route (mirrors real fix)
   const currentRoute = getRouteFromHash();
   const replaceHistory = startingRoute.view === "goal-dashboard" || currentRoute.view === "goal-dashboard";
   setHashRoute("session", sessionId, replaceHistory);
 }
 
 // ============================================================
-// Event handlers — mirrors real goal card + session card clicks
+// Goal card expand/collapse (mirrors new mobile design)
 // ============================================================
+const expandedGoals = new Set();
 
-// Goal card clicks → navigate to goal dashboard (guarded by connectingSessionId)
-document.querySelectorAll(".goal-card").forEach(card => {
-  card.addEventListener("click", () => {
-    if (connectingSessionId) return; // Don't navigate while connecting
-    const goalId = card.dataset.goalId;
+document.querySelectorAll(".goal-header").forEach(header => {
+  header.addEventListener("click", () => {
+    const goalId = header.dataset.goalId;
+    const body = document.getElementById("goal-body-" + goalId.split("-")[1]);
+    const chevron = document.getElementById("chevron-" + goalId.split("-")[1]);
+    if (expandedGoals.has(goalId)) {
+      expandedGoals.delete(goalId);
+      body.classList.add("hidden");
+      chevron.textContent = "▸";
+    } else {
+      expandedGoals.add(goalId);
+      body.classList.remove("hidden");
+      chevron.textContent = "▾";
+    }
+  });
+});
+
+// Dashboard buttons — explicit navigation to goal dashboard
+document.querySelectorAll(".dashboard-btn").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const goalId = btn.closest(".goal-card").querySelector(".goal-header").dataset.goalId;
     setHashRoute("goal-dashboard", goalId);
   });
 });
 
-// Session wrapper stopPropagation — mirrors the coder's fix
-document.querySelectorAll(".sessions-wrapper").forEach(wrapper => {
-  wrapper.addEventListener("click", (e) => {
-    e.stopPropagation();
-  });
-});
-
-// Session card clicks → connect to session
+// Session card clicks → connect directly
 document.querySelectorAll(".session-card").forEach(card => {
   card.addEventListener("click", () => {
     const sessionId = card.dataset.sessionId;
@@ -190,9 +201,8 @@ document.querySelectorAll(".session-card").forEach(card => {
 });
 
 // Expose for testing
-window.__getRouteFromHash = getRouteFromHash;
-window.__setHashRoute = setHashRoute;
 window.__connectToSession = connectToSession;
+window.__expandedGoals = expandedGoals;
 
 // Initialize
 if (window.location.hash && window.location.hash !== "#/") {

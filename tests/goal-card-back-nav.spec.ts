@@ -6,97 +6,93 @@ const TEST_PAGE = `file://${path.resolve("tests/goal-card-back-nav.html")}#/`;
 test.describe("Goal card back navigation", () => {
 	test.use({ viewport: { width: 375, height: 667 } }); // mobile
 
-	test("clicking session inside goal card on mobile landing — browser back goes to landing, not goal dashboard", async ({ page }) => {
+	test("clicking goal card header expands/collapses — does NOT navigate to dashboard", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-
-		// Verify we start on landing with #/
 		await expect(page.locator("#view-landing")).toHaveClass(/active/);
 
-		// Click a session card inside a goal card
-		await page.click("#session-card-tl");
+		// Sessions should be hidden initially
+		await expect(page.locator("#goal-body-1")).toHaveClass(/hidden/);
 
-		// Wait for async connectToSession to complete
-		await page.waitForFunction(() => window.location.hash.includes("session"));
+		// Click goal header to expand
+		await page.click("#goal-header-1");
 
-		// Verify we're on the session view
-		await expect(page.locator("#view-session")).toHaveClass(/active/);
+		// Sessions should now be visible, still on landing
+		await expect(page.locator("#goal-body-1")).not.toHaveClass(/hidden/);
+		expect(await page.evaluate(() => window.location.hash)).toBe("#/");
+		await expect(page.locator("#view-landing")).toHaveClass(/active/);
 
-		// Press browser back
-		await page.goBack();
-
-		// Should go to landing, NOT goal dashboard
-		await page.waitForFunction(() => !window.location.hash.includes("session"), { timeout: 3000 });
-		const hashAfterBack = await page.evaluate(() => window.location.hash);
-		const viewLabel = await page.locator("#view-label").textContent();
-
-		// Must NOT be on goal dashboard
-		expect(hashAfterBack).not.toContain("/goal/");
-		expect(viewLabel).not.toBe("goal-dashboard");
-		// Must be on landing
-		expect(hashAfterBack).toBe("#/");
-		expect(viewLabel).toBe("landing");
+		// Click again to collapse
+		await page.click("#goal-header-1");
+		await expect(page.locator("#goal-body-1")).toHaveClass(/hidden/);
+		expect(await page.evaluate(() => window.location.hash)).toBe("#/");
 	});
 
-	test("clicking session from goal dashboard — browser back goes to landing", async ({ page }) => {
+	test("clicking session inside expanded goal card — navigates directly, browser back goes to landing", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await expect(page.locator("#view-landing")).toHaveClass(/active/);
 
-		// Navigate to goal dashboard by clicking goal card header
-		await page.click("#goal-card-2");
+		// Expand goal
+		await page.click("#goal-header-1");
+		await expect(page.locator("#goal-body-1")).not.toHaveClass(/hidden/);
+
+		// Click session card directly
+		await page.click("#session-card-tl");
+		await page.waitForFunction(() => window.location.hash.includes("session"));
+
+		// Should be on session view
+		await expect(page.locator("#view-session")).toHaveClass(/active/);
+
+		// Browser back should go to landing (no goal-dashboard in history)
+		await page.goBack();
+		await page.waitForFunction(() => !window.location.hash.includes("session"), { timeout: 3000 });
+		const hash = await page.evaluate(() => window.location.hash);
+
+		expect(hash).toBe("#/");
+		expect(hash).not.toContain("/goal/");
+	});
+
+	test("explicit dashboard button navigates to dashboard, session from there — back goes to landing", async ({ page }) => {
+		await page.goto(TEST_PAGE);
+
+		// Expand goal and click dashboard button
+		await page.click("#goal-header-1");
+		await page.click("#dashboard-btn-1");
 
 		await page.waitForFunction(() => window.location.hash.includes("goal"));
 		await expect(page.locator("#view-goal-dashboard")).toHaveClass(/active/);
 
-		// Now click a session from the dashboard
+		// Click session from dashboard
 		await page.click("#dashboard-session-tl");
-
 		await page.waitForFunction(() => window.location.hash.includes("session"));
 		await expect(page.locator("#view-session")).toHaveClass(/active/);
 
-		// Press browser back — should go to landing (replace removed goal-dashboard entry)
+		// Browser back — should go to landing (dashboard entry replaced)
 		await page.goBack();
-
 		await page.waitForFunction(() => !window.location.hash.includes("session"), { timeout: 3000 });
-		const hashAfterBack = await page.evaluate(() => window.location.hash);
-		const viewLabel = await page.locator("#view-label").textContent();
+		const hash = await page.evaluate(() => window.location.hash);
 
-		expect(hashAfterBack).not.toContain("/goal/");
-		expect(viewLabel).not.toBe("goal-dashboard");
-		expect(hashAfterBack).toBe("#/");
-		expect(viewLabel).toBe("landing");
+		expect(hash).toBe("#/");
+		expect(hash).not.toContain("/goal/");
 	});
 
-	test("robust: back works even if stopPropagation is bypassed and goal card click fires", async ({ page }) => {
+	test("no goal-dashboard hash ever enters history when clicking sessions from landing", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await expect(page.locator("#view-landing")).toHaveClass(/active/);
 
-		// Remove the stopPropagation wrapper to simulate it being bypassed
+		// Track all hash changes
 		await page.evaluate(() => {
-			const wrapper = document.getElementById("sessions-wrapper-1")!;
-			const clone = wrapper.cloneNode(true) as HTMLElement;
-			clone.querySelectorAll(".session-card").forEach(card => {
-				card.addEventListener("click", () => {
-					(window as any).__connectToSession(card.getAttribute("data-session-id"));
-				});
+			(window as any).__hashHistory = [];
+			window.addEventListener("hashchange", () => {
+				(window as any).__hashHistory.push(window.location.hash);
 			});
-			wrapper.replaceWith(clone);
 		});
 
-		// Click the session card — without stopPropagation, the goal card click also fires
+		// Expand goal, click session
+		await page.click("#goal-header-1");
 		await page.click("#session-card-tl");
+		await page.waitForFunction(() => window.location.hash.includes("session"));
 
-		// Wait for session view
-		await page.waitForFunction(() => window.location.hash.includes("session"), { timeout: 5000 });
-
-		// Press browser back
-		await page.goBack();
-
-		// Should still go to landing, not goal dashboard
-		await page.waitForFunction(() => !window.location.hash.includes("session"), { timeout: 3000 });
-		const hashAfterBack = await page.evaluate(() => window.location.hash);
-		const viewLabel = await page.locator("#view-label").textContent();
-
-		expect(hashAfterBack).not.toContain("/goal/");
-		expect(viewLabel).not.toBe("goal-dashboard");
+		// Check no goal-dashboard hash was ever set
+		const hashHistory = await page.evaluate(() => (window as any).__hashHistory);
+		const goalDashboardEntries = hashHistory.filter((h: string) => h.includes("/goal/"));
+		expect(goalDashboardEntries).toHaveLength(0);
 	});
 });
