@@ -1,24 +1,13 @@
 // Bobbit Service Worker — minimal, for PWA installability + app shell caching
 const CACHE_NAME = 'bobbit-v1';
 
-// App shell files to pre-cache on install
-const APP_SHELL = [
-  '/',
-  '/manifest.json',
-  '/favicon.svg',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-];
-
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
-  );
+  // Skip waiting to activate immediately
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Clean up old caches
+  // Clean up old caches when cache name changes
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
@@ -30,32 +19,57 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Network-first for API and WebSocket
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) {
-    return; // Let the browser handle it normally
+  // Only handle GET requests
+  if (event.request.method !== 'GET') return;
+
+  // Never cache API or WebSocket requests
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws')) return;
+
+  // Network-first for HTML (navigation requests) — always get fresh index.html
+  if (event.request.mode === 'navigate' || url.pathname === '/') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
   }
 
-  // Cache-first for static assets (JS, CSS, images, fonts)
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        // Return cached, but update in background
-        const fetchPromise = fetch(event.request).then((response) => {
+  // Cache-first for hashed static assets (Vite bundles with content hashes)
+  // These are immutable — the hash changes when content changes
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
           if (response.ok) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response));
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
-          return response.clone();
-        }).catch(() => {});
-        return cached;
-      }
-      // Not cached — fetch from network and cache it
-      return fetch(event.request).then((response) => {
-        if (response.ok && event.request.method === 'GET') {
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Network-first for other static files (manifest, icons, favicon)
+  // These don't have content hashes so we need fresh copies
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
