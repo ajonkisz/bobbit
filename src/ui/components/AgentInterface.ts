@@ -700,7 +700,7 @@ export class AgentInterface extends LitElement {
 					${thinkingSelect}
 					${modelButton}
 				</div>
-				${cwdHtml ? html`<div class="flex items-center pl-4">${cwdHtml}</div>` : ""}
+				${cwdHtml ? html`<div class="hidden sm:flex items-center pl-4">${cwdHtml}</div>` : ""}
 				<div class="flex ml-auto items-center gap-3">
 					${contextHtml}
 					${
@@ -729,8 +729,8 @@ export class AgentInterface extends LitElement {
 				</div>
 
 				<!-- Input Area -->
-				<div class="shrink-0 pt-0 pb-1 relative">
-					<div class="max-w-5xl mx-auto px-2">
+				<div class="shrink-0 pt-0 pb-1">
+					<div class="max-w-5xl mx-auto px-2 relative">
 						${this.gitStatus || this.gitStatusLoading ? html`
 						<div class="absolute right-2 bottom-full mb-1.5 z-10 pointer-events-auto" style="max-width:calc(100% - 1rem)">
 							<git-status-widget
