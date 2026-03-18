@@ -159,7 +159,7 @@ Key endpoints: `GET /api/sessions`, `GET /api/goals`, `POST /api/goals/:id/swarm
 
 The primary branch in this repo is `master` (not `main`). If the user says "main branch", "merge to main", or similar, treat it as `master`. Do not create a `main` branch. Always verify the actual default branch with `git symbolic-ref refs/remotes/origin/HEAD` or `git branch -r` before assuming a branch name.
 
-**Never use the word "main" when referring to the primary branch or primary worktree.** Say `master` for the branch and "primary worktree" (or "root worktree") for the worktree checked out on `master`. The word "main" is reserved for repos whose primary branch is literally called `main` — using it loosely when the branch is `master` causes real confusion.
+**In this repo, never use the word "main" when referring to the primary branch or primary worktree.** Say `master` for the branch and "primary worktree" (or "root worktree") for the worktree checked out on `master`. Using "main" loosely when the branch is `master` causes real confusion. (If you're working in a different repo whose primary branch is literally called `main`, then of course use `main`.)
 
 ## Working directory and branch discipline
 
