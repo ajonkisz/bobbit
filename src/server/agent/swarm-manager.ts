@@ -291,7 +291,14 @@ export class SwarmManager {
 				undefined,
 				goalId,
 				false,
-				{ rolePrompt },
+				{
+					rolePrompt,
+					env: {
+						BOBBIT_GATEWAY_URL: this.config.gatewayUrl,
+						BOBBIT_AUTH_TOKEN: this.config.authToken,
+						BOBBIT_GOAL_ID: goalId,
+					},
+				},
 			);
 
 			// Assign a unique color and title
