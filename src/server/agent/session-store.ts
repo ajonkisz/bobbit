@@ -28,6 +28,8 @@ export interface PersistedSession {
 	goalAssistant?: boolean;
 	/** Task ID this session is working on */
 	taskId?: string;
+	/** Pixel-art accessory ID for the Bobbit sprite overlay */
+	accessory?: string;
 	/** Persisted prompt queue */
 	messageQueue?: QueuedMessage[];
 }

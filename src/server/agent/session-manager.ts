@@ -41,6 +41,8 @@ export interface SessionInfo {
 	worktreePath?: string;
 	/** Task ID this session is working on */
 	taskId?: string;
+	/** Pixel-art accessory ID for the Bobbit sprite overlay */
+	accessory?: string;
 	/** Server-side prompt queue */
 	promptQueue: PromptQueue;
 	/** True if the last agent turn ended due to a model/API error */
@@ -413,6 +415,7 @@ export class SessionManager {
 			swarmGoalId: ps.swarmGoalId,
 			worktreePath: ps.worktreePath,
 			taskId: ps.taskId,
+			accessory: ps.accessory,
 			promptQueue: new PromptQueue(ps.messageQueue),
 		};
 
@@ -779,6 +782,7 @@ export class SessionManager {
 			swarmGoalId: session.swarmGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
+			accessory: session.accessory,
 		});
 	}
 
@@ -802,6 +806,7 @@ export class SessionManager {
 		swarmGoalId?: string;
 		worktreePath?: string;
 		taskId?: string;
+		accessory?: string;
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -819,6 +824,7 @@ export class SessionManager {
 			swarmGoalId: s.swarmGoalId,
 			worktreePath: s.worktreePath,
 			taskId: s.taskId,
+			accessory: s.accessory,
 		}));
 	}
 
@@ -847,13 +853,14 @@ export class SessionManager {
 		return true;
 	}
 
-	/** Update session metadata fields (role, swarmGoalId, worktreePath) and persist. */
-	updateSessionMeta(id: string, updates: { role?: string; swarmGoalId?: string; worktreePath?: string }): boolean {
+	/** Update session metadata fields (role, swarmGoalId, worktreePath, accessory) and persist. */
+	updateSessionMeta(id: string, updates: { role?: string; swarmGoalId?: string; worktreePath?: string; accessory?: string }): boolean {
 		const session = this.sessions.get(id);
 		if (!session) return false;
 		if (updates.role !== undefined) session.role = updates.role;
 		if (updates.swarmGoalId !== undefined) session.swarmGoalId = updates.swarmGoalId;
 		if (updates.worktreePath !== undefined) session.worktreePath = updates.worktreePath;
+		if (updates.accessory !== undefined) session.accessory = updates.accessory;
 		this.store.update(id, updates);
 		return true;
 	}

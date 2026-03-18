@@ -58,6 +58,7 @@ export function createGateway(config: GatewayConfig) {
 	const swarmManager = new SwarmManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
+		roleStore,
 	});
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);

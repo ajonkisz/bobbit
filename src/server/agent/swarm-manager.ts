@@ -4,6 +4,7 @@ import type { GoalManager } from "./goal-manager.js";
 import { createWorktree, cleanupWorktree } from "../workflows/git.js";
 import { getRolePrompt, VALID_ROLES } from "./swarm-prompts.js";
 import { SwarmStore } from "./swarm-store.js";
+import type { RoleStore } from "./role-store.js";
 import type { PersistedSwarmEntry } from "./swarm-store.js";
 import { generateSwarmName } from "./swarm-names.js";
 import type { ColorStore } from "./color-store.js";
@@ -55,6 +56,8 @@ export interface SwarmManagerConfig {
 	colorStore: ColorStore;
 	/** Task manager for looking up tasks assigned to sessions */
 	taskManager: TaskManager;
+	/** Role store for looking up role definitions (prompts, accessories, tools) */
+	roleStore?: RoleStore;
 }
 
 export class SwarmManager {
@@ -183,7 +186,10 @@ export class SwarmManager {
 
 		// Build the Team Lead role prompt with structural placeholders only
 		// Secrets (gateway URL, auth token, goal ID) are passed as env vars, NOT embedded in prompt text
-		const teamLeadPrompt = (getRolePrompt("team-lead") ?? "")
+		const roleStore = this.config.roleStore;
+		const storedRole = roleStore?.get("team-lead");
+		const teamLeadPromptTemplate = storedRole?.promptTemplate || getRolePrompt("team-lead") || "";
+		const teamLeadPrompt = teamLeadPromptTemplate
 			.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
 			.replace(/\{\{AGENT_ID\}\}/g, `team-lead-${goalId.slice(0, 8)}`);
 
@@ -197,10 +203,12 @@ export class SwarmManager {
 		const teamLeadName = await generateSwarmName("team-lead");
 		this.sessionManager.setTitle(session.id, `Team Lead: ${teamLeadName}`);
 		session.titleGenerated = true;
+		const teamLeadAccessory = storedRole?.accessory ?? "crown";
 		this.sessionManager.updateSessionMeta(session.id, {
 			role: "team-lead",
 			swarmGoalId: goalId,
 			worktreePath: goal.worktreePath,
+			accessory: teamLeadAccessory,
 		});
 
 		// Initialize swarm tracking
@@ -238,8 +246,10 @@ export class SwarmManager {
 		role: string,
 		task: string,
 	): Promise<{ sessionId: string; worktreePath: string }> {
-		// Validate role
-		if (!VALID_ROLES.includes(role)) {
+		// Validate role — check RoleStore first, then fall back to hardcoded list
+		const roleStore = this.config.roleStore;
+		const storedRoleDef = roleStore?.get(role);
+		if (!storedRoleDef && !VALID_ROLES.includes(role)) {
 			throw new Error(`Invalid role "${role}". Valid roles: ${VALID_ROLES.join(", ")}`);
 		}
 
@@ -275,9 +285,10 @@ export class SwarmManager {
 		const worktreeResult = createWorktree(goal.repoPath, branchName);
 
 		try {
-			// Build role system prompt
+			// Build role system prompt — prefer RoleStore, fall back to hardcoded
 			const agentId = `${role}-${shortId}`;
-			const rolePrompt = (getRolePrompt(role) ?? "")
+			const rolePromptTemplate = storedRoleDef?.promptTemplate || getRolePrompt(role) || "";
+			const rolePrompt = rolePromptTemplate
 				.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
 				.replace(/\{\{AGENT_ID\}\}/g, agentId);
 
@@ -296,10 +307,12 @@ export class SwarmManager {
 			const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 			this.sessionManager.setTitle(session.id, `${roleLabel}: ${roleName}`);
 			session.titleGenerated = true;
+			const roleAccessory = storedRoleDef?.accessory ?? "";
 			this.sessionManager.updateSessionMeta(session.id, {
 				role,
 				swarmGoalId: goalId,
 				worktreePath: worktreeResult.worktreePath,
+				accessory: roleAccessory,
 			});
 
 			// Track the agent

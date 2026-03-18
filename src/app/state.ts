@@ -26,6 +26,8 @@ export interface GatewaySession {
 	swarmGoalId?: string;
 	/** Git worktree path */
 	worktreePath?: string;
+	/** Pixel-art accessory ID for the Bobbit sprite overlay */
+	accessory?: string;
 }
 
 export type GoalState = "todo" | "in-progress" | "complete" | "shelved";
