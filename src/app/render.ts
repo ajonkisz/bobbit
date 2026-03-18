@@ -20,7 +20,7 @@ import {
 import { createGoal, gatewayFetch, refreshSessions } from "./api.js";
 import { clearSessionModel } from "./routing.js";
 import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft } from "./session-manager.js";
-import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
+import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog } from "./dialogs.js";
 import { renderSidebar } from "./sidebar.js";
 
 import { renderGoalGroup, renderSessionRow } from "./render-helpers.js";
@@ -166,20 +166,6 @@ function goalPreviewPanel() {
 	const handleCancel = () => {
 		backToSessions();
 	};
-
-	if (!state.hasReceivedProposal) {
-		return html`
-			<div class="goal-preview-panel flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center border-l border-border">
-				<div class="text-muted-foreground empty-state-icon">${icon(Crosshair, "lg")}</div>
-				<p class="text-sm text-muted-foreground max-w-[280px]">
-					Chat with the assistant to define your goal. The proposal will appear here as it takes shape.
-				</p>
-				<div class="mt-2">
-					${Button({ variant: "ghost", size: "sm", onClick: handleCancel, children: "Cancel" })}
-				</div>
-			</div>
-		`;
-	}
 
 	return html`
 		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
@@ -457,53 +443,6 @@ export function doRenderApp(): void {
 		`;
 	};
 
-	const goalProposalBanner = () => {
-		if (state.isGoalAssistantSession) return "";
-		if (!state.activeGoalProposal || !connected) return "";
-		const p = state.activeGoalProposal;
-		return html`
-			<div class="shrink-0 border-b border-border bg-primary/5 px-4 py-3">
-				<div class="flex items-start gap-3">
-					<div class="flex-1 min-w-0">
-						<div class="flex items-center gap-2 mb-1">
-							<span class="text-xs font-medium text-primary uppercase tracking-wider">Goal Proposal</span>
-						</div>
-						<div class="text-sm font-medium text-foreground">${p.title}</div>
-						${p.cwd ? html`<div class="text-xs text-muted-foreground font-mono mt-0.5">${p.cwd}</div>` : ""}
-						<div class="text-xs text-muted-foreground mt-1 line-clamp-2">${p.spec.slice(0, 200)}${p.spec.length > 200 ? "…" : ""}</div>
-					</div>
-					<div class="flex items-center gap-1.5 shrink-0">
-						${Button({
-							variant: "ghost",
-							size: "sm",
-							onClick: () => { showGoalEditDialogFromProposal(p); },
-							children: html`<span class="inline-flex items-center gap-1">${icon(Pencil, "sm")} Edit</span>`,
-						})}
-						${Button({
-							variant: "default",
-							size: "sm",
-							onClick: async () => {
-								const sessionId = activeSessionId();
-								await createGoal(p.title, p.cwd || "", { spec: p.spec });
-								state.activeGoalProposal = null;
-								if (sessionId) {
-									await terminateSession(sessionId);
-								}
-							},
-							children: html`<span class="inline-flex items-center gap-1">${icon(Crosshair, "sm")} Create Goal</span>`,
-						})}
-						${Button({
-							variant: "ghost",
-							size: "sm",
-							onClick: () => { state.activeGoalProposal = null; renderApp(); },
-							children: "Dismiss",
-						})}
-					</div>
-				</div>
-			</div>
-		`;
-	};
-
 	const goalAssistantTabBar = () => {
 		return html`
 			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
@@ -555,14 +494,13 @@ export function doRenderApp(): void {
 			}
 			return html`
 				${reconnectBanner()}
-				${goalAssistantTabBar()}
 				${state.goalAssistantTab === "chat"
 					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
 					: html`<div class="flex-1 min-h-0 flex flex-col">${goalPreviewPanel()}</div>`
 				}
 			`;
 		}
-		if (connected) return html`${reconnectBanner()}${goalProposalBanner()}${state.chatPanel}`;
+		if (connected) return html`${reconnectBanner()}${state.chatPanel}`;
 
 		if (desktop) {
 			return html`
@@ -637,6 +575,7 @@ export function doRenderApp(): void {
 						${headerRight()}
 					</div>
 					${workflowBar("mobile")}
+					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
 				</div>
 				<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>

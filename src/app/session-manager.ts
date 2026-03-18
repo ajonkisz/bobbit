@@ -260,6 +260,12 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		// Track goal assistant state
 		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
 
+		// Clear goal proposal when connecting to a non-goal-assistant session
+		// to prevent stale proposals from showing in unrelated sessions
+		if (!state.isGoalAssistantSession) {
+			state.activeGoalProposal = null;
+		}
+
 		if (state.isGoalAssistantSession) {
 			// Try to restore persisted draft state; fall back to fresh defaults
 			const restored = await restoreGoalDraft(sessionId);

@@ -552,6 +552,12 @@ export class RemoteAgent {
 					for (const m of this._state.messages) {
 						this.emit({ type: "message_end", message: m });
 					}
+					// Scan loaded messages for goal proposals (e.g. reconnecting to an existing session)
+					for (const m of this._state.messages) {
+						if (m.role === "assistant") {
+							this._checkForGoalProposal(m);
+						}
+					}
 					// Re-add compacting placeholder if compaction is still in progress
 					if (this._isCompacting) {
 						this._addCompactingPlaceholder();
@@ -689,6 +695,8 @@ export class RemoteAgent {
 				this.flushDeferredMessage();
 				if (event.message) {
 					this._state.streamMessage = event.message;
+					// Check for goal proposal during streaming so preview syncs live
+					this._checkForGoalProposal(event.message);
 				}
 				break;
 

@@ -47,10 +47,11 @@ For simple known URLs, `bash` with `curl -sL <url> | head -200` is also fine.
 
 - **delegate**: Run a task in a separate agent process. The delegate gets full tool access but only sees the instructions you provide — it does not see this conversation. Blocks until the delegate finishes and returns its output.
 
-  **Do not use for tasks under 1 minute.** Spawning a delegate has significant overhead. Use only when:
-  - The user explicitly asks for delegation
-  - Context isolation is required (e.g., code review that must not see the parent conversation)
-  - Mass parallelism is needed (3+ independent sub-tasks)
+  **Never delegate a single task.** If you can do the work yourself inline, do it — spinning up a delegate for something you could handle directly is a waste of resources. Each delegate spawns an entire agent process with significant overhead. The only reasons to delegate are:
+  - **Context isolation** — the delegate must not see this conversation (e.g., code review)
+  - **Mass parallelism** — 3+ independent sub-tasks that benefit from running concurrently
+
+  If neither of these applies, do the work yourself. "The task is complex" or "the task is long" are not valid reasons to delegate — you can handle complex, long tasks directly.
 
   **Never delegate just to read files.** Reading files is instant — delegating it adds spawn overhead for zero benefit. Read files directly, then delegate only if the *processing* of what you read requires isolation or parallelism.
 

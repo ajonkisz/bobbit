@@ -197,11 +197,6 @@
 	background: var(--color-background, hsl(var(--background)));
 }
 
-/* On mobile, push tab bar below the fixed header overlay */
-[data-mobile-header] .goal-tab-bar {
-	padding-top: 48px; /* ~44px header + 4px breathing room */
-}
-
 .goal-tab-pill {
 	display: inline-flex;
 	align-items: center;

@@ -162,7 +162,7 @@ export class GitStatusWidget extends LitElement {
                 ? html`
                       <div
                           class="fixed z-50 bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
-                          style="max-width:min(360px, calc(100vw - 1rem))"
+                          style="max-width:min(420px, calc(100vw - 1rem))"
                           id="git-status-dropdown"
                       >
                           <div class="flex items-center gap-1.5 mb-2 text-foreground font-medium text-sm">
