@@ -1,8 +1,5 @@
 ## Backlog
-- [ ] #4 Review all changes — role:reviewer, depends:#1,#2,#3
-- [ ] #5 Update swarm-prompts.test.ts assertions for new API-based prompts — role:tester, depends:#2
-- [ ] #6 Review env vars pass-through in spawnRole() — role:reviewer, depends:#1, branch:goal-swarm-task-1-env-vars
-- [ ] #7 Test env vars pass-through in spawnRole() — role:tester, depends:#1
+- [ ] #4 Review all changes (env vars in spawnRole, Task API prompts, steer notifications) — role:reviewer, depends:#1,#2,#3
 
 ## In Progress
 
