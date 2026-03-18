@@ -100,11 +100,7 @@
   .role-info { flex: 1; min-width: 0; }
   .role-name { font-size: 0.8125rem; font-weight: 500; }
   .role-meta { font-size: 0.6875rem; color: var(--muted-foreground); display: flex; align-items: center; gap: 0.5rem; margin-top: 0.125rem; }
-  .built-in-badge {
-    font-size: 0.625rem; padding: 0.0625rem 0.375rem;
-    border-radius: 9999px; border: 1px solid var(--border);
-    color: var(--muted-foreground); background: var(--muted);
-  }
+
   .tool-count { font-size: 0.625rem; color: var(--muted-foreground); }
 
   /* Tool chips */
@@ -215,7 +211,7 @@
 <div>
   <div class="section-title">1. Role Identity = Accessories</div>
   <div class="section-desc">
-    Each role gets a unique pixel-art accessory overlay rendered on top of the Bobbit sprite. Accessories are counter-hue-rotated so they keep their fixed colors regardless of the session's identity hue. Currently: crown (team-lead), bandana (coder). New accessories needed for reviewer, tester, and custom roles.
+    Each role gets a unique pixel-art accessory overlay rendered on top of the Bobbit sprite. Accessories are counter-hue-rotated so they keep their fixed colors regardless of the session's identity hue. Currently: crown (team-lead), bandana (coder). New accessories needed for reviewer, tester, and any new roles.
   </div>
 
   <div style="display:flex; flex-wrap:wrap; gap:1.5rem; padding:1.25rem; background:var(--muted); border-radius:0.5rem; border:1px solid var(--border);">
@@ -261,17 +257,17 @@
       <div class="accessory-label">Goggles<br><span style="color:#22d3ee;">tester</span></div>
     </div>
 
-    <!-- Headphones - custom role example -->
+    <!-- Headphones -->
     <div class="accessory-item">
       <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
         <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
         <!-- Headphones overlay -->
         <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #a855f7,4px 0px 0 #a855f7,5px 0px 0 #a855f7,6px 0px 0 #a855f7,7px 0px 0 #a855f7,2px 1px 0 #000,8px 1px 0 #000,1px 2px 0 #000,9px 2px 0 #000,0px 3px 0 #7c3aed,0px 4px 0 #7c3aed,0px 5px 0 #7c3aed,9px 3px 0 #7c3aed,9px 4px 0 #7c3aed,9px 5px 0 #7c3aed;"></span>
       </div>
-      <div class="accessory-label">Headphones<br><span style="color:#a855f7;">custom</span></div>
+      <div class="accessory-label">Headphones<br><span style="color:#a855f7;">example</span></div>
     </div>
 
-    <!-- Pencil - custom role example -->
+    <!-- Pencil -->
     <div class="accessory-item">
       <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
         <span class="bobbit-lg" style="top:6px;left:4px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
@@ -281,7 +277,7 @@
       <div class="accessory-label">Pencil<br><span style="color:#fbbf24;">docs-writer</span></div>
     </div>
 
-    <!-- Book - custom role example -->
+    <!-- Book -->
     <div class="accessory-item">
       <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
         <span class="bobbit-lg" style="top:6px;left:4px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
@@ -291,14 +287,14 @@
       <div class="accessory-label">Book<br><span style="color:#e7e5e4;">architect</span></div>
     </div>
 
-    <!-- Glasses - custom role example -->
+    <!-- Glasses -->
     <div class="accessory-item">
       <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
         <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
         <!-- Glasses overlay across eyes -->
         <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:2px 4px 0 #000,3px 4px 0 #d4d4d8,4px 4px 0 #000,5px 4px 0 #d4d4d8,6px 4px 0 #d4d4d8,7px 4px 0 #000,8px 4px 0 #000;"></span>
       </div>
-      <div class="accessory-label">Glasses<br><span style="color:#d4d4d8;">custom</span></div>
+      <div class="accessory-label">Glasses<br><span style="color:#d4d4d8;">example</span></div>
     </div>
 
   </div>
@@ -314,7 +310,7 @@
 <div>
   <div class="section-title">2. Role Manager Dialog — List View</div>
   <div class="section-desc">
-    Launched from the sidebar "Roles" button. Each role row shows the Bobbit with its accessory at small scale, the role name, built-in badge, and tool restriction summary. No color picker — accessories are the visual identity.
+    Launched from the sidebar "Roles" button. Each role row shows the Bobbit with its accessory at small scale, the role name, and tool restriction summary. All roles are treated equally — Bobbit ships with 4 default roles (team-lead, coder, reviewer, tester) but they're fully editable and deletable like any other.
   </div>
 
   <div class="backdrop" style="height:520px;">
@@ -336,7 +332,7 @@
             <div class="role-info">
               <div class="role-name">Team Lead</div>
               <div class="role-meta">
-                <span class="built-in-badge">built-in</span>
+                
                 <span class="tool-count">All tools</span>
                 <span class="tool-count" style="color:#fde047;">crown</span>
               </div>
@@ -351,7 +347,7 @@
             <div class="role-info">
               <div class="role-name">Coder</div>
               <div class="role-meta">
-                <span class="built-in-badge">built-in</span>
+                
                 <span class="tool-count">All tools</span>
                 <span class="tool-count" style="color:#ef4444;">bandana</span>
               </div>
@@ -366,7 +362,7 @@
             <div class="role-info">
               <div class="role-name">Reviewer</div>
               <div class="role-meta">
-                <span class="built-in-badge">built-in</span>
+                
                 <span class="tool-count">Write/Edit disabled</span>
                 <span class="tool-count" style="color:#60a5fa;">magnifier</span>
               </div>
@@ -381,7 +377,7 @@
             <div class="role-info">
               <div class="role-name">Tester</div>
               <div class="role-meta">
-                <span class="built-in-badge">built-in</span>
+                
                 <span class="tool-count">All tools</span>
                 <span class="tool-count" style="color:#22d3ee;">goggles</span>
               </div>
@@ -396,7 +392,7 @@
             <div class="role-info">
               <div class="role-name">Documentation Writer</div>
               <div class="role-meta">
-                <span style="font-size:0.625rem;color:#a855f7;">custom</span>
+                
                 <span class="tool-count">4 tools allowed</span>
                 <span class="tool-count" style="color:#fbbf24;">pencil</span>
               </div>
@@ -411,7 +407,7 @@
             <div class="role-info">
               <div class="role-name">Architect</div>
               <div class="role-meta">
-                <span style="font-size:0.625rem;color:#f97316;">custom</span>
+                
                 <span class="tool-count">6 tools allowed</span>
                 <span class="tool-count" style="color:#e7e5e4;">book</span>
               </div>
@@ -444,14 +440,13 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
           </button>
           <div class="dialog-header">Edit Role</div>
-          <span class="built-in-badge" style="margin-left:0.5rem;">built-in</span>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:1.125rem;">
           <div>
             <label class="label">Name (identifier)</label>
             <input class="input" value="reviewer" disabled style="opacity:0.6;cursor:not-allowed;" />
-            <span style="font-size:0.625rem;color:var(--muted-foreground);margin-top:0.25rem;display:block;">URL-safe, lowercase. Cannot change for built-in roles.</span>
+            <span style="font-size:0.625rem;color:var(--muted-foreground);margin-top:0.25rem;display:block;">URL-safe, lowercase. Set at creation time, cannot be changed later.</span>
           </div>
 
           <div>
@@ -492,7 +487,7 @@ You review code written by coder agents. You read, analyze, and report — you d
               <div class="tool-chip" onclick="this.classList.toggle('active')"><span class="check"></span> Browser</div>
               <div class="tool-chip active" onclick="this.classList.toggle('active')"><span class="check">&#10003;</span> Workflow</div>
             </div>
-            <span style="font-size:0.625rem;color:var(--muted-foreground);margin-top:0.375rem;display:block;">Empty = all tools allowed. Reviewer has Write/Edit/Delegate disabled by design.</span>
+            <span style="font-size:0.625rem;color:var(--muted-foreground);margin-top:0.375rem;display:block;">Empty = all tools allowed.</span>
           </div>
 
           <!-- ACCESSORY SELECTOR (replaces old color picker) -->
@@ -539,9 +534,9 @@ You review code written by coder agents. You read, analyze, and report — you d
 
       <div class="detail-footer">
         <div>
-          <button class="btn btn-ghost btn-sm" style="color:var(--muted-foreground);">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-            Reset to Default
+          <button class="btn btn-ghost btn-sm" style="color:var(--destructive);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            Delete Role
           </button>
         </div>
         <div style="display:flex;gap:0.5rem;">
@@ -607,13 +602,13 @@ You review code written by coder agents. You read, analyze, and report — you d
       <strong>Accessory gallery in the selector.</strong> The edit dialog shows each accessory option as an emoji placeholder (fast to render, universally supported). The actual rendered pixel-art is visible in the sidebar and session list. Alternatively, the selector could render mini pixel-art previews — but emoji is simpler for a picker UI.
     </div>
     <div class="annotation" style="margin-top:0;">
-      <strong>Custom roles can reuse or extend accessories.</strong> The built-in set (crown, bandana, magnifier, goggles, headphones, pencil, book, glasses, shield) covers common archetypes. Custom roles pick from this gallery. Adding new pixel-art accessories is a code change (adding a box-shadow definition), not a UI configuration.
+      <strong>Roles pick from an accessory gallery.</strong> The shipped set (crown, bandana, magnifier, goggles, headphones, pencil, book, glasses, shield) covers common archetypes. All roles pick from this gallery equally. Adding new pixel-art accessories is a code change (adding a box-shadow definition), not a UI configuration.
     </div>
     <div class="annotation" style="margin-top:0;">
       <strong>No color picker in role editor.</strong> Color is managed per-session in the rename dialog (existing Aurora Borealis palette picker). The role editor only manages: name, label, prompt, tools, and accessory. This keeps the two identity axes cleanly separated.
     </div>
     <div class="annotation" style="margin-top:0;">
-      <strong>Same dialog patterns as before.</strong> Imperative render-in-container, mini-lit Dialog/Button/Input, list-to-detail navigation with back arrow. Tool chips are interactive toggles. Built-in roles have read-only name + "Reset to Default" instead of delete.
+      <strong>Same dialog patterns as before.</strong> Imperative render-in-container, mini-lit Dialog/Button/Input, list-to-detail navigation with back arrow. Tool chips are interactive toggles. Role names are immutable after creation (URL-safe identifiers). All roles are deletable.
     </div>
   </div>
 </div>
