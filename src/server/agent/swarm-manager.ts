@@ -324,6 +324,14 @@ export class SwarmManager {
 				console.error('[swarm-manager] Failed to send task prompt:', err);
 			});
 
+			// Subscribe to worker events to steer the team lead when the worker goes idle
+			session.rpcClient.onEvent((event: any) => {
+				if (event.type !== "agent_end") return;
+				this.notifyTeamLead(goalId, session.id, role, agentId).catch((err) => {
+					console.error("[swarm-manager] Failed to notify team lead:", err);
+				});
+			});
+
 			console.log(
 				`[swarm-manager] Spawned ${role} agent (${session.id}) for goal "${goal.title}" — worktree: ${worktreeResult.worktreePath}`,
 			);
@@ -338,6 +346,36 @@ export class SwarmManager {
 				console.error(`[swarm-manager] Failed to clean up orphaned worktree ${worktreeResult.worktreePath}:`, cleanupErr);
 			}
 			throw err;
+		}
+	}
+
+	/**
+	 * Notify the team lead that a worker agent has gone idle.
+	 * Sends a steer message with task context so the team lead can decide next steps.
+	 */
+	private async notifyTeamLead(goalId: string, workerSessionId: string, role: string, agentId: string): Promise<void> {
+		const entry = this.swarms.get(goalId);
+		if (!entry?.teamLeadSessionId) return;
+
+		const teamLeadSession = this.sessionManager.getSession(entry.teamLeadSessionId);
+		if (!teamLeadSession || teamLeadSession.status === "terminated") return;
+
+		// Look up tasks assigned to the worker
+		const tasks = this.sessionManager.taskManager.getTasksForSession(workerSessionId);
+
+		let message: string;
+		if (tasks.length > 0) {
+			const taskSummaries = tasks.map(t => `"${t.title}" (state: ${t.state})`).join(", ");
+			message = `Agent ${agentId} (${role}) has finished. Tasks: ${taskSummaries}. Check tasks and decide next steps.`;
+		} else {
+			message = `Agent ${agentId} (${role}) has finished with no assigned tasks. Check tasks and decide next steps.`;
+		}
+
+		try {
+			await teamLeadSession.rpcClient.steer(message);
+			console.log(`[swarm-manager] Steered team lead for goal ${goalId}: ${message}`);
+		} catch (err) {
+			console.error(`[swarm-manager] Failed to steer team lead for goal ${goalId}:`, err);
 		}
 	}
 
