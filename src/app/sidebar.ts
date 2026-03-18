@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { PanelLeftClose, PanelLeftOpen, Plus } from "lucide";
+import { PanelLeftClose, PanelLeftOpen, Plus, Users } from "lucide";
 import {
 	state,
 	renderApp,
@@ -110,14 +110,25 @@ export function renderSidebar() {
 						`
 				}
 			</div>
-			<button
-				class="flex items-center justify-end gap-1.5 px-3 py-2 w-full text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors border-t border-border/50"
-				@click=${toggleSidebar}
-				title="Collapse sidebar (Ctrl+[)"
-			>
-				<span>Collapse</span>
-				${icon(PanelLeftClose, "sm")}
-			</button>
+			<div class="flex items-center border-t border-border/50">
+				<button
+					class="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+					@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}
+					title="Manage roles"
+				>
+					${icon(Users, "sm")}
+					<span>Roles</span>
+				</button>
+				<span class="flex-1"></span>
+				<button
+					class="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+					@click=${toggleSidebar}
+					title="Collapse sidebar (Ctrl+[)"
+				>
+					<span>Collapse</span>
+					${icon(PanelLeftClose, "sm")}
+				</button>
+			</div>
 		</div>
 	`;
 }

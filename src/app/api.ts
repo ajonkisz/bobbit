@@ -284,3 +284,97 @@ export async function teardownSwarm(goalId: string): Promise<boolean> {
 		return false;
 	}
 }
+
+// ============================================================================
+// ROLE API
+// ============================================================================
+
+export interface RoleData {
+	name: string;
+	label: string;
+	promptTemplate: string;
+	allowedTools: string[];
+	accessory: string;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export async function fetchRoles(): Promise<RoleData[]> {
+	try {
+		const res = await gatewayFetch("/api/roles");
+		if (!res.ok) throw new Error(`Failed to fetch roles: ${res.status}`);
+		const data = await res.json();
+		return data.roles || data || [];
+	} catch (err) {
+		console.error("[role-api] fetchRoles failed:", err);
+		return [];
+	}
+}
+
+export async function fetchTools(): Promise<string[]> {
+	try {
+		const res = await gatewayFetch("/api/tools");
+		if (!res.ok) throw new Error(`Failed to fetch tools: ${res.status}`);
+		const data = await res.json();
+		return data.tools || data || [];
+	} catch (err) {
+		console.error("[role-api] fetchTools failed:", err);
+		return [];
+	}
+}
+
+export async function createRole(role: {
+	name: string;
+	label: string;
+	promptTemplate: string;
+	allowedTools: string[];
+	accessory: string;
+}): Promise<RoleData | null> {
+	try {
+		const res = await gatewayFetch("/api/roles", {
+			method: "POST",
+			body: JSON.stringify(role),
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || `Failed: ${res.status}`);
+		}
+		return await res.json();
+	} catch (err) {
+		showConnectionError("Failed to create role", err instanceof Error ? err.message : String(err));
+		return null;
+	}
+}
+
+export async function updateRole(name: string, updates: Partial<Pick<RoleData, "label" | "promptTemplate" | "allowedTools" | "accessory">>): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/roles/${encodeURIComponent(name)}`, {
+			method: "PUT",
+			body: JSON.stringify(updates),
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || `Failed: ${res.status}`);
+		}
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to update role", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
+
+export async function deleteRole(name: string): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/roles/${encodeURIComponent(name)}`, {
+			method: "DELETE",
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || `Failed: ${res.status}`);
+		}
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to delete role", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
