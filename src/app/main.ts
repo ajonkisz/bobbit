@@ -178,3 +178,8 @@ async function initApp() {
 }
 
 initApp();
+
+// Register service worker for PWA installability
+if ('serviceWorker' in navigator) {
+	navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
