@@ -7,7 +7,7 @@ import type {
 	UserMessage as UserMessageType,
 } from "@mariozechner/pi-ai";
 import { html, LitElement, type TemplateResult } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { renderTool } from "../tools/index.js";
 import type { Attachment } from "../utils/attachment-utils.js";
 import { formatUsage } from "../utils/format.js";
@@ -103,6 +103,7 @@ export class AssistantMessage extends LitElement {
 	@property({ type: Boolean }) hidePendingToolCalls = false;
 	@property({ attribute: false }) onCostClick?: () => void;
 	@property({ attribute: false }) onRetry?: () => void;
+	@state() private _retrying = false;
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
 		return this;
@@ -229,13 +230,22 @@ export class AssistantMessage extends LitElement {
 									</div>
 									${this.onRetry ? html`
 										<button
-											class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-destructive/15 hover:bg-destructive/25 text-destructive transition-colors cursor-pointer"
-											@click=${this.onRetry}
+											class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${this._retrying ? 'bg-destructive/10 text-destructive/60' : 'bg-destructive/15 hover:bg-destructive/25 text-destructive'}"
+											?disabled=${this._retrying}
+											@click=${() => { this._retrying = true; this.onRetry!(); }}
 										>
-											<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M20.015 4.356v4.992" />
-											</svg>
-											Retry
+											${this._retrying ? html`
+												<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+													<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+													<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+												</svg>
+												Retrying…
+											` : html`
+												<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+													<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M20.015 4.356v4.992" />
+												</svg>
+												Retry
+											`}
 										</button>
 									` : ""}
 								</div>
