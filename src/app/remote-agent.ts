@@ -72,6 +72,8 @@ export class RemoteAgent {
 	onConnectionStatusChange?: (status: ConnectionStatus) => void;
 	/** Callback fired when a goal proposal is detected in an assistant message. */
 	onGoalProposal?: (proposal: { title: string; spec: string; cwd?: string }) => void;
+	/** Callback fired when a role proposal is detected in an assistant message. */
+	onRoleProposal?: (proposal: { name: string; label: string; prompt: string; tools: string; accessory: string }) => void;
 	/** Callback fired when workflow tool execution updates (for real-time progress). */
 	onWorkflowUpdate?: () => void;
 	/** Callback fired when the server-side prompt queue changes. */
@@ -590,6 +592,7 @@ export class RemoteAgent {
 					for (const m of this._state.messages) {
 						if (m.role === "assistant") {
 							this._checkForGoalProposal(m);
+							this._checkForRoleProposal(m);
 						}
 					}
 					// Re-add compacting placeholder if compaction is still in progress
@@ -689,6 +692,42 @@ export class RemoteAgent {
 		});
 	}
 
+	/** Check an assistant message for a <role_proposal> block and fire the callback. */
+	private _checkForRoleProposal(message: any): void {
+		if (!this.onRoleProposal) return;
+
+		let text = "";
+		if (typeof message.content === "string") {
+			text = message.content;
+		} else if (Array.isArray(message.content)) {
+			text = message.content
+				.filter((c: any) => c.type === "text")
+				.map((c: any) => c.text || "")
+				.join("");
+		}
+		if (!text) return;
+
+		const match = text.match(/<role_proposal>([\s\S]*?)<\/role_proposal>/);
+		if (!match) return;
+
+		const block = match[1];
+		const nameMatch = block.match(/<name>([\s\S]*?)<\/name>/);
+		const labelMatch = block.match(/<label>([\s\S]*?)<\/label>/);
+		const promptMatch = block.match(/<prompt>([\s\S]*?)<\/prompt>/);
+		const toolsMatch = block.match(/<tools>([\s\S]*?)<\/tools>/);
+		const accessoryMatch = block.match(/<accessory>([\s\S]*?)<\/accessory>/);
+
+		if (!nameMatch || !labelMatch || !promptMatch) return;
+
+		this.onRoleProposal({
+			name: nameMatch[1].trim(),
+			label: labelMatch[1].trim(),
+			prompt: promptMatch[1].trim(),
+			tools: toolsMatch ? toolsMatch[1].trim() : "",
+			accessory: accessoryMatch ? accessoryMatch[1].trim() : "none",
+		});
+	}
+
 	private flushDeferredMessage() {
 		if (this._deferredAssistantMessage) {
 			this._state.messages = [...this._state.messages, this._deferredAssistantMessage];
@@ -734,16 +773,18 @@ export class RemoteAgent {
 				this.flushDeferredMessage();
 				if (event.message) {
 					this._state.streamMessage = event.message;
-					// Check for goal proposal during streaming so preview syncs live
+					// Check for goal/role proposal during streaming so preview syncs live
 					this._checkForGoalProposal(event.message);
+					this._checkForRoleProposal(event.message);
 				}
 				break;
 
 			case "message_end":
 				if (event.message) {
 					if (event.message.role === "assistant") {
-						// Check for goal proposal in assistant message
+						// Check for goal/role proposal in assistant message
 						this._checkForGoalProposal(event.message);
+						this._checkForRoleProposal(event.message);
 
 						// Check whether this assistant message contains tool calls.
 						const hasToolCalls = Array.isArray(event.message.content) &&

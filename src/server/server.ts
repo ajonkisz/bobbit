@@ -255,6 +255,7 @@ async function handleApiRoute(
 		// ── Normal session creation ──
 		const goalId = body?.goalId;
 		const goalAssistant = body?.goalAssistant === true;
+		const roleAssistant = body?.roleAssistant === true;
 
 		// If creating under a goal, use the goal's cwd as default
 		let cwd = body?.cwd || config.defaultCwd;
@@ -272,13 +273,14 @@ async function handleApiRoute(
 		const args = body?.args;
 
 		try {
-			const session = await sessionManager.createSession(cwd, args, goalId, goalAssistant);
+			const session = await sessionManager.createSession(cwd, args, goalId, goalAssistant, roleAssistant ? { roleAssistant: true } : undefined);
 			json({
 				id: session.id,
 				cwd: session.cwd,
 				status: session.status,
 				goalId: session.goalId,
 				goalAssistant: session.goalAssistant,
+				roleAssistant: session.roleAssistant,
 			}, 201);
 		} catch (err) {
 			json({ error: String(err) }, 500);
