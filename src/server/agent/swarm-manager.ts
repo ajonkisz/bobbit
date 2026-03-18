@@ -223,6 +223,11 @@ export class SwarmManager {
 			this.goalManager.updateGoal(goalId, { state: "in-progress" });
 		}
 
+		// Kick off the team lead with an initial prompt (same pattern as delegate sessions)
+		session.rpcClient.prompt("Execute the task described in your system prompt. Follow the instructions carefully.").catch((err: any) => {
+			console.error("[swarm-manager] Failed to send team lead kickoff prompt:", err);
+		});
+
 		console.log(`[swarm-manager] Started swarm for goal "${goal.title}" — team lead: ${session.id}`);
 		return session;
 	}
