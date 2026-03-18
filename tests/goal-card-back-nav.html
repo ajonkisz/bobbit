@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Goal Card Back Navigation Test</title>
+<style>
+body { margin: 0; font-family: sans-serif; background: #0a0a0a; color: #e4e4e7; }
+.landing { padding: 16px; }
+.goal-card {
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+.goal-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.sessions-wrapper { margin-top: 8px; }
+.session-card {
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.session-card:hover { border-color: #666; }
+.session-title { font-size: 13px; }
+.session-status { font-size: 11px; color: #888; }
+#current-view { position: fixed; top: 0; left: 0; right: 0; background: #1a1a1a; padding: 8px 16px; font-size: 12px; z-index: 10; border-bottom: 1px solid #333; }
+.view { display: none; }
+.view.active { display: block; }
+</style>
+</head>
+<body>
+
+<div id="current-view">View: <span id="view-label">landing</span> | Hash: <span id="hash-label">#/</span></div>
+
+<div id="view-landing" class="view active" style="padding-top: 40px;">
+  <div class="landing">
+    <h2>Goals &amp; Sessions</h2>
+
+    <div class="goal-card" id="goal-card-1" data-goal-id="goal-1">
+      <div class="goal-title">Test Goal Alpha</div>
+      <div class="sessions-wrapper" id="sessions-wrapper-1">
+        <div class="session-card" id="session-card-tl" data-session-id="session-tl-1">
+          <div class="session-title">Team Lead: Petra</div>
+          <div class="session-status">streaming</div>
+        </div>
+        <div class="session-card" id="session-card-c1" data-session-id="session-c1">
+          <div class="session-title">Coder: Ziggy</div>
+          <div class="session-status">idle</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="goal-card" id="goal-card-2" data-goal-id="goal-2">
+      <div class="goal-title">Test Goal Beta</div>
+    </div>
+  </div>
+</div>
+
+<div id="view-goal-dashboard" class="view" style="padding-top: 40px;">
+  <div class="landing">
+    <h2 id="dashboard-title">Goal Dashboard</h2>
+    <div class="session-card" id="dashboard-session-tl" data-session-id="session-tl-1">
+      <div class="session-title">Team Lead: Petra</div>
+      <div class="session-status">streaming</div>
+    </div>
+  </div>
+</div>
+
+<div id="view-session" class="view" style="padding-top: 40px;">
+  <div class="landing">
+    <h2 id="session-view-title">Session Chat</h2>
+    <p>Connected to session <span id="connected-session-id"></span></p>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Routing — mirrors src/app/routing.ts exactly
+// ============================================================
+function getRouteFromHash() {
+  const hash = window.location.hash || "";
+  const sessionMatch = hash.match(/^#\/session\/([a-z0-9-]+)$/i);
+  if (sessionMatch) return { view: "session", sessionId: sessionMatch[1] };
+  const goalMatch = hash.match(/^#\/goal\/([a-z0-9-]+)$/i);
+  if (goalMatch) return { view: "goal-dashboard", goalId: goalMatch[1] };
+  return { view: "landing" };
+}
+
+function setHashRoute(view, id, replace) {
+  let newHash;
+  if (view === "session" && id) newHash = "#/session/" + id;
+  else if (view === "goal-dashboard" && id) newHash = "#/goal/" + id;
+  else newHash = "#/";
+  if (window.location.hash !== newHash) {
+    if (replace) {
+      history.replaceState({}, "", newHash);
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    } else {
+      window.location.hash = newHash;
+    }
+  }
+}
+
+// ============================================================
+// View switching — mirrors renderApp logic
+// ============================================================
+let connectedSessionId = null;
+
+function showView(viewName) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  const el = document.getElementById("view-" + viewName);
+  if (el) el.classList.add("active");
+  document.getElementById("view-label").textContent = viewName;
+  document.getElementById("hash-label").textContent = window.location.hash || "#/";
+}
+
+function handleHashChange() {
+  const route = getRouteFromHash();
+  document.getElementById("hash-label").textContent = window.location.hash || "#/";
+
+  if (route.view === "session" && route.sessionId) {
+    connectedSessionId = route.sessionId;
+    document.getElementById("connected-session-id").textContent = route.sessionId;
+    showView("session");
+  } else if (route.view === "goal-dashboard" && route.goalId) {
+    connectedSessionId = null;
+    document.getElementById("dashboard-title").textContent = "Goal Dashboard: " + route.goalId;
+    showView("goal-dashboard");
+  } else {
+    connectedSessionId = null;
+    showView("landing");
+  }
+}
+
+window.addEventListener("hashchange", handleHashChange);
+
+// ============================================================
+// connectToSession — mirrors async behavior of real function
+// ============================================================
+let connectingSessionId = null;
+
+async function connectToSession(sessionId) {
+  if (connectingSessionId) return;
+  connectingSessionId = sessionId;
+
+  // Capture route BEFORE async gap (mirrors real fix)
+  const startingRoute = getRouteFromHash();
+
+  // Simulate async connection delay (real code does await remote.connect())
+  await new Promise(r => setTimeout(r, 50));
+
+  connectedSessionId = sessionId;
+  connectingSessionId = null;
+
+  // Check both starting route and current route (mirrors real fix)
+  const currentRoute = getRouteFromHash();
+  const replaceHistory = startingRoute.view === "goal-dashboard" || currentRoute.view === "goal-dashboard";
+  setHashRoute("session", sessionId, replaceHistory);
+}
+
+// ============================================================
+// Event handlers — mirrors real goal card + session card clicks
+// ============================================================
+
+// Goal card clicks → navigate to goal dashboard (guarded by connectingSessionId)
+document.querySelectorAll(".goal-card").forEach(card => {
+  card.addEventListener("click", () => {
+    if (connectingSessionId) return; // Don't navigate while connecting
+    const goalId = card.dataset.goalId;
+    setHashRoute("goal-dashboard", goalId);
+  });
+});
+
+// Session wrapper stopPropagation — mirrors the coder's fix
+document.querySelectorAll(".sessions-wrapper").forEach(wrapper => {
+  wrapper.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+});
+
+// Session card clicks → connect to session
+document.querySelectorAll(".session-card").forEach(card => {
+  card.addEventListener("click", () => {
+    const sessionId = card.dataset.sessionId;
+    connectToSession(sessionId);
+  });
+});
+
+// Expose for testing
+window.__getRouteFromHash = getRouteFromHash;
+window.__setHashRoute = setHashRoute;
+window.__connectToSession = connectToSession;
+
+// Initialize
+if (window.location.hash && window.location.hash !== "#/") {
+  handleHashChange();
+}
+</script>
+</body>
+</html>

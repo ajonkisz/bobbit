@@ -71,7 +71,7 @@ function renderMobileGoalCard(goal: { id: string; title: string; cwd: string; st
 
 	return html`
 		<div class="rounded-lg border border-border p-4 ${goal.state === "shelved" ? "opacity-60" : ""}"
-			@click=${() => setHashRoute("goal-dashboard", goal.id)}>
+			@click=${() => { if (!state.connectingSessionId) setHashRoute("goal-dashboard", goal.id); }}>
 			<div class="flex items-center justify-between mb-2">
 				<div class="flex items-center gap-2">
 					<span class="shrink-0">${goalStateIcon(goal.state, 16)}</span>

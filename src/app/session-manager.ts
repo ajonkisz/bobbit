@@ -121,6 +121,11 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 	if (state.connectingSessionId) return;
 	state.connectingSessionId = sessionId;
 
+	// Capture the current route BEFORE any async work. If we're on a goal dashboard,
+	// we'll replace the history entry instead of pushing, so browser-back skips it.
+	// Must be captured here because event bubbling during the async gap can change the hash.
+	const startingRoute = getRouteFromHash();
+
 	if (state.remoteAgent) {
 		state.remoteAgent.disconnect();
 		state.remoteAgent = null;
@@ -218,8 +223,10 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		document.documentElement.classList.toggle("bobbit-bandana", sessionForRole?.role === "coder");
 		// Replace history entry when navigating from goal dashboard so browser-back
 		// goes to the landing page instead of back to the goal dashboard.
+		// Also replace if the hash changed during the async connect (e.g. event bubbling
+		// caused a goal-dashboard navigation while we were connecting).
 		const currentRoute = getRouteFromHash();
-		const replaceHistory = currentRoute.view === "goal-dashboard";
+		const replaceHistory = startingRoute.view === "goal-dashboard" || currentRoute.view === "goal-dashboard";
 		setHashRoute("session", sessionId, replaceHistory);
 
 		const modelProvider = remote.state.model?.provider || "anthropic";
