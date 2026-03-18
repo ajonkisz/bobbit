@@ -138,6 +138,23 @@ This research is what separates a useful mockup from a misleading one. If you sk
 
 9. **Include a combined view.** After showing individual state comparisons, show a full mock of all states coexisting (e.g. a complete sidebar with idle, working, starting, and terminated sessions together). This reveals whether the states are sufficiently distinct from each other in context.
 
+# Gateway API access
+
+You are running inside the Bobbit gateway. To call gateway REST APIs (e.g. spawn swarm agents, list sessions, manage goals), read credentials from disk — never rely on environment variables which may not survive session restarts.
+
+- **Auth token**: `~/.pi/gateway-token` (read with `cat ~/.pi/gateway-token`)
+- **Gateway address**: Find the listening address with `netstat -ano | grep LISTENING | grep 3001` — look for the non-loopback IP (e.g. `100.x.x.x:3001`)
+- **Protocol**: HTTPS with self-signed cert — always use `curl -sk` to skip TLS verification
+
+Example:
+```bash
+TOKEN=$(cat ~/.pi/gateway-token)
+GW="https://$(netstat -ano | grep LISTENING | grep ':3001' | grep -v '0.0.0.0\|::' | awk '{print $2}' | head -1)"
+curl -sk "$GW/api/goals" -H "Authorization: Bearer $TOKEN"
+```
+
+Key endpoints: `GET /api/sessions`, `GET /api/goals`, `POST /api/goals/:id/swarm/spawn`, `GET /api/goals/:id/swarm/agents`. See `AGENTS.md` for the full API surface.
+
 # Git conventions
 
 The primary branch in this repo is `master` (not `main`). If the user says "main branch", "merge to main", or similar, treat it as `master`. Do not create a `main` branch. Always verify the actual default branch with `git symbolic-ref refs/remotes/origin/HEAD` or `git branch -r` before assuming a branch name.
