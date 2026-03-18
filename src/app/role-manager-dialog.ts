@@ -4,15 +4,15 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader } from "@mariozechner
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render, nothing } from "lit";
 import { ArrowLeft, ChevronRight, Plus, Trash2 } from "lucide";
-import { fetchRoles, fetchTools, createRole, updateRole, deleteRole, type RoleData } from "./api.js";
+import { gatewayFetch, fetchRoles, fetchTools, createRole, updateRole, deleteRole, type RoleData } from "./api.js";
 import { ACCESSORIES, ACCESSORY_IDS, getAccessory, statusBobbit } from "./session-colors.js";
-import { renderApp } from "./state.js";
+import { state, renderApp } from "./state.js";
 
 // ============================================================================
 // STATE
 // ============================================================================
 
-type View = "list" | "edit" | "create";
+type View = "list" | "edit";
 
 let currentView: View = "list";
 let roles: RoleData[] = [];
@@ -68,17 +68,34 @@ function showEdit(role: RoleData): void {
 	rerender();
 }
 
-function showCreate(): void {
-	currentView = "create";
-	selectedRole = null;
-	editLabel = "";
-	editPrompt = "";
-	editTools = [];
-	editAccessory = "none";
-	editName = "";
-	saving = false;
-	deleting = false;
-	rerender();
+async function createRoleAssistantSession(): Promise<void> {
+	if (state.creatingSession) return;
+	state.creatingSession = true;
+	renderApp();
+	closeDialog();
+	try {
+		const res = await gatewayFetch("/api/sessions", {
+			method: "POST",
+			body: JSON.stringify({ roleAssistant: true }),
+		});
+		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
+		const { id } = await res.json();
+		const { connectToSession } = await import("./session-manager.js");
+		await connectToSession(id, false);
+		// Wire up the role proposal callback after connection
+		if (state.remoteAgent) {
+			state.remoteAgent.onRoleProposal = (proposal) => {
+				showRoleEditDialogFromProposal(proposal);
+			};
+		}
+	} catch (err) {
+		const { showConnectionError } = await import("./dialogs.js");
+		const msg = err instanceof Error ? err.message : String(err);
+		showConnectionError("Failed to create role assistant", msg);
+	} finally {
+		state.creatingSession = false;
+		renderApp();
+	}
 }
 
 // ============================================================================
@@ -89,20 +106,7 @@ async function handleSave(): Promise<void> {
 	saving = true;
 	rerender();
 
-	if (currentView === "create") {
-		const result = await createRole({
-			name: editName,
-			label: editLabel,
-			promptTemplate: editPrompt,
-			allowedTools: editTools,
-			accessory: editAccessory,
-		});
-		if (result) {
-			await loadData();
-			showList();
-			return;
-		}
-	} else if (selectedRole) {
+	if (selectedRole) {
 		const ok = await updateRole(selectedRole.name, {
 			label: editLabel,
 			promptTemplate: editPrompt,
@@ -181,7 +185,8 @@ function renderListView() {
 				const toolText = role.allowedTools.length === 0 ? "All tools" : `${role.allowedTools.length} tool${role.allowedTools.length !== 1 ? "s" : ""}`;
 				return html`
 					<button
-						class="flex items-center gap-3 w-full px-3 py-2.5 rounded-md hover:bg-secondary/70 transition-colors text-left group"
+						class="flex items-center gap-3 w-full px-3 py-2.5 rounded-md hover:bg-secondary/70 transition-colors text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+						aria-label="Edit role: ${role.label}"
 						@click=${() => showEdit(role)}
 					>
 						<span class="flex-shrink-0" style="width:18px;display:flex;align-items:center;justify-content:center;">
@@ -206,31 +211,19 @@ function renderListView() {
 // ============================================================================
 
 function renderEditView() {
-	const isCreate = currentView === "create";
-	const title = isCreate ? "New Role" : `Edit: ${selectedRole?.label || ""}`;
-
-	const hasChanges = isCreate
-		? editName.length > 0 && editLabel.length > 0
-		: selectedRole && (
-			editLabel !== selectedRole.label ||
-			editPrompt !== selectedRole.promptTemplate ||
-			JSON.stringify(editTools.sort()) !== JSON.stringify([...selectedRole.allowedTools].sort()) ||
-			editAccessory !== selectedRole.accessory
-		);
+	const hasChanges = selectedRole && (
+		editLabel !== selectedRole.label ||
+		editPrompt !== selectedRole.promptTemplate ||
+		JSON.stringify(editTools.sort()) !== JSON.stringify([...selectedRole.allowedTools].sort()) ||
+		editAccessory !== selectedRole.accessory
+	);
 
 	return html`
 		<div class="flex flex-col gap-4">
 			<!-- Name field -->
 			<div>
 				<label class="block text-[11px] text-muted-foreground mb-1">Name</label>
-				${isCreate
-					? Input({
-						value: editName,
-						placeholder: "my-role (lowercase, hyphens ok)",
-						onInput: (e: Event) => { editName = (e.target as HTMLInputElement).value; rerender(); },
-					})
-					: html`<div class="text-sm text-muted-foreground px-3 py-1.5 bg-secondary/30 rounded-md">${editName}</div>`
-				}
+				<div class="text-sm text-muted-foreground px-3 py-1.5 bg-secondary/30 rounded-md">${editName}</div>
 			</div>
 
 			<!-- Label field -->
@@ -261,19 +254,23 @@ function renderEditView() {
 					<label class="text-[11px] text-muted-foreground">Allowed Tools</label>
 					<span class="text-[10px] text-muted-foreground/60">(empty = all)</span>
 					<span class="flex-1"></span>
-					<button class="text-[10px] text-muted-foreground hover:text-foreground transition-colors" @click=${selectAllTools}>Select All</button>
-					<button class="text-[10px] text-muted-foreground hover:text-foreground transition-colors" @click=${selectNoTools}>Select None</button>
+					<button class="text-[10px] text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" @click=${selectAllTools}>Select All</button>
+					<button class="text-[10px] text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" @click=${selectNoTools}>Select None</button>
 				</div>
 				<div class="flex flex-wrap gap-1.5">
 					${availableTools.map((tool) => {
 						const active = editTools.includes(tool);
 						return html`
 							<button
-								class="px-2.5 py-1 rounded-md text-xs font-medium transition-all ${active
+								role="checkbox"
+								aria-checked=${active ? "true" : "false"}
+								aria-label="${tool}"
+								class="px-2.5 py-1 rounded-md text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${active
 									? "bg-green-900/40 text-green-400 border border-green-700/50"
 									: "bg-secondary/50 text-muted-foreground border border-border hover:border-muted-foreground/50"}"
+								style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;"
 								@click=${() => toggleTool(tool)}
-							>${tool}</button>
+							>${active ? "✓ " : ""}${tool}</button>
 						`;
 					})}
 				</div>
@@ -281,14 +278,18 @@ function renderEditView() {
 
 			<!-- Accessory selector -->
 			<div>
-				<label class="block text-[11px] text-muted-foreground mb-1.5">Accessory</label>
-				<div class="grid gap-1.5" style="grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));">
+				<label class="block text-[11px] text-muted-foreground mb-1.5" id="accessory-label">Accessory</label>
+				<div class="grid gap-1.5" role="radiogroup" aria-labelledby="accessory-label" style="grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));">
 					${ACCESSORY_IDS.map((accId) => {
 						const acc = getAccessory(accId);
 						const selected = editAccessory === accId;
 						return html`
 							<button
-								class="flex flex-col items-center gap-1 py-2 px-1 rounded-md border transition-all ${selected
+								role="radio"
+								aria-selected=${selected ? "true" : "false"}
+								aria-checked=${selected ? "true" : "false"}
+								aria-label="${acc.label}"
+								class="flex flex-col items-center gap-1 py-2 px-1 rounded-md border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${selected
 									? "border-primary bg-secondary"
 									: "border-transparent hover:bg-secondary/50"}"
 								@click=${() => { editAccessory = accId; rerender(); }}
@@ -305,18 +306,16 @@ function renderEditView() {
 				</div>
 			</div>
 
-			<!-- Delete button (edit mode only) -->
-			${!isCreate ? html`
-				<div class="pt-2 border-t border-border/50">
-					${Button({
-						variant: "ghost" as any,
-						onClick: handleDelete,
-						disabled: deleting,
-						className: "text-destructive hover:text-destructive hover:bg-destructive/10",
-						children: html`${icon(Trash2, "sm")} ${deleting ? "Deleting…" : "Delete Role"}`,
-					})}
-				</div>
-			` : nothing}
+			<!-- Delete button -->
+			<div class="pt-2 border-t border-border/50">
+				${Button({
+					variant: "ghost" as any,
+					onClick: handleDelete,
+					disabled: deleting,
+					className: "text-destructive hover:text-destructive hover:bg-destructive/10",
+					children: html`${icon(Trash2, "sm")} ${deleting ? "Deleting…" : "Delete Role"}`,
+				})}
+			</div>
 		</div>
 
 		<!-- Save button in footer -->
@@ -326,7 +325,7 @@ function renderEditView() {
 				variant: "default",
 				onClick: handleSave,
 				disabled: saving || !hasChanges,
-				children: saving ? "Saving…" : isCreate ? "Create Role" : "Save Changes",
+				children: saving ? "Saving…" : "Save Changes",
 			})}
 		</div>
 	`;
@@ -340,7 +339,7 @@ function rerender(): void {
 	if (!dialogContainer) return;
 
 	const isListView = currentView === "list";
-	const dialogTitle = isListView ? "Roles" : currentView === "create" ? "New Role" : `Edit: ${selectedRole?.label || ""}`;
+	const dialogTitle = isListView ? "Roles" : `Edit: ${selectedRole?.label || ""}`;
 
 	render(
 		Dialog({
@@ -355,7 +354,8 @@ function rerender(): void {
 						<div class="flex items-center gap-2 mb-4">
 							${!isListView ? html`
 								<button
-									class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+									class="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+									aria-label="Back to role list"
 									@click=${showList}
 								>${icon(ArrowLeft, "sm")}</button>
 							` : nothing}
@@ -364,7 +364,7 @@ function rerender(): void {
 								${Button({
 									variant: "ghost",
 									size: "sm",
-									onClick: showCreate,
+									onClick: createRoleAssistantSession,
 									children: html`${icon(Plus, "sm")} New Role`,
 								})}
 							` : nothing}
@@ -384,6 +384,173 @@ function closeDialog(): void {
 		dialogContainer.remove();
 		dialogContainer = null;
 	}
+}
+
+// ============================================================================
+// ROLE PROPOSAL REVIEW DIALOG
+// ============================================================================
+
+export function showRoleEditDialogFromProposal(proposal: { name: string; label: string; prompt: string; tools: string; accessory: string }): void {
+	const container = document.createElement("div");
+	document.body.appendChild(container);
+
+	let nameValue = proposal.name;
+	let labelValue = proposal.label;
+	let promptValue = proposal.prompt;
+	let toolsValue = proposal.tools
+		? proposal.tools.split(",").map((t) => t.trim()).filter(Boolean)
+		: [];
+	let accessoryValue = proposal.accessory || "none";
+	let isSaving = false;
+
+	const cleanup = () => {
+		render(html``, container);
+		container.remove();
+	};
+
+	const doSave = async () => {
+		isSaving = true;
+		rerenderProposal();
+		const result = await createRole({
+			name: nameValue,
+			label: labelValue,
+			promptTemplate: promptValue,
+			allowedTools: toolsValue,
+			accessory: accessoryValue,
+		});
+		if (result) {
+			cleanup();
+		} else {
+			isSaving = false;
+			rerenderProposal();
+		}
+	};
+
+	const toggleProposalTool = (tool: string) => {
+		const idx = toolsValue.indexOf(tool);
+		if (idx >= 0) {
+			toolsValue = toolsValue.filter((t) => t !== tool);
+		} else {
+			toolsValue = [...toolsValue, tool];
+		}
+		rerenderProposal();
+	};
+
+	const rerenderProposal = () => {
+		render(
+			Dialog({
+				isOpen: true,
+				onClose: cleanup,
+				width: "min(520px, 92vw)",
+				height: "min(680px, 90vh)",
+				backdropClassName: "bg-black/50 backdrop-blur-sm",
+				children: html`
+					${DialogContent({
+						children: html`
+							<div class="flex items-center gap-2 mb-4">
+								<span class="text-base font-semibold flex-1">Review Role</span>
+							</div>
+							<div class="flex flex-col gap-4">
+								<div>
+									<label class="block text-[11px] text-muted-foreground mb-1">Name</label>
+									${Input({
+										value: nameValue,
+										placeholder: "my-role (lowercase, hyphens ok)",
+										onInput: (e: Event) => { nameValue = (e.target as HTMLInputElement).value; rerenderProposal(); },
+									})}
+								</div>
+								<div>
+									<label class="block text-[11px] text-muted-foreground mb-1">Display Label</label>
+									${Input({
+										value: labelValue,
+										placeholder: "e.g. Documentation Writer",
+										onInput: (e: Event) => { labelValue = (e.target as HTMLInputElement).value; rerenderProposal(); },
+									})}
+								</div>
+								<div>
+									<label class="block text-[11px] text-muted-foreground mb-1">System Prompt</label>
+									<textarea
+										class="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground text-[13px] outline-none focus:ring-1 focus:ring-ring resize-vertical"
+										style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; min-height: 140px;"
+										.value=${promptValue}
+										@input=${(e: Event) => { promptValue = (e.target as HTMLTextAreaElement).value; }}
+									></textarea>
+								</div>
+								<div>
+									<label class="block text-[11px] text-muted-foreground mb-1.5">Allowed Tools</label>
+									<div class="flex flex-wrap gap-1.5">
+										${availableTools.map((tool) => {
+											const active = toolsValue.includes(tool);
+											return html`
+												<button
+													role="checkbox"
+													aria-checked=${active ? "true" : "false"}
+													aria-label="${tool}"
+													class="px-2.5 py-1 rounded-md text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${active
+														? "bg-green-900/40 text-green-400 border border-green-700/50"
+														: "bg-secondary/50 text-muted-foreground border border-border hover:border-muted-foreground/50"}"
+													style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;"
+													@click=${() => toggleProposalTool(tool)}
+												>${active ? "✓ " : ""}${tool}</button>
+											`;
+										})}
+									</div>
+								</div>
+								<div>
+									<label class="block text-[11px] text-muted-foreground mb-1.5" id="proposal-accessory-label">Accessory</label>
+									<div class="grid gap-1.5" role="radiogroup" aria-labelledby="proposal-accessory-label" style="grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));">
+										${ACCESSORY_IDS.map((accId) => {
+											const acc = getAccessory(accId);
+											const selected = accessoryValue === accId;
+											return html`
+												<button
+													role="radio"
+													aria-selected=${selected ? "true" : "false"}
+													aria-checked=${selected ? "true" : "false"}
+													aria-label="${acc.label}"
+													class="flex flex-col items-center gap-1 py-2 px-1 rounded-md border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${selected
+														? "border-primary bg-secondary"
+														: "border-transparent hover:bg-secondary/50"}"
+													@click=${() => { accessoryValue = accId; rerenderProposal(); }}
+												>
+													<span style="height:20px;display:flex;align-items:center;">
+														${accId === "none"
+															? html`<span class="text-xs text-muted-foreground">—</span>`
+															: statusBobbit("idle", false, undefined, false, false, false, false, accId)}
+													</span>
+													<span class="text-[10px] ${selected ? "text-foreground" : "text-muted-foreground"}">${acc.label}</span>
+												</button>
+											`;
+										})}
+									</div>
+								</div>
+							</div>
+							<div class="flex gap-2 justify-end pt-4">
+								${Button({ variant: "ghost", onClick: cleanup, children: "Cancel" })}
+								${Button({
+									variant: "default",
+									onClick: doSave,
+									disabled: isSaving || !nameValue || !labelValue,
+									children: isSaving ? "Creating…" : "Create Role",
+								})}
+							</div>
+						`,
+					})}
+				`,
+			}),
+			container,
+		);
+	};
+
+	// Ensure we have the tools list loaded
+	if (availableTools.length === 0) {
+		fetchTools().then((t) => {
+			availableTools = t;
+			rerenderProposal();
+		});
+	}
+
+	rerenderProposal();
 }
 
 // ============================================================================
