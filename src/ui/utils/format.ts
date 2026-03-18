@@ -2,7 +2,8 @@ import { i18n } from "@mariozechner/mini-lit";
 import type { Usage } from "@mariozechner/pi-ai";
 
 export function formatCost(cost: number): string {
-	return `$${cost.toFixed(4)}`;
+	if (cost < 1) return `$${cost.toFixed(1).replace(/\.0$/, "")}`;
+	return `$${Math.round(cost)}`;
 }
 
 export function formatModelCost(cost: any): string {
@@ -11,12 +12,9 @@ export function formatModelCost(cost: any): string {
 	const output = cost.output || 0;
 	if (input === 0 && output === 0) return i18n("Free");
 
-	// Format numbers with appropriate precision
 	const formatNum = (num: number): string => {
-		if (num >= 100) return num.toFixed(0);
-		if (num >= 10) return num.toFixed(1).replace(/\.0$/, "");
-		if (num >= 1) return num.toFixed(2).replace(/\.?0+$/, "");
-		return num.toFixed(3).replace(/\.?0+$/, "");
+		if (num < 1) return num.toFixed(1).replace(/\.0$/, "");
+		return Math.round(num).toString();
 	};
 
 	return `$${formatNum(input)}/$${formatNum(output)}`;
