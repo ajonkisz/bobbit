@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug } from "lucide";
+import { ArrowLeft, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users } from "lucide";
 import "../ui/components/WorkflowStatusBar.js";
 import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 import {
@@ -118,6 +118,10 @@ function renderMobileLanding() {
 									<button class="text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center gap-1"
 										@click=${() => showGoalDialog()}>
 										${icon(Crosshair, "xs")} New Goal
+									</button>
+									<button class="text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center gap-1"
+										@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}>
+										${icon(Users, "xs")} Roles
 									</button>
 								</div>
 							`}
