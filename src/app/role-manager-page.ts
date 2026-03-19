@@ -86,13 +86,7 @@ async function createRoleAssistantSession(): Promise<void> {
 		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
 		const { id } = await res.json();
 		const { connectToSession } = await import("./session-manager.js");
-		await connectToSession(id, false);
-		if (state.remoteAgent) {
-			const { showRoleEditDialogFromProposal } = await import("./role-manager-dialog.js");
-			state.remoteAgent.onRoleProposal = (proposal) => {
-				showRoleEditDialogFromProposal(proposal);
-			};
-		}
+		await connectToSession(id, false, { isRoleAssistant: true });
 	} catch (err) {
 		const { showConnectionError } = await import("./dialogs.js");
 		const msg = err instanceof Error ? err.message : String(err);

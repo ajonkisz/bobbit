@@ -1,5 +1,6 @@
 import { ChatPanel } from "../ui/index.js";
 import type { GoalDraft } from "../ui/storage/stores/goal-draft-store.js";
+import type { RoleDraft } from "../ui/storage/stores/role-draft-store.js";
 import type { ConnectionStatus } from "./remote-agent.js";
 import { RemoteAgent } from "./remote-agent.js";
 import {
@@ -82,6 +83,73 @@ export function deleteGoalDraft(sessionId: string): void {
 }
 
 // ============================================================================
+// ROLE DRAFT PERSISTENCE HELPERS
+// ============================================================================
+
+/** Debounce timer for role draft saves. */
+let _roleDraftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Save the current role assistant preview state to IndexedDB (debounced 300ms). */
+export function saveRoleDraft(sessionId: string): void {
+	if (_roleDraftSaveTimer) clearTimeout(_roleDraftSaveTimer);
+	_roleDraftSaveTimer = setTimeout(() => {
+		_roleDraftSaveTimer = null;
+		const draft: RoleDraft = {
+			sessionId,
+			activeRoleProposal: state.activeRoleProposal ?? undefined,
+			previewName: state.rolePreviewName,
+			previewLabel: state.rolePreviewLabel,
+			previewPrompt: state.rolePreviewPrompt,
+			previewTools: state.rolePreviewTools,
+			previewAccessory: state.rolePreviewAccessory,
+			previewNameEdited: state.rolePreviewNameEdited,
+			previewLabelEdited: state.rolePreviewLabelEdited,
+			previewPromptEdited: state.rolePreviewPromptEdited,
+			previewToolsEdited: state.rolePreviewToolsEdited,
+			previewAccessoryEdited: state.rolePreviewAccessoryEdited,
+			hasReceivedRoleProposal: state.hasReceivedRoleProposal,
+			roleAssistantTab: state.roleAssistantTab,
+		};
+		storage.roleDrafts.saveDraft(draft).catch((err) => {
+			console.error("[role-draft] Failed to save draft:", err);
+		});
+	}, 300);
+}
+
+/** Restore role assistant preview state from IndexedDB. Returns true if a draft was found. */
+async function restoreRoleDraft(sessionId: string): Promise<boolean> {
+	try {
+		const draft = await storage.roleDrafts.getDraft(sessionId);
+		if (!draft) return false;
+
+		state.activeRoleProposal = draft.activeRoleProposal ?? null;
+		state.rolePreviewName = draft.previewName ?? "";
+		state.rolePreviewLabel = draft.previewLabel ?? "";
+		state.rolePreviewPrompt = draft.previewPrompt ?? "";
+		state.rolePreviewTools = draft.previewTools ?? "";
+		state.rolePreviewAccessory = draft.previewAccessory ?? "none";
+		state.rolePreviewNameEdited = draft.previewNameEdited ?? false;
+		state.rolePreviewLabelEdited = draft.previewLabelEdited ?? false;
+		state.rolePreviewPromptEdited = draft.previewPromptEdited ?? false;
+		state.rolePreviewToolsEdited = draft.previewToolsEdited ?? false;
+		state.rolePreviewAccessoryEdited = draft.previewAccessoryEdited ?? false;
+		state.hasReceivedRoleProposal = draft.hasReceivedRoleProposal ?? false;
+		state.roleAssistantTab = draft.roleAssistantTab ?? "chat";
+		return true;
+	} catch (err) {
+		console.error("[role-draft] Failed to restore draft:", err);
+		return false;
+	}
+}
+
+/** Delete role draft from IndexedDB. */
+export function deleteRoleDraft(sessionId: string): void {
+	storage.roleDrafts.deleteDraft(sessionId).catch((err) => {
+		console.error("[role-draft] Failed to delete draft:", err);
+	});
+}
+
+// ============================================================================
 // AUTHENTICATE GATEWAY
 // ============================================================================
 
@@ -117,7 +185,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 // CONNECT TO SESSION
 // ============================================================================
 
-export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean }): Promise<void> {
+export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean }): Promise<void> {
 	if (state.connectingSessionId) return;
 	state.connectingSessionId = sessionId;
 
@@ -212,6 +280,22 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			renderApp();
 		};
 
+		remote.onRoleProposal = (proposal) => {
+			state.activeRoleProposal = proposal;
+			if (!state.rolePreviewNameEdited) state.rolePreviewName = proposal.name;
+			if (!state.rolePreviewLabelEdited) state.rolePreviewLabel = proposal.label;
+			if (!state.rolePreviewPromptEdited) state.rolePreviewPrompt = proposal.prompt;
+			if (!state.rolePreviewToolsEdited) state.rolePreviewTools = proposal.tools;
+			if (!state.rolePreviewAccessoryEdited) state.rolePreviewAccessory = proposal.accessory;
+			state.hasReceivedRoleProposal = true;
+			if (state.roleAssistantTab === "chat" && !isDesktop()) {
+				state.roleAssistantTab = "preview";
+			}
+			// Persist draft to IndexedDB
+			saveRoleDraft(sessionId);
+			renderApp();
+		};
+
 		state.connectionStatus = "connected";
 		state.remoteAgent = remote;
 		state.appView = "authenticated";
@@ -227,6 +311,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		// isGoalAssistantSession) renders correctly on the first pass.
 		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
 		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
+		state.isRoleAssistantSession = options?.isRoleAssistant || sessionData?.roleAssistant || false;
 
 		// Render immediately so the mobile header appears without waiting
 		// for ChatPanel setup or other async work below.  This fixes a race
@@ -295,6 +380,34 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		if (options?.isGoalAssistant && !isExisting) {
 			remote.prompt("Start the goal creation session.");
+		}
+
+		// Clear role proposal when connecting to a non-role-assistant session
+		if (!state.isRoleAssistantSession) {
+			state.activeRoleProposal = null;
+		}
+
+		if (state.isRoleAssistantSession) {
+			const restored = await restoreRoleDraft(sessionId);
+			if (!restored) {
+				state.roleAssistantTab = "chat";
+				state.rolePreviewName = "";
+				state.rolePreviewLabel = "";
+				state.rolePreviewPrompt = "";
+				state.rolePreviewTools = "";
+				state.rolePreviewAccessory = "none";
+				state.rolePreviewNameEdited = false;
+				state.rolePreviewLabelEdited = false;
+				state.rolePreviewPromptEdited = false;
+				state.rolePreviewToolsEdited = false;
+				state.rolePreviewAccessoryEdited = false;
+				state.hasReceivedRoleProposal = false;
+			}
+			state.rolePreviewPromptEditMode = false;
+		}
+
+		if (options?.isRoleAssistant && !isExisting) {
+			remote.prompt("Start the role creation session.");
 		}
 
 		// Restore draft and set up auto-save
@@ -382,6 +495,7 @@ export async function terminateSession(sessionId: string): Promise<void> {
 	}
 	clearSessionModel(sessionId);
 	deleteGoalDraft(sessionId);
+	deleteRoleDraft(sessionId);
 	await refreshSessions();
 }
 
@@ -395,6 +509,8 @@ export function backToSessions(): void {
 	state.connectionStatus = "disconnected";
 	state.activeGoalProposal = null;
 	state.isGoalAssistantSession = false;
+	state.activeRoleProposal = null;
+	state.isRoleAssistantSession = false;
 	state.cwdDropdownOpen = false;
 	localStorage.removeItem(GW_SESSION_KEY);
 	state.appView = "authenticated";
@@ -409,6 +525,7 @@ export function disconnectGateway(): void {
 	state.remoteAgent = null;
 	state.connectionStatus = "disconnected";
 	state.isGoalAssistantSession = false;
+	state.isRoleAssistantSession = false;
 	state.appView = "disconnected";
 	localStorage.removeItem(GW_SESSION_KEY);
 	teardownMobileScrollTracking();
