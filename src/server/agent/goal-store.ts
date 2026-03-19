@@ -23,6 +23,8 @@ export interface PersistedGoal {
 	team?: boolean;
 	/** Session ID of the Team Lead agent (for team goals) */
 	teamLeadSessionId?: string;
+	/** Artifact types to skip requirement enforcement for */
+	skipArtifactRequirements?: string[];
 }
 
 const STORE_DIR = path.join(os.homedir(), ".pi");
