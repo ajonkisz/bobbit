@@ -228,17 +228,17 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 
 function renderRoleRow(role: RoleData): TemplateResult {
 	return html`
-		<div class="role-row">
+		<div class="role-row" @click=${() => showEdit(role)}>
 			${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory)}
 			<div class="role-row-info">
 				<span class="role-row-label">${role.label}</span>
 				<span class="role-row-slug">${role.name}</span>
 			</div>
 			<div class="role-row-actions">
-				<button class="role-row-action-btn" @click=${() => showEdit(role)} title="Edit">
+				<button class="role-row-action-btn" @click=${(e: Event) => { e.stopPropagation(); showEdit(role); }} title="Edit">
 					${icon(Pencil, "sm")}
 				</button>
-				<button class="role-row-action-btn delete" @click=${() => handleDeleteFromList(role)} title="Delete">
+				<button class="role-row-action-btn delete" @click=${(e: Event) => { e.stopPropagation(); handleDeleteFromList(role); }} title="Delete">
 					${icon(Trash2, "sm")}
 				</button>
 			</div>

@@ -8,8 +8,8 @@
 	display: flex;
 	flex-direction: column;
 	overflow-y: auto;
-	background: hsl(var(--background));
-	color: hsl(var(--foreground));
+	background: var(--background);
+	color: var(--foreground);
 }
 
 /* ============================================================================
@@ -21,8 +21,8 @@
 	align-items: center;
 	justify-content: space-between;
 	padding: 12px 20px;
-	border-bottom: 1px solid hsl(var(--border));
-	background: hsl(var(--background));
+	border-bottom: 1px solid var(--border);
+	background: var(--background);
 	position: sticky;
 	top: 0;
 	z-index: 10;
@@ -51,13 +51,13 @@
 	border-radius: 6px;
 	border: none;
 	background: transparent;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	cursor: pointer;
 	transition: background 150ms, color 150ms;
 }
 .roles-back:hover {
-	background: hsl(var(--secondary));
-	color: hsl(var(--foreground));
+	background: var(--secondary);
+	color: var(--foreground);
 }
 
 .roles-title-group {
@@ -78,17 +78,17 @@
 
 .roles-breadcrumb {
 	font-size: 14px;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	cursor: pointer;
 	transition: color 150ms;
 }
 .roles-breadcrumb:hover {
-	color: hsl(var(--foreground));
+	color: var(--foreground);
 }
 
 .roles-breadcrumb-sep {
 	font-size: 14px;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 }
 
 /* ============================================================================
@@ -120,15 +120,15 @@
 	align-items: center;
 	gap: 14px;
 	padding: 10px 16px;
-	background: hsl(var(--secondary));
-	border: 1px solid hsl(var(--border));
+	background: var(--secondary);
+	border: 1px solid var(--border);
 	border-radius: 8px;
 	transition: background 150ms, border-color 150ms;
 }
 
 .role-row:hover {
-	background: hsl(var(--accent));
-	border-color: hsl(var(--muted-foreground) / 0.25);
+	background: var(--accent);
+	border-color: color-mix(in oklch, var(--muted-foreground) 25%, transparent);
 }
 
 .role-row-info {
@@ -150,7 +150,7 @@
 .role-row-slug {
 	font-size: 11px;
 	font-family: var(--font-mono, monospace);
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -172,19 +172,19 @@
 	border-radius: 6px;
 	border: none;
 	background: transparent;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	cursor: pointer;
 	transition: background 150ms, color 150ms;
 }
 
 .role-row-action-btn:hover {
-	background: hsl(var(--secondary));
-	color: hsl(var(--foreground));
+	background: var(--secondary);
+	color: var(--foreground);
 }
 
 .role-row-action-btn.delete:hover {
-	color: hsl(var(--destructive));
-	background: hsl(var(--destructive) / 0.1);
+	color: var(--destructive);
+	background: color-mix(in oklch, var(--destructive) 10%, transparent);
 }
 
 /* ============================================================================
@@ -209,7 +209,7 @@
 .roles-edit-sidebar {
 	width: 300px;
 	flex-shrink: 0;
-	border-left: 1px solid hsl(var(--border));
+	border-left: 1px solid var(--border);
 	padding-left: 24px;
 	display: flex;
 	flex-direction: column;
@@ -227,7 +227,7 @@
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	margin: 0;
 }
 
@@ -239,17 +239,17 @@
 
 .roles-field-label {
 	font-size: 12px;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 }
 
 .roles-field-readonly {
 	font-size: 13px;
 	font-family: var(--font-mono, monospace);
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	padding: 8px 12px;
-	background: hsl(var(--secondary) / 0.5);
+	background: color-mix(in oklch, var(--secondary) 50%, transparent);
 	border-radius: 6px;
-	border: 1px solid hsl(var(--border));
+	border: 1px solid var(--border);
 }
 
 /* System prompt editor */
@@ -258,9 +258,9 @@
 	min-height: 300px;
 	padding: 12px;
 	border-radius: 6px;
-	border: 1px solid hsl(var(--border));
-	background: hsl(var(--background));
-	color: hsl(var(--foreground));
+	border: 1px solid var(--border);
+	background: var(--background);
+	color: var(--foreground);
 	font-size: 13px;
 	font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 	line-height: 1.6;
@@ -269,7 +269,7 @@
 	transition: border-color 150ms;
 }
 .roles-prompt-editor:focus {
-	border-color: hsl(var(--ring));
+	border-color: var(--ring);
 }
 
 /* Tools */
@@ -281,12 +281,12 @@
 
 .roles-tools-hint {
 	font-size: 10px;
-	color: hsl(var(--muted-foreground) / 0.6);
+	color: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
 }
 
 .roles-tools-action {
 	font-size: 10px;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	background: none;
 	border: none;
 	cursor: pointer;
@@ -295,8 +295,8 @@
 	transition: color 150ms, background 150ms;
 }
 .roles-tools-action:hover {
-	color: hsl(var(--foreground));
-	background: hsl(var(--secondary));
+	color: var(--foreground);
+	background: var(--secondary);
 }
 
 .roles-tools-grid {
@@ -311,14 +311,14 @@
 	font-size: 12px;
 	font-weight: 500;
 	font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-	border: 1px solid hsl(var(--border));
-	background: hsl(var(--secondary) / 0.5);
-	color: hsl(var(--muted-foreground));
+	border: 1px solid var(--border);
+	background: color-mix(in oklch, var(--secondary) 50%, transparent);
+	color: var(--muted-foreground);
 	cursor: pointer;
 	transition: all 150ms;
 }
 .roles-tool-chip:hover {
-	border-color: hsl(var(--muted-foreground) / 0.5);
+	border-color: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
 }
 .roles-tool-chip--active {
 	background: rgba(34, 197, 94, 0.12);
@@ -346,11 +346,11 @@
 	transition: all 150ms;
 }
 .roles-accessory-option:hover {
-	background: hsl(var(--secondary) / 0.5);
+	background: color-mix(in oklch, var(--secondary) 50%, transparent);
 }
 .roles-accessory-option--selected {
-	border-color: hsl(var(--primary));
-	background: hsl(var(--secondary));
+	border-color: var(--primary);
+	background: var(--secondary);
 }
 
 .roles-accessory-preview {
@@ -361,23 +361,23 @@
 
 .roles-accessory-label {
 	font-size: 10px;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 }
 .roles-accessory-option--selected .roles-accessory-label {
-	color: hsl(var(--foreground));
+	color: var(--foreground);
 }
 
 /* Actions in sidebar */
 .roles-edit-actions {
 	margin-top: auto;
 	padding-top: 16px;
-	border-top: 1px solid hsl(var(--border));
+	border-top: 1px solid var(--border);
 }
 
 .roles-danger-zone {
 	margin-top: 12px;
 	padding-top: 12px;
-	border-top: 1px solid hsl(var(--border));
+	border-top: 1px solid var(--border);
 }
 
 /* ============================================================================
@@ -390,7 +390,7 @@
 	align-items: center;
 	justify-content: center;
 	gap: 8px;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	font-size: 14px;
 	padding: 80px 0;
 }
@@ -414,12 +414,12 @@
 .roles-empty-title {
 	font-size: 14px;
 	font-weight: 600;
-	color: hsl(var(--foreground));
+	color: var(--foreground);
 }
 
 .roles-empty-desc {
 	font-size: 12px;
-	color: hsl(var(--muted-foreground));
+	color: var(--muted-foreground);
 	max-width: 280px;
 	line-height: 1.5;
 }
@@ -455,7 +455,7 @@
 	.roles-edit-sidebar {
 		width: auto;
 		border-left: none;
-		border-top: 1px solid hsl(var(--border));
+		border-top: 1px solid var(--border);
 		padding-left: 0;
 		padding-top: 24px;
 	}
