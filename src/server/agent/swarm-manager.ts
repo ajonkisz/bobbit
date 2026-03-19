@@ -18,6 +18,8 @@ export interface SwarmAgent {
 	branch: string;
 	task: string;
 	createdAt: number;
+	/** Unsubscribe from the agent_end event listener (cleanup on dismiss). */
+	unsubscribeEvent?: () => void;
 }
 
 export interface SwarmAgentInfo {
@@ -337,12 +339,13 @@ export class SwarmManager {
 			});
 
 			// Subscribe to worker events to steer the team lead when the worker goes idle
-			session.rpcClient.onEvent((event: any) => {
+			const unsubscribe = session.rpcClient.onEvent((event: any) => {
 				if (event.type !== "agent_end") return;
 				this.notifyTeamLead(goalId, session.id, role, agentId).catch((err) => {
 					console.error("[swarm-manager] Failed to notify team lead:", err);
 				});
 			});
+			agent.unsubscribeEvent = unsubscribe;
 
 			console.log(
 				`[swarm-manager] Spawned ${role} agent (${session.id}) for goal "${goal.title}" — worktree: ${worktreeResult.worktreePath}`,
@@ -446,6 +449,11 @@ export class SwarmManager {
 		}
 
 		const agent = entry.agents[agentIndex];
+
+		// Unsubscribe from agent_end events before terminating
+		if (agent.unsubscribeEvent) {
+			agent.unsubscribeEvent();
+		}
 
 		// Terminate the session
 		await this.sessionManager.terminateSession(sessionId);

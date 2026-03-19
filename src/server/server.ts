@@ -508,8 +508,8 @@ async function handleApiRoute(
 				});
 				if (!ok) { json({ error: "Task not found" }, 404); return; }
 
-				// Notify team lead when state transitions to terminal via PUT
-				if (body.state && body.state !== prevState && (body.state === "complete" || body.state === "skipped") && task?.goalId) {
+				// Notify team lead when state transitions to terminal or blocked via PUT
+				if (body.state && body.state !== prevState && (body.state === "complete" || body.state === "skipped" || body.state === "blocked") && task?.goalId) {
 					swarmManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, body.state);
 				}
 
@@ -567,8 +567,8 @@ async function handleApiRoute(
 			const ok = sessionManager.taskManager.transitionTask(taskId, state as TaskState);
 			if (!ok) { json({ error: "Task not found" }, 400); return; }
 
-			// Notify team lead when a task reaches a terminal state
-			if ((state === "complete" || state === "skipped") && task?.goalId) {
+			// Notify team lead when a task reaches a terminal or blocked state
+			if ((state === "complete" || state === "skipped" || state === "blocked") && task?.goalId) {
 				swarmManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, state);
 			}
 
