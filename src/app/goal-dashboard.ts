@@ -3,7 +3,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { ArrowLeft, Pencil, Play, Plus, Square, Trash2 } from "lucide";
 import { state, renderApp, type Goal } from "./state.js";
-import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState } from "./api.js";
+import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState, fetchGoalArtifacts, type GoalArtifact, type ArtifactType } from "./api.js";
 import { setHashRoute } from "./routing.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
@@ -65,6 +65,9 @@ let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
 let commits: CommitInfo[] = [];
 let reports: ReportInfo[] = [];
+let artifacts: GoalArtifact[] = [];
+let expandedArtifactIds: Set<string> = new Set();
+let artifactPollTimer: ReturnType<typeof setInterval> | null = null;
 let teamActive = false;
 let teamStarting = false;
 let teamStopping = false;
@@ -86,10 +89,11 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	startTaskPolling(goalId);
 
 	try {
-		const [goalRes, tasksRes, commitsRes] = await Promise.all([
+		const [goalRes, tasksRes, commitsRes, fetchedArtifacts] = await Promise.all([
 			gatewayFetch(`/api/goals/${goalId}`),
 			gatewayFetch(`/api/goals/${goalId}/tasks`),
 			gatewayFetch(`/api/goals/${goalId}/commits?limit=20`).catch(() => null),
+			fetchGoalArtifacts(goalId),
 		]);
 
 		if (!goalRes.ok) throw new Error(`Goal not found (${goalRes.status})`);
@@ -110,12 +114,17 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 			commits = [];
 		}
 
+		artifacts = fetchedArtifacts;
+
 		// Fetch workflow reports for all sessions belonging to this goal
 		reports = await fetchGoalReports(goalId);
 
 		// Check if a team is active
 		const teamState = await getTeamState(goalId);
 		teamActive = teamState != null;
+
+		// Start artifact polling
+		startArtifactPolling(goalId);
 
 		loading = false;
 	} catch (err) {
@@ -181,6 +190,8 @@ export function clearDashboardState(): void {
 	tasks = [];
 	commits = [];
 	reports = [];
+	artifacts = [];
+	expandedArtifactIds = new Set();
 	teamActive = false;
 	teamStarting = false;
 	teamStopping = false;
@@ -188,6 +199,7 @@ export function clearDashboardState(): void {
 	error = "";
 	stopAgentPolling();
 	stopTaskPolling();
+	stopArtifactPolling();
 }
 
 // ============================================================================
@@ -591,6 +603,286 @@ export function renderAgentPanel(agentList: TeamAgent[]): TemplateResult {
 }
 
 // ============================================================================
+// ARTIFACT POLLING
+// ============================================================================
+
+function startArtifactPolling(goalId: string): void {
+	stopArtifactPolling();
+	artifactPollTimer = setInterval(async () => {
+		if (!currentGoalId || currentGoalId !== goalId) return;
+		try {
+			const newArtifacts = await fetchGoalArtifacts(goalId);
+			if (JSON.stringify(newArtifacts) !== JSON.stringify(artifacts)) {
+				artifacts = newArtifacts;
+				renderApp();
+			}
+		} catch { /* ignore poll errors */ }
+	}, 10_000);
+}
+
+function stopArtifactPolling(): void {
+	if (artifactPollTimer) {
+		clearInterval(artifactPollTimer);
+		artifactPollTimer = null;
+	}
+}
+
+// ============================================================================
+// PHASE INDICATOR
+// ============================================================================
+
+type GoalPhase = "planning" | "design" | "implementation" | "review" | "complete";
+
+interface PhaseInfo {
+	phase: GoalPhase;
+	label: string;
+	description: string;
+}
+
+const PHASES: PhaseInfo[] = [
+	{ phase: "planning", label: "Planning", description: "No artifacts produced yet" },
+	{ phase: "design", label: "Design", description: "Design document exists" },
+	{ phase: "implementation", label: "Implementation", description: "Design + test plan ready" },
+	{ phase: "review", label: "Review", description: "Review findings produced" },
+	{ phase: "complete", label: "Complete", description: "All required artifacts exist" },
+];
+
+function derivePhase(artifactList: GoalArtifact[]): GoalPhase {
+	const types = new Set(artifactList.map((a) => a.type));
+	const hasDesign = types.has("design-doc");
+	const hasTestPlan = types.has("test-plan");
+	const hasReview = types.has("review-findings");
+
+	if (hasDesign && hasTestPlan && hasReview) return "complete";
+	if (hasReview) return "review";
+	if (hasDesign && hasTestPlan) return "implementation";
+	if (hasDesign) return "design";
+	return "planning";
+}
+
+const PHASE_COLORS: Record<GoalPhase, string> = {
+	planning: "#6b7280",
+	design: "#8b5cf6",
+	implementation: "#3b82f6",
+	review: "#f59e0b",
+	complete: "#22c55e",
+};
+
+function renderPhaseIndicator(artifactList: GoalArtifact[]): TemplateResult {
+	const currentPhase = derivePhase(artifactList);
+	const currentIdx = PHASES.findIndex((p) => p.phase === currentPhase);
+
+	return html`
+		<div class="phase-indicator">
+			<div class="phase-indicator-header">Phase</div>
+			<div class="phase-track">
+				${PHASES.map((p, i) => {
+					const isActive = i === currentIdx;
+					const isPast = i < currentIdx;
+					const color = isPast || isActive ? PHASE_COLORS[p.phase] : "hsl(var(--border))";
+					return html`
+						<div class="phase-step ${isActive ? "phase-step--active" : ""} ${isPast ? "phase-step--past" : ""}">
+							<div class="phase-dot" style="background: ${color}; ${isActive ? `box-shadow: 0 0 0 3px ${color}40;` : ""}"></div>
+							${i < PHASES.length - 1 ? html`<div class="phase-line" style="background: ${isPast ? PHASE_COLORS[PHASES[i + 1].phase] : "hsl(var(--border))"};"></div>` : nothing}
+							<div class="phase-label" style="color: ${isActive ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))"}">${p.label}</div>
+						</div>
+					`;
+				})}
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
+// REQUIRED ARTIFACTS PANEL
+// ============================================================================
+
+interface ArtifactRequirementStatus {
+	type: ArtifactType;
+	label: string;
+	required: boolean;
+	artifact: GoalArtifact | null;
+}
+
+const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
+	"design-doc": "Design Document",
+	"test-plan": "Test Plan",
+	"review-findings": "Review Findings",
+	"gap-analysis": "Gap Analysis",
+	"security-findings": "Security Findings",
+	"custom": "Custom",
+};
+
+const ARTIFACT_TYPE_ICONS: Record<ArtifactType, string> = {
+	"design-doc": "\uD83D\uDCD0",       // 📐
+	"test-plan": "\uD83E\uDDEA",         // 🧪
+	"review-findings": "\uD83D\uDD0D",   // 🔍
+	"gap-analysis": "\uD83D\uDCCA",      // 📊
+	"security-findings": "\uD83D\uDD12", // 🔒
+	"custom": "\uD83D\uDCCB",            // 📋
+};
+
+const REQUIRED_ARTIFACT_TYPES: ArtifactType[] = ["design-doc", "test-plan", "review-findings"];
+
+function getArtifactStatuses(artifactList: GoalArtifact[]): ArtifactRequirementStatus[] {
+	const byType = new Map<ArtifactType, GoalArtifact>();
+	for (const a of artifactList) {
+		const existing = byType.get(a.type);
+		// Keep the latest version
+		if (!existing || a.updatedAt > existing.updatedAt) {
+			byType.set(a.type, a);
+		}
+	}
+
+	const statuses: ArtifactRequirementStatus[] = [];
+
+	// Required artifacts first
+	for (const type of REQUIRED_ARTIFACT_TYPES) {
+		statuses.push({
+			type,
+			label: ARTIFACT_TYPE_LABELS[type],
+			required: true,
+			artifact: byType.get(type) || null,
+		});
+	}
+
+	// Additional artifacts that exist but aren't in the required list
+	for (const a of artifactList) {
+		if (!REQUIRED_ARTIFACT_TYPES.includes(a.type) && !statuses.some((s) => s.type === a.type)) {
+			statuses.push({
+				type: a.type,
+				label: ARTIFACT_TYPE_LABELS[a.type] || a.type,
+				required: false,
+				artifact: byType.get(a.type) || null,
+			});
+		}
+	}
+
+	return statuses;
+}
+
+function toggleArtifactExpand(artifactId: string): void {
+	if (expandedArtifactIds.has(artifactId)) {
+		expandedArtifactIds.delete(artifactId);
+	} else {
+		expandedArtifactIds.add(artifactId);
+	}
+	renderApp();
+}
+
+function formatArtifactTime(timestamp: number): string {
+	const diffMs = Date.now() - timestamp;
+	const mins = Math.floor(diffMs / 60_000);
+	if (mins < 1) return "just now";
+	if (mins < 60) return `${mins}m ago`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+}
+
+function renderArtifactStatus(status: ArtifactRequirementStatus): TemplateResult {
+	const { type, label, required, artifact } = status;
+	const iconStr = ARTIFACT_TYPE_ICONS[type] || "\uD83D\uDCCB";
+	const exists = artifact != null;
+	const isExpanded = artifact ? expandedArtifactIds.has(artifact.id) : false;
+
+	return html`
+		<div class="artifact-row ${exists ? "artifact-row--exists" : "artifact-row--missing"}"
+			@click=${() => artifact && toggleArtifactExpand(artifact.id)}>
+			<div class="artifact-icon">${iconStr}</div>
+			<div class="artifact-info">
+				<div class="artifact-name">
+					${label}
+					${required ? html`<span class="artifact-required-badge">Required</span>` : nothing}
+				</div>
+				<div class="artifact-meta">
+					${exists
+						? html`<span class="artifact-status artifact-status--exists">v${artifact!.version}</span>
+							<span class="artifact-time">${formatArtifactTime(artifact!.updatedAt)}</span>`
+						: html`<span class="artifact-status artifact-status--missing">Missing</span>`
+					}
+				</div>
+			</div>
+			${exists ? html`
+				<div class="artifact-expand-icon">${isExpanded ? "\u25B2" : "\u25BC"}</div>
+			` : nothing}
+		</div>
+		${isExpanded && artifact ? html`
+			<div class="artifact-content-panel">
+				<div class="artifact-content-header">
+					<span>${artifact.name}</span>
+					${artifact.skillId ? html`<span class="artifact-skill-badge">Skill: ${artifact.skillId}</span>` : nothing}
+				</div>
+				<pre class="artifact-content-body">${artifact.content}</pre>
+			</div>
+		` : nothing}
+	`;
+}
+
+function renderArtifactsPanel(artifactList: GoalArtifact[]): TemplateResult {
+	const statuses = getArtifactStatuses(artifactList);
+
+	return html`
+		<div class="artifacts-panel">
+			<div class="artifacts-panel-header">Artifacts</div>
+			${statuses.length > 0
+				? statuses.map(renderArtifactStatus)
+				: html`<div class="artifacts-panel-empty">No artifacts yet</div>`
+			}
+		</div>
+	`;
+}
+
+// ============================================================================
+// ARTIFACT TIMELINE
+// ============================================================================
+
+function renderArtifactTimeline(artifactList: GoalArtifact[]): TemplateResult {
+	if (artifactList.length === 0) return html``;
+
+	// Sort by updatedAt desc (most recent first)
+	const sorted = [...artifactList].sort((a, b) => b.updatedAt - a.updatedAt);
+
+	return html`
+		<div class="dashboard-section">
+			<h2 class="dashboard-section-title">Artifact Timeline</h2>
+			<div class="artifact-timeline">
+				${sorted.map((artifact, index) => {
+					const iconStr = ARTIFACT_TYPE_ICONS[artifact.type] || "\uD83D\uDCCB";
+					const isFirst = index === 0;
+					const isExpanded = expandedArtifactIds.has(artifact.id);
+					const session = state.gatewaySessions.find((s) => s.id === artifact.producedBy);
+					const producerName = session?.title || artifact.producedBy.slice(0, 8);
+
+					return html`
+						<div class="artifact-timeline-item" @click=${() => toggleArtifactExpand(artifact.id)}>
+							<div class="${isFirst ? "artifact-timeline-dot artifact-timeline-dot--latest" : "artifact-timeline-dot"}"></div>
+							<div class="artifact-timeline-content">
+								<div class="artifact-timeline-header">
+									<span class="artifact-timeline-icon">${iconStr}</span>
+									<span class="artifact-timeline-name">${ARTIFACT_TYPE_LABELS[artifact.type] || artifact.name}</span>
+									<span class="artifact-timeline-version">v${artifact.version}</span>
+									<span class="artifact-timeline-time">${formatArtifactTime(artifact.updatedAt)}</span>
+								</div>
+								<div class="artifact-timeline-meta">
+									${artifact.version > 1 ? html`<span>Revised</span><span>\u00B7</span>` : html`<span>Created</span><span>\u00B7</span>`}
+									<span>by ${producerName}</span>
+									${artifact.skillId ? html`<span>\u00B7</span><span>via ${artifact.skillId}</span>` : nothing}
+								</div>
+								${isExpanded ? html`
+									<pre class="artifact-content-body artifact-timeline-body">${artifact.content}</pre>
+								` : nothing}
+							</div>
+						</div>
+					`;
+				})}
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
 // REPORTS PANEL
 // ============================================================================
 
@@ -811,12 +1103,14 @@ export function renderGoalDashboard(): TemplateResult {
 		<div class="dashboard-container">
 			${renderNavBar(currentGoal)}
 			${renderSummaryHeader(currentGoal, tasks)}
+			${renderPhaseIndicator(artifacts)}
 			<div class="dashboard-body">
 				<div class="dashboard-main-content">
 					<div class="dashboard-section">
 						<h2 class="dashboard-section-title">Tasks</h2>
 						${renderKanbanBoard(tasks)}
 					</div>
+					${renderArtifactTimeline(artifacts)}
 					${commits.length > 0 ? html`
 						<div class="dashboard-section">
 							<h2 class="dashboard-section-title">Commit Timeline</h2>
@@ -826,6 +1120,7 @@ export function renderGoalDashboard(): TemplateResult {
 				</div>
 				<div class="dashboard-right-panel">
 					${renderAgentPanel(agents)}
+					${renderArtifactsPanel(artifacts)}
 					${renderReportsPanel(reports)}
 				</div>
 			</div>
