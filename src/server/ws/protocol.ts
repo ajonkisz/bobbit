@@ -44,6 +44,7 @@ export type ClientMessage =
 		| { op: "complete" }
 	> }
 	| { type: "workflow_synthesise_review" }
+	| { type: "invoke_skill"; skillId: string; context?: Record<string, string> }
 	| { type: "task_create"; goalId: string; title: string; taskType: string; parentTaskId?: string; spec?: string; dependsOn?: string[] }
 	| { type: "task_update"; taskId: string; updates: { title?: string; spec?: string; state?: string; assignedSessionId?: string; dependsOn?: string[] } }
 	| { type: "task_delete"; taskId: string };
@@ -65,6 +66,9 @@ export type ServerMessage =
 	| { type: "workflow_phase_changed"; data: unknown }
 	| { type: "workflow_completed"; data: unknown }
 	| { type: "workflow_report"; reportUrl: string }
+	| { type: "skill_started"; skillId: string }
+	| { type: "skill_completed"; skillId: string; result: string }
+	| { type: "skill_failed"; skillId: string; error: string }
 	| { type: "cost_update"; sessionId: string; goalId?: string; taskId?: string; cost: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; totalCost: number } }
 	| { type: "queue_update"; sessionId: string; queue: QueuedMessage[] }
 	| { type: "task_changed"; task: unknown }
