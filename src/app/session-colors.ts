@@ -63,13 +63,13 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		id: "magnifier",
 		label: "Magnifying Glass",
 		shadow: `
-			8px 0 0 #000,9px 0 0 #000,10px 0 0 #000,
-			7px 1px 0 #000,8px 1px 0 #87ceeb,9px 1px 0 #b0e0f0,10px 1px 0 #87ceeb,11px 1px 0 #000,
-			7px 2px 0 #000,8px 2px 0 #b0e0f0,9px 2px 0 #e0f4ff,10px 2px 0 #87ceeb,11px 2px 0 #000,
+			8px 2px 0 #000,9px 2px 0 #000,10px 2px 0 #000,
 			7px 3px 0 #000,8px 3px 0 #87ceeb,9px 3px 0 #b0e0f0,10px 3px 0 #87ceeb,11px 3px 0 #000,
-			8px 4px 0 #000,9px 4px 0 #000,10px 4px 0 #000,11px 4px 0 #000,
-			7px 5px 0 #000,8px 5px 0 #8b4513,
-			6px 6px 0 #000,7px 6px 0 #8b4513
+			7px 4px 0 #000,8px 4px 0 #b0e0f0,9px 4px 0 #e0f4ff,10px 4px 0 #87ceeb,11px 4px 0 #000,
+			7px 5px 0 #000,8px 5px 0 #87ceeb,9px 5px 0 #b0e0f0,10px 5px 0 #87ceeb,11px 5px 0 #000,
+			7px 6px 0 #000,8px 6px 0 #000,9px 6px 0 #000,10px 6px 0 #000,
+			6px 7px 0 #000,7px 7px 0 #8b4513,
+			5px 8px 0 #000,6px 8px 0 #8b4513
 		`,
 		yOffset: 0,
 		addsHeight: false,
