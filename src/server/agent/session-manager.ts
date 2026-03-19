@@ -256,6 +256,13 @@ export class SessionManager {
 			session.lastTurnErrored = event.message.stopReason === "error";
 		}
 
+		// When a steered user message appears in chat, remove the dispatched pill
+		if (event.type === "message_end" && event.message?.role === "user") {
+			if (session.promptQueue.removeDispatched()) {
+				this.broadcastQueue(session);
+			}
+		}
+
 		if (event.type === "agent_start") {
 			session.status = "streaming";
 			session.lastTurnErrored = false;

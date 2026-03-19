@@ -74,6 +74,13 @@ export class PromptQueue {
 		return this.queue.shift();
 	}
 
+	/** Remove all dispatched messages from the queue. Returns true if any were removed. */
+	removeDispatched(): boolean {
+		const before = this.queue.length;
+		this.queue = this.queue.filter(m => !m.dispatched);
+		return this.queue.length < before;
+	}
+
 	/** Mark a message as dispatched (sent mid-turn, kept for UI display). */
 	markDispatched(messageId: string): boolean {
 		const msg = this.queue.find(m => m.id === messageId);
