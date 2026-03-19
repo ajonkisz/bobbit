@@ -34,7 +34,11 @@ let deleting = false;
 // ============================================================================
 
 export async function loadRolePageData(): Promise<void> {
+	currentView = "list";
+	selectedRole = null;
 	loading = true;
+	saving = false;
+	deleting = false;
 	renderApp();
 	const [r, t] = await Promise.all([fetchRoles(), fetchTools()]);
 	roles = r;
@@ -258,7 +262,7 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 function renderRoleRow(role: RoleData): TemplateResult {
 	return html`
 		<div class="role-row" @click=${() => showEdit(role)}>
-			${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory)}
+			${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}
 			<div class="role-row-info">
 				<span class="role-row-label">${role.label}</span>
 				<span class="role-row-slug">${role.name}</span>
@@ -290,7 +294,7 @@ function renderListView(): TemplateResult {
 	if (roles.length === 0) {
 		return html`
 			<div class="roles-empty">
-				<div class="roles-empty-bobbit">${statusBobbit("idle", false, undefined, false, false, false, false, "none")}</div>
+				<div class="roles-empty-bobbit">${statusBobbit("idle", false, undefined, false, false, false, false, "none", true)}</div>
 				<p class="roles-empty-title">No roles yet</p>
 				<p class="roles-empty-desc">Roles give agents a persona, system prompt, and tool restrictions.</p>
 				${Button({
@@ -392,7 +396,7 @@ function renderEditView(): TemplateResult {
 									<span class="roles-accessory-preview">
 										${accId === "none"
 											? html`<span class="text-xs text-muted-foreground">\u2014</span>`
-											: statusBobbit("idle", false, undefined, false, false, false, false, accId)}
+											: statusBobbit("idle", false, undefined, false, false, false, false, accId, true)}
 									</span>
 									<span class="roles-accessory-label">${acc.label}</span>
 								</button>
