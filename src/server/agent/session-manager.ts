@@ -154,13 +154,31 @@ export class SessionManager {
 		}
 	}
 
-	/** Promote a queued message to steered and reorder. */
+	/**
+	 * Promote a queued message to steered and reorder.
+	 * If the agent is streaming, immediately dequeue and dispatch the steered
+	 * message via `steer` RPC so it interrupts between tool calls.
+	 */
 	steerQueued(sessionId: string, messageId: string): boolean {
 		const session = this.sessions.get(sessionId);
 		if (!session) return false;
 		const ok = session.promptQueue.steer(messageId);
-		if (ok) this.broadcastQueue(session);
-		return ok;
+		if (!ok) return false;
+
+		// If agent is streaming, dispatch the steered message immediately
+		// so it gets picked up between tool calls via getSteeringMessages()
+		if (session.status === "streaming") {
+			const front = session.promptQueue.peek();
+			if (front?.isSteered) {
+				session.promptQueue.dequeue();
+				session.rpcClient.steer(front.text).catch((err: any) => {
+					console.error(`[session-manager] Failed to dispatch steered message for ${session.id}:`, err);
+				});
+			}
+		}
+
+		this.broadcastQueue(session);
+		return true;
 	}
 
 	/** Remove a queued message. */
