@@ -19,6 +19,9 @@ import { ScreenshotRenderer } from "./renderers/ScreenshotRenderer.js";
 import { WebFetchRenderer } from "./renderers/WebFetchRenderer.js";
 import { WebSearchRenderer } from "./renderers/WebSearchRenderer.js";
 import { WriteRenderer } from "./renderers/WriteRenderer.js";
+import { TeamSpawnRenderer, TeamListRenderer, TeamDismissRenderer, TeamCompleteRenderer } from "./renderers/TeamToolRenderers.js";
+import { TaskListRenderer, TaskCreateRenderer, TaskUpdateRenderer } from "./renderers/TaskToolRenderers.js";
+import { ArtifactListRenderer, ArtifactCreateRenderer, ArtifactGetRenderer, ArtifactUpdateRenderer } from "./renderers/ArtifactToolRenderers.js";
 import type { ToolRenderResult } from "./types.js";
 
 // Register all built-in tool renderers
@@ -38,6 +41,19 @@ registerToolRenderer("browser_wait", new BrowserWaitRenderer());
 registerToolRenderer("web_search", new WebSearchRenderer());
 registerToolRenderer("web_fetch", new WebFetchRenderer());
 registerToolRenderer("delegate", new DelegateRenderer());
+
+// Team lead coordination tools
+registerToolRenderer("team_spawn", new TeamSpawnRenderer());
+registerToolRenderer("team_list", new TeamListRenderer());
+registerToolRenderer("team_dismiss", new TeamDismissRenderer());
+registerToolRenderer("team_complete", new TeamCompleteRenderer());
+registerToolRenderer("task_list", new TaskListRenderer());
+registerToolRenderer("task_create", new TaskCreateRenderer());
+registerToolRenderer("task_update", new TaskUpdateRenderer());
+registerToolRenderer("artifact_list", new ArtifactListRenderer());
+registerToolRenderer("artifact_create", new ArtifactCreateRenderer());
+registerToolRenderer("artifact_get", new ArtifactGetRenderer());
+registerToolRenderer("artifact_update", new ArtifactUpdateRenderer());
 
 const defaultRenderer = new DefaultRenderer();
 
