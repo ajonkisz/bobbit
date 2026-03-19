@@ -162,13 +162,11 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		id: "flask",
 		label: "Flask",
 		shadow: `
-			4px -2px 0 #000,5px -2px 0 #000,6px -2px 0 #000,
-			4px -1px 0 #000,5px -1px 0 #c4c4c4,6px -1px 0 #000,
-			4px 0 0 #000,5px 0 0 #93c5fd,6px 0 0 #000,
-			3px 1px 0 #000,4px 1px 0 #c4c4c4,5px 1px 0 #60a5fa,6px 1px 0 #c4c4c4,7px 1px 0 #000,
-			2px 2px 0 #000,3px 2px 0 #c4c4c4,4px 2px 0 #60a5fa,5px 2px 0 #3b82f6,6px 2px 0 #60a5fa,7px 2px 0 #c4c4c4,8px 2px 0 #000,
-			1px 3px 0 #000,2px 3px 0 #c4c4c4,3px 3px 0 #60a5fa,4px 3px 0 #3b82f6,5px 3px 0 #2563eb,6px 3px 0 #3b82f6,7px 3px 0 #60a5fa,8px 3px 0 #c4c4c4,9px 3px 0 #000,
-			1px 4px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000
+			8px 0 0 #000,9px 0 0 #000,
+			8px 1px 0 #000,9px 1px 0 #93c5fd,10px 1px 0 #000,
+			7px 2px 0 #000,8px 2px 0 #c4c4c4,9px 2px 0 #60a5fa,10px 2px 0 #c4c4c4,11px 2px 0 #000,
+			6px 3px 0 #000,7px 3px 0 #c4c4c4,8px 3px 0 #3b82f6,9px 3px 0 #2563eb,10px 3px 0 #3b82f6,11px 3px 0 #c4c4c4,12px 3px 0 #000,
+			6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,10px 4px 0 #000,11px 4px 0 #000,12px 4px 0 #000
 		`,
 		yOffset: 0,
 		addsHeight: false,
