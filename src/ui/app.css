@@ -1299,4 +1299,13 @@ html {
 	.bobbit-blob {
 		margin-left: 16px;
 	}
+
+	/* Larger text on mobile session/chat view for readability */
+	.markdown-content {
+		font-size: 15px;
+	}
+
+	.user-message-container {
+		font-size: 15px;
+	}
 }
