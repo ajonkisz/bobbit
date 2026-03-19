@@ -456,11 +456,11 @@ function agentStatusLabel(status: string): "working" | "idle" | "blocked" {
 }
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-	coder: { bg: "rgba(59, 130, 246, 0.15)", text: "#3b82f6" },
-	tester: { bg: "rgba(34, 197, 94, 0.15)", text: "#22c55e" },
-	reviewer: { bg: "rgba(245, 158, 11, 0.15)", text: "#f59e0b" },
-	lead: { bg: "rgba(168, 85, 247, 0.15)", text: "#a855f7" },
-	"team-lead": { bg: "rgba(168, 85, 247, 0.15)", text: "#a855f7" },
+	coder: { bg: "oklch(0.62 0.15 250 / 0.15)", text: "oklch(0.62 0.15 250)" },
+	tester: { bg: "oklch(0.65 0.15 145 / 0.15)", text: "oklch(0.65 0.15 145)" },
+	reviewer: { bg: "oklch(0.70 0.14 75 / 0.15)", text: "oklch(0.70 0.14 75)" },
+	lead: { bg: "oklch(0.60 0.15 300 / 0.15)", text: "oklch(0.60 0.15 300)" },
+	"team-lead": { bg: "oklch(0.60 0.15 300 / 0.15)", text: "oklch(0.60 0.15 300)" },
 };
 
 function getRoleColor(role: string): { bg: string; text: string } {
@@ -473,8 +473,8 @@ function getRoleLabel(role: string): string {
 }
 
 const AVATAR_COLORS = [
-	"#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ef4444",
-	"#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#8b5cf6",
+	"oklch(0.62 0.15 250)", "oklch(0.65 0.15 145)", "oklch(0.70 0.14 75)", "oklch(0.60 0.15 300)", "oklch(0.60 0.20 25)",
+	"oklch(0.65 0.15 220)", "oklch(0.65 0.18 350)", "oklch(0.65 0.12 175)", "oklch(0.70 0.14 55)", "oklch(0.55 0.15 300)",
 ];
 
 function getAvatarColor(sessionId: string): string {
@@ -596,11 +596,11 @@ function derivePhase(artifactList: GoalArtifact[]): GoalPhase {
 }
 
 const PHASE_COLORS: Record<GoalPhase, string> = {
-	planning: "#6b7280",
-	design: "#8b5cf6",
-	implementation: "#3b82f6",
-	review: "#f59e0b",
-	complete: "#22c55e",
+	planning: "var(--muted-foreground)",
+	design: "oklch(0.60 0.15 300)",
+	implementation: "oklch(0.62 0.15 250)",
+	review: "oklch(0.70 0.14 75)",
+	complete: "oklch(0.65 0.15 145)",
 };
 
 function renderPhaseIndicator(artifactList: GoalArtifact[]): TemplateResult {
