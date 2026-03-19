@@ -13,9 +13,6 @@ import type { ColorStore } from "./color-store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Resolve the absolute path to the bobbit-cli.js tool (built alongside the server). */
-const BOBBIT_CLI_PATH = path.resolve(__dirname, "../tools/bobbit-cli.js");
-
 /** Resolve the absolute path to the team-lead-tools extension (raw .ts, loaded by jiti). */
 const TEAM_LEAD_EXTENSION_PATH = path.resolve(__dirname, "../../../extensions/team-lead-tools.ts");
 import type { TaskManager } from "./task-manager.js";
@@ -205,9 +202,8 @@ export class TeamManager {
 			.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
 			.replace(/\{\{AGENT_ID\}\}/g, `team-lead-${goalId.slice(0, 8)}`);
 
-		// Create the team lead session under the goal, with role prompt and team tools extension.
+		// Create the team lead session with the team tools extension.
 		// The extension registers first-class tools (team_spawn, task_create, etc.) in the agent.
-		// Also pass BOBBIT_CLI and BOBBIT_GOAL_ID as fallback for manual API access.
 		const session = await this.sessionManager.createSession(
 			cwd,
 			["--extension", TEAM_LEAD_EXTENSION_PATH],
@@ -215,7 +211,7 @@ export class TeamManager {
 			false,
 			{
 				rolePrompt: teamLeadPrompt,
-				env: { BOBBIT_CLI: BOBBIT_CLI_PATH, BOBBIT_GOAL_ID: goalId },
+				env: { BOBBIT_GOAL_ID: goalId },
 			},
 		);
 
