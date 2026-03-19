@@ -542,16 +542,7 @@ export function doRenderApp(): void {
 							${bobbitIcon}
 							<span class="text-base font-semibold text-foreground">Bobbit</span>
 						</div>
-						<div class="flex items-center gap-0.5">
-							<button
-								class="inline-flex items-center gap-1 p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-								@click=${() => showGoalDialog()}
-								title="New goal"
-							>
-								${icon(Crosshair, "sm")}
-								<span class="text-xs">New Goal</span>
-							</button>
-						</div>
+
 					</div>
 					`}
 					<div class="flex-1 flex items-center justify-between min-w-0">
