@@ -202,12 +202,12 @@ describe("GoalStore", () => {
 
 		it("update with explicit false boolean DOES overwrite", async () => {
 			const store = await createFreshGoalStore();
-			store.put(makeGoal({ swarm: true }));
+			store.put(makeGoal({ team: true }));
 
-			store.update("goal-1", { swarm: false });
+			store.update("goal-1", { team: false });
 
 			const updated = store.get("goal-1")!;
-			assert.equal(updated.swarm, false);
+			assert.equal(updated.team, false);
 		});
 
 		it("update with explicit null overwrites the field", async () => {

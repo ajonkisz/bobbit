@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { TEAM_LEAD_PROMPT, CODER_PROMPT, REVIEWER_PROMPT, TESTER_PROMPT, VALID_ROLES, getRolePrompt } from '../src/server/agent/swarm-prompts.ts';
+import { TEAM_LEAD_PROMPT, CODER_PROMPT, REVIEWER_PROMPT, TESTER_PROMPT, VALID_ROLES, getRolePrompt } from '../src/server/agent/team-prompts.ts';
 
 describe('VALID_ROLES', () => {
   it('contains exactly the four expected roles', () => {

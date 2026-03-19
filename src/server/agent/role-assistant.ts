@@ -14,7 +14,7 @@ When you receive the initial prompt to start the session, respond with a brief, 
 
 Keep it to 1-2 sentences. Don't explain the full process — just ask what they want.
 
-## Your workflow
+## Your process
 
 1. The user describes the kind of agent they want.
 2. Ask 1-2 brief clarifying questions about:
