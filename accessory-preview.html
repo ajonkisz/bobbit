@@ -55,6 +55,7 @@ h2 { font-size: 1rem; color: #94a3b8; margin: 1.5rem 0 0.75rem; border-bottom: 1
       <option value="book">Book</option>
       <option value="glasses">Glasses</option>
       <option value="shield">Shield</option>
+      <option value="flask">Flask</option>
     </select>
   </label>
   <label>Hue:
@@ -86,7 +87,7 @@ h2 { font-size: 1rem; color: #94a3b8; margin: 1.5rem 0 0.75rem; border-bottom: 1
 <div class="grid" id="hue-grid"></div>
 
 <script>
-const ACCESSORIES = ['none','crown','bandana','magnifier','goggles','headphones','pencil','book','glasses','shield'];
+const ACCESSORIES = ['none','crown','bandana','magnifier','goggles','headphones','pencil','book','glasses','shield','flask'];
 const STATES = [
   { label: 'Busy', cls: '' },
   { label: 'Idle', cls: 'bobbit-blob--idle' },
@@ -116,6 +117,7 @@ function makeBlob(accId, stateClass, hue) {
       <div class="bobbit-blob__book"></div>
       <div class="bobbit-blob__glasses"></div>
       <div class="bobbit-blob__shield"></div>
+      <div class="bobbit-blob__flask"></div>
       <div class="bobbit-blob__shadow"></div>
     </div>
   </div>`;
