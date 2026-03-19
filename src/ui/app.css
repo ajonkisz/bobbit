@@ -589,39 +589,39 @@ html {
 	image-rendering: pixelated;
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
-		9px 2px 0 #000, 10px 2px 0 #000, 11px 2px 0 #000,
-		8px 3px 0 #000, 9px 3px 0 #87ceeb, 10px 3px 0 #b0e0f0, 11px 3px 0 #87ceeb, 12px 3px 0 #000,
-		8px 4px 0 #000, 9px 4px 0 #b0e0f0, 10px 4px 0 #e0f4ff, 11px 4px 0 #87ceeb, 12px 4px 0 #000,
-		8px 5px 0 #000, 9px 5px 0 #87ceeb, 10px 5px 0 #b0e0f0, 11px 5px 0 #87ceeb, 12px 5px 0 #000,
-		8px 6px 0 #000, 9px 6px 0 #000, 10px 6px 0 #000, 11px 6px 0 #000,
-		7px 7px 0 #000, 8px 7px 0 #8b4513,
-		6px 8px 0 #000, 7px 8px 0 #8b4513;
-	animation: blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+		8px 2px 0 #000, 9px 2px 0 #000, 10px 2px 0 #000,
+		7px 3px 0 #000, 8px 3px 0 #87ceeb, 9px 3px 0 #b0e0f0, 10px 3px 0 #87ceeb, 11px 3px 0 #000,
+		7px 4px 0 #000, 8px 4px 0 #b0e0f0, 9px 4px 0 #e0f4ff, 10px 4px 0 #87ceeb, 11px 4px 0 #000,
+		7px 5px 0 #000, 8px 5px 0 #87ceeb, 9px 5px 0 #b0e0f0, 10px 5px 0 #87ceeb, 11px 5px 0 #000,
+		7px 6px 0 #000, 8px 6px 0 #000, 9px 6px 0 #000, 10px 6px 0 #000,
+		6px 7px 0 #000, 7px 7px 0 #8b4513,
+		5px 8px 0 #000, 6px 8px 0 #8b4513;
+	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__magnifier {
 	animation: none;
 	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__magnifier {
-	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--exit-roll .bobbit-blob__magnifier {
-	animation: blob-exit-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-exit-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--enter .bobbit-blob__magnifier {
-	animation: blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-enter-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--enter-roll .bobbit-blob__magnifier {
-	animation: blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-enter-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--compact-shake .bobbit-blob__magnifier {
-	animation: blob-compact-shake 0.8s ease-in-out forwards !important;
+	animation: blob-compact-shake-rigid 0.8s ease-in-out forwards !important;
 }
 .bobbit-blob--compacting .bobbit-blob__magnifier {
-	animation: blob-compact-squash 3s ease-in-out infinite !important;
+	animation: blob-compact-squash-rigid 3s ease-in-out infinite !important;
 }
 .bobbit-blob--compact-pop .bobbit-blob__magnifier {
-	animation: blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 
 /* ===== Goggles overlay (head-worn, on face) ===== */
@@ -645,32 +645,32 @@ html {
 		1px 4px 0 #000, 2px 4px 0 #3b82f6, 3px 4px 0 #60a5fa, 4px 4px 0 #000, 5px 4px 0 #000, 6px 4px 0 #000, 7px 4px 0 #3b82f6, 8px 4px 0 #60a5fa, 9px 4px 0 #000,
 		2px 5px 0 #000, 3px 5px 0 #000, 4px 5px 0 #000, 7px 5px 0 #000, 8px 5px 0 #000, 9px 5px 0 #000,
 		0 3px 0 #000, 0 4px 0 #6b7280, 10px 3px 0 #000, 10px 4px 0 #6b7280, 11px 3px 0 #000, 11px 4px 0 #000;
-	animation: blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__goggles {
 	animation: none;
 	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__goggles {
-	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--exit-roll .bobbit-blob__goggles {
-	animation: blob-exit-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-exit-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--enter .bobbit-blob__goggles {
-	animation: blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-enter-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--enter-roll .bobbit-blob__goggles {
-	animation: blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-enter-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--compact-shake .bobbit-blob__goggles {
-	animation: blob-compact-shake 0.8s ease-in-out forwards !important;
+	animation: blob-compact-shake-rigid 0.8s ease-in-out forwards !important;
 }
 .bobbit-blob--compacting .bobbit-blob__goggles {
-	animation: blob-compact-squash 3s ease-in-out infinite !important;
+	animation: blob-compact-squash-rigid 3s ease-in-out infinite !important;
 }
 .bobbit-blob--compact-pop .bobbit-blob__goggles {
-	animation: blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 
 /* ===== Headphones overlay (head-worn, over head + ear cups) ===== */
@@ -696,32 +696,32 @@ html {
 		0 3px 0 #000, 1px 3px 0 #ef4444, 2px 3px 0 #000, 8px 3px 0 #000, 9px 3px 0 #ef4444, 10px 3px 0 #000,
 		0 4px 0 #000, 1px 4px 0 #dc2626, 2px 4px 0 #000, 8px 4px 0 #000, 9px 4px 0 #dc2626, 10px 4px 0 #000,
 		1px 5px 0 #000, 2px 5px 0 #000, 8px 5px 0 #000, 9px 5px 0 #000;
-	animation: blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__headphones {
 	animation: none;
 	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__headphones {
-	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--exit-roll .bobbit-blob__headphones {
-	animation: blob-exit-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-exit-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--enter .bobbit-blob__headphones {
-	animation: blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-enter-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--enter-roll .bobbit-blob__headphones {
-	animation: blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-enter-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--compact-shake .bobbit-blob__headphones {
-	animation: blob-compact-shake 0.8s ease-in-out forwards !important;
+	animation: blob-compact-shake-rigid 0.8s ease-in-out forwards !important;
 }
 .bobbit-blob--compacting .bobbit-blob__headphones {
-	animation: blob-compact-squash 3s ease-in-out infinite !important;
+	animation: blob-compact-squash-rigid 3s ease-in-out infinite !important;
 }
 .bobbit-blob--compact-pop .bobbit-blob__headphones {
-	animation: blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 
 /* ===== Pencil overlay (hand-held, upper right) ===== */
@@ -747,32 +747,32 @@ html {
 		9px 4px 0 #000, 10px 4px 0 #fde047, 11px 4px 0 #000,
 		8px 5px 0 #000, 9px 5px 0 #f4a460, 10px 5px 0 #000,
 		7px 6px 0 #000, 8px 6px 0 #2d2d2d, 9px 6px 0 #000;
-	animation: blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__pencil {
 	animation: none;
 	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__pencil {
-	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--exit-roll .bobbit-blob__pencil {
-	animation: blob-exit-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-exit-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--enter .bobbit-blob__pencil {
-	animation: blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-enter-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--enter-roll .bobbit-blob__pencil {
-	animation: blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-enter-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--compact-shake .bobbit-blob__pencil {
-	animation: blob-compact-shake 0.8s ease-in-out forwards !important;
+	animation: blob-compact-shake-rigid 0.8s ease-in-out forwards !important;
 }
 .bobbit-blob--compacting .bobbit-blob__pencil {
-	animation: blob-compact-squash 3s ease-in-out infinite !important;
+	animation: blob-compact-squash-rigid 3s ease-in-out infinite !important;
 }
 .bobbit-blob--compact-pop .bobbit-blob__pencil {
-	animation: blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 
 /* ===== Book overlay (hand-held, held in front at body height) ===== */
@@ -796,32 +796,32 @@ html {
 		1px 9px 0 #000, 2px 9px 0 #2563eb, 3px 9px 0 #f5f5f5, 4px 9px 0 #d4d4d4, 5px 9px 0 #f5f5f5, 6px 9px 0 #d4d4d4, 7px 9px 0 #2563eb, 8px 9px 0 #000,
 		1px 10px 0 #000, 2px 10px 0 #3b82f6, 3px 10px 0 #60a5fa, 4px 10px 0 #60a5fa, 5px 10px 0 #60a5fa, 6px 10px 0 #60a5fa, 7px 10px 0 #3b82f6, 8px 10px 0 #000,
 		2px 11px 0 #000, 3px 11px 0 #000, 4px 11px 0 #000, 5px 11px 0 #000, 6px 11px 0 #000, 7px 11px 0 #000;
-	animation: blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__book {
 	animation: none;
 	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__book {
-	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--exit-roll .bobbit-blob__book {
-	animation: blob-exit-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-exit-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--enter .bobbit-blob__book {
-	animation: blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-enter-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--enter-roll .bobbit-blob__book {
-	animation: blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-enter-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--compact-shake .bobbit-blob__book {
-	animation: blob-compact-shake 0.8s ease-in-out forwards !important;
+	animation: blob-compact-shake-rigid 0.8s ease-in-out forwards !important;
 }
 .bobbit-blob--compacting .bobbit-blob__book {
-	animation: blob-compact-squash 3s ease-in-out infinite !important;
+	animation: blob-compact-squash-rigid 3s ease-in-out infinite !important;
 }
 .bobbit-blob--compact-pop .bobbit-blob__book {
-	animation: blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 
 /* ===== Glasses overlay (head-worn, on face) ===== */
@@ -845,32 +845,32 @@ html {
 		1px 5px 0 #000, 2px 5px 0 #c7d2fe, 3px 5px 0 #e0e7ff, 4px 5px 0 #000, 6px 5px 0 #000, 7px 5px 0 #c7d2fe, 8px 5px 0 #e0e7ff, 9px 5px 0 #000,
 		2px 6px 0 #000, 3px 6px 0 #000, 4px 6px 0 #000, 7px 6px 0 #000, 8px 6px 0 #000, 9px 6px 0 #000,
 		0 4px 0 #000, 10px 4px 0 #000, 0 5px 0 #4b5563, 10px 5px 0 #4b5563, 11px 5px 0 #000;
-	animation: blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__glasses {
 	animation: none;
 	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__glasses {
-	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--exit-roll .bobbit-blob__glasses {
-	animation: blob-exit-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-exit-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--enter .bobbit-blob__glasses {
-	animation: blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-enter-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--enter-roll .bobbit-blob__glasses {
-	animation: blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-enter-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--compact-shake .bobbit-blob__glasses {
-	animation: blob-compact-shake 0.8s ease-in-out forwards !important;
+	animation: blob-compact-shake-rigid 0.8s ease-in-out forwards !important;
 }
 .bobbit-blob--compacting .bobbit-blob__glasses {
-	animation: blob-compact-squash 3s ease-in-out infinite !important;
+	animation: blob-compact-squash-rigid 3s ease-in-out infinite !important;
 }
 .bobbit-blob--compact-pop .bobbit-blob__glasses {
-	animation: blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 
 /* ===== Shield overlay (hand-held, left side at body height) ===== */
@@ -896,32 +896,32 @@ html {
 		-3px 6px 0 #000, -2px 6px 0 #6b7280, -1px 6px 0 #9ca3af, 0 6px 0 #6b7280, 1px 6px 0 #000,
 		-2px 7px 0 #000, -1px 7px 0 #6b7280, 0 7px 0 #000,
 		-1px 8px 0 #000;
-	animation: blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__shield {
 	animation: none;
 	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__shield {
-	animation: blob-exit 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--exit-roll .bobbit-blob__shield {
-	animation: blob-exit-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-exit-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--enter .bobbit-blob__shield {
-	animation: blob-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-enter-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 .bobbit-blob--enter-roll .bobbit-blob__shield {
-	animation: blob-enter-roll 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+	animation: blob-enter-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
 .bobbit-blob--compact-shake .bobbit-blob__shield {
-	animation: blob-compact-shake 0.8s ease-in-out forwards !important;
+	animation: blob-compact-shake-rigid 0.8s ease-in-out forwards !important;
 }
 .bobbit-blob--compacting .bobbit-blob__shield {
-	animation: blob-compact-squash 3s ease-in-out infinite !important;
+	animation: blob-compact-squash-rigid 3s ease-in-out infinite !important;
 }
 .bobbit-blob--compact-pop .bobbit-blob__shield {
-	animation: blob-compact-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 
 /* Disney 12-principles bounce:
@@ -1260,6 +1260,303 @@ html {
 	/* Settle */
 	100% {
 		transform: scale(3.5) translateX(-7px) translateY(0) scaleX(1) scaleY(1) rotate(-360deg);
+	}
+}
+
+/* ===================================================================
+   RIGID KEYFRAMES -- same motion but WITHOUT scaleX/scaleY warping.
+   Used for accessories so they move/rotate with the blob but keep shape.
+   =================================================================== */
+
+@keyframes blob-busy-move-rigid {
+	/* ── Bounce 1: "Oh! What's that?" — big, surprised, full of gravitas ── */
+	0%   { transform: scale(3.5) translateX(0) translateY(0) rotate(0deg); }
+	/* Deep anticipation squat — leans forward eagerly [Step 2: deeper 0.72] */
+	2%   { transform: scale(3.5) translateX(0) translateY(1.5px) rotate(2deg); }
+	/* Hold the squat one extra beat — tension builds [Step 2: extra hold] */
+	3%   { transform: scale(3.5) translateX(0) translateY(1.5px) rotate(2deg); }
+	/* Launch! — big stretch upward with stronger forward lean [Step 2: rotate 4deg] */
+	5%   { transform: scale(3.5) translateX(0) translateY(-4px) rotate(4deg); }
+	/* Peak — Disney hang, higher apex [Step 2: -6px] */
+	8%   { transform: scale(3.5) translateX(0) translateY(-6px) rotate(3deg); }
+	/* Linger at top — weightless moment */
+	10%  { transform: scale(3.5) translateX(0) translateY(-5.5px) rotate(-1deg); }
+	/* Falling fast */
+	12%  { transform: scale(3.5) translateX(0) translateY(-1px) rotate(1deg); }
+	/* LAND — satisfying squash full of weight */
+	14%  { transform: scale(3.5) translateX(0) translateY(1.5px) rotate(0deg); }
+	/* Rebound spring */
+	16%  { transform: scale(3.5) translateX(0) translateY(-0.5px) rotate(-1deg); }
+	/* Settle with micro-wiggle */
+	18%  { transform: scale(3.5) translateX(0) translateY(0) rotate(0.5deg); }
+	19%  { transform: scale(3.5) translateX(0) translateY(0) rotate(0deg); }
+	/* ── Bounce 2: "Yep, let's go!" — smaller, breezy, quick confirmation ── */
+	/* Shallower squat [Step 2: 0.88 vs 0.85] */
+	21%  { transform: scale(3.5) translateX(0) translateY(0.8px) rotate(-1deg); }
+	/* Lower peak [Step 2: -3.5px] with distinct head tilt [Step 2: -3.5deg] */
+	23%  { transform: scale(3.5) translateX(0) translateY(-2.5px) rotate(2deg); }
+	25%  { transform: scale(3.5) translateX(0) translateY(-3.5px) rotate(-3.5deg); }
+	/* Falling — quick, not lingering */
+	27%  { transform: scale(3.5) translateX(0) translateY(0.8px) rotate(0deg); }
+	/* Compressed settle — two frames, breezy [Step 2: fewer settle frames] */
+	29%  { transform: scale(3.5) translateX(0) translateY(-0.3px) rotate(-0.5deg); }
+	31%  { transform: scale(3.5) translateX(0) translateY(0) rotate(0.2deg); }
+	33%  { transform: scale(3.5) translateX(0) translateY(0) rotate(0deg); }
+	/* ── Anticipation crouch — "what's over there?" — held pose [Step 3] ── */
+	/* Start slow crouch */
+	35%  { transform: scale(3.5) translateX(0) translateY(0) rotate(2deg); }
+	/* Deeper crouch — loading up with excitement */
+	36%  { transform: scale(3.5) translateX(0) translateY(0.5px) rotate(4deg); }
+	/* HOLD the crouch — the "wound spring" beat [Step 3: held anticipation] */
+	37%  { transform: scale(3.5) translateX(0) translateY(0.5px) rotate(4deg); }
+	/* Begin uncoiling — release into hop */
+	38%  { transform: scale(3.5) translateX(0) translateY(0.3px) rotate(3deg); }
+	/* ── Hop right: two eager hops with body english (39-57%) [Step 4: eager] ── */
+	/* Squat for hop 1 — strong forward lean [Step 4: rotate 4deg] */
+	41%  { transform: scale(3.5) translateX(0) translateY(1px) rotate(4deg); }
+	/* Airborne hop 1 — higher arc [Step 4: -3.5px] */
+	44%  { transform: scale(3.5) translateX(1.5px) translateY(-3.5px) rotate(-2deg); }
+	/* Land hop 1 with squash */
+	47%  { transform: scale(3.5) translateX(3px) translateY(1px) rotate(1deg); }
+	48%  { transform: scale(3.5) translateX(3px) translateY(0) rotate(0deg); }
+	/* Squat for hop 2 — escalating excitement */
+	49%  { transform: scale(3.5) translateX(3px) translateY(1px) rotate(4deg); }
+	/* Airborne hop 2 — even higher [Step 4: -4px] */
+	52%  { transform: scale(3.5) translateX(4.5px) translateY(-4px) rotate(-2deg); }
+	/* Land hop 2 */
+	55%  { transform: scale(3.5) translateX(6px) translateY(1px) rotate(1deg); }
+	57%  { transform: scale(3.5) translateX(6px) translateY(0) rotate(0deg); }
+	/* ── At +6px: curious look-around with micro-movements (57-70%) ── */
+	/* Tiny excited arrival bounce — "I'm here!" */
+	59%  { transform: scale(3.5) translateX(6px) translateY(0.5px) rotate(0deg); }
+	61%  { transform: scale(3.5) translateX(6px) translateY(-1.5px) rotate(-2deg); }
+	62%  { transform: scale(3.5) translateX(6px) translateY(0) rotate(0deg); }
+	/* Lean left — looking back thoughtfully */
+	64%  { transform: scale(3.5) translateX(6px) translateY(0) rotate(-4deg); }
+	/* Lean right — peering further */
+	67%  { transform: scale(3.5) translateX(6px) translateY(0) rotate(3deg); }
+	/* Settle center */
+	69%  { transform: scale(3.5) translateX(6px) translateY(0) rotate(0deg); }
+	70%  { transform: scale(3.5) translateX(6px) translateY(0) rotate(0deg); }
+	/* ── Hop back left — relaxed trot home (70-87%) [Step 4: relaxed] ── */
+	/* Squat — less lean than outbound [Step 4: rotate capped at 1.5deg] */
+	72%  { transform: scale(3.5) translateX(6px) translateY(1px) rotate(-1.5deg); }
+	/* Airborne hop back 1 — lower arc [Step 4: -2.5px] */
+	75%  { transform: scale(3.5) translateX(4.5px) translateY(-2.5px) rotate(1.5deg); }
+	/* Gentler landing squash [Step 4: 0.87 vs 0.78] */
+	78%  { transform: scale(3.5) translateX(3px) translateY(0.8px) rotate(-0.5deg); }
+	79%  { transform: scale(3.5) translateX(3px) translateY(0) rotate(0deg); }
+	/* Squat for hop back 2 — gentle [Step 4: wider spacing] */
+	81%  { transform: scale(3.5) translateX(3px) translateY(0.8px) rotate(-1.5deg); }
+	/* Airborne hop back 2 — low easy arc [Step 4: -2.5px] */
+	84%  { transform: scale(3.5) translateX(1.5px) translateY(-2.5px) rotate(1.5deg); }
+	/* Land at home — satisfying squash */
+	87%  { transform: scale(3.5) translateX(0) translateY(1px) rotate(0deg); }
+	/* ── Expressive settle — asymmetric follow-through [Step 5] ── */
+	/* Overshoot — lean back catching balance */
+	89%  { transform: scale(3.5) translateX(0) translateY(-0.3px) rotate(-2.5deg); }
+	/* Counter-correct forward */
+	91%  { transform: scale(3.5) translateX(0) translateY(0) rotate(1.5deg); }
+	/* Damping — almost settled */
+	93%  { transform: scale(3.5) translateX(0) translateY(0) rotate(-0.5deg); }
+	/* ── Moving hold / "satisfied sigh" — never fully static [Step 5] ── */
+	95%  { transform: scale(3.5) translateX(0) translateY(0) rotate(0.2deg); }
+	97%  { transform: scale(3.5) translateX(0) translateY(0) rotate(-0.15deg); }
+	99%  { transform: scale(3.5) translateX(0) translateY(0) rotate(0.1deg); }
+	100% { transform: scale(3.5) translateX(0) translateY(0) rotate(0deg); }
+}
+
+@keyframes blob-compact-shake-rigid {
+	/* Start normal, then increasingly frantic vibration */
+	0%   { transform: scale(3.5) translateX(0); }
+	8%   { transform: scale(3.5) translateX(-0.3px); }
+	16%  { transform: scale(3.5) translateX(0.3px); }
+	22%  { transform: scale(3.5) translateX(-0.5px); }
+	28%  { transform: scale(3.5) translateX(0.5px); }
+	34%  { transform: scale(3.5) translateX(-0.7px); }
+	40%  { transform: scale(3.5) translateX(0.7px); }
+	46%  { transform: scale(3.5) translateX(-0.8px); }
+	52%  { transform: scale(3.5) translateX(0.9px); }
+	58%  { transform: scale(3.5) translateX(-1px); }
+	64%  { transform: scale(3.5) translateX(1px); }
+	70%  { transform: scale(3.5) translateX(-1.1px); }
+	76%  { transform: scale(3.5) translateX(1.1px); }
+	82%  { transform: scale(3.5) translateX(-1.2px); }
+	88%  { transform: scale(3.5) translateX(1.2px); }
+	/* Final crouch — anticipation before the squash hits */
+	95%  { transform: scale(3.5) translateX(0) translateY(-1px); }
+	100% { transform: scale(3.5) translateX(0) translateY(-1px); }
+}
+
+@keyframes blob-compact-squash-rigid {
+	/* Start from crouched position (where shake ends) */
+	0% {
+		transform: scale(3.5) translateY(-1px);
+	}
+	/* SLAM down — first big squash */
+	8% {
+		transform: scale(3.5) translateY(2px);
+	}
+	/* First press — moderate squash */
+	20% {
+		transform: scale(3.5) translateY(2px);
+	}
+	/* Partial recovery — but not full */
+	30% {
+		transform: scale(3.5) translateY(1px);
+	}
+	/* Second press — squashier */
+	42% {
+		transform: scale(3.5) translateY(2px);
+	}
+	/* Tiny recovery */
+	52% {
+		transform: scale(3.5) translateY(1px);
+	}
+	/* Third press — good squash but still recognizable */
+	65% {
+		transform: scale(3.5) translateY(3px);
+	}
+	/* Hold at maximum squash with a wobble */
+	75% {
+		transform: scale(3.5) translateY(3px);
+	}
+	82% {
+		transform: scale(3.5) translateY(3px);
+	}
+	/* Slowly ease back up for loop */
+	92% {
+		transform: scale(3.5) translateY(1px);
+	}
+	100% {
+		transform: scale(3.5) translateY(0);
+	}
+}
+
+@keyframes blob-compact-pop-rigid {
+	/* Start from squashed */
+	0% {
+		transform: scale(3.5) translateY(3px);
+	}
+	/* Overshoot — spring tall */
+	40% {
+		transform: scale(3.5) translateY(-2px);
+	}
+	/* Settle back */
+	70% {
+		transform: scale(3.5) translateY(0);
+	}
+	100% {
+		transform: scale(3.5) translateY(0);
+	}
+}
+
+@keyframes blob-enter-rigid {
+	0% {
+		transform: scale(3.5) translateX(-7px) translateY(0) rotate(0deg);
+	}
+	/* Squat before hop */
+	15% {
+		transform: scale(3.5) translateX(-7px) translateY(1px) rotate(0deg);
+	}
+	/* Launch right */
+	35% {
+		transform: scale(3.5) translateX(-7px) translateY(-2px) rotate(3deg);
+	}
+	55% {
+		transform: scale(3.5) translateX(-3px) translateY(-1px) rotate(-2deg);
+	}
+	/* Land with squash */
+	75% {
+		transform: scale(3.5) translateX(0) translateY(1px) rotate(1deg);
+	}
+	/* Settle */
+	100% {
+		transform: scale(3.5) translateX(0) translateY(0) rotate(0deg);
+	}
+}
+
+@keyframes blob-exit-rigid {
+	0% {
+		transform: scale(3.5) translateX(0) translateY(0) rotate(0deg);
+	}
+	20% {
+		transform: scale(3.5) translateX(0) translateY(1px) rotate(0deg);
+	}
+	35% {
+		transform: scale(3.5) translateX(-1.5px) translateY(1px) rotate(-6deg);
+	}
+	50% {
+		transform: scale(3.5) translateX(-3.5px) translateY(1px) rotate(4deg);
+	}
+	65% {
+		transform: scale(3.5) translateX(-5.5px) translateY(-2px) rotate(-2deg);
+	}
+	80% {
+		transform: scale(3.5) translateX(-7px) translateY(0) rotate(1deg);
+	}
+	100% {
+		transform: scale(3.5) translateX(-7px) translateY(0) rotate(0deg);
+	}
+}
+
+@keyframes blob-enter-roll-rigid {
+	0% {
+		transform: scale(3.5) translateX(-7px) translateY(0) rotate(0deg);
+	}
+	/* Squat */
+	12% {
+		transform: scale(3.5) translateX(-7px) translateY(1px) rotate(0deg);
+	}
+	/* Launch up spinning */
+	30% {
+		transform: scale(3.5) translateX(-7px) translateY(-5px) rotate(120deg);
+	}
+	/* Peak — mid roll */
+	50% {
+		transform: scale(3.5) translateX(-4px) translateY(-7px) rotate(250deg);
+	}
+	/* Coming down */
+	70% {
+		transform: scale(3.5) translateX(-1px) translateY(-3px) rotate(340deg);
+	}
+	/* Land with squash */
+	85% {
+		transform: scale(3.5) translateX(0) translateY(1px) rotate(360deg);
+	}
+	/* Settle */
+	100% {
+		transform: scale(3.5) translateX(0) translateY(0) rotate(360deg);
+	}
+}
+
+@keyframes blob-exit-roll-rigid {
+	0% {
+		transform: scale(3.5) translateX(0) translateY(0) rotate(0deg);
+	}
+	/* Squat before launch */
+	12% {
+		transform: scale(3.5) translateX(0) translateY(1px) rotate(0deg);
+	}
+	/* Launch up and start spinning */
+	30% {
+		transform: scale(3.5) translateX(-2px) translateY(-5px) rotate(-120deg);
+	}
+	/* Peak of arc — mid roll */
+	50% {
+		transform: scale(3.5) translateX(-4px) translateY(-7px) rotate(-250deg);
+	}
+	/* Coming down, finishing roll */
+	70% {
+		transform: scale(3.5) translateX(-6px) translateY(-3px) rotate(-340deg);
+	}
+	/* Land with squash */
+	85% {
+		transform: scale(3.5) translateX(-7px) translateY(1px) rotate(-360deg);
+	}
+	/* Settle */
+	100% {
+		transform: scale(3.5) translateX(-7px) translateY(0) rotate(-360deg);
 	}
 }
 
