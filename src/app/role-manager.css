@@ -480,37 +480,27 @@
  * .bobbit-blob--inline cancels all of that and renders the sprite centered
  * within a fixed-size box at a smaller scale.
  * ============================================================================ */
+/* The blob container renders at natural size (3.5x sprite = ~37×37px margin-box)
+ * inside an overflow:hidden viewport, then the outer div scales it down. */
 .bobbit-blob--inline {
-	margin-bottom: 0;
-	overflow: hidden;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
+	margin-bottom: 0 !important;
+	overflow: visible;
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%);
 }
 
-/* Reset sprite margins and reposition.
- * The sprite is 1×1px with box-shadow extending 0-9px right and 0-8px down.
- * At scale(2.5) the visual is 25×22.5px. We need ~13px left margin so the
- * leftmost shadow pixels (x=0, scaled from origin 5px) aren't clipped. */
+/* Keep the original 3.5x scale and sprite margins — the blob layout is
+ * tightly coupled (accessories are position:absolute relative to the sprite's
+ * margin box). Instead, scale the entire blob container down to fit.
+ *
+ * Sprite natural box: 1px + margins 8/18/28/18 = 37×37px.
+ * With accessories the visual area is ~55×45px (overflow:visible extends it).
+ * We scale the whole thing with the outer container's transform. */
 .bobbit-blob--inline .bobbit-blob__sprite {
-	margin: 4px 4px 4px 13px !important;
-	transform: scale(2.5) !important;
-	transform-origin: 5px 4px !important;
-}
-
-/* All accessories: match the sprite's scale and origin */
-.bobbit-blob--inline .bobbit-blob__crown,
-.bobbit-blob--inline .bobbit-blob__bandana,
-.bobbit-blob--inline .bobbit-blob__magnifier,
-.bobbit-blob--inline .bobbit-blob__goggles,
-.bobbit-blob--inline .bobbit-blob__headphones,
-.bobbit-blob--inline .bobbit-blob__pencil,
-.bobbit-blob--inline .bobbit-blob__book,
-.bobbit-blob--inline .bobbit-blob__glasses,
-.bobbit-blob--inline .bobbit-blob__shield,
-.bobbit-blob--inline .bobbit-blob__flask {
-	transform: scale(2.5) !important;
+	/* Keep original margins and scale — just remove the idle translateX
+	   since we center via the container */
 }
 
 /* Shadow not needed inline */

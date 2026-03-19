@@ -24,19 +24,27 @@ function idleBlob(accId: string, size = 40): TemplateResult {
 		? `bobbit-${accId === "crown" ? "crowned" : accId}`
 		: "";
 	const cls = `bobbit-blob bobbit-blob--idle bobbit-blob--inline ${accClass}`.trim();
+	// Blob's sprite margin-box is 37×37px. We render at natural size in a 37×37
+	// viewport then CSS-scale the viewport to the desired display size.
+	const naturalSize = 37;
+	const s = size / naturalSize;
 	return html`
-		<div class="${cls}" style="width:${size}px;height:${size}px;">
-			<div class="bobbit-blob__sprite"></div>
-			<div class="bobbit-blob__crown"></div>
-			<div class="bobbit-blob__bandana"></div>
-			<div class="bobbit-blob__magnifier"></div>
-			<div class="bobbit-blob__goggles"></div>
-			<div class="bobbit-blob__headphones"></div>
-			<div class="bobbit-blob__pencil"></div>
-			<div class="bobbit-blob__book"></div>
-			<div class="bobbit-blob__glasses"></div>
-			<div class="bobbit-blob__shield"></div>
-			<div class="bobbit-blob__flask"></div>
+		<div style="width:${size}px;height:${size}px;flex-shrink:0;">
+			<div style="width:${naturalSize}px;height:${naturalSize}px;position:relative;overflow:hidden;transform:scale(${s.toFixed(3)});transform-origin:top left;">
+				<div class="${cls}">
+					<div class="bobbit-blob__sprite"></div>
+					<div class="bobbit-blob__crown"></div>
+					<div class="bobbit-blob__bandana"></div>
+					<div class="bobbit-blob__magnifier"></div>
+					<div class="bobbit-blob__goggles"></div>
+					<div class="bobbit-blob__headphones"></div>
+					<div class="bobbit-blob__pencil"></div>
+					<div class="bobbit-blob__book"></div>
+					<div class="bobbit-blob__glasses"></div>
+					<div class="bobbit-blob__shield"></div>
+					<div class="bobbit-blob__flask"></div>
+				</div>
+			</div>
 		</div>
 	`;
 }
