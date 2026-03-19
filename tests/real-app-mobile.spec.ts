@@ -2,12 +2,12 @@ import { test, expect } from "@playwright/test";
 
 /**
  * Test against the real vite dev server to verify the mobile header
- * auto-hide wiring works in the actual app.
+ * stays pinned at the top in the actual app.
  *
  * Without a gateway, we can't get to a connected session, but we CAN:
  * 1. Verify the app loads at mobile viewport
  * 2. Simulate what happens when connected by injecting a mock session state
- * 3. Verify the scroll tracking attaches correctly
+ * 3. Verify the header stays visible on scroll
  */
 
 test.describe("Real app mobile header", () => {
@@ -38,7 +38,7 @@ test.describe("Real app mobile header", () => {
 		await expect(sidebar).not.toBeVisible();
 	});
 
-	test("mobile header markup is correct when injected into DOM", async ({ page }) => {
+	test("mobile header stays pinned when scrolling", async ({ page }) => {
 		await page.goto("/");
 		await page.waitForTimeout(500);
 
@@ -49,8 +49,7 @@ test.describe("Real app mobile header", () => {
 			app.innerHTML = `
 				<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden relative">
 					<div id="app-header"
-						class="absolute top-0 left-0 right-0 z-50 bg-background border-b border-border flex items-center justify-between transition-transform duration-200"
-						style="transform: translateY(0)">
+						class="fixed top-0 left-0 right-0 z-50 bg-background border-b border-border flex items-center justify-between">
 						<span>Test Header</span>
 					</div>
 					<div id="app-main" class="flex-1 min-h-0 flex flex-col">
@@ -73,49 +72,16 @@ test.describe("Real app mobile header", () => {
 				content.appendChild(p);
 			}
 
-			// Set up the same capture-phase listener as main.ts
+			// Sync padding
 			const mainEl = document.getElementById("app-main")!;
 			const headerEl = document.getElementById("app-header")!;
-
-			// Sync padding
 			mainEl.style.paddingTop = headerEl.offsetHeight + "px";
-
-			let mobileHeaderVisible = true;
-			let lastScrollTop = 0;
-
-			mainEl.addEventListener("scroll", (e) => {
-				const target = e.target as HTMLElement;
-				if (!target || (!target.scrollTop && target.scrollTop !== 0)) return;
-				const currentTop = target.scrollTop;
-				const delta = currentTop - lastScrollTop;
-				if (currentTop < 20) {
-					if (!mobileHeaderVisible) {
-						mobileHeaderVisible = true;
-						headerEl.style.transform = "translateY(0)";
-					}
-				} else if (delta < -3) {
-					if (!mobileHeaderVisible) {
-						mobileHeaderVisible = true;
-						headerEl.style.transform = "translateY(0)";
-					}
-				} else if (delta > 3) {
-					if (mobileHeaderVisible) {
-						mobileHeaderVisible = false;
-						headerEl.style.transform = "translateY(-100%)";
-					}
-				}
-				lastScrollTop = currentTop;
-			}, { capture: true, passive: true });
-
-			(window as any).__mobileHeaderVisible = () => mobileHeaderVisible;
 
 			const scrollEl = document.getElementById("test-scroll")!;
 			return {
 				headerHeight: headerEl.offsetHeight,
 				paddingTop: mainEl.style.paddingTop,
 				scrollable: scrollEl.scrollHeight > scrollEl.clientHeight,
-				scrollHeight: scrollEl.scrollHeight,
-				clientHeight: scrollEl.clientHeight,
 			};
 		});
 
@@ -123,26 +89,21 @@ test.describe("Real app mobile header", () => {
 		expect(parseInt(result.paddingTop)).toBe(result.headerHeight);
 		expect(result.scrollable).toBe(true);
 
-		// Now test scroll behavior
+		// Scroll down — header should remain visible (always pinned)
 		const scrollEl = page.locator("#test-scroll");
-
-		// Scroll down
 		await scrollEl.evaluate((el) => { el.scrollTop = 300; });
 		await page.waitForTimeout(100);
 
-		let visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(false);
+		const header = page.locator("#app-header");
+		await expect(header).toBeVisible();
 
-		const headerTransform = await page.locator("#app-header").evaluate(
-			(el) => el.style.transform
-		);
-		expect(headerTransform).toBe("translateY(-100%)");
+		// No translateY(-100%) should be applied
+		const transform = await header.evaluate((el) => el.style.transform);
+		expect(transform === "" || transform === "none").toBe(true);
 
-		// Scroll up
-		await scrollEl.evaluate((el) => { el.scrollTop = 250; });
+		// Scroll further — still visible
+		await scrollEl.evaluate((el) => { el.scrollTop = 600; });
 		await page.waitForTimeout(100);
-
-		visible = await page.evaluate(() => (window as any).__mobileHeaderVisible());
-		expect(visible).toBe(true);
+		await expect(header).toBeVisible();
 	});
 });

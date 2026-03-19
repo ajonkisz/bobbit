@@ -17,7 +17,7 @@
   }
   
   #app-header {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
@@ -28,13 +28,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    transition: transform 0.2s ease;
-    transform: translateY(0);
   }
 
-  /* BUG REGRESSION: without display:flex and flex-direction:column here,
-     children with height:100% don't get constrained, the scroll container
-     never gets a bounded height, and scroll events never fire. */
   #app-main {
     flex: 1;
     min-height: 0;
@@ -42,7 +37,6 @@
     flex-direction: column;
   }
 
-  /* Mimics pi-chat-panel (sets these in connectedCallback) */
   .chat-panel {
     display: flex;
     flex-direction: column;
@@ -50,7 +44,6 @@
     min-height: 0;
   }
   
-  /* Mimics agent-interface (sets these in connectedCallback) */
   .agent-interface {
     display: flex;
     flex-direction: column;
@@ -58,14 +51,12 @@
     min-height: 0;
   }
 
-  /* Mimics the div.flex.flex-col.h-full inside AgentInterface.render() */
   .messages-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%;
   }
 
-  /* Mimics div.flex-1.overflow-y-auto */
   .scroll-container {
     flex: 1;
     overflow-y: auto;
@@ -98,7 +89,6 @@
         <div class="messages-wrapper">
           <div class="scroll-container overflow-y-auto" id="scroll-target">
             <div style="padding-top: 0" id="messages-content">
-              <!-- Messages will be injected by the test -->
             </div>
           </div>
           <div class="input-area">
@@ -120,76 +110,17 @@ for (let i = 0; i < 50; i++) {
   content.appendChild(div);
 }
 
-// === Replicate the exact scroll tracking logic from main.ts ===
-// Uses capture-phase scroll listening on #app-main — no DOM query needed.
-let mobileHeaderVisible = true;
-let _scrollCleanup = null;
-
-function setupMobileScrollTracking() {
-  if (_scrollCleanup) _scrollCleanup();
-
-  const mainEl = document.getElementById("app-main");
-  if (!mainEl) {
-    console.error("SETUP FAILED: no #app-main");
-    return;
-  }
-
-  let lastScrollTop = 0;
-
-  const onScroll = (e) => {
-    const headerEl = document.getElementById("app-header");
-    if (!headerEl) return;
-
-    const target = e.target;
-    if (!target || (!target.scrollTop && target.scrollTop !== 0)) return;
-
-    const currentTop = target.scrollTop;
-    const delta = currentTop - lastScrollTop;
-
-    if (currentTop < 20) {
-      if (!mobileHeaderVisible) {
-        mobileHeaderVisible = true;
-        headerEl.style.transform = "translateY(0)";
-      }
-    } else if (delta < -3) {
-      if (!mobileHeaderVisible) {
-        mobileHeaderVisible = true;
-        headerEl.style.transform = "translateY(0)";
-      }
-    } else if (delta > 3) {
-      if (mobileHeaderVisible) {
-        mobileHeaderVisible = false;
-        headerEl.style.transform = "translateY(-100%)";
-      }
-    }
-
-    lastScrollTop = currentTop;
-  };
-
-  // Capture phase: intercepts scroll events from ANY descendant
-  mainEl.addEventListener("scroll", onScroll, { capture: true, passive: true });
-  _scrollCleanup = () => mainEl.removeEventListener("scroll", onScroll, { capture: true });
-
-  console.log("SETUP OK: capture listener on #app-main");
-}
-
+// Set padding-top on app-main to account for fixed header
 function syncMobileHeader() {
   const headerEl = document.getElementById("app-header");
   const mainEl = document.getElementById("app-main");
   if (headerEl && mainEl) {
     mainEl.style.paddingTop = headerEl.offsetHeight + "px";
   }
-  setupMobileScrollTracking();
 }
 
-// Expose state for test assertions
-window.__mobileHeaderVisible = () => mobileHeaderVisible;
-window.__setup = () => syncMobileHeader();
-
 /**
- * Programmatic scrollTop assignment does not reliably fire scroll events
- * in headless Chromium. This helper sets scrollTop AND dispatches a scroll
- * event so the capture-phase handler always runs.
+ * Helper for tests — scrolls #scroll-target and dispatches a scroll event.
  */
 window.__scrollTo = (top) => {
   const el = document.getElementById("scroll-target");

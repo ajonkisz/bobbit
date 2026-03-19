@@ -28,7 +28,7 @@ import { renderGoalGroup, renderSessionRow } from "./render-helpers.js";
 const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:18px;image-rendering:pixelated;" />`;
 
 import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
-import { mobileHeaderVisible, teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
+import { teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
 import { getRouteFromHash, setHashRoute } from "./routing.js";
 import { renderGoalDashboard } from "./goal-dashboard.js";
 import "./goal-dashboard.css";
@@ -572,8 +572,7 @@ export function doRenderApp(): void {
 			<div class="w-full h-screen flex flex-col bg-background text-foreground overflow-hidden relative"
 				data-mobile-header>
 				<div id="app-header"
-					class="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border flex flex-col"
-					style="transform: translateY(${mobileHeaderVisible ? "0" : "-100%"}); transition: transform 200ms ease, box-shadow 200ms ease; will-change: transform;">
+					class="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border flex flex-col">
 					<div class="flex items-center justify-between">
 						${headerLeft()}
 						${headerRight()}
