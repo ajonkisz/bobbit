@@ -15,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Resolve from repo root: dist/server/agent/ -> ../../../data/team-names.json
 let NAME_POOL: string[];
 try {
-	const poolPath = join(__dirname, "..", "..", "..", "data", "swarm-names.json");
+	const poolPath = join(__dirname, "..", "..", "..", "data", "team-names.json");
 	NAME_POOL = JSON.parse(readFileSync(poolPath, "utf-8"));
 } catch {
 	// Absolute fallback if the file is missing
