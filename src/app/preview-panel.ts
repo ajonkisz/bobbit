@@ -4,18 +4,15 @@ import { state, renderApp } from "./state.js";
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let lastMtime = 0;
 
-/** Start polling ~/.pi/preview.html for changes. Opens the preview panel. */
+/** Start polling ~/.pi/preview.html for changes. */
 export function startPreviewPolling(): void {
 	if (pollTimer) return;
-	state.previewPanelVisible = true;
-	state.previewPanelTab = "preview";
 	lastMtime = 0;
 	pollNow();
 	pollTimer = setInterval(pollNow, 1000);
-	renderApp();
 }
 
-/** Stop polling and close the preview panel. */
+/** Stop polling. */
 export function stopPreviewPolling(): void {
 	if (pollTimer) {
 		clearInterval(pollTimer);
@@ -25,7 +22,7 @@ export function stopPreviewPolling(): void {
 }
 
 async function pollNow(): Promise<void> {
-	if (!state.previewPanelVisible) {
+	if (!state.isPreviewSession) {
 		stopPreviewPolling();
 		return;
 	}

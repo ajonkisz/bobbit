@@ -26,7 +26,7 @@ import { renderGoalGroup, renderSessionRow } from "./render-helpers.js";
 const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:18px;image-rendering:pixelated;" />`;
 
 import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
-import { stopPreviewPolling } from "./preview-panel.js";
+
 import { teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
 import { getRouteFromHash, setHashRoute } from "./routing.js";
 import { renderGoalDashboard } from "./goal-dashboard.js";
@@ -702,7 +702,7 @@ export function doRenderApp(): void {
 		`;
 	};
 
-	const previewPanelTabBar = () => {
+	const previewTabBar = () => {
 		return html`
 			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
 				<button
@@ -713,11 +713,6 @@ export function doRenderApp(): void {
 					class="goal-tab-pill ${state.previewPanelTab === "preview" ? "goal-tab-pill--active" : ""}"
 					@click=${() => { state.previewPanelTab = "preview"; renderApp(); }}
 				>Preview</button>
-				<button
-					class="goal-tab-pill"
-					style="margin-left:auto;font-size:0.65rem;opacity:0.6;"
-					@click=${() => { stopPreviewPolling(); state.previewPanelVisible = false; state.previewPanelHtml = ""; renderApp(); }}
-				>&times; Close</button>
 			</div>
 		`;
 	};
@@ -727,14 +722,10 @@ export function doRenderApp(): void {
 			<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
 				<div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
 					<span class="text-xs font-medium text-muted-foreground">Live Preview</span>
-					<button
-						class="text-xs text-muted-foreground hover:text-foreground"
-						@click=${() => { stopPreviewPolling(); state.previewPanelVisible = false; state.previewPanelHtml = ""; renderApp(); }}
-					>&times; Close</button>
 				</div>
 				<iframe
 					class="flex-1 w-full border-0"
-					sandbox="allow-scripts"
+					sandbox="allow-scripts allow-same-origin"
 					.srcdoc=${state.previewPanelHtml}
 				></iframe>
 			</div>
@@ -787,7 +778,7 @@ export function doRenderApp(): void {
 				}
 			`;
 		}
-		if (connected && state.previewPanelVisible) {
+		if (connected && state.isPreviewSession) {
 			if (desktop) {
 				return html`
 					${reconnectBanner()}
@@ -870,7 +861,7 @@ export function doRenderApp(): void {
 					</div>
 					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
 					${state.isRoleAssistantSession ? roleAssistantTabBar() : ""}
-					${state.previewPanelVisible && !state.isGoalAssistantSession && !state.isRoleAssistantSession ? previewPanelTabBar() : ""}
+					${state.isPreviewSession && !state.isGoalAssistantSession && !state.isRoleAssistantSession ? previewTabBar() : ""}
 				</div>
 				<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>

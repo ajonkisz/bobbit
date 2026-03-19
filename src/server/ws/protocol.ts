@@ -31,8 +31,7 @@ export type ClientMessage =
 	| { type: "invoke_skill"; skillId: string; context?: Record<string, string> }
 	| { type: "task_create"; goalId: string; title: string; taskType: string; parentTaskId?: string; spec?: string; dependsOn?: string[] }
 	| { type: "task_update"; taskId: string; updates: { title?: string; spec?: string; state?: string; assignedSessionId?: string; dependsOn?: string[] } }
-	| { type: "task_delete"; taskId: string }
-	| { type: "open_preview" };
+	| { type: "task_delete"; taskId: string };
 
 /** Server → Client messages over WebSocket */
 export type ServerMessage =
@@ -53,5 +52,4 @@ export type ServerMessage =
 	| { type: "cost_update"; sessionId: string; goalId?: string; taskId?: string; cost: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; totalCost: number } }
 	| { type: "queue_update"; sessionId: string; queue: QueuedMessage[] }
 	| { type: "task_changed"; task: unknown }
-	| { type: "tasks_list"; tasks: unknown[] }
-	| { type: "open_preview" };
+	| { type: "tasks_list"; tasks: unknown[] };

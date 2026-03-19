@@ -251,10 +251,6 @@ export function handleWebSocketConnection(
 					}
 					break;
 				}
-				case "open_preview": {
-					send(ws, { type: "open_preview" } as any);
-					break;
-				}
 				case "invoke_skill": {
 					const skill = getSkill(msg.skillId);
 					if (!skill) {

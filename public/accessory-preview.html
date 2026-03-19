@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reviewer Accessory — All Contexts</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 1.5rem; }
+h1 { font-size: 1.3rem; text-align: center; margin-bottom: 0.25rem; color: #f8fafc; }
+.subtitle { text-align: center; color: #64748b; font-size: 0.8rem; margin-bottom: 1.5rem; }
+h2 { font-size: 1rem; color: #94a3b8; margin: 1.5rem 0 0.75rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.4rem; }
+h3 { font-size: 0.8rem; color: #64748b; margin: 0.75rem 0 0.5rem; font-weight: 500; }
+
+.section { max-width: 900px; margin: 0 auto; }
+
+/* ============ SIDEBAR CONTEXT (1.6x scale) ============ */
+.sidebar-mock { background: #111827; border-radius: 8px; padding: 0.5rem; width: 260px; border: 1px solid #1e293b; }
+.sidebar-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: default; }
+.sidebar-row:hover { background: #1e293b; }
+.sidebar-row.active { background: #1e293b; }
+.sidebar-title { font-size: 0.8rem; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.sidebar-role { font-size: 0.6rem; color: #64748b; }
+
+/* Sidebar bobbit: 1.6x scale, 16px wide, 15px tall */
+.sb-bobbit {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 15px; flex-shrink: 0; position: relative;
+  overflow: hidden; margin-top: 2px;
+}
+.sb-sprite {
+  position: absolute; left: 0; top: 0;
+  display: block; width: 1px; height: 1px;
+  image-rendering: pixelated;
+  transform: scale(1.6); transform-origin: 0 0;
+}
+.sb-acc {
+  position: absolute; left: 0; top: 0;
+  display: block; width: 1px; height: 1px;
+  image-rendering: pixelated;
+  transform: scale(1.6); transform-origin: 0 0;
+}
+
+/* Sprite body colours */
+.sprite-green { box-shadow:
+  3px 0 0 #000,4px 0 0 #000,5px 0 0 #000,6px 0 0 #000,7px 0 0 #000,
+  2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,
+  1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,
+  0 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,
+  0 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,
+  0 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,
+  0 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,
+  1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,
+  2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;
+}
+
+/* Magnifier accessory (sidebar 1.6x — from session-colors.ts) */
+.acc-mag-sb { box-shadow:
+  8px 0 0 #000,9px 0 0 #000,10px 0 0 #000,
+  7px 1px 0 #000,8px 1px 0 #87ceeb,9px 1px 0 #b0e0f0,10px 1px 0 #87ceeb,11px 1px 0 #000,
+  7px 2px 0 #000,8px 2px 0 #b0e0f0,9px 2px 0 #e0f4ff,10px 2px 0 #87ceeb,11px 2px 0 #000,
+  7px 3px 0 #000,8px 3px 0 #87ceeb,9px 3px 0 #b0e0f0,10px 3px 0 #87ceeb,11px 3px 0 #000,
+  8px 4px 0 #000,9px 4px 0 #000,10px 4px 0 #000,11px 4px 0 #000,
+  7px 5px 0 #000,8px 5px 0 #8b4513,
+  6px 6px 0 #000,7px 6px 0 #8b4513;
+}
+
+/* ============ ROLE EDITOR CONTEXT ============ */
+.role-editor-mock { background: #111827; border-radius: 8px; padding: 1rem; width: 320px; border: 1px solid #1e293b; }
+.role-row-mock { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #1e293b; margin-bottom: 6px; }
+.role-row-mock .role-info { display: flex; flex-direction: column; }
+.role-row-mock .role-label { font-size: 0.85rem; color: #e2e8f0; font-weight: 500; }
+.role-row-mock .role-slug { font-size: 0.7rem; color: #64748b; }
+
+/* Accessory picker tile */
+.acc-picker { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 0.5rem; }
+.acc-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; cursor: default; }
+.acc-tile.selected { border-color: #3b82f6; background: #1e293b; }
+.acc-tile-label { font-size: 0.55rem; color: #64748b; text-align: center; }
+.acc-tile.selected .acc-tile-label { color: #93c5fd; }
+
+/* ============ CHAT BLOB CONTEXT (3.5x scale) ============ */
+.chat-mock { background: #111827; border-radius: 8px; padding: 1.5rem; border: 1px solid #1e293b; }
+.blob-row { display: flex; gap: 2rem; align-items: flex-end; flex-wrap: wrap; }
+.blob-cell { display: flex; flex-direction: column; align-items: center; }
+.blob-cell-label { font-size: 0.65rem; color: #64748b; margin-top: 8px; text-align: center; }
+
+.blob-container {
+  position: relative; width: 70px; height: 55px;
+  display: flex; align-items: flex-end; overflow: visible;
+}
+.blob-sprite {
+  width: 1px; height: 1px; overflow: visible;
+  transform-origin: 5px 8px; transform: scale(3.5);
+  margin: 8px 18px 28px 18px; image-rendering: pixelated;
+}
+.blob-sprite.sprite-body { box-shadow:
+  3px 0 0 #000,4px 0 0 #000,5px 0 0 #000,6px 0 0 #000,7px 0 0 #000,
+  2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,
+  1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,
+  0 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,
+  0 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,
+  0 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,
+  0 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,
+  1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,
+  2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;
+}
+.blob-accessory {
+  position: absolute; width: 1px; height: 1px; overflow: visible;
+  transform-origin: 5px 8px; transform: scale(3.5);
+  margin: 8px 18px 28px 18px; image-rendering: pixelated;
+}
+/* Magnifier (blob 3.5x — from app.css) */
+.acc-mag-blob { box-shadow:
+  9px 2px 0 #000, 10px 2px 0 #000, 11px 2px 0 #000,
+  8px 3px 0 #000, 9px 3px 0 #87ceeb, 10px 3px 0 #b0e0f0, 11px 3px 0 #87ceeb, 12px 3px 0 #000,
+  8px 4px 0 #000, 9px 4px 0 #b0e0f0, 10px 4px 0 #e0f4ff, 11px 4px 0 #87ceeb, 12px 4px 0 #000,
+  8px 5px 0 #000, 9px 5px 0 #87ceeb, 10px 5px 0 #b0e0f0, 11px 5px 0 #87ceeb, 12px 5px 0 #000,
+  8px 6px 0 #000, 9px 6px 0 #000, 10px 6px 0 #000, 11px 6px 0 #000,
+  7px 7px 0 #000, 8px 7px 0 #8b4513,
+  6px 8px 0 #000, 7px 8px 0 #8b4513;
+}
+
+/* Busy bounce animation */
+@keyframes busy-bounce {
+  0%   { transform: scale(3.5) translateX(0) translateY(0) scaleX(1) scaleY(1); }
+  2%   { transform: scale(3.5) translateX(0) translateY(1.5px) scaleX(1.22) scaleY(0.72); }
+  5%   { transform: scale(3.5) translateX(0) translateY(-4px) scaleX(0.85) scaleY(1.2); }
+  8%   { transform: scale(3.5) translateX(0) translateY(-6px) scaleX(0.95) scaleY(1.05); }
+  14%  { transform: scale(3.5) translateX(0) translateY(1.5px) scaleX(1.2) scaleY(0.75); }
+  19%  { transform: scale(3.5) translateX(0) translateY(0) scaleX(1) scaleY(1); }
+  21%  { transform: scale(3.5) translateX(0) translateY(0.8px) scaleX(1.1) scaleY(0.88); }
+  25%  { transform: scale(3.5) translateX(0) translateY(-3.5px) scaleX(0.97) scaleY(1.03); }
+  33%  { transform: scale(3.5) translateX(0) translateY(0) scaleX(1) scaleY(1); }
+  41%  { transform: scale(3.5) translateX(0) translateY(1px) scaleX(1.15) scaleY(0.82); }
+  44%  { transform: scale(3.5) translateX(1.5px) translateY(-3.5px) scaleX(0.88) scaleY(1.12); }
+  48%  { transform: scale(3.5) translateX(3px) translateY(0) scaleX(1) scaleY(1); }
+  52%  { transform: scale(3.5) translateX(4.5px) translateY(-4px) scaleX(0.88) scaleY(1.12); }
+  57%  { transform: scale(3.5) translateX(6px) translateY(0) scaleX(1) scaleY(1); }
+  64%  { transform: scale(3.5) translateX(6px) translateY(0) rotate(-4deg); }
+  67%  { transform: scale(3.5) translateX(6px) translateY(0) rotate(3deg); }
+  70%  { transform: scale(3.5) translateX(6px) translateY(0); }
+  75%  { transform: scale(3.5) translateX(4.5px) translateY(-2.5px) scaleX(0.9) scaleY(1.1); }
+  84%  { transform: scale(3.5) translateX(1.5px) translateY(-2.5px) scaleX(0.9) scaleY(1.1); }
+  87%  { transform: scale(3.5) translateX(0) translateY(0.8px) scaleX(1.12) scaleY(0.87); }
+  92%  { transform: scale(3.5) translateX(0) translateY(0) scaleX(1) scaleY(1); }
+  100% { transform: scale(3.5) translateX(0) translateY(0) scaleX(1) scaleY(1); }
+}
+@keyframes idle-breathe-blob {
+  0%, 100% { transform: scale(3.5) translateX(-7px) scaleY(1); }
+  50% { transform: scale(3.5) translateX(-7px) scaleY(1.02); }
+}
+/* Sidebar bob */
+@keyframes sb-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+@keyframes sb-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+.blob-busy .blob-sprite, .blob-busy .blob-accessory { animation: busy-bounce 10s cubic-bezier(0.34, 1, 0.64, 1) infinite; }
+.blob-idle .blob-sprite, .blob-idle .blob-accessory { animation: idle-breathe-blob 4s ease-in-out infinite; }
+
+/* Hue variants row */
+.hue-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+
+/* Light theme */
+.theme-light { background: #f1f5f9; }
+.theme-light .sidebar-mock, .theme-light .role-editor-mock, .theme-light .chat-mock { background: #fff; border-color: #e2e8f0; }
+.theme-light .sidebar-row:hover, .theme-light .sidebar-row.active, .theme-light .role-row-mock { background: #f1f5f9; }
+.theme-light .sidebar-title, .theme-light .role-label { color: #1e293b; }
+.theme-light h2 { color: #475569; border-color: #e2e8f0; }
+
+.controls { display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.controls button { padding: 0.35rem 0.7rem; border: 1px solid #334155; background: #1e293b; color: #94a3b8; border-radius: 6px; cursor: pointer; font-size: 0.75rem; }
+.controls button:hover { background: #334155; color: #e2e8f0; }
+.controls button.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+</style>
+</head>
+<body>
+
+<h1>Reviewer (Magnifier) — All Rendering Contexts</h1>
+<p class="subtitle">Sidebar (1.6x), Role Editor (1.6x), Chat Blob (3.5x) &mdash; across states and hues</p>
+
+<div class="controls">
+  <button data-theme="dark" class="active">Dark</button>
+  <button data-theme="light">Light</button>
+</div>
+
+<div class="section">
+
+<!-- ============ 1. SIDEBAR ============ -->
+<h2>1. Sidebar</h2>
+<h3>Different states — idle, active (selected), streaming, starting, terminated</h3>
+<div style="display:flex;gap:1rem;flex-wrap:wrap;">
+
+  <!-- Idle (desaturated) -->
+  <div class="sidebar-mock">
+    <div class="sidebar-row" style="filter:saturate(0.4);">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc acc-mag-sb"></span></span>
+      <span class="sidebar-title">Code review findings</span>
+    </div>
+    <div class="sidebar-row active">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc acc-mag-sb"></span></span>
+      <span class="sidebar-title">Review PR #42 — selected</span>
+    </div>
+    <div class="sidebar-row" style="animation:sb-bob 1.8s ease-in-out infinite;">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc acc-mag-sb"></span></span>
+      <span class="sidebar-title">Reviewing auth flow... <span style="color:#6ee7b7;font-size:0.65rem;">streaming</span></span>
+    </div>
+  </div>
+
+  <!-- Different hue rotations -->
+  <div class="sidebar-mock">
+    <div class="sidebar-row" style="filter:hue-rotate(75deg);">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc acc-mag-sb" style="filter:hue-rotate(-75deg);"></span></span>
+      <span class="sidebar-title">Hue +75° (teal)</span>
+    </div>
+    <div class="sidebar-row" style="filter:hue-rotate(150deg);">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc acc-mag-sb" style="filter:hue-rotate(-150deg);"></span></span>
+      <span class="sidebar-title">Hue +150° (blue)</span>
+    </div>
+    <div class="sidebar-row" style="filter:hue-rotate(250deg);">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc acc-mag-sb" style="filter:hue-rotate(-250deg);"></span></span>
+      <span class="sidebar-title">Hue +250° (pink)</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ 2. ROLE EDITOR ============ -->
+<h2>2. Role Editor / Dropdown</h2>
+<h3>Role list rows and accessory picker tiles</h3>
+<div style="display:flex;gap:1rem;flex-wrap:wrap;">
+
+  <div class="role-editor-mock">
+    <div style="font-size:0.7rem;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Roles</div>
+    <div class="role-row-mock">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc" style="box-shadow:3px -2px 0 #000,5px -2px 0 #000,7px -2px 0 #000,2px -1px 0 #000,3px -1px 0 #fde047,4px -1px 0 #000,5px -1px 0 #fde047,6px -1px 0 #000,7px -1px 0 #fde047,8px -1px 0 #000,1px 0 0 #000,2px 0 0 #fbbf24,3px 0 0 #fde047,4px 0 0 #fbbf24,5px 0 0 #fde047,6px 0 0 #fbbf24,7px 0 0 #fde047,8px 0 0 #fbbf24,9px 0 0 #000,1px 1px 0 #000,2px 1px 0 #b45309,3px 1px 0 #d97706,4px 1px 0 #d97706,5px 1px 0 #d97706,6px 1px 0 #d97706,7px 1px 0 #d97706,8px 1px 0 #b45309,9px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000;"></span></span>
+      <div class="role-info"><span class="role-label">Team Lead</span><span class="role-slug">team-lead</span></div>
+    </div>
+    <div class="role-row-mock" style="border: 1px solid #3b82f6;">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc acc-mag-sb"></span></span>
+      <div class="role-info"><span class="role-label">Reviewer</span><span class="role-slug">reviewer</span></div>
+    </div>
+    <div class="role-row-mock">
+      <span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc" style="box-shadow:1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,0 3px 0 #000,1px 3px 0 #b91c1c,2px 3px 0 #dc2626,3px 3px 0 #ef4444,4px 3px 0 #ef4444,5px 3px 0 #ef4444,6px 3px 0 #ef4444,7px 3px 0 #ef4444,8px 3px 0 #f87171,9px 3px 0 #000,0 4px 0 #000,1px 4px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,10px 3px 0 #000,10px 4px 0 #b91c1c,11px 4px 0 #000,10px 5px 0 #991b1b,11px 5px 0 #000,10px 6px 0 #000;"></span></span>
+      <div class="role-info"><span class="role-label">Coder</span><span class="role-slug">coder</span></div>
+    </div>
+
+    <div style="font-size:0.7rem;color:#64748b;margin:10px 0 6px;text-transform:uppercase;letter-spacing:0.05em;">Accessory Picker (editing Reviewer)</div>
+    <div class="acc-picker">
+      <div class="acc-tile"><span class="sb-bobbit" style="filter:saturate(0.4);"><span class="sb-sprite sprite-green"></span></span><span class="acc-tile-label">None</span></div>
+      <div class="acc-tile"><span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc" style="box-shadow:3px -2px 0 #000,5px -2px 0 #000,7px -2px 0 #000,2px -1px 0 #000,3px -1px 0 #fde047,4px -1px 0 #000,5px -1px 0 #fde047,6px -1px 0 #000,7px -1px 0 #fde047,8px -1px 0 #000,1px 0 0 #000,2px 0 0 #fbbf24,3px 0 0 #fde047,4px 0 0 #fbbf24,5px 0 0 #fde047,6px 0 0 #fbbf24,7px 0 0 #fde047,8px 0 0 #fbbf24,9px 0 0 #000,1px 1px 0 #000,2px 1px 0 #b45309,3px 1px 0 #d97706,4px 1px 0 #d97706,5px 1px 0 #d97706,6px 1px 0 #d97706,7px 1px 0 #d97706,8px 1px 0 #b45309,9px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000;"></span></span><span class="acc-tile-label">Crown</span></div>
+      <div class="acc-tile selected"><span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc acc-mag-sb"></span></span><span class="acc-tile-label">Magnifier</span></div>
+      <div class="acc-tile"><span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc" style="box-shadow:1px 1px 0 #000,2px 1px 0 #000,3px 1px 0 #000,4px 1px 0 #000,5px 1px 0 #000,6px 1px 0 #000,7px 1px 0 #000,8px 1px 0 #000,9px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #60a5fa,3px 2px 0 #93c5fd,4px 2px 0 #000,5px 2px 0 #6b7280,6px 2px 0 #000,7px 2px 0 #60a5fa,8px 2px 0 #93c5fd,9px 2px 0 #000,1px 3px 0 #000,2px 3px 0 #3b82f6,3px 3px 0 #60a5fa,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #3b82f6,8px 3px 0 #60a5fa,9px 3px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,0 2px 0 #000,0 3px 0 #6b7280,10px 2px 0 #000,10px 3px 0 #6b7280,11px 2px 0 #000,11px 3px 0 #000;"></span></span><span class="acc-tile-label">Goggles</span></div>
+      <div class="acc-tile"><span class="sb-bobbit"><span class="sb-sprite sprite-green"></span><span class="sb-acc" style="box-shadow:2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,1px 3px 0 #000,2px 3px 0 #e0e7ff,3px 3px 0 #c7d2fe,4px 3px 0 #000,5px 3px 0 #4b5563,6px 3px 0 #000,7px 3px 0 #e0e7ff,8px 3px 0 #c7d2fe,9px 3px 0 #000,1px 4px 0 #000,2px 4px 0 #c7d2fe,3px 4px 0 #e0e7ff,4px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #c7d2fe,8px 4px 0 #e0e7ff,9px 4px 0 #000,2px 5px 0 #000,3px 5px 0 #000,4px 5px 0 #000,7px 5px 0 #000,8px 5px 0 #000,9px 5px 0 #000,0 3px 0 #000,10px 3px 0 #000,0 4px 0 #4b5563,10px 4px 0 #4b5563,11px 4px 0 #000;"></span></span><span class="acc-tile-label">Glasses</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 3. CHAT BLOB ============ -->
+<h2>3. Chat Blob (In-Session)</h2>
+
+<h3>Busy (streaming) — bouncing animation</h3>
+<div class="chat-mock">
+  <div class="blob-row">
+    <div class="blob-cell">
+      <div class="blob-container blob-busy"><div class="blob-sprite sprite-body"></div><div class="blob-accessory acc-mag-blob"></div></div>
+      <div class="blob-cell-label">Default (green)</div>
+    </div>
+    <div class="blob-cell">
+      <div class="blob-container blob-busy" style="filter:hue-rotate(75deg);"><div class="blob-sprite sprite-body"></div><div class="blob-accessory acc-mag-blob" style="filter:hue-rotate(-75deg);"></div></div>
+      <div class="blob-cell-label">Hue +75° (teal)</div>
+    </div>
+    <div class="blob-cell">
+      <div class="blob-container blob-busy" style="filter:hue-rotate(150deg);"><div class="blob-sprite sprite-body"></div><div class="blob-accessory acc-mag-blob" style="filter:hue-rotate(-150deg);"></div></div>
+      <div class="blob-cell-label">Hue +150° (blue)</div>
+    </div>
+    <div class="blob-cell">
+      <div class="blob-container blob-busy" style="filter:hue-rotate(250deg);"><div class="blob-sprite sprite-body"></div><div class="blob-accessory acc-mag-blob" style="filter:hue-rotate(-250deg);"></div></div>
+      <div class="blob-cell-label">Hue +250° (pink)</div>
+    </div>
+  </div>
+</div>
+
+<h3>Idle — static with gentle breathing</h3>
+<div class="chat-mock">
+  <div class="blob-row">
+    <div class="blob-cell">
+      <div class="blob-container blob-idle"><div class="blob-sprite sprite-body"></div><div class="blob-accessory acc-mag-blob"></div></div>
+      <div class="blob-cell-label">Default (green)</div>
+    </div>
+    <div class="blob-cell">
+      <div class="blob-container blob-idle" style="filter:hue-rotate(75deg);"><div class="blob-sprite sprite-body"></div><div class="blob-accessory acc-mag-blob" style="filter:hue-rotate(-75deg);"></div></div>
+      <div class="blob-cell-label">Hue +75° (teal)</div>
+    </div>
+    <div class="blob-cell">
+      <div class="blob-container blob-idle" style="filter:hue-rotate(150deg);"><div class="blob-sprite sprite-body"></div><div class="blob-accessory acc-mag-blob" style="filter:hue-rotate(-150deg);"></div></div>
+      <div class="blob-cell-label">Hue +150° (blue)</div>
+    </div>
+    <div class="blob-cell">
+      <div class="blob-container blob-idle" style="filter:hue-rotate(250deg);"><div class="blob-sprite sprite-body"></div><div class="blob-accessory acc-mag-blob" style="filter:hue-rotate(-250deg);"></div></div>
+      <div class="blob-cell-label">Hue +250° (pink)</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+document.querySelectorAll('[data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-theme]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.body.classList.toggle('theme-light', btn.dataset.theme === 'light');
+  });
+});
+</script>
+</body>
+</html>
