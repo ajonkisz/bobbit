@@ -143,15 +143,17 @@ function makeBlob(accId, stateClass, hue) {
   </div>`;
 }
 
-function renderSidebar(acc, hue) {
+function renderSidebar(acc) {
   const sidebarEl = document.getElementById('sidebar-section');
-  // Build sidebar rows for each accessory using the real statusBobbit function
-  const rows = ACC_IDS.map(accId => {
+  // Use unique fake session IDs so each bobbit gets a different hue via sessionHueRotation
+  const fakeIds = ACC_IDS.map((_, i) => `preview-session-${i}-${i * 37}`);
+
+  const streamingRows = ACC_IDS.map((accId, i) => {
     const label = ACCESSORIES[accId].label || accId;
     const isActive = accId === acc;
-    const bobbit = statusBobbit('streaming', false, undefined, isActive, false, false, false, accId);
+    const bobbit = statusBobbit('streaming', false, fakeIds[i], isActive, false, false, false, accId);
     return html`
-      <div class="sidebar-row ${isActive ? 'active' : ''}" style="${hue ? `filter:hue-rotate(${hue}deg)` : ''}">
+      <div class="sidebar-row ${isActive ? 'active' : ''}">
         ${bobbit}
         <div style="min-width:0;flex:1;">
           <div class="sidebar-title">${label} Session</div>
@@ -161,11 +163,11 @@ function renderSidebar(acc, hue) {
     `;
   });
 
-  const idleRows = ACC_IDS.map(accId => {
+  const idleRows = ACC_IDS.map((accId, i) => {
     const label = ACCESSORIES[accId].label || accId;
-    const bobbit = statusBobbit('idle', false, undefined, false, false, false, false, accId);
+    const bobbit = statusBobbit('idle', false, fakeIds[i], false, false, false, false, accId);
     return html`
-      <div class="sidebar-row" style="${hue ? `filter:hue-rotate(${hue}deg)` : ''}">
+      <div class="sidebar-row">
         ${bobbit}
         <div style="min-width:0;flex:1;">
           <div class="sidebar-title">${label} Session</div>
@@ -179,7 +181,7 @@ function renderSidebar(acc, hue) {
     <div style="display:flex;gap:1rem;flex-wrap:wrap;">
       <div>
         <div style="font-size:0.7rem;color:#64748b;margin-bottom:0.5rem;">Streaming (busy)</div>
-        <div class="sidebar-mock">${rows}</div>
+        <div class="sidebar-mock">${streamingRows}</div>
       </div>
       <div>
         <div style="font-size:0.7rem;color:#64748b;margin-bottom:0.5rem;">Idle</div>
@@ -194,8 +196,8 @@ function renderAll() {
   const hue = parseInt(document.getElementById('hue-slider').value);
   const stateVal = document.getElementById('state-select').value;
 
-  // Sidebar
-  renderSidebar(acc, hue);
+  // Sidebar (uses its own per-session hue, not the slider)
+  renderSidebar(acc);
 
   // All accessories grid (blob)
   document.getElementById('all-grid').innerHTML = ACC_IDS.map(a => `
