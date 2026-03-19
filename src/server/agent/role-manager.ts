@@ -12,7 +12,6 @@ const AVAILABLE_TOOLS = [
 	"web_search",
 	"web_fetch",
 	"delegate",
-	"workflow",
 ];
 
 export class RoleManager {

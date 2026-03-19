@@ -1,5 +1,5 @@
 /**
- * Fun name generator for swarm agents.
+ * Fun name generator for team agents.
  *
  * Picks a random name from a pre-generated pool of ~1700 short,
  * funny names stored in data/swarm-names.json. No API calls needed.
@@ -32,11 +32,11 @@ const recentlyUsed = new Set<string>();
 const MAX_RECENT = Math.min(Math.floor(NAME_POOL.length / 2), 500);
 
 /**
- * Pick a random fun name for a swarm agent.
+ * Pick a random fun name for a team agent.
  * Role parameter is accepted for API compatibility but ignored —
  * all names are role-agnostic.
  */
-export async function generateSwarmName(_role?: string): Promise<string> {
+export async function generateTeamName(_role?: string): Promise<string> {
 	return pickName();
 }
 

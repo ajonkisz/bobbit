@@ -246,7 +246,7 @@ export class AgentInterface extends LitElement {
 				return;
 			}
 			if ((ev as any).type === "tool_execution_update") {
-				// Partial results from long-running tools (delegate, workflow run_phase)
+				// Partial results from long-running tools (delegate, skill invocations)
 				// Force streaming container to re-render with updated delegate cards
 				this.requestUpdate();
 				if (this._streamingContainer) {
