@@ -56,7 +56,10 @@ function renderMobileLanding() {
 						@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}>
 						${icon(Users, "xs")} Roles
 					</button>
-
+					<button class="text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center gap-1"
+						@click=${() => showGoalDialog()}>
+						${icon(Crosshair, "xs")} New Goal
+					</button>
 				</div>
 				${state.sessionsLoading
 					? html`<div class="text-center py-12 text-muted-foreground text-xs">Loading…</div>`
@@ -539,16 +542,7 @@ export function doRenderApp(): void {
 							${bobbitIcon}
 							<span class="text-base font-semibold text-foreground">Bobbit</span>
 						</div>
-						<div class="flex items-center gap-0.5">
-							<button
-								class="inline-flex items-center gap-1 p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-								@click=${() => showGoalDialog()}
-								title="New goal"
-							>
-								${icon(Crosshair, "sm")}
-								<span class="text-xs">New Goal</span>
-							</button>
-						</div>
+
 					</div>
 					`}
 					<div class="flex-1 flex items-center justify-between min-w-0">
