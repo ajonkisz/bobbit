@@ -24,9 +24,9 @@ function idleBlob(accId: string, size = 40): TemplateResult {
 		? `bobbit-${accId === "crown" ? "crowned" : accId}`
 		: "";
 	const cls = `bobbit-blob bobbit-blob--idle bobbit-blob--inline ${accClass}`.trim();
-	// Blob's sprite margin-box is 37×37px. We render at natural size in a 37×37
-	// viewport then CSS-scale the viewport to the desired display size.
-	const naturalSize = 37;
+	// The sprite margin-box is 37×37px but accessories overflow it.
+	// Use a larger viewport to capture everything, then scale down.
+	const naturalSize = 60;
 	const s = size / naturalSize;
 	return html`
 		<div style="width:${size}px;height:${size}px;flex-shrink:0;">
