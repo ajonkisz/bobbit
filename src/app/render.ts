@@ -56,10 +56,7 @@ function renderMobileLanding() {
 						@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}>
 						${icon(Users, "xs")} Roles
 					</button>
-					<button class="text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center gap-1"
-						@click=${() => showGoalDialog()}>
-						${icon(Crosshair, "xs")} New Goal
-					</button>
+
 				</div>
 				${state.sessionsLoading
 					? html`<div class="text-center py-12 text-muted-foreground text-xs">Loading…</div>`

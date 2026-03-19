@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Crosshair, PanelLeftClose, PanelLeftOpen, Plus, Users } from "lucide";
+import { PanelLeftClose, PanelLeftOpen, Plus, Users } from "lucide";
 import {
 	state,
 	renderApp,
@@ -15,7 +15,6 @@ import {
 	type GoalState,
 } from "./state.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
-import { showGoalDialog } from "./dialogs.js";
 import { refreshSessions } from "./api.js";
 import { statusBobbit, sessionAcronym } from "./session-colors.js";
 import { renderGoalGroup, renderSessionRow, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
@@ -59,14 +58,7 @@ export function renderSidebar() {
 					${icon(Users, "sm")}
 					<span>Roles</span>
 				</button>
-				<button
-					class="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
-					@click=${() => showGoalDialog()}
-					title="New goal"
-				>
-					${icon(Crosshair, "sm")}
-					<span>New Goal</span>
-				</button>
+
 			</div>
 			<div class="flex-1 overflow-y-auto flex flex-col gap-0.5 py-2 px-0.5">
 				${state.sessionsLoading
