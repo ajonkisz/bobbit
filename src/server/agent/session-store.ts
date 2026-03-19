@@ -18,10 +18,10 @@ export interface PersistedSession {
 	wasStreaming?: boolean;
 	/** If this session is a delegate, the parent session ID */
 	delegateOf?: string;
-	/** Role in a swarm goal (e.g., 'coder', 'reviewer', 'tester') */
+	/** Role in a team goal (e.g., 'coder', 'reviewer', 'tester') */
 	role?: string;
-	/** The swarm goal this agent belongs to */
-	swarmGoalId?: string;
+	/** The team goal this agent belongs to */
+	teamGoalId?: string;
 	/** Path to the git worktree for this session */
 	worktreePath?: string;
 	/** Whether this is a goal-creation assistant session */
@@ -57,6 +57,11 @@ export class SessionStore {
 				if (Array.isArray(data)) {
 					for (const s of data) {
 						if (s.id && s.agentSessionFile) {
+							// Migrate legacy 'swarmGoalId' field to 'teamGoalId'
+							if (s.swarmGoalId !== undefined && s.teamGoalId === undefined) {
+								s.teamGoalId = s.swarmGoalId;
+								delete s.swarmGoalId;
+							}
 							this.sessions.set(s.id, s);
 						}
 					}
@@ -98,7 +103,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "swarmGoalId" | "worktreePath" | "goalAssistant" | "roleAssistant" | "taskId" | "accessory" | "messageQueue">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "goalAssistant" | "roleAssistant" | "taskId" | "accessory" | "messageQueue">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);
