@@ -1,0 +1,44 @@
+import { gatewayFetch } from "./api.js";
+import { state, renderApp } from "./state.js";
+
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let lastMtime = 0;
+
+/** Start polling ~/.pi/preview.html for changes. Opens the preview panel. */
+export function startPreviewPolling(): void {
+	if (pollTimer) return;
+	state.previewPanelVisible = true;
+	state.previewPanelTab = "preview";
+	lastMtime = 0;
+	pollNow();
+	pollTimer = setInterval(pollNow, 1000);
+	renderApp();
+}
+
+/** Stop polling and close the preview panel. */
+export function stopPreviewPolling(): void {
+	if (pollTimer) {
+		clearInterval(pollTimer);
+		pollTimer = null;
+	}
+	lastMtime = 0;
+}
+
+async function pollNow(): Promise<void> {
+	if (!state.previewPanelVisible) {
+		stopPreviewPolling();
+		return;
+	}
+	try {
+		const res = await gatewayFetch("/api/preview");
+		if (!res.ok) return;
+		const data = await res.json();
+		if (data.mtime && data.mtime !== lastMtime && data.html) {
+			lastMtime = data.mtime;
+			state.previewPanelHtml = data.html;
+			renderApp();
+		}
+	} catch {
+		// ignore fetch errors
+	}
+}
