@@ -11,11 +11,12 @@ import { RateLimiter } from "./auth/rate-limit.js";
 import { validateToken } from "./auth/token.js";
 import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
-import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
-import { SwarmManager } from "./agent/swarm-manager.js";
+import { exportSkillDefinitions, listSkills } from "./skills/index.js";
+import { TeamManager } from "./agent/team-manager.js";
 import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
 import type { TaskType, TaskState } from "./agent/task-store.js";
+import { GoalArtifactStore, getDefaultRequirements, type ArtifactType } from "./agent/goal-artifact-store.js";
 
 const VALID_TASK_TYPES = new Set<string>(["architecture", "design-review", "mock-generation", "tdd-tests", "implementation", "code-review", "security-review", "documentation", "testing", "bug-fix", "refactor", "custom"]);
 const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
@@ -38,8 +39,8 @@ export interface GatewayConfig {
 }
 
 export function createGateway(config: GatewayConfig) {
-	// Export workflow definitions so agent-side extensions can discover them
-	exportDefinitions();
+	// Export skill definitions so agent-side extensions can discover them
+	exportSkillDefinitions();
 
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
@@ -56,7 +57,8 @@ export function createGateway(config: GatewayConfig) {
 	const colorStore = new ColorStore();
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
-	const swarmManager = new SwarmManager(sessionManager, {
+	const goalArtifactStore = new GoalArtifactStore();
+	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
 		roleStore,
@@ -100,7 +102,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, swarmManager, roleManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, goalArtifactStore);
 			return;
 		}
 
@@ -173,8 +175,9 @@ async function handleApiRoute(
 	sessionManager: SessionManager,
 	config: GatewayConfig,
 	colorStore: ColorStore,
-	swarmManager: SwarmManager,
+	teamManager: TeamManager,
 	roleManager: RoleManager,
+	goalArtifactStore: GoalArtifactStore,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -237,7 +240,7 @@ async function handleApiRoute(
 			goalAssistant: session.goalAssistant,
 			delegateOf: session.delegateOf,
 			role: session.role,
-			swarmGoalId: session.swarmGoalId,
+			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
 			colorIndex: colorStore.get(session.id),
@@ -321,13 +324,13 @@ async function handleApiRoute(
 		const title = body?.title;
 		const cwd = body?.cwd || config.defaultCwd;
 		const spec = body?.spec || "";
-		const swarm = body?.swarm === true;
+		const team = body?.team === true || body?.swarm === true; // Accept legacy 'swarm' field
 		const worktree = body?.worktree === true;
 		if (!title || typeof title !== "string") {
 			json({ error: "Missing title" }, 400);
 			return;
 		}
-		const goal = sessionManager.goalManager.createGoal(title, cwd, { spec, swarm, worktree });
+		const goal = sessionManager.goalManager.createGoal(title, cwd, { spec, team, worktree });
 		json(goal, 201);
 		return;
 	}
@@ -352,7 +355,7 @@ async function handleApiRoute(
 				cwd: body.cwd,
 				state: body.state,
 				spec: body.spec,
-				swarm: body.swarm,
+				team: body.team ?? body.swarm, // Accept legacy 'swarm' field
 				repoPath: body.repoPath,
 				branch: body.branch,
 			});
@@ -466,6 +469,24 @@ async function handleApiRoute(
 			json({ error: `Invalid task type: ${type}` }, 400);
 			return;
 		}
+
+		// Enforce artifact requirements
+		const requirements = getDefaultRequirements();
+		const skipTypes = goal.skipArtifactRequirements ?? [];
+		const existingArtifacts = goalArtifactStore.getByGoalId(goalId);
+		const existingTypes = new Set(existingArtifacts.map((a) => a.type));
+		const missingArtifacts: { type: string; description: string }[] = [];
+		for (const req2 of requirements) {
+			if (skipTypes.includes(req2.artifactType)) continue;
+			if (req2.blocksTaskTypes.includes(type) && !existingTypes.has(req2.artifactType)) {
+				missingArtifacts.push({ type: req2.artifactType, description: req2.description });
+			}
+		}
+		if (missingArtifacts.length > 0) {
+			json({ error: "Missing required artifacts", missingArtifacts }, 409);
+			return;
+		}
+
 		try {
 			const task = sessionManager.taskManager.createTask(goalId, title, type as TaskType, {
 				parentTaskId: body.parentTaskId,
@@ -476,6 +497,75 @@ async function handleApiRoute(
 		} catch (err: any) {
 			json({ error: err.message }, 400);
 		}
+		return;
+	}
+
+	// GET /api/goals/:goalId/artifacts — list artifacts for a goal
+	const goalArtifactsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/artifacts$/);
+	if (goalArtifactsMatch && req.method === "GET") {
+		const artifacts = goalArtifactStore.getByGoalId(goalArtifactsMatch[1]);
+		json({ artifacts });
+		return;
+	}
+
+	// POST /api/goals/:goalId/artifacts — create an artifact
+	if (goalArtifactsMatch && req.method === "POST") {
+		const goalId = goalArtifactsMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		const body = await readBody(req);
+		if (!body?.name || typeof body.name !== "string") {
+			json({ error: "Missing name" }, 400); return;
+		}
+		if (!body?.type || typeof body.type !== "string") {
+			json({ error: "Missing type" }, 400); return;
+		}
+		if (!body?.content || typeof body.content !== "string") {
+			json({ error: "Missing content" }, 400); return;
+		}
+		if (!body?.producedBy || typeof body.producedBy !== "string") {
+			json({ error: "Missing producedBy" }, 400); return;
+		}
+		const artifact = goalArtifactStore.create({
+			goalId,
+			name: body.name,
+			type: body.type as ArtifactType,
+			content: body.content,
+			producedBy: body.producedBy,
+			skillId: body.skillId,
+		});
+		json(artifact, 201);
+		return;
+	}
+
+	// GET /api/goals/:goalId/artifacts/:artifactId — get a specific artifact
+	const goalArtifactMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/artifacts\/([^/]+)$/);
+	if (goalArtifactMatch && req.method === "GET") {
+		const artifact = goalArtifactStore.get(goalArtifactMatch[2]);
+		if (!artifact || artifact.goalId !== goalArtifactMatch[1]) {
+			json({ error: "Artifact not found" }, 404); return;
+		}
+		json(artifact);
+		return;
+	}
+
+	// PUT /api/goals/:goalId/artifacts/:artifactId — revise an artifact
+	if (goalArtifactMatch && req.method === "PUT") {
+		const artifact = goalArtifactStore.get(goalArtifactMatch[2]);
+		if (!artifact || artifact.goalId !== goalArtifactMatch[1]) {
+			json({ error: "Artifact not found" }, 404); return;
+		}
+		const body = await readBody(req);
+		if (!body) { json({ error: "Missing body" }, 400); return; }
+		const updated = goalArtifactStore.update(goalArtifactMatch[2], {
+			name: body.name,
+			type: body.type,
+			content: body.content,
+			skillId: body.skillId,
+		});
+		if (!updated) { json({ error: "Artifact not found" }, 404); return; }
+		json(updated);
 		return;
 	}
 
@@ -508,9 +598,9 @@ async function handleApiRoute(
 				});
 				if (!ok) { json({ error: "Task not found" }, 404); return; }
 
-				// Notify team lead when state transitions to terminal via PUT
-				if (body.state && body.state !== prevState && (body.state === "complete" || body.state === "skipped") && task?.goalId) {
-					swarmManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, body.state);
+				// Notify team lead when state transitions to terminal or blocked via PUT
+				if (body.state && body.state !== prevState && (body.state === "complete" || body.state === "skipped" || body.state === "blocked") && task?.goalId) {
+					teamManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, body.state);
 				}
 
 				json({ ok: true });
@@ -567,9 +657,9 @@ async function handleApiRoute(
 			const ok = sessionManager.taskManager.transitionTask(taskId, state as TaskState);
 			if (!ok) { json({ error: "Task not found" }, 400); return; }
 
-			// Notify team lead when a task reaches a terminal state
-			if ((state === "complete" || state === "skipped") && task?.goalId) {
-				swarmManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, state);
+			// Notify team lead when a task reaches a terminal or blocked state
+			if ((state === "complete" || state === "skipped" || state === "blocked") && task?.goalId) {
+				teamManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, state);
 			}
 
 			json({ ok: true });
@@ -579,14 +669,15 @@ async function handleApiRoute(
 		return;
 	}
 
-	// ── Swarm endpoints ────────────────────────────────────────────
+	// ── Team endpoints ─────────────────────────────────────────────
+	// Routes accept both /team/ and legacy /swarm/ paths
 
-	// POST /api/goals/:id/swarm/start — start a swarm for a goal
-	const swarmStartMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/start$/);
-	if (swarmStartMatch && req.method === "POST") {
-		const goalId = swarmStartMatch[1];
+	// POST /api/goals/:id/team/start — start a team for a goal
+	const teamStartMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/start$/);
+	if (teamStartMatch && req.method === "POST") {
+		const goalId = teamStartMatch[1];
 		try {
-			const session = await swarmManager.startSwarm(goalId);
+			const session = await teamManager.startTeam(goalId);
 			json({ sessionId: session.id, title: session.title }, 201);
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -594,17 +685,17 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/spawn — spawn a role agent
-	const swarmSpawnMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/spawn$/);
-	if (swarmSpawnMatch && req.method === "POST") {
-		const goalId = swarmSpawnMatch[1];
+	// POST /api/goals/:id/team/spawn — spawn a role agent
+	const teamSpawnMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/spawn$/);
+	if (teamSpawnMatch && req.method === "POST") {
+		const goalId = teamSpawnMatch[1];
 		const body = await readBody(req);
 		if (!body?.role || !body?.task) {
 			json({ error: "Missing role or task" }, 400);
 			return;
 		}
 		try {
-			const result = await swarmManager.spawnRole(goalId, body.role, body.task);
+			const result = await teamManager.spawnRole(goalId, body.role, body.task);
 			json(result, 201);
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -612,16 +703,16 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/dismiss — dismiss a role agent
-	const swarmDismissMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/dismiss$/);
-	if (swarmDismissMatch && req.method === "POST") {
+	// POST /api/goals/:id/team/dismiss — dismiss a role agent
+	const teamDismissMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/dismiss$/);
+	if (teamDismissMatch && req.method === "POST") {
 		const body = await readBody(req);
 		if (!body?.sessionId) {
 			json({ error: "Missing sessionId" }, 400);
 			return;
 		}
 		try {
-			const ok = await swarmManager.dismissRole(body.sessionId);
+			const ok = await teamManager.dismissRole(body.sessionId);
 			json({ ok });
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -654,33 +745,33 @@ async function handleApiRoute(
 		return;
 	}
 
-	// GET /api/goals/:id/swarm — get swarm state
-	const swarmStateMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm$/);
-	if (swarmStateMatch && req.method === "GET") {
-		const goalId = swarmStateMatch[1];
-		const state = swarmManager.getSwarmState(goalId);
+	// GET /api/goals/:id/team — get team state
+	const teamStateMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)$/);
+	if (teamStateMatch && req.method === "GET") {
+		const goalId = teamStateMatch[1];
+		const state = teamManager.getTeamState(goalId);
 		if (!state) {
-			json({ error: "No active swarm for this goal" }, 404);
+			json({ error: "No active team for this goal" }, 404);
 			return;
 		}
 		json(state);
 		return;
 	}
 
-	// GET /api/goals/:id/swarm/agents — list agents for a swarm goal
-	const swarmAgentsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/agents$/);
-	if (swarmAgentsMatch && req.method === "GET") {
-		const goalId = swarmAgentsMatch[1];
-		json({ agents: swarmManager.listAgents(goalId) });
+	// GET /api/goals/:id/team/agents — list agents for a team goal
+	const teamAgentsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/agents$/);
+	if (teamAgentsMatch && req.method === "GET") {
+		const goalId = teamAgentsMatch[1];
+		json({ agents: teamManager.listAgents(goalId) });
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/complete — complete a swarm (dismiss agents, keep team lead)
-	const swarmCompleteMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/complete$/);
-	if (swarmCompleteMatch && req.method === "POST") {
-		const goalId = swarmCompleteMatch[1];
+	// POST /api/goals/:id/team/complete — complete a team (dismiss agents, keep team lead)
+	const teamCompleteMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/complete$/);
+	if (teamCompleteMatch && req.method === "POST") {
+		const goalId = teamCompleteMatch[1];
 		try {
-			await swarmManager.completeSwarm(goalId);
+			await teamManager.completeTeam(goalId);
 			json({ ok: true });
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -688,12 +779,12 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/teardown — fully tear down a swarm (dismiss agents + terminate team lead)
-	const swarmTeardownMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/teardown$/);
-	if (swarmTeardownMatch && req.method === "POST") {
-		const goalId = swarmTeardownMatch[1];
+	// POST /api/goals/:id/team/teardown — fully tear down a team (dismiss agents + terminate team lead)
+	const teamTeardownMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/teardown$/);
+	if (teamTeardownMatch && req.method === "POST") {
+		const goalId = teamTeardownMatch[1];
 		try {
-			await swarmManager.teardownSwarm(goalId);
+			await teamManager.teardownTeam(goalId);
 			json({ ok: true });
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -1007,90 +1098,9 @@ async function handleApiRoute(
 		return;
 	}
 
-	// GET /api/workflows — list available workflow definitions
-	if (url.pathname === "/api/workflows" && req.method === "GET") {
-		json({ workflows: listWorkflows().map((w) => ({ id: w.id, name: w.name, description: w.description, phaseCount: w.phases.length })) });
-		return;
-	}
-
-	// GET /api/sessions/:id/workflow — get workflow state for a session
-	const workflowStateMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow$/);
-	if (workflowStateMatch && req.method === "GET") {
-		const id = workflowStateMatch[1];
-		const session = sessionManager.getSession(id);
-		const runner = (session as any)?._workflowRunner as InstanceType<typeof WorkflowRunner> | undefined
-			?? WorkflowRunner.restore(id);
-		if (!runner) {
-			json({ error: "No workflow for this session" }, 404);
-			return;
-		}
-		json(runner.getState());
-		return;
-	}
-
-	// The server is the single source of truth for report rendering.
-	// The agent extension writes state + artifacts; the server renders the report.
-	const workflowReportMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/report$/);
-	if (workflowReportMatch && req.method === "GET") {
-		const id = workflowReportMatch[1];
-
-		const resolvedReportId = resolveWorkflowSessionId(id, sessionManager);
-
-		// Try to load workflow state and regenerate the report from it
-		const runner = (sessionManager.getSession(id) as any)?._workflowRunner as InstanceType<typeof WorkflowRunner> | undefined
-			?? WorkflowRunner.restore(id)
-			?? WorkflowRunner.restore(resolvedReportId);
-		if (runner) {
-			const state = runner.getState();
-			const workflow = getWorkflow(state.workflowId);
-			if (workflow) {
-				try {
-					const html = generateReport(workflow, state);
-					res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-					res.end(html);
-					return;
-				} catch (err) {
-					console.error("[report] Failed to generate report:", err);
-					json({ error: `Report generation failed: ${err instanceof Error ? err.message : String(err)}` }, 500);
-					return;
-				}
-			}
-		}
-
-		// Fallback: serve pre-generated report if it exists on disk
-		const html = readArtifact(resolvedReportId, "report.html");
-		if (!html) {
-			json({ error: "Report not found" }, 404);
-			return;
-		}
-		res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-		res.end(html);
-		return;
-	}
-
-	// GET /api/sessions/:id/workflow/artifacts — list artifacts
-	const artifactListMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/artifacts$/);
-	if (artifactListMatch && req.method === "GET") {
-		const id = artifactListMatch[1];
-		const resolvedId = resolveWorkflowSessionId(id, sessionManager);
-		json({ artifacts: listArtifactFiles(resolvedId) });
-		return;
-	}
-
-	// GET /api/sessions/:id/workflow/artifacts/:filename — serve an artifact
-	const artifactMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/artifacts\/([^/]+)$/);
-	if (artifactMatch && req.method === "GET") {
-		const [, id, filename] = artifactMatch;
-		const resolvedId = resolveWorkflowSessionId(id, sessionManager);
-		const content = readArtifact(resolvedId, decodeURIComponent(filename));
-		if (!content) {
-			json({ error: "Artifact not found" }, 404);
-			return;
-		}
-		const ext = filename.split(".").pop()?.toLowerCase() || "";
-		const mimeType = MIME_TYPES[`.${ext}`] || "application/octet-stream";
-		res.writeHead(200, { "Content-Type": mimeType });
-		res.end(content);
+	// GET /api/skills — list available skill definitions
+	if (url.pathname === "/api/skills" && req.method === "GET") {
+		json({ skills: listSkills().map((s) => ({ id: s.id, name: s.name, description: s.description })) });
 		return;
 	}
 
@@ -1143,94 +1153,6 @@ async function handleApiRoute(
 	}
 
 	json({ error: "Not found" }, 404);
-}
-
-/**
- * Resolve the workflow session ID used for artifact storage.
- *
- * The gateway uses UUIDs for session IDs, but the workflow extension stores
- * artifacts under the agent's session directory name (extracted from the
- * agent session file path, e.g., "--C--Users-jsubr-w-bobbit--").
- *
- * Resolution order:
- *   1. Gateway session ID directly
- *   2. Agent session directory name (from persisted session data)
- *   3. Scan all workflow-artifacts dirs for matching workflow state
- */
-function resolveWorkflowSessionId(gatewaySessionId: string, sessionManager: SessionManager): string {
-	// 1. Check if artifacts exist directly under the gateway session ID
-	const directFiles = listArtifactFiles(gatewaySessionId);
-	if (directFiles.length > 0) return gatewaySessionId;
-
-	// 2. Extract agent session directory name from persisted session data
-	const agentDirName = getAgentSessionDirName(gatewaySessionId, sessionManager);
-	if (agentDirName) {
-		const agentFiles = listArtifactFiles(agentDirName);
-		if (agentFiles.length > 0) return agentDirName;
-	}
-
-	// 3. Scan workflow-state files for one referencing this gateway session or agent dir
-	const stateDir = path.join(os.homedir(), ".pi", "workflow-state");
-	try {
-		for (const file of fs.readdirSync(stateDir)) {
-			if (!file.endsWith(".json")) continue;
-			const candidateId = file.replace(/\.json$/, "");
-			const candidateFiles = listArtifactFiles(candidateId);
-			if (candidateFiles.length > 0) {
-				// Check if this state file's sessionId matches something we know
-				if (agentDirName && candidateId === agentDirName) return candidateId;
-				// Also check if the state file itself references our gateway or agent dir
-				try {
-					const stateData = JSON.parse(fs.readFileSync(path.join(stateDir, file), "utf-8"));
-					if (stateData.sessionId === gatewaySessionId || stateData.sessionId === agentDirName) {
-						return stateData.sessionId;
-					}
-				} catch { /* ignore */ }
-			}
-		}
-	} catch { /* ignore */ }
-
-	return gatewaySessionId;
-}
-
-/** Extract the agent session directory name from persisted gateway session data */
-function getAgentSessionDirName(gatewaySessionId: string, sessionManager: SessionManager): string | null {
-	// Try live session first
-	const session = sessionManager.getSession(gatewaySessionId);
-	if (session) {
-		try {
-			// RPC bridge state may have the session file
-			const rpc = session.rpcClient as any;
-			const sf = rpc._lastSessionFile ?? rpc.sessionFile;
-			if (sf) {
-				const dir = extractSessionDirFromPath(sf);
-				if (dir) return dir;
-			}
-		} catch { /* ignore */ }
-	}
-
-	// Try persisted session store
-	try {
-		const storeFile = path.join(os.homedir(), ".pi", "gateway-sessions.json");
-		const data = JSON.parse(fs.readFileSync(storeFile, "utf-8"));
-		const sessions = Array.isArray(data) ? data : [];
-		for (const s of sessions) {
-			if (s.id === gatewaySessionId && s.agentSessionFile) {
-				const dir = extractSessionDirFromPath(s.agentSessionFile);
-				if (dir) return dir;
-			}
-		}
-	} catch { /* ignore */ }
-
-	return null;
-}
-
-/** Extract session directory name from a session file path like ".../sessions/dirname/file.jsonl" */
-function extractSessionDirFromPath(sessionFilePath: string): string | null {
-	const parts = String(sessionFilePath).replace(/\\/g, "/").split("/");
-	const idx = parts.indexOf("sessions");
-	if (idx >= 0 && idx + 1 < parts.length) return parts[idx + 1];
-	return null;
 }
 
 function readBody(req: http.IncomingMessage): Promise<any> {

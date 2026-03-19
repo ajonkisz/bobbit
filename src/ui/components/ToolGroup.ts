@@ -7,7 +7,6 @@ import {
 	Bot,
 	FileText,
 	FileCode2,
-	ListChecks,
 	SquareTerminal,
 	ChevronRight,
 	ChevronsUpDown,
@@ -25,7 +24,6 @@ const TOOL_ICONS: Record<string, any> = {
 	ls: ChevronRight,
 	find: FileText,
 	grep: FileText,
-	workflow: ListChecks,
 	delegate: Bot,
 };
 
@@ -38,7 +36,6 @@ const TOOL_LABELS: Record<string, { verb: string; noun: string; nounPlural: stri
 	ls: { verb: "Listed", noun: "directory", nounPlural: "directories" },
 	find: { verb: "Searched", noun: "pattern", nounPlural: "patterns" },
 	grep: { verb: "Searched", noun: "pattern", nounPlural: "patterns" },
-	workflow: { verb: "Updated", noun: "workflow step", nounPlural: "workflow steps" },
 	delegate: { verb: "Delegated", noun: "task", nounPlural: "tasks" },
 };
 
@@ -56,12 +53,6 @@ function summarizeCall(toolName: string, args: Record<string, any>): string {
 			return args?.pattern ? `"${args.pattern}"` : "pattern";
 		case "find":
 			return args?.pattern || args?.path || "files";
-		case "workflow": {
-			const action = args?.action || "unknown";
-			if (action === "set_context" && args?.key) return `${args.key} = ${args.value || ""}`;
-			if (action === "collect_artifact" && args?.name) return `artifact: ${args.name}`;
-			return action;
-		}
 		case "delegate": {
 			const instr = args?.instructions || "";
 			return truncate(instr.split("\n")[0], 80);

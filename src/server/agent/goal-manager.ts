@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { GoalStore, type GoalState, type PersistedGoal } from "./goal-store.js";
-import { createWorktree, cleanupWorktree } from "../workflows/git.js";
+import { createWorktree, cleanupWorktree } from "../skills/git.js";
 
 /**
  * Sanitize a goal title into a valid git branch name.
@@ -33,8 +33,8 @@ function getRepoRoot(cwd: string): string {
 export class GoalManager {
 	private store = new GoalStore();
 
-	createGoal(title: string, cwd: string, opts?: { spec?: string; swarm?: boolean; worktree?: boolean }): PersistedGoal {
-		const { spec = "", swarm = false, worktree = false } = opts ?? {};
+	createGoal(title: string, cwd: string, opts?: { spec?: string; team?: boolean; worktree?: boolean }): PersistedGoal {
+		const { spec = "", team = false, worktree = false } = opts ?? {};
 		const now = Date.now();
 		const id = randomUUID();
 
@@ -43,8 +43,8 @@ export class GoalManager {
 		let repoPath: string | undefined;
 		let goalCwd = cwd;
 
-		// Create a git worktree if the cwd is a git repo (only for swarm goals)
-		if ((swarm || worktree) && isGitRepo(cwd)) {
+		// Create a git worktree if the cwd is a git repo (only for team goals)
+		if ((team || worktree) && isGitRepo(cwd)) {
 			repoPath = getRepoRoot(cwd);
 			branch = `goal/${toBranchName(title)}-${id.slice(0, 8)}`;
 			try {
@@ -72,7 +72,7 @@ export class GoalManager {
 			worktreePath,
 			branch,
 			repoPath,
-			swarm,
+			team,
 		};
 		this.store.put(goal);
 		return goal;
@@ -86,14 +86,14 @@ export class GoalManager {
 		return this.store.getAll();
 	}
 
-	updateGoal(id: string, updates: { title?: string; cwd?: string; state?: GoalState; spec?: string; swarm?: boolean; repoPath?: string; branch?: string }): boolean {
+	updateGoal(id: string, updates: { title?: string; cwd?: string; state?: GoalState; spec?: string; team?: boolean; repoPath?: string; branch?: string }): boolean {
 		return this.store.update(id, updates);
 	}
 
 	deleteGoal(id: string): boolean {
 		const goal = this.store.get(id);
-		if (goal?.swarm) {
-			console.warn(`[goal-manager] Deleting swarm goal "${goal.title}" — ensure no active swarm sessions remain (cannot check from GoalManager)`);
+		if (goal?.team) {
+			console.warn(`[goal-manager] Deleting team goal "${goal.title}" — ensure no active team sessions remain (cannot check from GoalManager)`);
 		}
 		if (goal?.worktreePath && goal?.repoPath) {
 			try {

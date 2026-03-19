@@ -2,7 +2,7 @@
  * Shared delegate card rendering components.
  *
  * Used by both DelegateRenderer (standalone delegate tool) and
- * WorkflowRenderer (run_phase action that spawns sub-agents).
+ * DelegateRenderer (for delegate actions that spawn sub-agents).
  */
 
 import { icon } from "@mariozechner/mini-lit";

@@ -28,22 +28,7 @@ export type ClientMessage =
 	| { type: "set_title"; title: string }
 	| { type: "generate_title" }
 	| { type: "ping" }
-	| { type: "start_workflow"; workflowId: string }
-	| { type: "workflow_advance" }
-	| { type: "workflow_reset"; phaseId: string; context?: string }
-	| { type: "workflow_collect_artifact"; name: string; content: string; mimeType?: string }
-	| { type: "workflow_set_context"; key: string; value: string }
-	| { type: "workflow_complete" }
-	| { type: "workflow_fail"; reason?: string }
-	| { type: "workflow_cancel" }
-	| { type: "workflow_status" }
-	| { type: "workflow_batch"; operations: Array<
-		| { op: "collect_artifact"; name: string; content: string; mimeType?: string }
-		| { op: "set_context"; key: string; value: string }
-		| { op: "advance" }
-		| { op: "complete" }
-	> }
-	| { type: "workflow_synthesise_review" }
+	| { type: "invoke_skill"; skillId: string; context?: Record<string, string> }
 	| { type: "task_create"; goalId: string; title: string; taskType: string; parentTaskId?: string; spec?: string; dependsOn?: string[] }
 	| { type: "task_update"; taskId: string; updates: { title?: string; spec?: string; state?: string; assignedSessionId?: string; dependsOn?: string[] } }
 	| { type: "task_delete"; taskId: string };
@@ -61,10 +46,9 @@ export type ServerMessage =
 	| { type: "session_status"; status: string }
 	| { type: "session_title"; sessionId: string; title: string }
 	| { type: "pong" }
-	| { type: "workflow_state"; data: unknown }
-	| { type: "workflow_phase_changed"; data: unknown }
-	| { type: "workflow_completed"; data: unknown }
-	| { type: "workflow_report"; reportUrl: string }
+	| { type: "skill_started"; skillId: string }
+	| { type: "skill_completed"; skillId: string; result: string }
+	| { type: "skill_failed"; skillId: string; error: string }
 	| { type: "cost_update"; sessionId: string; goalId?: string; taskId?: string; cost: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; totalCost: number } }
 	| { type: "queue_update"; sessionId: string; queue: QueuedMessage[] }
 	| { type: "task_changed"; task: unknown }

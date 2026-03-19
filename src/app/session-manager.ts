@@ -42,7 +42,7 @@ export function saveGoalDraft(sessionId: string): void {
 			previewCwdEdited: state.previewCwdEdited,
 			hasReceivedProposal: state.hasReceivedProposal,
 			goalAssistantTab: state.goalAssistantTab,
-			previewSwarmMode: state.previewSwarmMode,
+			previewTeamMode: state.previewTeamMode,
 			previewWorktree: state.previewWorktree,
 		};
 		storage.goalDrafts.saveDraft(draft).catch((err) => {
@@ -66,7 +66,7 @@ async function restoreGoalDraft(sessionId: string): Promise<boolean> {
 		state.previewCwdEdited = draft.previewCwdEdited ?? false;
 		state.hasReceivedProposal = draft.hasReceivedProposal ?? false;
 		state.goalAssistantTab = draft.goalAssistantTab ?? "chat";
-		state.previewSwarmMode = draft.previewSwarmMode ?? false;
+		state.previewTeamMode = draft.previewTeamMode ?? false;
 		state.previewWorktree = draft.previewWorktree ?? false;
 		return true;
 	} catch (err) {
@@ -373,7 +373,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 				state.previewCwdEdited = false;
 				state.previewSpecEdited = false;
 				state.hasReceivedProposal = false;
-				state.previewSwarmMode = false;
+				state.previewTeamMode = false;
 			}
 			state.previewSpecEditMode = false;
 		}
