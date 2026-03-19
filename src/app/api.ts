@@ -153,12 +153,12 @@ export async function fetchGitStatus(sessionId: string): Promise<GitStatusData |
 // GOAL API
 // ============================================================================
 
-export async function createGoal(title: string, cwd: string, opts?: { spec?: string; swarm?: boolean; worktree?: boolean }): Promise<Goal | null> {
-	const { spec = "", swarm = false, worktree = false } = opts ?? {};
+export async function createGoal(title: string, cwd: string, opts?: { spec?: string; team?: boolean; worktree?: boolean }): Promise<Goal | null> {
+	const { spec = "", team = false, worktree = false } = opts ?? {};
 	try {
 		const res = await gatewayFetch("/api/goals", {
 			method: "POST",
-			body: JSON.stringify({ title, cwd, spec, swarm, worktree }),
+			body: JSON.stringify({ title, cwd, spec, team, worktree }),
 		});
 		if (!res.ok) throw new Error(`Failed to create goal: ${res.status}`);
 		const goal = await res.json();
@@ -172,7 +172,7 @@ export async function createGoal(title: string, cwd: string, opts?: { spec?: str
 	}
 }
 
-export async function updateGoal(id: string, updates: Partial<Pick<Goal, "title" | "cwd" | "state" | "spec" | "swarm">>): Promise<boolean> {
+export async function updateGoal(id: string, updates: Partial<Pick<Goal, "title" | "cwd" | "state" | "spec" | "team">>): Promise<boolean> {
 	try {
 		const res = await gatewayFetch(`/api/goals/${id}`, {
 			method: "PUT",
@@ -221,17 +221,17 @@ export function patchSession(sessionId: string, updates: Record<string, unknown>
 }
 
 // ============================================================================
-// SWARM API
+// TEAM API
 // ============================================================================
 
-/** @deprecated Use createGoal with { swarm: true, worktree } instead */
-export async function createSwarmGoal(title: string, cwd: string, spec = "", worktree = true): Promise<Goal | null> {
-	return createGoal(title, cwd, { spec, swarm: true, worktree });
+/** @deprecated Use createGoal with { team: true, worktree } instead */
+export async function createTeamGoal(title: string, cwd: string, spec = "", worktree = true): Promise<Goal | null> {
+	return createGoal(title, cwd, { spec, team: true, worktree });
 }
 
-export async function startSwarm(goalId: string): Promise<string | null> {
+export async function startTeam(goalId: string): Promise<string | null> {
 	try {
-		const res = await gatewayFetch(`/api/goals/${goalId}/swarm/start`, {
+		const res = await gatewayFetch(`/api/goals/${goalId}/team/start`, {
 			method: "POST",
 		});
 		if (!res.ok) {
@@ -242,14 +242,14 @@ export async function startSwarm(goalId: string): Promise<string | null> {
 		await refreshSessions();
 		return data.sessionId;
 	} catch (err) {
-		showConnectionError("Failed to start swarm", err instanceof Error ? err.message : String(err));
+		showConnectionError("Failed to start team", err instanceof Error ? err.message : String(err));
 		return null;
 	}
 }
 
-export async function getSwarmState(goalId: string): Promise<any | null> {
+export async function getTeamState(goalId: string): Promise<any | null> {
 	try {
-		const res = await gatewayFetch(`/api/goals/${goalId}/swarm`);
+		const res = await gatewayFetch(`/api/goals/${goalId}/team`);
 		if (!res.ok) return null;
 		return await res.json();
 	} catch {
@@ -257,30 +257,30 @@ export async function getSwarmState(goalId: string): Promise<any | null> {
 	}
 }
 
-export async function completeSwarm(goalId: string): Promise<boolean> {
+export async function completeTeam(goalId: string): Promise<boolean> {
 	try {
-		const res = await gatewayFetch(`/api/goals/${goalId}/swarm/complete`, {
+		const res = await gatewayFetch(`/api/goals/${goalId}/team/complete`, {
 			method: "POST",
 		});
 		if (!res.ok) throw new Error(`Failed: ${res.status}`);
 		await refreshSessions();
 		return true;
 	} catch (err) {
-		showConnectionError("Failed to complete swarm", err instanceof Error ? err.message : String(err));
+		showConnectionError("Failed to complete team", err instanceof Error ? err.message : String(err));
 		return false;
 	}
 }
 
-export async function teardownSwarm(goalId: string): Promise<boolean> {
+export async function teardownTeam(goalId: string): Promise<boolean> {
 	try {
-		const res = await gatewayFetch(`/api/goals/${goalId}/swarm/teardown`, {
+		const res = await gatewayFetch(`/api/goals/${goalId}/team/teardown`, {
 			method: "POST",
 		});
 		if (!res.ok) throw new Error(`Failed: ${res.status}`);
 		await refreshSessions();
 		return true;
 	} catch (err) {
-		showConnectionError("Failed to tear down swarm", err instanceof Error ? err.message : String(err));
+		showConnectionError("Failed to tear down team", err instanceof Error ? err.message : String(err));
 		return false;
 	}
 }
