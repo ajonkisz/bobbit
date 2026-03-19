@@ -21,7 +21,7 @@ h2 { font-size: 1rem; color: #94a3b8; margin: 1.5rem 0 0.75rem; border-bottom: 1
 .cell { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1rem; background: #1e293b; border-radius: 8px; }
 .cell-label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
 
-/* Override blob positioning for preview grid — needs space */
+/* Override blob positioning for preview grid */
 .blob-wrap {
   position: relative;
   width: 80px;
@@ -32,15 +32,22 @@ h2 { font-size: 1rem; color: #94a3b8; margin: 1.5rem 0 0.75rem; border-bottom: 1
 }
 .blob-wrap .bobbit-blob {
   position: relative;
-  /* Cancel the flex-end margin from app.css */
   margin: 0 !important;
   align-self: center !important;
 }
+
+/* Sidebar mock */
+.sidebar-mock { background: #111827; border-radius: 8px; padding: 0.5rem; width: 260px; border: 1px solid #1e293b; }
+.sidebar-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; }
+.sidebar-row:hover { background: #1e293b; }
+.sidebar-row.active { background: #1e293b; }
+.sidebar-title { font-size: 0.8rem; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-time { font-size: 0.65rem; color: #64748b; }
 </style>
 </head>
 <body>
 <h1>Bobbit Accessory Preview</h1>
-<p class="subtitle">Uses real app.css — what you see here is exactly what renders in the app</p>
+<p class="subtitle">Uses real app.css + session-colors.ts — what you see here is exactly what renders in the app</p>
 
 <div class="controls">
   <label>Accessory:
@@ -77,7 +84,10 @@ h2 { font-size: 1rem; color: #94a3b8; margin: 1.5rem 0 0.75rem; border-bottom: 1
   </label>
 </div>
 
-<h2>All Accessories — Current State</h2>
+<h2>Sidebar (1.6x) — All Accessories</h2>
+<div id="sidebar-section"></div>
+
+<h2>Chat Blob (3.5x) — All Accessories</h2>
 <div class="grid" id="all-grid"></div>
 
 <h2>Selected Accessory — All States</h2>
@@ -86,8 +96,12 @@ h2 { font-size: 1rem; color: #94a3b8; margin: 1.5rem 0 0.75rem; border-bottom: 1
 <h2>Selected Accessory — Hue Variants</h2>
 <div class="grid" id="hue-grid"></div>
 
-<script>
-const ACCESSORIES = ['none','crown','bandana','magnifier','goggles','headphones','pencil','book','glasses','shield','flask'];
+<script type="module">
+// Import the real sidebar bobbit renderer and accessory data
+import { statusBobbit, ACCESSORIES } from '/src/app/session-colors.ts';
+import { html, render as litRender } from '/node_modules/lit/index.js';
+
+const ACC_IDS = Object.keys(ACCESSORIES);
 const STATES = [
   { label: 'Busy', cls: '' },
   { label: 'Idle', cls: 'bobbit-blob--idle' },
@@ -101,10 +115,16 @@ const STATES = [
 ];
 const HUES = [0, 60, 120, 180, 240, 300];
 
+// Generate a fake session ID that produces a specific hue
+function fakeSessionId(hue) {
+  // statusBobbit uses sessionHueRotation which hashes the ID
+  // We'll pass hue via a wrapper approach instead
+  return `preview-${hue}`;
+}
+
 function makeBlob(accId, stateClass, hue) {
   const accClass = accId && accId !== 'none' ? `bobbit-${accId === 'crown' ? 'crowned' : accId}` : '';
   const blobCls = ['bobbit-blob', stateClass, accClass].filter(Boolean).join(' ');
-  // The exact DOM structure from StreamingMessageContainer
   return `<div class="blob-wrap" style="--bobbit-hue-rotate: ${hue || 0}deg">
     <div class="${blobCls}">
       <div class="bobbit-blob__sprite"></div>
@@ -123,47 +143,93 @@ function makeBlob(accId, stateClass, hue) {
   </div>`;
 }
 
-function render() {
+function renderSidebar(acc, hue) {
+  const sidebarEl = document.getElementById('sidebar-section');
+  // Build sidebar rows for each accessory using the real statusBobbit function
+  const rows = ACC_IDS.map(accId => {
+    const label = ACCESSORIES[accId].label || accId;
+    const isActive = accId === acc;
+    const bobbit = statusBobbit('streaming', false, undefined, isActive, false, false, false, accId);
+    return html`
+      <div class="sidebar-row ${isActive ? 'active' : ''}" style="${hue ? `filter:hue-rotate(${hue}deg)` : ''}">
+        ${bobbit}
+        <div style="min-width:0;flex:1;">
+          <div class="sidebar-title">${label} Session</div>
+          <div class="sidebar-time">2m ago</div>
+        </div>
+      </div>
+    `;
+  });
+
+  const idleRows = ACC_IDS.map(accId => {
+    const label = ACCESSORIES[accId].label || accId;
+    const bobbit = statusBobbit('idle', false, undefined, false, false, false, false, accId);
+    return html`
+      <div class="sidebar-row" style="${hue ? `filter:hue-rotate(${hue}deg)` : ''}">
+        ${bobbit}
+        <div style="min-width:0;flex:1;">
+          <div class="sidebar-title">${label} Session</div>
+          <div class="sidebar-time">5m ago</div>
+        </div>
+      </div>
+    `;
+  });
+
+  litRender(html`
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:0.7rem;color:#64748b;margin-bottom:0.5rem;">Streaming (busy)</div>
+        <div class="sidebar-mock">${rows}</div>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;color:#64748b;margin-bottom:0.5rem;">Idle</div>
+        <div class="sidebar-mock">${idleRows}</div>
+      </div>
+    </div>
+  `, sidebarEl);
+}
+
+function renderAll() {
   const acc = document.getElementById('acc-select').value;
   const hue = parseInt(document.getElementById('hue-slider').value);
   const stateVal = document.getElementById('state-select').value;
 
-  // All accessories grid
-  const allHtml = ACCESSORIES.map(a => `
+  // Sidebar
+  renderSidebar(acc, hue);
+
+  // All accessories grid (blob)
+  document.getElementById('all-grid').innerHTML = ACC_IDS.map(a => `
     <div class="cell">
       ${makeBlob(a, stateVal, hue)}
       <span class="cell-label">${a}</span>
     </div>
   `).join('');
-  document.getElementById('all-grid').innerHTML = allHtml;
 
   // All states for selected accessory
-  const statesHtml = STATES.map(s => `
+  document.getElementById('states-grid').innerHTML = STATES.map(s => `
     <div class="cell">
       ${makeBlob(acc, s.cls, hue)}
       <span class="cell-label">${s.label}</span>
     </div>
   `).join('');
-  document.getElementById('states-grid').innerHTML = statesHtml;
 
-  // Hue variants for selected accessory
-  const hueHtml = HUES.map(h => `
+  // Hue variants
+  document.getElementById('hue-grid').innerHTML = HUES.map(h => `
     <div class="cell">
       ${makeBlob(acc, stateVal, h)}
       <span class="cell-label">${h}°</span>
     </div>
   `).join('');
-  document.getElementById('hue-grid').innerHTML = hueHtml;
 }
 
-document.getElementById('acc-select').addEventListener('change', render);
-document.getElementById('state-select').addEventListener('change', render);
+document.getElementById('acc-select').addEventListener('change', renderAll);
+document.getElementById('state-select').addEventListener('change', renderAll);
 document.getElementById('hue-slider').addEventListener('input', (e) => {
   document.getElementById('hue-val').textContent = e.target.value + '°';
-  render();
+  renderAll();
 });
 
-render();
+renderAll();
 </script>
 </body>
 </html>
