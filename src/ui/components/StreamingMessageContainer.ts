@@ -197,6 +197,13 @@ export class StreamingMessageContainer extends LitElement {
 						<div class="bobbit-blob__sprite"></div>
 						<div class="bobbit-blob__crown"></div>
 						<div class="bobbit-blob__bandana"></div>
+						<div class="bobbit-blob__magnifier"></div>
+						<div class="bobbit-blob__goggles"></div>
+						<div class="bobbit-blob__headphones"></div>
+						<div class="bobbit-blob__pencil"></div>
+						<div class="bobbit-blob__book"></div>
+						<div class="bobbit-blob__glasses"></div>
+						<div class="bobbit-blob__shield"></div>
 						<div class="bobbit-blob__shadow"></div>
 					</div>
 				</div>`;
@@ -228,6 +235,13 @@ export class StreamingMessageContainer extends LitElement {
 						<div class="bobbit-blob__sprite"></div>
 						<div class="bobbit-blob__crown"></div>
 						<div class="bobbit-blob__bandana"></div>
+						<div class="bobbit-blob__magnifier"></div>
+						<div class="bobbit-blob__goggles"></div>
+						<div class="bobbit-blob__headphones"></div>
+						<div class="bobbit-blob__pencil"></div>
+						<div class="bobbit-blob__book"></div>
+						<div class="bobbit-blob__glasses"></div>
+						<div class="bobbit-blob__shield"></div>
 						<div class="bobbit-blob__shadow"></div>
 					</div>` : ""}
 				</div>

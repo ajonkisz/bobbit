@@ -303,8 +303,16 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		document.documentElement.style.setProperty("--bobbit-hue-rotate", `${sessionHueRotation(sessionId)}deg`);
 		const sessionForRole = state.gatewaySessions.find((s) => s.id === sessionId);
-		document.documentElement.classList.toggle("bobbit-crowned", sessionForRole?.role === "team-lead");
-		document.documentElement.classList.toggle("bobbit-bandana", sessionForRole?.role === "coder");
+		// Remove all accessory classes, then add the active one
+		const accClasses = ["bobbit-crowned", "bobbit-bandana", "bobbit-magnifier", "bobbit-goggles", "bobbit-headphones", "bobbit-pencil", "bobbit-book", "bobbit-glasses", "bobbit-shield"];
+		accClasses.forEach((c) => document.documentElement.classList.remove(c));
+		const accId = sessionForRole?.accessory
+			?? (sessionForRole?.role === "team-lead" ? "crown" : sessionForRole?.role === "coder" ? "bandana" : undefined);
+		if (accId && accId !== "none") {
+			// Crown uses "bobbit-crowned" for backward compat; others use "bobbit-{id}"
+			const cls = accId === "crown" ? "bobbit-crowned" : `bobbit-${accId}`;
+			document.documentElement.classList.add(cls);
+		}
 
 		// Detect goal assistant state early — before async work and before
 		// the first renderApp() — so the mobile header (which depends on
