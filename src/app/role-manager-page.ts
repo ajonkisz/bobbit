@@ -12,33 +12,31 @@ import { setHashRoute } from "./routing.js";
 // HELPERS
 // ============================================================================
 
-/** Render an idle in-chat blob with the given accessory, in a fixed-size container.
- *  The blob is designed for chat context (negative margins, absolute children),
- *  so we contain it in a clipped box and scale it to fit. */
+/** Render an idle in-chat blob with the given accessory in a self-contained box.
+ *
+ *  The blob's CSS assumes chat context: the sprite has margin 8px 18px 28px 18px,
+ *  the blob container has margin-bottom:-24px and overflow:visible. To render it
+ *  outside chat we use a CSS class (.bobbit-blob--inline) that resets these
+ *  properties, added via role-manager.css.
+ */
 function idleBlob(accId: string, size = 40): TemplateResult {
 	const accClass = accId && accId !== "none"
 		? `bobbit-${accId === "crown" ? "crowned" : accId}`
 		: "";
-	const cls = `bobbit-blob bobbit-blob--idle ${accClass}`.trim();
-	// The blob sprite is 10x9 px at 3.5x scale = 35x31.5px, plus accessories may extend above.
-	// We use a scaled-down wrapper to fit within the target size.
-	const blobNaturalHeight = 40; // approximate px including accessories
-	const s = size / blobNaturalHeight;
+	const cls = `bobbit-blob bobbit-blob--idle bobbit-blob--inline ${accClass}`.trim();
 	return html`
-		<div style="width:${size}px;height:${size}px;display:flex;align-items:end;justify-content:center;overflow:hidden;flex-shrink:0;">
-			<div class="${cls}" style="transform:scale(${s});transform-origin:bottom center;margin:0;margin-bottom:0;">
-				<div class="bobbit-blob__sprite"></div>
-				<div class="bobbit-blob__crown"></div>
-				<div class="bobbit-blob__bandana"></div>
-				<div class="bobbit-blob__magnifier"></div>
-				<div class="bobbit-blob__goggles"></div>
-				<div class="bobbit-blob__headphones"></div>
-				<div class="bobbit-blob__pencil"></div>
-				<div class="bobbit-blob__book"></div>
-				<div class="bobbit-blob__glasses"></div>
-				<div class="bobbit-blob__shield"></div>
-				<div class="bobbit-blob__flask"></div>
-			</div>
+		<div class="${cls}" style="width:${size}px;height:${size}px;">
+			<div class="bobbit-blob__sprite"></div>
+			<div class="bobbit-blob__crown"></div>
+			<div class="bobbit-blob__bandana"></div>
+			<div class="bobbit-blob__magnifier"></div>
+			<div class="bobbit-blob__goggles"></div>
+			<div class="bobbit-blob__headphones"></div>
+			<div class="bobbit-blob__pencil"></div>
+			<div class="bobbit-blob__book"></div>
+			<div class="bobbit-blob__glasses"></div>
+			<div class="bobbit-blob__shield"></div>
+			<div class="bobbit-blob__flask"></div>
 		</div>
 	`;
 }

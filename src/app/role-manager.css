@@ -468,3 +468,49 @@
 		padding-top: 24px;
 	}
 }
+
+/* ============================================================================
+ * Inline blob — resets chat-specific blob layout for use in rows/grids.
+ *
+ * The normal .bobbit-blob has:
+ *   - margin-bottom: -24px (pulls up in chat)
+ *   - overflow: visible (accessories extend beyond)
+ *   - sprite margin: 8px 18px 28px 18px (spacing for bounce animations)
+ *
+ * .bobbit-blob--inline cancels all of that and renders the sprite centered
+ * within a fixed-size box at a smaller scale.
+ * ============================================================================ */
+.bobbit-blob--inline {
+	margin-bottom: 0;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+/* Shrink sprite margins and scale to fit the inline container */
+.bobbit-blob--inline .bobbit-blob__sprite {
+	margin: 0 !important;
+	transform: scale(2.5) translateX(-5px) !important;
+	transform-origin: 5px 4px !important;
+}
+
+/* All accessories: reset to match the smaller scale + zero-margin sprite */
+.bobbit-blob--inline .bobbit-blob__crown,
+.bobbit-blob--inline .bobbit-blob__bandana,
+.bobbit-blob--inline .bobbit-blob__magnifier,
+.bobbit-blob--inline .bobbit-blob__goggles,
+.bobbit-blob--inline .bobbit-blob__headphones,
+.bobbit-blob--inline .bobbit-blob__pencil,
+.bobbit-blob--inline .bobbit-blob__book,
+.bobbit-blob--inline .bobbit-blob__glasses,
+.bobbit-blob--inline .bobbit-blob__shield,
+.bobbit-blob--inline .bobbit-blob__flask {
+	transform: scale(2.5) translateX(-5px) !important;
+}
+
+/* Shadow not needed inline */
+.bobbit-blob--inline .bobbit-blob__shadow {
+	display: none !important;
+}
