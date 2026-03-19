@@ -76,7 +76,7 @@ export class RemoteAgent {
 	onGoalProposal?: (proposal: { title: string; spec: string; cwd?: string }) => void;
 	/** Callback fired when a role proposal is detected in an assistant message. */
 	onRoleProposal?: (proposal: { name: string; label: string; prompt: string; tools: string; accessory: string }) => void;
-	/** Callback fired when workflow tool execution updates (for real-time progress). */
+	/** Callback fired when tool execution updates (for real-time progress). */
 	onWorkflowUpdate?: () => void;
 	/** Callback fired when the server-side prompt queue changes. */
 	onQueueUpdate?: (queue: QueuedMessage[]) => void;
@@ -841,7 +841,7 @@ export class RemoteAgent {
 				break;
 
 			case "tool_execution_update":
-				// Store partial results from long-running tools (e.g., workflow run_phase)
+				// Store partial results from long-running tools (e.g., skill invocations)
 				// so the UI can show real-time progress.
 				if (event.toolCallId && event.partialResult) {
 					if (!this._state.toolPartialResults) {
@@ -851,7 +851,7 @@ export class RemoteAgent {
 						...this._state.toolPartialResults,
 						[event.toolCallId]: event.partialResult,
 					};
-					// Notify workflow status bar to re-render
+					// Notify UI to re-render with partial results
 					this.onWorkflowUpdate?.();
 					this.emit(event);
 					return; // skip default emit at end

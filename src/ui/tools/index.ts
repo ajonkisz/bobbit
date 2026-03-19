@@ -18,7 +18,6 @@ import { ReadRenderer } from "./renderers/ReadRenderer.js";
 import { ScreenshotRenderer } from "./renderers/ScreenshotRenderer.js";
 import { WebFetchRenderer } from "./renderers/WebFetchRenderer.js";
 import { WebSearchRenderer } from "./renderers/WebSearchRenderer.js";
-import { WorkflowRenderer } from "./renderers/WorkflowRenderer.js";
 import { WriteRenderer } from "./renderers/WriteRenderer.js";
 import type { ToolRenderResult } from "./types.js";
 
@@ -38,7 +37,6 @@ registerToolRenderer("browser_eval", new BrowserEvalRenderer());
 registerToolRenderer("browser_wait", new BrowserWaitRenderer());
 registerToolRenderer("web_search", new WebSearchRenderer());
 registerToolRenderer("web_fetch", new WebFetchRenderer());
-registerToolRenderer("workflow", new WorkflowRenderer());
 registerToolRenderer("delegate", new DelegateRenderer());
 
 const defaultRenderer = new DefaultRenderer();

@@ -13,7 +13,7 @@ export interface GoalDraft {
 	previewCwdEdited?: boolean;
 	hasReceivedProposal?: boolean;
 	goalAssistantTab?: "chat" | "preview";
-	previewSwarmMode?: boolean;
+	previewTeamMode?: boolean;
 	previewWorktree?: boolean;
 }
 

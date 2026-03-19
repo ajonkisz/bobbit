@@ -5,8 +5,6 @@ import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
 import { ArrowLeft, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users } from "lucide";
-import "../ui/components/WorkflowStatusBar.js";
-import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 import {
 	state,
 	renderApp,
@@ -34,9 +32,6 @@ import { renderGoalDashboard } from "./goal-dashboard.js";
 import "./goal-dashboard.css";
 import { renderRoleManagerPage, loadRolePageData } from "./role-manager-page.js";
 import "./role-manager.css";
-
-// Expose for testing
-(window as any).__extractWorkflowStatus = extractWorkflowStatus;
 
 // ============================================================================
 // MOBILE LANDING PAGE
@@ -149,9 +144,9 @@ function goalPreviewPanel() {
 		}
 		state.isGoalAssistantSession = false;
 		state.activeGoalProposal = null;
-		const swarmMode = state.previewSwarmMode;
+		const teamMode = state.previewTeamMode;
 		const worktree = state.previewWorktree;
-		state.previewSwarmMode = false;
+		state.previewTeamMode = false;
 		state.previewWorktree = false;
 		// Clean up persisted draft
 		if (sessionId) {
@@ -161,7 +156,7 @@ function goalPreviewPanel() {
 		setHashRoute("landing");
 		state.appView = "authenticated";
 
-		await createGoal(trimmedTitle, state.previewCwd.trim(), { spec: state.previewSpec, swarm: swarmMode, worktree });
+		await createGoal(trimmedTitle, state.previewCwd.trim(), { spec: state.previewSpec, team: teamMode, worktree });
 		if (sessionId) {
 			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
 			clearSessionModel(sessionId);
@@ -250,10 +245,10 @@ function goalPreviewPanel() {
 			<div class="shrink-0 flex flex-col gap-3 px-5 py-3 border-t border-border">
 				<label class="flex items-center gap-2.5 cursor-pointer">
 					<input type="checkbox"
-						.checked=${state.previewSwarmMode}
-						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; if (state.previewSwarmMode) state.previewWorktree = true; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
+						.checked=${state.previewTeamMode}
+						@change=${(e: Event) => { state.previewTeamMode = (e.target as HTMLInputElement).checked; if (state.previewTeamMode) state.previewWorktree = true; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
 						class="toggle-switch" />
-					<span class="text-xs text-muted-foreground">🐝 Swarm mode — Team Lead auto-spawns role agents</span>
+					<span class="text-xs text-muted-foreground">🐝 Team mode — Team Lead auto-spawns role agents</span>
 				</label>
 				<div class="flex items-center justify-end gap-2">
 					${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
@@ -690,21 +685,6 @@ export function doRenderApp(): void {
 		`;
 	};
 
-	const workflowBar = (position: "desktop" | "mobile" = "desktop") => {
-		if (!state.remoteAgent) return html``;
-		const wfStatus = extractWorkflowStatus(
-			state.remoteAgent.state.messages,
-			activeSessionId(),
-			state.remoteAgent.state.streamMessage,
-			state.remoteAgent.state.toolPartialResults,
-		);
-		if (!wfStatus) return html``;
-		const borderClass = position === "desktop"
-			? "border-b border-border bg-card/80 backdrop-blur-sm"
-			: "border-t border-border";
-		return html`<div class="${borderClass}"><workflow-status-bar .status=${wfStatus}></workflow-status-bar></div>`;
-	};
-
 	const mainArea = () => {
 		// Goal dashboard route
 		const route = getRouteFromHash();
@@ -799,7 +779,6 @@ export function doRenderApp(): void {
 				<div class="flex-1 flex min-h-0">
 					${renderSidebar()}
 					<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">
-						${workflowBar()}
 						${mainArea()}
 					</div>
 				</div>
@@ -815,7 +794,6 @@ export function doRenderApp(): void {
 						${headerLeft()}
 						${headerRight()}
 					</div>
-					${workflowBar("mobile")}
 					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
 					${state.isRoleAssistantSession ? roleAssistantTabBar() : ""}
 				</div>

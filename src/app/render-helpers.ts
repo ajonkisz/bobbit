@@ -18,7 +18,7 @@ import { statusBobbit } from "./session-colors.js";
 import { connectToSession, terminateSession, createAndConnectSession } from "./session-manager.js";
 import { showRenameDialog } from "./dialogs.js";
 import { setHashRoute } from "./routing.js";
-import { startSwarm, teardownSwarm, refreshSessions } from "./api.js";
+import { startTeam, teardownTeam, refreshSessions } from "./api.js";
 
 // ============================================================================
 // TOOLTIP (desktop only — mouse hover)
@@ -148,7 +148,7 @@ export function renderSessionRow(session: GatewaySession) {
 export { renderSessionRow as renderSidebarSession };
 
 // ============================================================================
-// TEAM LEAD ROW (with collapsible swarm children)
+// TEAM LEAD ROW (with collapsible team children)
 // ============================================================================
 
 /**
@@ -212,14 +212,14 @@ function renderTeamLeadRow(session: GatewaySession, childCount: number, expanded
 // UNIFIED GOAL GROUP
 // ============================================================================
 
-/** Track in-flight swarm start/stop (shared across desktop and mobile). */
-const swarmLoading = new Set<string>();
+/** Track in-flight team start/stop (shared across desktop and mobile). */
+const teamLoading = new Set<string>();
 
 /**
  * Expandable goal group used by both desktop sidebar and mobile landing.
  *
  * Layout: [▾/▸] [TITLE] [dashboard btn]
- * Expanded: child session rows + empty state + swarm controls
+ * Expanded: child session rows + empty state + team controls
  *
  * Desktop: dashboard button hidden until hover. Double-click opens team-lead.
  * Mobile:  dashboard button always visible. No double-click (no hover hint).
@@ -227,11 +227,11 @@ const swarmLoading = new Set<string>();
 export function renderGoalGroup(goal: Goal) {
 	const mobile = !isDesktop();
 	const isExpanded = expandedGoals.has(goal.id);
-	const goalSessions = state.gatewaySessions.filter((s) => (s.goalId === goal.id || s.swarmGoalId === goal.id) && !s.delegateOf);
+	const goalSessions = state.gatewaySessions.filter((s) => (s.goalId === goal.id || s.teamGoalId === goal.id) && !s.delegateOf);
 	const isCreatingHere = state.creatingSessionForGoalId === goal.id;
-	const isSwarmGoal = !!(goal as any).swarm;
-	const hasActiveSwarm = isSwarmGoal && goalSessions.some((s) => s.role === "team-lead" && s.status !== "terminated");
-	const isLoading = swarmLoading.has(goal.id);
+	const isTeamGoal = !!(goal as any).team;
+	const hasActiveTeam = isTeamGoal && goalSessions.some((s) => s.role === "team-lead" && s.status !== "terminated");
+	const isLoading = teamLoading.has(goal.id);
 
 	const toggleExpand = () => {
 		if (isExpanded) expandedGoals.delete(goal.id); else expandedGoals.add(goal.id);
@@ -239,21 +239,21 @@ export function renderGoalGroup(goal: Goal) {
 		renderApp();
 	};
 
-	const handleStartSwarm = async (e?: Event) => {
+	const handleStartTeam = async (e?: Event) => {
 		e?.stopPropagation();
-		swarmLoading.add(goal.id);
+		teamLoading.add(goal.id);
 		renderApp();
-		const sid = await startSwarm(goal.id);
-		swarmLoading.delete(goal.id);
+		const sid = await startTeam(goal.id);
+		teamLoading.delete(goal.id);
 		if (sid) connectToSession(sid, false); else renderApp();
 	};
 
-	const handleEndSwarm = async (e?: Event) => {
+	const handleEndTeam = async (e?: Event) => {
 		e?.stopPropagation();
-		swarmLoading.add(goal.id);
+		teamLoading.add(goal.id);
 		renderApp();
-		await teardownSwarm(goal.id);
-		swarmLoading.delete(goal.id);
+		await teardownTeam(goal.id);
+		teamLoading.delete(goal.id);
 		await refreshSessions();
 		renderApp();
 	};
@@ -268,30 +268,30 @@ export function renderGoalGroup(goal: Goal) {
 
 	const emptyState = html`
 		<div class="pl-3 py-1 text-[10px] text-muted-foreground">
-			${isSwarmGoal
-				? html`No agents — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${handleStartSwarm}>${isLoading ? "starting\u2026" : "start swarm"}</button>`
+			${isTeamGoal
+				? html`No agents — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${handleStartTeam}>${isLoading ? "starting\u2026" : "start team"}</button>`
 				: html`No sessions — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${() => createAndConnectSession(goal.id)}>start one</button>`}
 		</div>
 	`;
 
-	const swarmControls = "";
+	const teamControls = "";
 
-	// Separate team lead from swarm children for nested rendering
-	const teamLead = isSwarmGoal ? goalSessions.find(s => s.role === "team-lead") : null;
-	const swarmChildren = isSwarmGoal && teamLead ? goalSessions.filter(s => s.id !== teamLead.id) : [];
-	const nonSwarmSessions = isSwarmGoal ? goalSessions.filter(s => !teamLead || (s.id !== teamLead.id && !swarmChildren.includes(s))) : goalSessions;
+	// Separate team lead from team children for nested rendering
+	const teamLead = isTeamGoal ? goalSessions.find(s => s.role === "team-lead") : null;
+	const teamChildren = isTeamGoal && teamLead ? goalSessions.filter(s => s.id !== teamLead.id) : [];
+	const nonTeamSessions = isTeamGoal ? goalSessions.filter(s => !teamLead || (s.id !== teamLead.id && !teamChildren.includes(s))) : goalSessions;
 
-	const renderSwarmGroup = () => {
+	const renderTeamGroup = () => {
 		if (!teamLead) return goalSessions.map(renderSessionRow);
 		const tlExpanded = isTeamLeadExpanded(teamLead.id);
 		return html`
-			${renderTeamLeadRow(teamLead, swarmChildren.length, tlExpanded)}
+			${renderTeamLeadRow(teamLead, teamChildren.length, tlExpanded)}
 			${tlExpanded ? html`
 				<div class="flex flex-col gap-0.5" style="padding-left:12px;">
-					${swarmChildren.map(renderSessionRow)}
+					${teamChildren.map(renderSessionRow)}
 				</div>
 			` : ""}
-			${nonSwarmSessions.map(renderSessionRow)}
+			${nonTeamSessions.map(renderSessionRow)}
 		`;
 	};
 
@@ -299,7 +299,7 @@ export function renderGoalGroup(goal: Goal) {
 		<div class="flex flex-col ${goal.state === "shelved" ? "opacity-60" : ""}">
 			<div class="${mobile ? "" : "group relative"} flex items-center gap-1 px-1 ${mobile ? "py-1" : "py-0.5"} rounded-md cursor-pointer ${mobile ? "active:bg-secondary/50" : "hover:bg-secondary/50"} transition-colors"
 				@click=${toggleExpand}
-				@dblclick=${!mobile ? () => { if (goal.swarm) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } } : null}>
+				@dblclick=${!mobile ? () => { if (goal.team) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } } : null}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
 				<span class="flex-1 min-w-0 truncate ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
 				${mobile
@@ -310,12 +310,12 @@ export function renderGoalGroup(goal: Goal) {
 			</div>
 			${isExpanded ? html`
 				<div class="flex flex-col gap-0.5">
-					${goalSessions.length === 0 && !isCreatingHere ? emptyState : (isSwarmGoal ? renderSwarmGroup() : goalSessions.map(renderSessionRow))}
+					${goalSessions.length === 0 && !isCreatingHere ? emptyState : (isTeamGoal ? renderTeamGroup() : goalSessions.map(renderSessionRow))}
 					${isCreatingHere ? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground flex items-center gap-1">
 						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
 						Creating…
 					</div>` : ""}
-					${swarmControls}
+					${teamControls}
 				</div>
 			` : ""}
 		</div>
