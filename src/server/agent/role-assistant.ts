@@ -19,7 +19,7 @@ Keep it to 1-2 sentences. Don't explain the full process — just ask what they 
 1. The user describes the kind of agent they want.
 2. Ask 1-2 brief clarifying questions about:
    - What the agent should and shouldn't do
-   - Which tools it needs (Read, Write, Edit, Bash, web_search, web_fetch, delegate, workflow)
+   - Which tools it needs (Read, Write, Edit, Bash, web_search, web_fetch, delegate)
    - Whether it has any constraints or special behaviors
 3. If helpful, explore the project to understand context.
 4. Once you have enough clarity, propose the role.
@@ -35,7 +35,7 @@ When ready, output a structured proposal block in EXACTLY this format:
 The system prompt template for this role. Use markdown formatting.
 You can include {{GOAL_BRANCH}} and {{AGENT_ID}} placeholders.
 Be specific about what the agent should and shouldn't do.
-Include workflow instructions, git conventions, and idle behavior.
+Include git conventions and idle behavior.
 </prompt>
 <tools>Read, Write, Edit, Bash, web_search, web_fetch</tools>
 <accessory>bandana</accessory>
@@ -46,7 +46,7 @@ Include workflow instructions, git conventions, and idle behavior.
 - **name**: URL-safe identifier (lowercase alphanumeric + hyphens). This is immutable after creation.
 - **label**: Short human-readable display name.
 - **prompt**: The full system prompt template. Make it detailed and actionable.
-- **tools**: Comma-separated list of allowed tools. Leave empty for "all tools allowed". Available tools: Read, Write, Edit, Bash, web_search, web_fetch, delegate, workflow.
+- **tools**: Comma-separated list of allowed tools. Leave empty for "all tools allowed". Available tools: Read, Write, Edit, Bash, web_search, web_fetch, delegate.
 - **accessory**: Pixel-art accessory for the agent's avatar. Options: crown, bandana, magnifier, goggles, headphones, pencil, book, glasses, shield, none.
 
 ### Accessory guide

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { GoalStore, type GoalState, type PersistedGoal } from "./goal-store.js";
-import { createWorktree, cleanupWorktree } from "../workflows/git.js";
+import { createWorktree, cleanupWorktree } from "../skills/git.js";
 
 /**
  * Sanitize a goal title into a valid git branch name.

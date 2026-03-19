@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SessionManager, SessionInfo } from "./session-manager.js";
 import type { GoalManager } from "./goal-manager.js";
-import { createWorktree, cleanupWorktree } from "../workflows/git.js";
+import { createWorktree, cleanupWorktree } from "../skills/git.js";
 import { getRolePrompt, VALID_ROLES } from "./team-prompts.js";
 import { TeamStore } from "./team-store.js";
 import type { RoleStore } from "./role-store.js";

@@ -44,17 +44,7 @@ export interface CommitInfo {
 // REPORT TYPES
 // ============================================================================
 
-export interface ReportInfo {
-	sessionId: string;
-	workflowId: string;
-	workflowName: string;
-	status: "running" | "completed" | "skipped" | "cancelled";
-	startedAt: number;
-	completedAt?: number;
-	artifactCount: number;
-	/** Derived from workflowId */
-	type: "code-review" | "test-suite" | "other";
-}
+
 
 // ============================================================================
 // DASHBOARD STATE
@@ -64,7 +54,6 @@ let currentGoalId: string | null = null;
 let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
 let commits: CommitInfo[] = [];
-let reports: ReportInfo[] = [];
 let teamActive = false;
 let teamStarting = false;
 let teamStopping = false;
@@ -110,9 +99,6 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 			commits = [];
 		}
 
-		// Fetch workflow reports for all sessions belonging to this goal
-		reports = await fetchGoalReports(goalId);
-
 		// Check if a team is active
 		const teamState = await getTeamState(goalId);
 		teamActive = teamState != null;
@@ -126,61 +112,11 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	renderApp();
 }
 
-async function fetchGoalReports(goalId: string): Promise<ReportInfo[]> {
-	const goalSessions = state.gatewaySessions.filter((s) => s.goalId === goalId);
-	const results: ReportInfo[] = [];
-
-	await Promise.all(
-		goalSessions.map(async (session) => {
-			try {
-				const res = await gatewayFetch(`/api/sessions/${session.id}/workflow`);
-				if (!res.ok) return;
-				const ws = await res.json() as {
-					workflowId: string;
-					status: string;
-					startedAt: number;
-					completedAt?: number;
-					artifacts?: unknown[];
-					context?: Record<string, string>;
-				};
-
-				let type: ReportInfo["type"] = "other";
-				if (ws.workflowId.includes("code-review")) type = "code-review";
-				else if (ws.workflowId.includes("test")) type = "test-suite";
-
-				// Derive a friendly name from the workflow ID
-				const workflowName = ws.workflowId
-					.split("-")
-					.map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-					.join(" ");
-
-				results.push({
-					sessionId: session.id,
-					workflowId: ws.workflowId,
-					workflowName,
-					status: ws.status as ReportInfo["status"],
-					startedAt: ws.startedAt,
-					completedAt: ws.completedAt,
-					artifactCount: ws.artifacts?.length ?? 0,
-					type,
-				});
-			} catch {
-				// Session has no workflow — skip
-			}
-		}),
-	);
-
-	// Sort by most recent first
-	results.sort((a, b) => (b.completedAt ?? b.startedAt) - (a.completedAt ?? a.startedAt));
-	return results;
-}
-
 export function clearDashboardState(): void {
 	currentGoalId = null;
 	currentGoal = null;
 	tasks = [];
 	commits = [];
-	reports = [];
 	teamActive = false;
 	teamStarting = false;
 	teamStopping = false;
@@ -591,93 +527,6 @@ export function renderAgentPanel(agentList: TeamAgent[]): TemplateResult {
 }
 
 // ============================================================================
-// REPORTS PANEL
-// ============================================================================
-
-function reportTypeIcon(type: ReportInfo["type"]): string {
-	switch (type) {
-		case "code-review": return "\uD83D\uDD0D"; // 🔍
-		case "test-suite": return "\uD83E\uDDEA"; // 🧪
-		default: return "\uD83D\uDCCB"; // 📋
-	}
-}
-
-function reportTypeColor(type: ReportInfo["type"], failed: boolean): string {
-	if (failed) return "#ef4444";
-	switch (type) {
-		case "code-review": return "#f59e0b";
-		case "test-suite": return "#22c55e";
-		default: return "#6b7280";
-	}
-}
-
-function reportStatusLabel(status: ReportInfo["status"]): string {
-	switch (status) {
-		case "completed": return "Completed";
-		case "skipped": return "Failed";
-		case "running": return "Running";
-		case "cancelled": return "Cancelled";
-	}
-}
-
-function formatReportTime(timestamp: number): string {
-	const diffMs = Date.now() - timestamp;
-	const mins = Math.floor(diffMs / 60_000);
-	if (mins < 1) return "just now";
-	if (mins < 60) return `${mins}m ago`;
-	const hours = Math.floor(mins / 60);
-	if (hours < 24) return `${hours}h ago`;
-	const days = Math.floor(hours / 24);
-	return `${days}d ago`;
-}
-
-function openReport(sessionId: string): void {
-	const base = window.location.origin;
-	const token = new URLSearchParams(window.location.search).get("token") || "";
-	const url = `${base}/api/sessions/${sessionId}/workflow/report${token ? `?token=${encodeURIComponent(token)}` : ""}`;
-	window.open(url, "_blank");
-}
-
-function renderReportCard(report: ReportInfo): TemplateResult {
-	const isFailed = report.status === "skipped" || report.status === "cancelled";
-	const color = reportTypeColor(report.type, isFailed);
-	const completedTime = report.completedAt
-		? formatReportTime(report.completedAt)
-		: reportStatusLabel(report.status);
-
-	return html`
-		<div
-			class="report-card ${isFailed ? "report-card--failed" : ""}"
-			@click=${() => openReport(report.sessionId)}
-			title="Open ${report.workflowName} report"
-		>
-			<div class="report-icon" style="background: ${color}20; color: ${color};">
-				${reportTypeIcon(report.type)}
-			</div>
-			<div class="report-info">
-				<div class="report-title">${report.workflowName}</div>
-				<div class="report-meta">
-					<span>${completedTime}</span>
-					${report.artifactCount > 0 ? html`<span>\u00B7 ${report.artifactCount} artifact${report.artifactCount !== 1 ? "s" : ""}</span>` : nothing}
-				</div>
-			</div>
-		</div>
-	`;
-}
-
-function renderReportsPanel(reportList: ReportInfo[]): TemplateResult {
-	return html`
-		<div class="reports-panel">
-			<div class="reports-panel-header">Reports</div>
-			${reportList.length > 0
-				? reportList.map(renderReportCard)
-				: html`<div class="reports-panel-empty">No reports yet</div>`
-			}
-		</div>
-	`;
-}
-
-// ============================================================================
 // DASHBOARD LAYOUT
 // ============================================================================
 
@@ -826,7 +675,6 @@ export function renderGoalDashboard(): TemplateResult {
 				</div>
 				<div class="dashboard-right-panel">
 					${renderAgentPanel(agents)}
-					${renderReportsPanel(reports)}
 				</div>
 			</div>
 		</div>
