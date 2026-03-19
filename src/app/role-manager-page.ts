@@ -12,27 +12,33 @@ import { setHashRoute } from "./routing.js";
 // HELPERS
 // ============================================================================
 
-/** Render an idle in-chat blob with the given accessory, at a custom scale */
-function idleBlob(accId: string, scale = 1): TemplateResult {
+/** Render an idle in-chat blob with the given accessory, in a fixed-size container.
+ *  The blob is designed for chat context (negative margins, absolute children),
+ *  so we contain it in a clipped box and scale it to fit. */
+function idleBlob(accId: string, size = 40): TemplateResult {
 	const accClass = accId && accId !== "none"
 		? `bobbit-${accId === "crown" ? "crowned" : accId}`
 		: "";
 	const cls = `bobbit-blob bobbit-blob--idle ${accClass}`.trim();
-	const scaleStyle = scale !== 1 ? `transform: scale(${scale}); transform-origin: bottom center;` : "";
+	// The blob sprite is 10x9 px at 3.5x scale = 35x31.5px, plus accessories may extend above.
+	// We use a scaled-down wrapper to fit within the target size.
+	const blobNaturalHeight = 40; // approximate px including accessories
+	const s = size / blobNaturalHeight;
 	return html`
-		<div class="${cls}" style="${scaleStyle}">
-			<div class="bobbit-blob__sprite"></div>
-			<div class="bobbit-blob__crown"></div>
-			<div class="bobbit-blob__bandana"></div>
-			<div class="bobbit-blob__magnifier"></div>
-			<div class="bobbit-blob__goggles"></div>
-			<div class="bobbit-blob__headphones"></div>
-			<div class="bobbit-blob__pencil"></div>
-			<div class="bobbit-blob__book"></div>
-			<div class="bobbit-blob__glasses"></div>
-			<div class="bobbit-blob__shield"></div>
-			<div class="bobbit-blob__flask"></div>
-			<div class="bobbit-blob__shadow"></div>
+		<div style="width:${size}px;height:${size}px;display:flex;align-items:end;justify-content:center;overflow:hidden;flex-shrink:0;">
+			<div class="${cls}" style="transform:scale(${s});transform-origin:bottom center;margin:0;margin-bottom:0;">
+				<div class="bobbit-blob__sprite"></div>
+				<div class="bobbit-blob__crown"></div>
+				<div class="bobbit-blob__bandana"></div>
+				<div class="bobbit-blob__magnifier"></div>
+				<div class="bobbit-blob__goggles"></div>
+				<div class="bobbit-blob__headphones"></div>
+				<div class="bobbit-blob__pencil"></div>
+				<div class="bobbit-blob__book"></div>
+				<div class="bobbit-blob__glasses"></div>
+				<div class="bobbit-blob__shield"></div>
+				<div class="bobbit-blob__flask"></div>
+			</div>
 		</div>
 	`;
 }
@@ -291,7 +297,7 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 function renderRoleRow(role: RoleData): TemplateResult {
 	return html`
 		<div class="role-row" tabindex="0" role="button" @click=${() => showEdit(role)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showEdit(role); } }}>
-			${idleBlob(role.accessory ?? "none", 0.6)}
+			${idleBlob(role.accessory ?? "none", 32)}
 			<div class="role-row-info">
 				<span class="role-row-label">${role.label}</span>
 				<span class="role-row-slug">${role.name}</span>
@@ -425,7 +431,7 @@ function renderEditView(): TemplateResult {
 									<span class="roles-accessory-preview">
 										${accId === "none"
 											? html`<span class="text-xs text-muted-foreground">\u2014</span>`
-											: idleBlob(accId, 0.6)}
+											: idleBlob(accId, 32)}
 									</span>
 									<span class="roles-accessory-label">${acc.label}</span>
 								</button>
