@@ -26,6 +26,7 @@ import { renderGoalGroup, renderSessionRow } from "./render-helpers.js";
 const bobbitIcon = html`<img src="/favicon.svg" alt="" style="width:20px;height:18px;image-rendering:pixelated;" />`;
 
 import { cwdCombobox, worktreeToggle } from "./cwd-combobox.js";
+import { stopPreviewPolling } from "./preview-panel.js";
 import { teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobile-header.js";
 import { getRouteFromHash, setHashRoute } from "./routing.js";
 import { renderGoalDashboard } from "./goal-dashboard.js";
@@ -701,6 +702,45 @@ export function doRenderApp(): void {
 		`;
 	};
 
+	const previewPanelTabBar = () => {
+		return html`
+			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
+				<button
+					class="goal-tab-pill ${state.previewPanelTab === "chat" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.previewPanelTab = "chat"; renderApp(); }}
+				>Chat</button>
+				<button
+					class="goal-tab-pill ${state.previewPanelTab === "preview" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.previewPanelTab = "preview"; renderApp(); }}
+				>Preview</button>
+				<button
+					class="goal-tab-pill"
+					style="margin-left:auto;font-size:0.65rem;opacity:0.6;"
+					@click=${() => { stopPreviewPolling(); state.previewPanelVisible = false; state.previewPanelHtml = ""; renderApp(); }}
+				>&times; Close</button>
+			</div>
+		`;
+	};
+
+	const htmlPreviewPanel = () => {
+		return html`
+			<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
+				<div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
+					<span class="text-xs font-medium text-muted-foreground">Live Preview</span>
+					<button
+						class="text-xs text-muted-foreground hover:text-foreground"
+						@click=${() => { stopPreviewPolling(); state.previewPanelVisible = false; state.previewPanelHtml = ""; renderApp(); }}
+					>&times; Close</button>
+				</div>
+				<iframe
+					class="flex-1 w-full border-0"
+					sandbox="allow-scripts"
+					.srcdoc=${state.previewPanelHtml}
+				></iframe>
+			</div>
+		`;
+	};
+
 	const mainArea = () => {
 		// Goal dashboard route
 		const route = getRouteFromHash();
@@ -744,6 +784,24 @@ export function doRenderApp(): void {
 				${state.roleAssistantTab === "chat"
 					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
 					: html`<div class="flex-1 min-h-0 flex flex-col">${rolePreviewPanel()}</div>`
+				}
+			`;
+		}
+		if (connected && state.previewPanelVisible) {
+			if (desktop) {
+				return html`
+					${reconnectBanner()}
+					<div class="flex-1 flex min-h-0 overflow-hidden">
+						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
+						${htmlPreviewPanel()}
+					</div>
+				`;
+			}
+			return html`
+				${reconnectBanner()}
+				${state.previewPanelTab === "chat"
+					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
+					: html`<div class="flex-1 min-h-0 flex flex-col">${htmlPreviewPanel()}</div>`
 				}
 			`;
 		}
@@ -812,6 +870,7 @@ export function doRenderApp(): void {
 					</div>
 					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
 					${state.isRoleAssistantSession ? roleAssistantTabBar() : ""}
+					${state.previewPanelVisible && !state.isGoalAssistantSession && !state.isRoleAssistantSession ? previewPanelTabBar() : ""}
 				</div>
 				<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>

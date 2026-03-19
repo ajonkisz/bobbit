@@ -110,6 +110,11 @@ export const state = {
 	hasReceivedRoleProposal: false,
 	rolePreviewPromptEditMode: false,
 
+	// HTML preview panel (for live visual iteration)
+	previewPanelHtml: "" as string,
+	previewPanelVisible: false,
+	previewPanelTab: "chat" as "chat" | "preview",
+
 	/** Currently viewed goal dashboard (null = not on dashboard) */
 	goalDashboardId: null as string | null,
 

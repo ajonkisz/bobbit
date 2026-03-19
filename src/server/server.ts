@@ -1194,6 +1194,28 @@ async function handleApiRoute(
 		return;
 	}
 
+	// GET /api/preview — get current preview HTML
+	if (url.pathname === "/api/preview" && req.method === "GET") {
+		const previewPath = path.join(os.homedir(), ".pi", "preview.html");
+		try {
+			const content = fs.readFileSync(previewPath, "utf-8");
+			const stat = fs.statSync(previewPath);
+			json({ html: content, mtime: stat.mtimeMs });
+		} catch {
+			json({ html: "", mtime: 0 });
+		}
+		return;
+	}
+
+	// POST /api/preview — set preview HTML
+	if (url.pathname === "/api/preview" && req.method === "POST") {
+		const body = await readBody(req);
+		const previewPath = path.join(os.homedir(), ".pi", "preview.html");
+		fs.writeFileSync(previewPath, body?.html || "", "utf-8");
+		json({ ok: true });
+		return;
+	}
+
 	json({ error: "Not found" }, 404);
 }
 
