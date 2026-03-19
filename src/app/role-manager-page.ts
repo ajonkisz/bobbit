@@ -2,7 +2,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
-import { ArrowLeft, Pencil, Plus, Trash2, Users } from "lucide";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
 import { fetchRoles, fetchTools, createRole, updateRole, deleteRole, gatewayFetch, type RoleData } from "./api.js";
 import { ACCESSORY_IDS, getAccessory, statusBobbit } from "./session-colors.js";
 import { state, renderApp } from "./state.js";
@@ -229,10 +229,11 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 function renderRoleRow(role: RoleData): TemplateResult {
 	return html`
 		<div class="role-row">
-			<span class="role-row-avatar">
-				${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory)}
-			</span>
-			<span class="role-row-label">${role.label}</span>
+			${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory)}
+			<div class="role-row-info">
+				<span class="role-row-label">${role.label}</span>
+				<span class="role-row-slug">${role.name}</span>
+			</div>
 			<div class="role-row-actions">
 				<button class="role-row-action-btn" @click=${() => showEdit(role)} title="Edit">
 					${icon(Pencil, "sm")}
@@ -260,8 +261,9 @@ function renderListView(): TemplateResult {
 	if (roles.length === 0) {
 		return html`
 			<div class="roles-empty">
-				<div class="roles-empty-icon">${icon(Users, "lg")}</div>
-				<p>No roles defined yet</p>
+				<div class="roles-empty-bobbit">${statusBobbit("idle", false, undefined, false, false, false, false, "none")}</div>
+				<p class="roles-empty-title">No roles yet</p>
+				<p class="roles-empty-desc">Roles give agents a persona, system prompt, and tool restrictions.</p>
 				${Button({
 					variant: "default",
 					onClick: createRoleAssistantSession,
