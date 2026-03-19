@@ -8,7 +8,7 @@ test.describe("Stick-to-bottom scroll behavior", () => {
 
 	test("starts at bottom, sticks when new content arrives", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__ready === true);
 
 		const state0 = await page.evaluate(() => (window as any).__getState());
 		expect(state0.stickToBottom).toBe(true);
@@ -27,7 +27,7 @@ test.describe("Stick-to-bottom scroll behavior", () => {
 
 	test("user scrolls up → unsticks → new content does not pull back", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__ready === true);
 
 		// Scroll up
 		await page.evaluate(() => {
@@ -54,7 +54,7 @@ test.describe("Stick-to-bottom scroll behavior", () => {
 
 	test("user scrolls back to bottom → re-sticks", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__ready === true);
 
 		// Scroll up
 		await page.evaluate(() => {
@@ -85,7 +85,7 @@ test.describe("Stick-to-bottom scroll behavior", () => {
 
 	test("keyboard open: user at bottom stays stuck, position stable", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__ready === true);
 
 		// At bottom, stuck
 		expect((await page.evaluate(() => (window as any).__getState())).stickToBottom).toBe(true);
@@ -103,7 +103,7 @@ test.describe("Stick-to-bottom scroll behavior", () => {
 
 	test("keyboard open: user scrolled up stays unstuck, no jump", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__ready === true);
 
 		// Scroll to middle
 		await page.evaluate(() => {
@@ -135,7 +135,7 @@ test.describe("Stick-to-bottom scroll behavior", () => {
 
 	test("workflow bar update does not affect vertical scroll", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__ready === true);
 
 		await page.evaluate(() => {
 			document.getElementById("scroll-container")!.scrollTop = 400;
@@ -160,7 +160,7 @@ test.describe("Stick-to-bottom scroll behavior", () => {
 
 	test("typing in textarea does not cause scroll jump when unstuck", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		await page.waitForTimeout(100);
+		await page.waitForFunction(() => (window as any).__ready === true);
 
 		// Scroll to middle
 		await page.evaluate(() => {

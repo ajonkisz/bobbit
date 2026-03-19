@@ -114,7 +114,7 @@
       <span class="phase" data-phase-id="p3">Clean Up</span>
     </div>
   </div>
-  <div id="app-main" style="padding-top: 80px">
+  <div id="app-main">
     <div class="agent-interface">
       <div class="messages-wrapper">
         <div class="scroll-container" id="scroll-container">
@@ -143,8 +143,11 @@ for (let i = 0; i < 50; i++) {
 const scrollContainer = document.getElementById("scroll-container");
 let stickToBottom = true;
 
-// Scroll to bottom initially
-scrollContainer.scrollTop = scrollContainer.scrollHeight;
+// Scroll handler: near bottom = stick, scrolled up = unstick
+scrollContainer.addEventListener("scroll", () => {
+  const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+  stickToBottom = scrollHeight - scrollTop - clientHeight < 50;
+}, { passive: true });
 
 // ResizeObserver: scroll to bottom if sticking
 const resizeObserver = new ResizeObserver(() => {
@@ -154,11 +157,19 @@ const resizeObserver = new ResizeObserver(() => {
 });
 resizeObserver.observe(content);
 
-// Scroll handler: near bottom = stick, scrolled up = unstick
-scrollContainer.addEventListener("scroll", () => {
-  const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
-  stickToBottom = scrollHeight - scrollTop - clientHeight < 50;
-}, { passive: true });
+// Sync header padding then scroll to bottom. Use a double-rAF to ensure
+// layout is fully resolved before reading dimensions.
+requestAnimationFrame(() => {
+  const headerEl = document.getElementById("app-header");
+  const mainEl = document.getElementById("app-main");
+  if (headerEl && mainEl) {
+    mainEl.style.paddingTop = headerEl.offsetHeight + "px";
+  }
+  requestAnimationFrame(() => {
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    window.__ready = true;
+  });
+});
 
 // ─── Workflow bar scroll (only horizontal, only on phase change) ───
 let lastActivePhase = null;
