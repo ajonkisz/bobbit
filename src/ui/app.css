@@ -953,9 +953,8 @@ html {
 		/* Deep liquid */
 		5px 6px 0 #000, 6px 6px 0 #1e3a5f, 7px 6px 0 #0c4a6e, 8px 6px 0 #0369a1, 9px 6px 0 #0c4a6e, 10px 6px 0 #082f49, 11px 6px 0 #0c4a6e, 12px 6px 0 #172554, 13px 6px 0 #1e3a5f, 14px 6px 0 #000,
 		5px 7px 0 #000, 6px 7px 0 #1e3a5f, 7px 7px 0 #082f49, 8px 7px 0 #0c4a6e, 9px 7px 0 #082f49, 10px 7px 0 #172554, 11px 7px 0 #082f49, 12px 7px 0 #172554, 13px 7px 0 #1e3a5f, 14px 7px 0 #000,
-		/* Bottom + glass base */
-		5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000, 8px 8px 0 #000, 9px 8px 0 #000, 10px 8px 0 #000, 11px 8px 0 #000, 12px 8px 0 #000, 13px 8px 0 #000, 14px 8px 0 #000,
-		4px 9px 0 #000, 5px 9px 0 #1e3a5f, 6px 9px 0 #2c5282, 7px 9px 0 #2c5282, 8px 9px 0 #2c5282, 9px 9px 0 #2c5282, 10px 9px 0 #2c5282, 11px 9px 0 #2c5282, 12px 9px 0 #2c5282, 13px 9px 0 #2c5282, 14px 9px 0 #1e3a5f, 15px 9px 0 #000;
+		/* Bottom */
+		5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000, 8px 8px 0 #000, 9px 8px 0 #000, 10px 8px 0 #000, 11px 8px 0 #000, 12px 8px 0 #000, 13px 8px 0 #000, 14px 8px 0 #000;
 	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 
