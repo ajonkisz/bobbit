@@ -149,9 +149,9 @@ function goalPreviewPanel() {
 		}
 		state.isGoalAssistantSession = false;
 		state.activeGoalProposal = null;
-		const swarmMode = state.previewSwarmMode;
+		const teamMode = state.previewTeamMode;
 		const worktree = state.previewWorktree;
-		state.previewSwarmMode = false;
+		state.previewTeamMode = false;
 		state.previewWorktree = false;
 		// Clean up persisted draft
 		if (sessionId) {
@@ -161,7 +161,7 @@ function goalPreviewPanel() {
 		setHashRoute("landing");
 		state.appView = "authenticated";
 
-		await createGoal(trimmedTitle, state.previewCwd.trim(), { spec: state.previewSpec, swarm: swarmMode, worktree });
+		await createGoal(trimmedTitle, state.previewCwd.trim(), { spec: state.previewSpec, team: teamMode, worktree });
 		if (sessionId) {
 			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
 			clearSessionModel(sessionId);
@@ -250,10 +250,10 @@ function goalPreviewPanel() {
 			<div class="shrink-0 flex flex-col gap-3 px-5 py-3 border-t border-border">
 				<label class="flex items-center gap-2.5 cursor-pointer">
 					<input type="checkbox"
-						.checked=${state.previewSwarmMode}
-						@change=${(e: Event) => { state.previewSwarmMode = (e.target as HTMLInputElement).checked; if (state.previewSwarmMode) state.previewWorktree = true; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
+						.checked=${state.previewTeamMode}
+						@change=${(e: Event) => { state.previewTeamMode = (e.target as HTMLInputElement).checked; if (state.previewTeamMode) state.previewWorktree = true; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); }}
 						class="toggle-switch" />
-					<span class="text-xs text-muted-foreground">🐝 Swarm mode — Team Lead auto-spawns role agents</span>
+					<span class="text-xs text-muted-foreground">🐝 Team mode — Team Lead auto-spawns role agents</span>
 				</label>
 				<div class="flex items-center justify-end gap-2">
 					${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}

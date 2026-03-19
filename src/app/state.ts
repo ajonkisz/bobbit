@@ -20,10 +20,10 @@ export interface GatewaySession {
 	colorIndex?: number;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
-	/** Role in a swarm goal */
+	/** Role in a team goal */
 	role?: string;
-	/** The swarm goal this agent belongs to */
-	swarmGoalId?: string;
+	/** The team goal this agent belongs to */
+	teamGoalId?: string;
 	/** Git worktree path */
 	worktreePath?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
@@ -43,7 +43,7 @@ export interface Goal {
 	worktreePath?: string;
 	branch?: string;
 	repoPath?: string;
-	swarm?: boolean;
+	team?: boolean;
 	teamLeadSessionId?: string;
 }
 
@@ -85,7 +85,7 @@ export const state = {
 	previewSpecEdited: false,
 	hasReceivedProposal: false,
 	previewSpecEditMode: false,
-	previewSwarmMode: false,
+	previewTeamMode: false,
 	previewWorktree: false,
 	cwdDropdownOpen: false,
 	cwdHighlightIndex: -1,

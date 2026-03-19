@@ -3,7 +3,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { ArrowLeft, Pencil, Play, Plus, Square, Trash2 } from "lucide";
 import { state, renderApp, type Goal } from "./state.js";
-import { gatewayFetch, deleteGoal, startSwarm, teardownSwarm, getSwarmState } from "./api.js";
+import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState } from "./api.js";
 import { setHashRoute } from "./routing.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
@@ -65,9 +65,9 @@ let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
 let commits: CommitInfo[] = [];
 let reports: ReportInfo[] = [];
-let swarmActive = false;
-let swarmStarting = false;
-let swarmStopping = false;
+let teamActive = false;
+let teamStarting = false;
+let teamStopping = false;
 let loading = true;
 let error = "";
 
@@ -113,9 +113,9 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 		// Fetch workflow reports for all sessions belonging to this goal
 		reports = await fetchGoalReports(goalId);
 
-		// Check if a swarm is active
-		const swarmState = await getSwarmState(goalId);
-		swarmActive = swarmState != null;
+		// Check if a team is active
+		const teamState = await getTeamState(goalId);
+		teamActive = teamState != null;
 
 		loading = false;
 	} catch (err) {
@@ -181,9 +181,9 @@ export function clearDashboardState(): void {
 	tasks = [];
 	commits = [];
 	reports = [];
-	swarmActive = false;
-	swarmStarting = false;
-	swarmStopping = false;
+	teamActive = false;
+	teamStarting = false;
+	teamStopping = false;
 	loading = true;
 	error = "";
 	stopAgentPolling();
@@ -425,7 +425,7 @@ function renderCommitTimeline(commitList: CommitInfo[], taskList: Task[]): Templ
 // AGENT ACTIVITY PANEL
 // ============================================================================
 
-export interface SwarmAgent {
+export interface TeamAgent {
 	sessionId: string;
 	role: string;
 	status: string; // "starting" | "idle" | "streaming" | "terminated"
@@ -435,13 +435,13 @@ export interface SwarmAgent {
 	createdAt: number;
 }
 
-let agents: SwarmAgent[] = [];
+let agents: TeamAgent[] = [];
 let agentPollTimer: ReturnType<typeof setInterval> | null = null;
 let taskPollTimer: ReturnType<typeof setInterval> | null = null;
 
-async function fetchAgents(goalId: string): Promise<SwarmAgent[]> {
+async function fetchAgents(goalId: string): Promise<TeamAgent[]> {
 	try {
-		const res = await gatewayFetch(`/api/goals/${goalId}/swarm/agents`);
+		const res = await gatewayFetch(`/api/goals/${goalId}/team/agents`);
 		if (!res.ok) return [];
 		const data = await res.json();
 		return data.agents ?? [];
@@ -486,9 +486,9 @@ function startAgentPolling(goalId: string): void {
 	// Poll every 5 seconds
 	agentPollTimer = setInterval(async () => {
 		agents = await fetchAgents(goalId);
-		// Also refresh swarm active state
-		const swarmState = await getSwarmState(goalId);
-		swarmActive = swarmState != null;
+		// Also refresh team active state
+		const teamState = await getTeamState(goalId);
+		teamActive = teamState != null;
 		renderApp();
 	}, 5000);
 }
@@ -542,14 +542,14 @@ function getInitials(role: string): string {
 	return role.charAt(0).toUpperCase();
 }
 
-function formatAgentName(agent: SwarmAgent): string {
+function formatAgentName(agent: TeamAgent): string {
 	const session = state.gatewaySessions.find((s) => s.id === agent.sessionId);
 	if (session?.title) return session.title;
 	if (agent.role === "team-lead") return "Team Lead";
 	return agent.role.charAt(0).toUpperCase() + agent.role.slice(1);
 }
 
-export function renderAgentPanel(agentList: SwarmAgent[]): TemplateResult {
+export function renderAgentPanel(agentList: TeamAgent[]): TemplateResult {
 	if (agentList.length === 0) {
 		return html`
 			<div class="agent-panel">
@@ -681,13 +681,13 @@ function renderReportsPanel(reportList: ReportInfo[]): TemplateResult {
 // DASHBOARD LAYOUT
 // ============================================================================
 
-async function handleStartSwarm(goalId: string): Promise<void> {
-	swarmStarting = true;
+async function handleStartTeam(goalId: string): Promise<void> {
+	teamStarting = true;
 	renderApp();
-	const sessionId = await startSwarm(goalId);
-	swarmStarting = false;
+	const sessionId = await startTeam(goalId);
+	teamStarting = false;
 	if (sessionId) {
-		swarmActive = true;
+		teamActive = true;
 		renderApp();
 		connectToSession(sessionId, false);
 	} else {
@@ -695,20 +695,20 @@ async function handleStartSwarm(goalId: string): Promise<void> {
 	}
 }
 
-async function handleEndSwarm(goalId: string): Promise<void> {
-	swarmStopping = true;
+async function handleEndTeam(goalId: string): Promise<void> {
+	teamStopping = true;
 	renderApp();
-	const ok = await teardownSwarm(goalId);
-	swarmStopping = false;
+	const ok = await teardownTeam(goalId);
+	teamStopping = false;
 	if (ok) {
-		swarmActive = false;
+		teamActive = false;
 		agents = [];
 	}
 	renderApp();
 }
 
 function renderNavBar(goal: Goal): TemplateResult {
-	const isSwarmGoal = !!goal.swarm;
+	const isTeamGoal = !!goal.team;
 
 	return html`
 		<div class="dashboard-nav">
