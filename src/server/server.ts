@@ -16,6 +16,7 @@ import { TeamManager } from "./agent/team-manager.js";
 import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
 import type { TaskType, TaskState } from "./agent/task-store.js";
+import { GoalArtifactStore, getDefaultRequirements, type ArtifactType } from "./agent/goal-artifact-store.js";
 
 const VALID_TASK_TYPES = new Set<string>(["architecture", "design-review", "mock-generation", "tdd-tests", "implementation", "code-review", "security-review", "documentation", "testing", "bug-fix", "refactor", "custom"]);
 const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
@@ -56,6 +57,7 @@ export function createGateway(config: GatewayConfig) {
 	const colorStore = new ColorStore();
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
+	const goalArtifactStore = new GoalArtifactStore();
 	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
@@ -100,7 +102,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, goalArtifactStore);
 			return;
 		}
 
@@ -175,6 +177,7 @@ async function handleApiRoute(
 	colorStore: ColorStore,
 	teamManager: TeamManager,
 	roleManager: RoleManager,
+	goalArtifactStore: GoalArtifactStore,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -466,6 +469,24 @@ async function handleApiRoute(
 			json({ error: `Invalid task type: ${type}` }, 400);
 			return;
 		}
+
+		// Enforce artifact requirements
+		const requirements = getDefaultRequirements();
+		const skipTypes = goal.skipArtifactRequirements ?? [];
+		const existingArtifacts = goalArtifactStore.getByGoalId(goalId);
+		const existingTypes = new Set(existingArtifacts.map((a) => a.type));
+		const missingArtifacts: { type: string; description: string }[] = [];
+		for (const req2 of requirements) {
+			if (skipTypes.includes(req2.artifactType)) continue;
+			if (req2.blocksTaskTypes.includes(type) && !existingTypes.has(req2.artifactType)) {
+				missingArtifacts.push({ type: req2.artifactType, description: req2.description });
+			}
+		}
+		if (missingArtifacts.length > 0) {
+			json({ error: "Missing required artifacts", missingArtifacts }, 409);
+			return;
+		}
+
 		try {
 			const task = sessionManager.taskManager.createTask(goalId, title, type as TaskType, {
 				parentTaskId: body.parentTaskId,
@@ -476,6 +497,75 @@ async function handleApiRoute(
 		} catch (err: any) {
 			json({ error: err.message }, 400);
 		}
+		return;
+	}
+
+	// GET /api/goals/:goalId/artifacts — list artifacts for a goal
+	const goalArtifactsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/artifacts$/);
+	if (goalArtifactsMatch && req.method === "GET") {
+		const artifacts = goalArtifactStore.getByGoalId(goalArtifactsMatch[1]);
+		json({ artifacts });
+		return;
+	}
+
+	// POST /api/goals/:goalId/artifacts — create an artifact
+	if (goalArtifactsMatch && req.method === "POST") {
+		const goalId = goalArtifactsMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+
+		const body = await readBody(req);
+		if (!body?.name || typeof body.name !== "string") {
+			json({ error: "Missing name" }, 400); return;
+		}
+		if (!body?.type || typeof body.type !== "string") {
+			json({ error: "Missing type" }, 400); return;
+		}
+		if (!body?.content || typeof body.content !== "string") {
+			json({ error: "Missing content" }, 400); return;
+		}
+		if (!body?.producedBy || typeof body.producedBy !== "string") {
+			json({ error: "Missing producedBy" }, 400); return;
+		}
+		const artifact = goalArtifactStore.create({
+			goalId,
+			name: body.name,
+			type: body.type as ArtifactType,
+			content: body.content,
+			producedBy: body.producedBy,
+			skillId: body.skillId,
+		});
+		json(artifact, 201);
+		return;
+	}
+
+	// GET /api/goals/:goalId/artifacts/:artifactId — get a specific artifact
+	const goalArtifactMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/artifacts\/([^/]+)$/);
+	if (goalArtifactMatch && req.method === "GET") {
+		const artifact = goalArtifactStore.get(goalArtifactMatch[2]);
+		if (!artifact || artifact.goalId !== goalArtifactMatch[1]) {
+			json({ error: "Artifact not found" }, 404); return;
+		}
+		json(artifact);
+		return;
+	}
+
+	// PUT /api/goals/:goalId/artifacts/:artifactId — revise an artifact
+	if (goalArtifactMatch && req.method === "PUT") {
+		const artifact = goalArtifactStore.get(goalArtifactMatch[2]);
+		if (!artifact || artifact.goalId !== goalArtifactMatch[1]) {
+			json({ error: "Artifact not found" }, 404); return;
+		}
+		const body = await readBody(req);
+		if (!body) { json({ error: "Missing body" }, 400); return; }
+		const updated = goalArtifactStore.update(goalArtifactMatch[2], {
+			name: body.name,
+			type: body.type,
+			content: body.content,
+			skillId: body.skillId,
+		});
+		if (!updated) { json({ error: "Artifact not found" }, 404); return; }
+		json(updated);
 		return;
 	}
 
