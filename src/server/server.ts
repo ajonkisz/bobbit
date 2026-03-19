@@ -12,7 +12,7 @@ import { validateToken } from "./auth/token.js";
 import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
 import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
-import { SwarmManager } from "./agent/swarm-manager.js";
+import { TeamManager } from "./agent/team-manager.js";
 import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
 import type { TaskType, TaskState } from "./agent/task-store.js";
@@ -56,7 +56,7 @@ export function createGateway(config: GatewayConfig) {
 	const colorStore = new ColorStore();
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
-	const swarmManager = new SwarmManager(sessionManager, {
+	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
 		roleStore,
@@ -100,7 +100,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, swarmManager, roleManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager);
 			return;
 		}
 
@@ -173,7 +173,7 @@ async function handleApiRoute(
 	sessionManager: SessionManager,
 	config: GatewayConfig,
 	colorStore: ColorStore,
-	swarmManager: SwarmManager,
+	teamManager: TeamManager,
 	roleManager: RoleManager,
 ) {
 	const json = (data: unknown, status = 200) => {
@@ -237,7 +237,7 @@ async function handleApiRoute(
 			goalAssistant: session.goalAssistant,
 			delegateOf: session.delegateOf,
 			role: session.role,
-			swarmGoalId: session.swarmGoalId,
+			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
 			colorIndex: colorStore.get(session.id),
@@ -321,13 +321,13 @@ async function handleApiRoute(
 		const title = body?.title;
 		const cwd = body?.cwd || config.defaultCwd;
 		const spec = body?.spec || "";
-		const swarm = body?.swarm === true;
+		const team = body?.team === true || body?.swarm === true; // Accept legacy 'swarm' field
 		const worktree = body?.worktree === true;
 		if (!title || typeof title !== "string") {
 			json({ error: "Missing title" }, 400);
 			return;
 		}
-		const goal = sessionManager.goalManager.createGoal(title, cwd, { spec, swarm, worktree });
+		const goal = sessionManager.goalManager.createGoal(title, cwd, { spec, team, worktree });
 		json(goal, 201);
 		return;
 	}
@@ -352,7 +352,7 @@ async function handleApiRoute(
 				cwd: body.cwd,
 				state: body.state,
 				spec: body.spec,
-				swarm: body.swarm,
+				team: body.team ?? body.swarm, // Accept legacy 'swarm' field
 				repoPath: body.repoPath,
 				branch: body.branch,
 			});
@@ -510,7 +510,7 @@ async function handleApiRoute(
 
 				// Notify team lead when state transitions to terminal or blocked via PUT
 				if (body.state && body.state !== prevState && (body.state === "complete" || body.state === "skipped" || body.state === "blocked") && task?.goalId) {
-					swarmManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, body.state);
+					teamManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, body.state);
 				}
 
 				json({ ok: true });
@@ -569,7 +569,7 @@ async function handleApiRoute(
 
 			// Notify team lead when a task reaches a terminal or blocked state
 			if ((state === "complete" || state === "skipped" || state === "blocked") && task?.goalId) {
-				swarmManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, state);
+				teamManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, state);
 			}
 
 			json({ ok: true });
@@ -579,14 +579,15 @@ async function handleApiRoute(
 		return;
 	}
 
-	// ── Swarm endpoints ────────────────────────────────────────────
+	// ── Team endpoints ─────────────────────────────────────────────
+	// Routes accept both /team/ and legacy /swarm/ paths
 
-	// POST /api/goals/:id/swarm/start — start a swarm for a goal
-	const swarmStartMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/start$/);
-	if (swarmStartMatch && req.method === "POST") {
-		const goalId = swarmStartMatch[1];
+	// POST /api/goals/:id/team/start — start a team for a goal
+	const teamStartMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/start$/);
+	if (teamStartMatch && req.method === "POST") {
+		const goalId = teamStartMatch[1];
 		try {
-			const session = await swarmManager.startSwarm(goalId);
+			const session = await teamManager.startTeam(goalId);
 			json({ sessionId: session.id, title: session.title }, 201);
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -594,17 +595,17 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/spawn — spawn a role agent
-	const swarmSpawnMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/spawn$/);
-	if (swarmSpawnMatch && req.method === "POST") {
-		const goalId = swarmSpawnMatch[1];
+	// POST /api/goals/:id/team/spawn — spawn a role agent
+	const teamSpawnMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/spawn$/);
+	if (teamSpawnMatch && req.method === "POST") {
+		const goalId = teamSpawnMatch[1];
 		const body = await readBody(req);
 		if (!body?.role || !body?.task) {
 			json({ error: "Missing role or task" }, 400);
 			return;
 		}
 		try {
-			const result = await swarmManager.spawnRole(goalId, body.role, body.task);
+			const result = await teamManager.spawnRole(goalId, body.role, body.task);
 			json(result, 201);
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -612,16 +613,16 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/dismiss — dismiss a role agent
-	const swarmDismissMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/dismiss$/);
-	if (swarmDismissMatch && req.method === "POST") {
+	// POST /api/goals/:id/team/dismiss — dismiss a role agent
+	const teamDismissMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/dismiss$/);
+	if (teamDismissMatch && req.method === "POST") {
 		const body = await readBody(req);
 		if (!body?.sessionId) {
 			json({ error: "Missing sessionId" }, 400);
 			return;
 		}
 		try {
-			const ok = await swarmManager.dismissRole(body.sessionId);
+			const ok = await teamManager.dismissRole(body.sessionId);
 			json({ ok });
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -654,33 +655,33 @@ async function handleApiRoute(
 		return;
 	}
 
-	// GET /api/goals/:id/swarm — get swarm state
-	const swarmStateMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm$/);
-	if (swarmStateMatch && req.method === "GET") {
-		const goalId = swarmStateMatch[1];
-		const state = swarmManager.getSwarmState(goalId);
+	// GET /api/goals/:id/team — get team state
+	const teamStateMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)$/);
+	if (teamStateMatch && req.method === "GET") {
+		const goalId = teamStateMatch[1];
+		const state = teamManager.getTeamState(goalId);
 		if (!state) {
-			json({ error: "No active swarm for this goal" }, 404);
+			json({ error: "No active team for this goal" }, 404);
 			return;
 		}
 		json(state);
 		return;
 	}
 
-	// GET /api/goals/:id/swarm/agents — list agents for a swarm goal
-	const swarmAgentsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/agents$/);
-	if (swarmAgentsMatch && req.method === "GET") {
-		const goalId = swarmAgentsMatch[1];
-		json({ agents: swarmManager.listAgents(goalId) });
+	// GET /api/goals/:id/team/agents — list agents for a team goal
+	const teamAgentsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/agents$/);
+	if (teamAgentsMatch && req.method === "GET") {
+		const goalId = teamAgentsMatch[1];
+		json({ agents: teamManager.listAgents(goalId) });
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/complete — complete a swarm (dismiss agents, keep team lead)
-	const swarmCompleteMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/complete$/);
-	if (swarmCompleteMatch && req.method === "POST") {
-		const goalId = swarmCompleteMatch[1];
+	// POST /api/goals/:id/team/complete — complete a team (dismiss agents, keep team lead)
+	const teamCompleteMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/complete$/);
+	if (teamCompleteMatch && req.method === "POST") {
+		const goalId = teamCompleteMatch[1];
 		try {
-			await swarmManager.completeSwarm(goalId);
+			await teamManager.completeTeam(goalId);
 			json({ ok: true });
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -688,12 +689,12 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/goals/:id/swarm/teardown — fully tear down a swarm (dismiss agents + terminate team lead)
-	const swarmTeardownMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/swarm\/teardown$/);
-	if (swarmTeardownMatch && req.method === "POST") {
-		const goalId = swarmTeardownMatch[1];
+	// POST /api/goals/:id/team/teardown — fully tear down a team (dismiss agents + terminate team lead)
+	const teamTeardownMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/teardown$/);
+	if (teamTeardownMatch && req.method === "POST") {
+		const goalId = teamTeardownMatch[1];
 		try {
-			await swarmManager.teardownSwarm(goalId);
+			await teamManager.teardownTeam(goalId);
 			json({ ok: true });
 		} catch (err) {
 			json({ error: String(err) }, 400);

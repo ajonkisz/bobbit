@@ -2,16 +2,16 @@ import { randomUUID } from "node:crypto";
 import type { SessionManager, SessionInfo } from "./session-manager.js";
 import type { GoalManager } from "./goal-manager.js";
 import { createWorktree, cleanupWorktree } from "../workflows/git.js";
-import { getRolePrompt, VALID_ROLES } from "./swarm-prompts.js";
-import { SwarmStore } from "./swarm-store.js";
+import { getRolePrompt, VALID_ROLES } from "./team-prompts.js";
+import { TeamStore } from "./team-store.js";
 import type { RoleStore } from "./role-store.js";
-import type { PersistedSwarmEntry } from "./swarm-store.js";
-import { generateSwarmName } from "./swarm-names.js";
+import type { PersistedTeamEntry } from "./team-store.js";
+import { generateTeamName } from "./team-names.js";
 import type { ColorStore } from "./color-store.js";
 import type { TaskManager } from "./task-manager.js";
 
 
-export interface SwarmAgent {
+export interface TeamAgent {
 	sessionId: string;
 	role: string;
 	worktreePath: string;
@@ -22,7 +22,7 @@ export interface SwarmAgent {
 	unsubscribeEvent?: () => void;
 }
 
-export interface SwarmAgentInfo {
+export interface TeamAgentInfo {
 	sessionId: string;
 	role: string;
 	status: string;
@@ -32,29 +32,29 @@ export interface SwarmAgentInfo {
 	createdAt: number;
 }
 
-export interface SwarmState {
+export interface TeamState {
 	goalId: string;
 	teamLeadSessionId: string | null;
-	agents: SwarmAgentInfo[];
+	agents: TeamAgentInfo[];
 	maxConcurrent: number;
 }
 
-/** Internal tracking for a swarm associated with a goal. */
-interface SwarmEntry {
+/** Internal tracking for a team associated with a goal. */
+interface TeamEntry {
 	goalId: string;
 	teamLeadSessionId: string | null;
-	agents: SwarmAgent[];
+	agents: TeamAgent[];
 	maxConcurrent: number;
 }
 
 
 
 /**
- * Manages swarm goal lifecycles — team lead sessions and role agent sessions
+ * Manages team goal lifecycles — team lead sessions and role agent sessions
  * with isolated git worktrees.
  */
-export interface SwarmManagerConfig {
-	/** Color store for assigning unique palette indices to swarm sessions */
+export interface TeamManagerConfig {
+	/** Color store for assigning unique palette indices to team sessions */
 	colorStore: ColorStore;
 	/** Task manager for looking up tasks assigned to sessions */
 	taskManager: TaskManager;
@@ -62,22 +62,22 @@ export interface SwarmManagerConfig {
 	roleStore?: RoleStore;
 }
 
-export class SwarmManager {
+export class TeamManager {
 	private sessionManager: SessionManager;
-	private config: SwarmManagerConfig;
+	private config: TeamManagerConfig;
 	private taskManager: TaskManager;
-	private swarms = new Map<string, SwarmEntry>();
-	private store: SwarmStore;
+	private teams = new Map<string, TeamEntry>();
+	private store: TeamStore;
 
 	/** Reverse lookup: sessionId → goalId for quick dismissal. */
 	private sessionToGoal = new Map<string, string>();
 
-	constructor(sessionManager: SessionManager, config: SwarmManagerConfig) {
+	constructor(sessionManager: SessionManager, config: TeamManagerConfig) {
 		this.sessionManager = sessionManager;
 		this.config = config;
 		this.taskManager = config.taskManager;
-		this.store = new SwarmStore();
-		this.restoreSwarms();
+		this.store = new TeamStore();
+		this.restoreTeams();
 	}
 
 	/** Pick a palette index (0-19) not already used by any session, with randomisation. */
@@ -99,9 +99,9 @@ export class SwarmManager {
 	}
 
 	/**
-	 * Convert an in-memory SwarmEntry to a PersistedSwarmEntry for storage.
+	 * Convert an in-memory TeamEntry to a PersistedTeamEntry for storage.
 	 */
-	private toPersistedEntry(entry: SwarmEntry): PersistedSwarmEntry {
+	private toPersistedEntry(entry: TeamEntry): PersistedTeamEntry {
 		return {
 			goalId: entry.goalId,
 			teamLeadSessionId: entry.teamLeadSessionId,
@@ -118,23 +118,23 @@ export class SwarmManager {
 	}
 
 	/**
-	 * Persist the current state of a swarm entry to disk.
+	 * Persist the current state of a team entry to disk.
 	 */
 	private persistEntry(goalId: string): void {
-		const entry = this.swarms.get(goalId);
+		const entry = this.teams.get(goalId);
 		if (entry) {
 			this.store.put(this.toPersistedEntry(entry));
 		}
 	}
 
 	/**
-	 * Restore swarms from disk persistence.
+	 * Restore teams from disk persistence.
 	 * Reconstructs the in-memory Maps from the persisted store.
 	 */
-	private restoreSwarms(): void {
+	private restoreTeams(): void {
 		const persisted = this.store.getAll();
 		for (const p of persisted) {
-			const entry: SwarmEntry = {
+			const entry: TeamEntry = {
 				goalId: p.goalId,
 				teamLeadSessionId: p.teamLeadSessionId,
 				agents: p.agents.map((a) => ({
@@ -147,7 +147,7 @@ export class SwarmManager {
 				})),
 				maxConcurrent: p.maxConcurrent,
 			};
-			this.swarms.set(p.goalId, entry);
+			this.teams.set(p.goalId, entry);
 
 			// Rebuild reverse lookup
 			if (p.teamLeadSessionId) {
@@ -158,7 +158,7 @@ export class SwarmManager {
 			}
 
 			console.log(
-				`[swarm-manager] Restored swarm for goal ${p.goalId} — team lead: ${p.teamLeadSessionId}, agents: ${entry.agents.length}`,
+				`[team-manager] Restored team for goal ${p.goalId} — team lead: ${p.teamLeadSessionId}, agents: ${entry.agents.length}`,
 			);
 		}
 	}
@@ -168,19 +168,19 @@ export class SwarmManager {
 	}
 
 	/**
-	 * Start a swarm for the given goal.
+	 * Start a team for the given goal.
 	 * Creates a Team Lead session and returns it.
 	 */
-	async startSwarm(goalId: string): Promise<SessionInfo> {
+	async startTeam(goalId: string): Promise<SessionInfo> {
 		const goal = this.goalManager.getGoal(goalId);
 		if (!goal) {
 			throw new Error(`Goal not found: ${goalId}`);
 		}
-		if (!goal.swarm) {
-			throw new Error(`Goal "${goal.title}" does not have swarm mode enabled`);
+		if (!goal.team) {
+			throw new Error(`Goal "${goal.title}" does not have team mode enabled`);
 		}
-		if (this.swarms.has(goalId)) {
-			throw new Error(`Swarm already active for goal: ${goalId}`);
+		if (this.teams.has(goalId)) {
+			throw new Error(`Team already active for goal: ${goalId}`);
 		}
 
 		// Use the goal's worktree/cwd for the team lead
@@ -202,25 +202,25 @@ export class SwarmManager {
 
 		// Assign a unique color and title
 		this.assignUniqueColor(session.id);
-		const teamLeadName = await generateSwarmName("team-lead");
+		const teamLeadName = await generateTeamName("team-lead");
 		this.sessionManager.setTitle(session.id, `Team Lead: ${teamLeadName}`);
 		session.titleGenerated = true;
 		const teamLeadAccessory = storedRole?.accessory ?? "crown";
 		this.sessionManager.updateSessionMeta(session.id, {
 			role: "team-lead",
-			swarmGoalId: goalId,
+			teamGoalId: goalId,
 			worktreePath: goal.worktreePath,
 			accessory: teamLeadAccessory,
 		});
 
-		// Initialize swarm tracking
-		const entry: SwarmEntry = {
+		// Initialize team tracking
+		const entry: TeamEntry = {
 			goalId,
 			teamLeadSessionId: session.id,
 			agents: [],
 			maxConcurrent: 5,
 		};
-		this.swarms.set(goalId, entry);
+		this.teams.set(goalId, entry);
 		this.sessionToGoal.set(session.id, goalId);
 		this.persistEntry(goalId);
 
@@ -231,15 +231,15 @@ export class SwarmManager {
 
 		// Kick off the team lead with an initial prompt (same pattern as delegate sessions)
 		session.rpcClient.prompt("Execute the task described in your system prompt. Follow the instructions carefully.").catch((err: any) => {
-			console.error("[swarm-manager] Failed to send team lead kickoff prompt:", err);
+			console.error("[team-manager] Failed to send team lead kickoff prompt:", err);
 		});
 
-		console.log(`[swarm-manager] Started swarm for goal "${goal.title}" — team lead: ${session.id}`);
+		console.log(`[team-manager] Started team for goal "${goal.title}" — team lead: ${session.id}`);
 		return session;
 	}
 
 	/**
-	 * Spawn a role agent for a swarm goal.
+	 * Spawn a role agent for a team goal.
 	 * Creates an isolated git worktree and a session with the role's system prompt.
 	 * Sends the task as the first prompt.
 	 */
@@ -256,18 +256,18 @@ export class SwarmManager {
 		}
 
 		if (role === 'team-lead') {
-			throw new Error('Cannot spawn team-lead role via spawnRole — use startSwarm() instead');
+			throw new Error('Cannot spawn team-lead role via spawnRole — use startTeam() instead');
 		}
 
-		const entry = this.swarms.get(goalId);
+		const entry = this.teams.get(goalId);
 		if (!entry) {
-			throw new Error(`No active swarm for goal: ${goalId}`);
+			throw new Error(`No active team for goal: ${goalId}`);
 		}
 
 		// Check concurrency limit
 		if (entry.agents.length >= entry.maxConcurrent) {
 			throw new Error(
-				`Swarm for goal ${goalId} already has ${entry.agents.length} agents (max: ${entry.maxConcurrent})`,
+				`Team for goal ${goalId} already has ${entry.agents.length} agents (max: ${entry.maxConcurrent})`,
 			);
 		}
 
@@ -308,20 +308,20 @@ export class SwarmManager {
 
 			// Assign a unique color and title
 			this.assignUniqueColor(session.id);
-			const roleName = await generateSwarmName(role);
+			const roleName = await generateTeamName(role);
 			const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 			this.sessionManager.setTitle(session.id, `${roleLabel}: ${roleName}`);
 			session.titleGenerated = true;
 			const roleAccessory = storedRoleDef?.accessory ?? "";
 			this.sessionManager.updateSessionMeta(session.id, {
 				role,
-				swarmGoalId: goalId,
+				teamGoalId: goalId,
 				worktreePath: worktreeResult.worktreePath,
 				accessory: roleAccessory,
 			});
 
 			// Track the agent
-			const agent: SwarmAgent = {
+			const agent: TeamAgent = {
 				sessionId: session.id,
 				role,
 				worktreePath: worktreeResult.worktreePath,
@@ -335,20 +335,20 @@ export class SwarmManager {
 
 			// Send the task as the first prompt
 			session.rpcClient.prompt(task).catch((err: any) => {
-				console.error('[swarm-manager] Failed to send task prompt:', err);
+				console.error('[team-manager] Failed to send task prompt:', err);
 			});
 
 			// Subscribe to worker events to steer the team lead when the worker goes idle
 			const unsubscribe = session.rpcClient.onEvent((event: any) => {
 				if (event.type !== "agent_end") return;
 				this.notifyTeamLead(goalId, session.id, role, agentId).catch((err) => {
-					console.error("[swarm-manager] Failed to notify team lead:", err);
+					console.error("[team-manager] Failed to notify team lead:", err);
 				});
 			});
 			agent.unsubscribeEvent = unsubscribe;
 
 			console.log(
-				`[swarm-manager] Spawned ${role} agent (${session.id}) for goal "${goal.title}" — worktree: ${worktreeResult.worktreePath}`,
+				`[team-manager] Spawned ${role} agent (${session.id}) for goal "${goal.title}" — worktree: ${worktreeResult.worktreePath}`,
 			);
 
 			return { sessionId: session.id, worktreePath: worktreeResult.worktreePath };
@@ -356,9 +356,9 @@ export class SwarmManager {
 			// Clean up the orphaned worktree on failure
 			try {
 				cleanupWorktree(goal.repoPath, worktreeResult.worktreePath, branchName, true);
-				console.log(`[swarm-manager] Cleaned up orphaned worktree after spawnRole failure: ${worktreeResult.worktreePath}`);
+				console.log(`[team-manager] Cleaned up orphaned worktree after spawnRole failure: ${worktreeResult.worktreePath}`);
 			} catch (cleanupErr) {
-				console.error(`[swarm-manager] Failed to clean up orphaned worktree ${worktreeResult.worktreePath}:`, cleanupErr);
+				console.error(`[team-manager] Failed to clean up orphaned worktree ${worktreeResult.worktreePath}:`, cleanupErr);
 			}
 			throw err;
 		}
@@ -369,7 +369,7 @@ export class SwarmManager {
 	 * Sends a steer message with task context so the team lead can decide next steps.
 	 */
 	private async notifyTeamLead(goalId: string, workerSessionId: string, role: string, agentId: string): Promise<void> {
-		const entry = this.swarms.get(goalId);
+		const entry = this.teams.get(goalId);
 		if (!entry?.teamLeadSessionId) return;
 
 		const teamLeadSession = this.sessionManager.getSession(entry.teamLeadSessionId);
@@ -394,9 +394,9 @@ export class SwarmManager {
 				// Idle: enqueue as a steered prompt so it drains immediately
 				this.sessionManager.enqueuePrompt(entry.teamLeadSessionId, message, { isSteered: true });
 			}
-			console.log(`[swarm-manager] Notified team lead for goal ${goalId} (status=${teamLeadSession.status}): ${message}`);
+			console.log(`[team-manager] Notified team lead for goal ${goalId} (status=${teamLeadSession.status}): ${message}`);
 		} catch (err) {
-			console.error(`[swarm-manager] Failed to notify team lead for goal ${goalId}:`, err);
+			console.error(`[team-manager] Failed to notify team lead for goal ${goalId}:`, err);
 		}
 	}
 
@@ -406,7 +406,7 @@ export class SwarmManager {
 	 * even if the worker continues with another task without going idle.
 	 */
 	notifyTeamLeadOfTaskCompletion(goalId: string, taskTitle: string, taskState: string): void {
-		const entry = this.swarms.get(goalId);
+		const entry = this.teams.get(goalId);
 		if (!entry?.teamLeadSessionId) return;
 
 		const teamLeadSession = this.sessionManager.getSession(entry.teamLeadSessionId);
@@ -416,12 +416,12 @@ export class SwarmManager {
 
 		if (teamLeadSession.status === "streaming") {
 			teamLeadSession.rpcClient.steer(message).catch((err: any) => {
-				console.error(`[swarm-manager] Failed to steer team lead on task completion for goal ${goalId}:`, err);
+				console.error(`[team-manager] Failed to steer team lead on task completion for goal ${goalId}:`, err);
 			});
 		} else {
 			this.sessionManager.enqueuePrompt(entry.teamLeadSessionId, message, { isSteered: true });
 		}
-		console.log(`[swarm-manager] Notified team lead of task completion for goal ${goalId}: ${taskTitle} → ${taskState}`);
+		console.log(`[team-manager] Notified team lead of task completion for goal ${goalId}: ${taskTitle} → ${taskState}`);
 	}
 
 	/**
@@ -433,14 +433,14 @@ export class SwarmManager {
 			return false;
 		}
 
-		const entry = this.swarms.get(goalId);
+		const entry = this.teams.get(goalId);
 		if (!entry) {
 			return false;
 		}
 
 		// Don't allow dismissing the team lead via this method
 		if (entry.teamLeadSessionId === sessionId) {
-			throw new Error("Cannot dismiss the team lead — use completeSwarm() instead");
+			throw new Error("Cannot dismiss the team lead — use completeTeam() instead");
 		}
 
 		const agentIndex = entry.agents.findIndex((a) => a.sessionId === sessionId);
@@ -463,9 +463,9 @@ export class SwarmManager {
 		if (goal?.repoPath && agent.worktreePath) {
 			try {
 				cleanupWorktree(goal.repoPath, agent.worktreePath, agent.branch, true);
-				console.log(`[swarm-manager] Cleaned up worktree for ${agent.role} agent: ${agent.worktreePath}`);
+				console.log(`[team-manager] Cleaned up worktree for ${agent.role} agent: ${agent.worktreePath}`);
 			} catch (err) {
-				console.error(`[swarm-manager] Failed to clean up worktree for ${agent.role} agent:`, err);
+				console.error(`[team-manager] Failed to clean up worktree for ${agent.role} agent:`, err);
 			}
 		}
 
@@ -474,15 +474,15 @@ export class SwarmManager {
 		this.sessionToGoal.delete(sessionId);
 		this.persistEntry(goalId);
 
-		console.log(`[swarm-manager] Dismissed ${agent.role} agent (${sessionId}) for goal ${goalId}`);
+		console.log(`[team-manager] Dismissed ${agent.role} agent (${sessionId}) for goal ${goalId}`);
 		return true;
 	}
 
 	/**
 	 * List all active agents for a goal.
 	 */
-	listAgents(goalId: string): SwarmAgentInfo[] {
-		const entry = this.swarms.get(goalId);
+	listAgents(goalId: string): TeamAgentInfo[] {
+		const entry = this.teams.get(goalId);
 		if (!entry) {
 			return [];
 		}
@@ -502,13 +502,13 @@ export class SwarmManager {
 	}
 
 	/**
-	 * Complete a swarm: dismiss all role agents but keep the team lead alive.
+	 * Complete a team: dismiss all role agents but keep the team lead alive.
 	 * The team lead remains active to present a report and await further instructions.
 	 */
-	async completeSwarm(goalId: string): Promise<void> {
-		const entry = this.swarms.get(goalId);
+	async completeTeam(goalId: string): Promise<void> {
+		const entry = this.teams.get(goalId);
 		if (!entry) {
-			throw new Error(`No active swarm for goal: ${goalId}`);
+			throw new Error(`No active team for goal: ${goalId}`);
 		}
 
 		// Dismiss all role agents
@@ -517,7 +517,7 @@ export class SwarmManager {
 			try {
 				await this.dismissRole(sessionId);
 			} catch (err) {
-				console.error(`[swarm-manager] Error dismissing agent ${sessionId} during swarm completion:`, err);
+				console.error(`[team-manager] Error dismissing agent ${sessionId} during team completion:`, err);
 			}
 		}
 
@@ -527,21 +527,21 @@ export class SwarmManager {
 		// Update goal state
 		this.goalManager.updateGoal(goalId, { state: "complete" });
 
-		// Keep swarm tracking alive so the team lead can still be found
+		// Keep team tracking alive so the team lead can still be found
 		// but persist the updated state (agents cleared)
 		this.persistEntry(goalId);
 
-		console.log(`[swarm-manager] Completed swarm for goal ${goalId} — team lead remains active: ${entry.teamLeadSessionId}`);
+		console.log(`[team-manager] Completed team for goal ${goalId} — team lead remains active: ${entry.teamLeadSessionId}`);
 	}
 
 	/**
-	 * Fully tear down a swarm: dismiss all agents AND terminate the team lead.
+	 * Fully tear down a team: dismiss all agents AND terminate the team lead.
 	 * Use this when explicitly shutting down everything.
 	 */
-	async teardownSwarm(goalId: string): Promise<void> {
-		const entry = this.swarms.get(goalId);
+	async teardownTeam(goalId: string): Promise<void> {
+		const entry = this.teams.get(goalId);
 		if (!entry) {
-			throw new Error(`No active swarm for goal: ${goalId}`);
+			throw new Error(`No active team for goal: ${goalId}`);
 		}
 
 		// Dismiss all role agents
@@ -550,7 +550,7 @@ export class SwarmManager {
 			try {
 				await this.dismissRole(sessionId);
 			} catch (err) {
-				console.error(`[swarm-manager] Error dismissing agent ${sessionId} during swarm teardown:`, err);
+				console.error(`[team-manager] Error dismissing agent ${sessionId} during team teardown:`, err);
 			}
 		}
 
@@ -559,23 +559,23 @@ export class SwarmManager {
 			try {
 				await this.sessionManager.terminateSession(entry.teamLeadSessionId);
 			} catch (err) {
-				console.error(`[swarm-manager] Error terminating team lead ${entry.teamLeadSessionId}:`, err);
+				console.error(`[team-manager] Error terminating team lead ${entry.teamLeadSessionId}:`, err);
 			}
 			this.sessionToGoal.delete(entry.teamLeadSessionId);
 		}
 
-		// Remove swarm tracking entirely
-		this.swarms.delete(goalId);
+		// Remove team tracking entirely
+		this.teams.delete(goalId);
 		this.store.remove(goalId);
 
-		console.log(`[swarm-manager] Tore down swarm for goal ${goalId}`);
+		console.log(`[team-manager] Tore down team for goal ${goalId}`);
 	}
 
 	/**
-	 * Get the full swarm state for a goal.
+	 * Get the full team state for a goal.
 	 */
-	getSwarmState(goalId: string): SwarmState | undefined {
-		const entry = this.swarms.get(goalId);
+	getTeamState(goalId: string): TeamState | undefined {
+		const entry = this.teams.get(goalId);
 		if (!entry) {
 			return undefined;
 		}
