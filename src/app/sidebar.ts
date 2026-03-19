@@ -49,6 +49,16 @@ export function renderSidebar() {
 
 	return html`
 		<div class="w-[240px] shrink-0 h-full flex flex-col sidebar-edge" style="background: var(--sidebar);">
+			<div class="flex items-center border-b border-border/50 px-1 py-1">
+				<button
+					class="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}
+					title="Manage roles"
+				>
+					${icon(Users, "sm")}
+					<span>Roles</span>
+				</button>
+			</div>
 			<div class="flex-1 overflow-y-auto flex flex-col gap-0.5 py-2 px-0.5">
 				${state.sessionsLoading
 					? html`<div class="text-center py-6 text-muted-foreground text-xs">Loading…</div>`
@@ -111,14 +121,6 @@ export function renderSidebar() {
 				}
 			</div>
 			<div class="flex items-center border-t border-border/50">
-				<button
-					class="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-					@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}
-					title="Manage roles"
-				>
-					${icon(Users, "sm")}
-					<span>Roles</span>
-				</button>
 				<span class="flex-1"></span>
 				<button
 					class="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
