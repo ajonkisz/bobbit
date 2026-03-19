@@ -52,7 +52,7 @@ export function renderSidebar() {
 		<div class="w-[240px] shrink-0 h-full flex flex-col sidebar-edge" style="background: var(--sidebar);">
 			<div class="flex items-center border-b border-border/50 px-1 py-1">
 				<button
-					class="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 					@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}
 					title="Manage roles"
 				>
@@ -60,7 +60,7 @@ export function renderSidebar() {
 					<span>Roles</span>
 				</button>
 				<button
-					class="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 					@click=${() => showGoalDialog()}
 					title="New goal"
 				>
