@@ -133,8 +133,8 @@ async function main() {
 		console.log(`  System prompt: ${systemPromptPath}`);
 	}
 
-	// TLS setup — auto-generate self-signed cert if needed
-	const tls = args.tls ? ensureTlsCert(args.host) : undefined;
+	// TLS setup — auto-generate cert (mkcert CA preferred, openssl fallback)
+	const tls = args.tls ? await ensureTlsCert(args.host) : undefined;
 
 	const gateway = createGateway({
 		host: args.host,

@@ -23,6 +23,7 @@ const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "co
 export interface TlsConfig {
 	cert: string;  // path to PEM certificate
 	key: string;   // path to PEM private key
+	caCert?: string;  // path to CA certificate (for mkcert-based certs)
 }
 
 export interface GatewayConfig {
@@ -183,6 +184,23 @@ async function handleApiRoute(
 	// GET /api/health
 	if (url.pathname === "/api/health" && req.method === "GET") {
 		json({ status: "ok", sessions: sessionManager.listSessions().length });
+		return;
+	}
+
+	// GET /api/ca-cert — download the Bobbit CA certificate for device trust
+	if (url.pathname === "/api/ca-cert" && req.method === "GET") {
+		const caCertPath = config.tls?.caCert;
+		if (!caCertPath || !fs.existsSync(caCertPath)) {
+			json({ error: "No CA certificate available. Server is using a self-signed certificate." }, 404);
+			return;
+		}
+		const certData = fs.readFileSync(caCertPath);
+		res.writeHead(200, {
+			"Content-Type": "application/x-pem-file",
+			"Content-Disposition": "attachment; filename=\"bobbit-ca.crt\"",
+			"Content-Length": certData.length,
+		});
+		res.end(certData);
 		return;
 	}
 
