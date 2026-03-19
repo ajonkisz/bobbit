@@ -2,7 +2,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
-import { ArrowLeft, ChevronRight, Plus, Trash2, Users } from "lucide";
+import { ArrowLeft, Pencil, Plus, Trash2, Users } from "lucide";
 import { fetchRoles, fetchTools, createRole, updateRole, deleteRole, gatewayFetch, type RoleData } from "./api.js";
 import { ACCESSORY_IDS, getAccessory, statusBobbit } from "./session-colors.js";
 import { state, renderApp } from "./state.js";
@@ -205,60 +205,41 @@ function renderNavBar(): TemplateResult {
 }
 
 // ============================================================================
-// RENDER: SUMMARY
+// RENDER: ROLE ROWS (list view)
 // ============================================================================
 
-function renderSummary(): TemplateResult {
-	const total = roles.length;
-	const withTools = roles.filter((r) => r.allowedTools.length > 0).length;
-	const withAccessory = roles.filter((r) => r.accessory !== "none").length;
+async function handleDeleteFromList(role: RoleData): Promise<void> {
+	const { confirmAction } = await import("./dialogs.js");
+	const confirmed = await confirmAction(
+		"Delete Role",
+		`Are you sure you want to delete "${role.label}"? This cannot be undone.`,
+		"Delete",
+		true,
+	);
+	if (!confirmed) return;
 
-	return html`
-		<div class="roles-summary">
-			<div class="roles-stat">
-				<span class="roles-stat-value">${total}</span>
-				<span class="roles-stat-label">Total roles</span>
-			</div>
-			<div class="roles-stat">
-				<span class="roles-stat-value">${withTools}</span>
-				<span class="roles-stat-label">Tool-restricted</span>
-			</div>
-			<div class="roles-stat">
-				<span class="roles-stat-value">${withAccessory}</span>
-				<span class="roles-stat-label">With accessory</span>
-			</div>
-		</div>
-	`;
+	const ok = await deleteRole(role.name);
+	if (ok) {
+		const [r] = await Promise.all([fetchRoles()]);
+		roles = r;
+		renderApp();
+	}
 }
 
-// ============================================================================
-// RENDER: ROLE CARDS (list view)
-// ============================================================================
-
-function renderRoleCard(role: RoleData): TemplateResult {
-	const toolText = role.allowedTools.length === 0 ? "All tools" : `${role.allowedTools.length} tool${role.allowedTools.length !== 1 ? "s" : ""}`;
-	const promptPreview = role.promptTemplate.replace(/^#+\s.*/gm, "").replace(/\n+/g, " ").trim().slice(0, 120);
-
+function renderRoleRow(role: RoleData): TemplateResult {
 	return html`
-		<div class="role-card" @click=${() => showEdit(role)}>
-			<div class="role-card-header">
-				<span class="role-card-avatar">
-					${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory)}
-				</span>
-				<div class="role-card-title-group">
-					<span class="role-card-label">${role.label}</span>
-					<span class="role-card-name">${role.name}</span>
-				</div>
-				<span class="role-card-chevron">${icon(ChevronRight, "sm")}</span>
-			</div>
-			<div class="role-card-body">
-				<span class="role-card-preview">${promptPreview || "No prompt template"}</span>
-			</div>
-			<div class="role-card-footer">
-				<span class="role-card-tool-badge">${toolText}</span>
-				${role.accessory !== "none" ? html`
-					<span class="role-card-accessory-badge">${getAccessory(role.accessory).label}</span>
-				` : nothing}
+		<div class="role-row">
+			<span class="role-row-avatar">
+				${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory)}
+			</span>
+			<span class="role-row-label">${role.label}</span>
+			<div class="role-row-actions">
+				<button class="role-row-action-btn" @click=${() => showEdit(role)} title="Edit">
+					${icon(Pencil, "sm")}
+				</button>
+				<button class="role-row-action-btn delete" @click=${() => handleDeleteFromList(role)} title="Delete">
+					${icon(Trash2, "sm")}
+				</button>
 			</div>
 		</div>
 	`;
@@ -291,8 +272,8 @@ function renderListView(): TemplateResult {
 	}
 
 	return html`
-		<div class="roles-grid">
-			${roles.map(renderRoleCard)}
+		<div class="roles-list">
+			${roles.map(renderRoleRow)}
 		</div>
 	`;
 }
@@ -420,7 +401,6 @@ export function renderRoleManagerPage(): TemplateResult {
 	return html`
 		<div class="roles-container">
 			${renderNavBar()}
-			${currentView === "list" ? renderSummary() : nothing}
 			<div class="roles-body">
 				${currentView === "list" ? renderListView() : renderEditView()}
 			</div>
