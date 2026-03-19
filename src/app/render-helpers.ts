@@ -111,10 +111,11 @@ export function renderSessionRow(session: GatewaySession) {
 	const btnPad = mobile ? "p-1.5" : "p-0.5";
 
 	// Desktop: hover-revealed gradient overlay. Mobile: always-visible inline buttons.
+	const isTeamAgent = !!session.teamGoalId;
 	const buttons = html`
-		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
+		${isTeamAgent ? "" : html`<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
 			@click=${(e: Event) => { e.stopPropagation(); showAssignRoleDialog(session.id); }}
-			title="Assign Role">${icon(Shield, "xs")}</button>
+			title="Assign Role">${icon(Shield, "xs")}</button>`}
 		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
 			@click=${(e: Event) => { e.stopPropagation(); showRenameDialog(session.id, displayTitle); }}
 			title="Rename">${icon(Pencil, "xs")}</button>
@@ -137,7 +138,7 @@ export function renderSessionRow(session: GatewaySession) {
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead", session.role === "coder", session.accessory)}
 			</div>
-			<div class="flex-1 min-w-0 truncate ${mobile ? "text-sm" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			<div class="flex-1 min-w-0 truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
 			${mobile
 				? buttons
 				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
@@ -200,7 +201,7 @@ function renderTeamLeadRow(session: GatewaySession, childCount: number, expanded
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, true, false, session.accessory)}
 			</div>
-			<div class="flex-1 min-w-0 truncate ${mobile ? "text-sm" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			<div class="flex-1 min-w-0 truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
 			${childBadge}
 			${mobile
 				? buttons
@@ -270,7 +271,7 @@ export function renderGoalGroup(goal: Goal) {
 	`;
 
 	const emptyState = html`
-		<div class="pl-3 py-1 text-[10px] text-muted-foreground">
+		<div class="pl-3 py-1 ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground">
 			${isTeamGoal
 				? html`No agents — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${handleStartTeam}>${isLoading ? "starting\u2026" : "start team"}</button>`
 				: html`No sessions — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${() => createAndConnectSession(goal.id)}>start one</button>`}
@@ -304,7 +305,7 @@ export function renderGoalGroup(goal: Goal) {
 				@click=${toggleExpand}
 				@dblclick=${!mobile ? () => { if (goal.team) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } } : null}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
-				<span class="flex-1 min-w-0 truncate ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
+				<span class="flex-1 min-w-0 truncate ${mobile ? "text-sm" : "text-[10px]"} text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
 				${mobile
 					? dashboardBtn
 					: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
@@ -314,7 +315,7 @@ export function renderGoalGroup(goal: Goal) {
 			${isExpanded ? html`
 				<div class="flex flex-col gap-0.5">
 					${goalSessions.length === 0 && !isCreatingHere ? emptyState : (isTeamGoal ? renderTeamGroup() : goalSessions.map(renderSessionRow))}
-					${isCreatingHere ? html`<div class="pl-3 py-1 text-[10px] text-muted-foreground flex items-center gap-1">
+					${isCreatingHere ? html`<div class="pl-3 py-1 ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground flex items-center gap-1">
 						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
 						Creating…
 					</div>` : ""}

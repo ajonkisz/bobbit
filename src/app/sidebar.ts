@@ -26,7 +26,7 @@ import type { GatewaySession } from "./state.js";
 // ============================================================================
 
 /** Toggle role picker dropdown, fetching roles if needed. */
-async function toggleRolePicker(e: Event): Promise<void> {
+export async function toggleRolePicker(e: Event): Promise<void> {
 	e.stopPropagation();
 	if (state.rolePickerOpen) {
 		state.rolePickerOpen = false;
@@ -38,18 +38,19 @@ async function toggleRolePicker(e: Event): Promise<void> {
 	renderApp();
 }
 
-function renderRolePickerDropdown() {
+export function renderRolePickerDropdown() {
 	if (!state.rolePickerOpen) return "";
 	return html`
 		<div class="absolute right-0 top-full mt-1 z-50 rounded-md shadow-lg py-1 min-w-[140px]"
 			style="background: var(--popover); border: 1px solid var(--border);"
 			@click=${(e: Event) => e.stopPropagation()}>
 			${state.roles.length === 0
-				? html`<div class="px-3 py-1.5 text-xs text-muted-foreground">No roles defined</div>`
+				? html`<div class="px-3 py-2 text-xs text-muted-foreground">No roles defined</div>`
 				: state.roles.map(role => html`
-					<button class="w-full text-left px-3 py-1.5 text-xs hover:bg-secondary/50 text-foreground"
+					<button class="w-full text-left px-3 py-2.5 text-sm hover:bg-secondary/50 active:bg-secondary text-foreground flex items-center gap-2"
 						@click=${() => { state.rolePickerOpen = false; createAndConnectSession(undefined, role.name); }}>
-						${role.label}
+						<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>
+						<span>${role.label}</span>
 					</button>
 				`)}
 		</div>

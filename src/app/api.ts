@@ -8,6 +8,7 @@ import {
 	type GatewaySession,
 	type Goal,
 } from "./state.js";
+import { setHashRoute } from "./routing.js";
 import { sessionHueRotation, sessionColorMap } from "./session-colors.js";
 
 // dialogs.ts imports from api.ts, so we use dynamic import to break the cycle
@@ -205,6 +206,8 @@ export async function deleteGoal(id: string): Promise<void> {
 		await gatewayFetch(`/api/goals/${id}`, { method: "DELETE" });
 		expandedGoals.delete(id);
 		saveExpandedGoals();
+		// Navigate away from the deleted goal's dashboard
+		setHashRoute("landing");
 		await refreshSessions();
 	} catch (err) {
 		showConnectionError("Failed to delete goal", err instanceof Error ? err.message : String(err));

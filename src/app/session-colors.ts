@@ -239,7 +239,7 @@ export function sessionAcronym(title: string): string {
  *   When provided, overrides isTeamLead/isCoder. When absent, falls back to
  *   the legacy booleans for backward compatibility.
  */
-export function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false, isAborting = false, isTeamLead = false, isCoder = false, accessory?: string) {
+export function statusBobbit(status: string, isCompacting = false, sessionId?: string, isSelected = false, isAborting = false, isTeamLead = false, isCoder = false, accessory?: string, noDesaturate = false) {
 	const hueRotate = sessionId ? sessionHueRotation(sessionId) : 0;
 
 	// Resolve which accessory to render: explicit param > legacy booleans > none
@@ -279,7 +279,7 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 
 	const shimmerDelay = -(Date.now() % 8000);
 	const shimmer = isBusy ? `animation:blob-shimmer 8s ease-in-out infinite;animation-delay:${shimmerDelay}ms;` : "";
-	const isIdle = status === "idle" && !isCompacting && !isSelected;
+	const isIdle = status === "idle" && !isCompacting && !isSelected && !noDesaturate;
 	const isCancelling = isAborting && (status === "streaming" || isBusy);
 	const filters: string[] = [];
 	if (hueRotate && status !== "starting" && status !== "terminated") filters.push(`hue-rotate(${hueRotate}deg)`);

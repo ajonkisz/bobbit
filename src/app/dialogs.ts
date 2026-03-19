@@ -19,7 +19,7 @@ import {
 import { gatewayFetch, createGoal, updateGoal } from "./api.js";
 import { updateLocalSessionTitle } from "./api.js";
 import { refreshSessions } from "./api.js";
-import { BOBBIT_HUE_ROTATIONS, sessionColorMap, setSessionColor } from "./session-colors.js";
+import { BOBBIT_HUE_ROTATIONS, sessionColorMap, setSessionColor, statusBobbit } from "./session-colors.js";
 import { clearSessionModel } from "./routing.js";
 // NOTE: session-manager imports from dialogs, so we use dynamic imports to break the cycle
 
@@ -979,9 +979,10 @@ export async function showAssignRoleDialog(sessionId: string): Promise<void> {
 									</div>`
 									: state.roles.map(role => html`
 										<button
-											class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-secondary/50 text-foreground transition-colors"
+											class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-secondary/50 text-foreground transition-colors flex items-center gap-2"
 											@click=${() => doAssign(role.name)}>
-											${role.label}
+											<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>
+											<span>${role.label}</span>
 										</button>
 									`)
 								}
