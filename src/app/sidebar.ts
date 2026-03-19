@@ -228,8 +228,8 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 	};
 
 	const renderCollapsedGoalSessions = (goalSessions: GatewaySession[], goal: Goal) => {
-		const isSwarm = !!(goal as any).swarm;
-		const teamLead = isSwarm ? goalSessions.find(s => s.role === "team-lead") : null;
+		const isTeam = !!(goal as any).team;
+		const teamLead = isTeam ? goalSessions.find(s => s.role === "team-lead") : null;
 		if (!teamLead) return goalSessions.map(s => renderCollapsedSession(s));
 
 		const children = goalSessions.filter(s => s.id !== teamLead.id);
@@ -258,7 +258,7 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 		<div class="w-14 shrink-0 h-full flex flex-col items-center sidebar-edge" style="background: var(--sidebar);">
 			<div class="flex-1 overflow-y-auto flex flex-col items-center gap-0.5 py-2 px-0.5">
 				${sortedGoals.map((goal, i) => {
-					const goalSessions = allSessions.filter((s) => (s.goalId === goal.id || s.swarmGoalId === goal.id) && !s.delegateOf);
+					const goalSessions = allSessions.filter((s) => (s.goalId === goal.id || s.teamGoalId === goal.id) && !s.delegateOf);
 					const expanded = expandedGoals.has(goal.id);
 					return html`
 						${i > 0 ? html`<div class="w-7 border-t border-border/50 my-1.5"></div>` : ""}

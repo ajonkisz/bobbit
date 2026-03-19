@@ -4,14 +4,14 @@ import os from "node:os";
 import path from "node:path";
 
 /**
- * End-to-end tests for swarm and goal session lifecycle.
+ * End-to-end tests for team and goal session lifecycle.
  *
- * Covers: creating a swarm goal, starting a swarm, letting it run,
- * ending/tearing down a swarm, creating manual sessions in a goal,
- * deleting sessions, starting a second swarm after ending a previous one, etc.
+ * Covers: creating a team goal, starting a team, letting it run,
+ * ending/tearing down a team, creating manual sessions in a goal,
+ * deleting sessions, starting a second team after ending a previous one, etc.
  *
  * Run with:
- *   npx playwright test tests/swarm-lifecycle.spec.ts --config tests/playwright-e2e.config.ts
+ *   npx playwright test tests/team-lifecycle.spec.ts --config tests/playwright-e2e.config.ts
  */
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ function headers(token: string): Record<string, string> {
 
 async function apiCreateGoal(
 	token: string,
-	data: { title: string; cwd?: string; spec?: string; swarm?: boolean; worktree?: boolean },
+	data: { title: string; cwd?: string; spec?: string; team?: boolean; worktree?: boolean },
 ) {
 	const res = await fetch(`${GW_URL}/api/goals`, {
 		method: "POST",
@@ -43,7 +43,7 @@ async function apiCreateGoal(
 	expect(res.status).toBe(201);
 	return res.json() as Promise<{
 		id: string; title: string; cwd: string; state: string; spec: string;
-		swarm?: boolean; worktreePath?: string; branch?: string; repoPath?: string;
+		team?: boolean; worktreePath?: string; branch?: string; repoPath?: string;
 	}>;
 }
 
@@ -52,7 +52,7 @@ async function apiGetGoal(token: string, id: string) {
 	expect(res.ok).toBe(true);
 	return res.json() as Promise<{
 		id: string; title: string; cwd: string; state: string; spec: string;
-		swarm?: boolean; worktreePath?: string; branch?: string; repoPath?: string;
+		team?: boolean; worktreePath?: string; branch?: string; repoPath?: string;
 	}>;
 }
 
@@ -78,7 +78,7 @@ async function apiListSessions(token: string) {
 	const data = await res.json();
 	return data.sessions as Array<{
 		id: string; title: string; cwd: string; status: string;
-		goalId?: string; role?: string; swarmGoalId?: string;
+		goalId?: string; role?: string; teamGoalId?: string;
 	}>;
 }
 
@@ -104,21 +104,21 @@ async function apiGetSession(token: string, id: string) {
 	return { status: res.status, data: res.ok ? await res.json() : null };
 }
 
-async function apiStartSwarm(token: string, goalId: string) {
-	const res = await fetch(`${GW_URL}/api/goals/${goalId}/swarm/start`, {
+async function apiStartTeam(token: string, goalId: string) {
+	const res = await fetch(`${GW_URL}/api/goals/${goalId}/team/start`, {
 		method: "POST",
 		headers: headers(token),
 	});
 	return { status: res.status, data: await res.json() };
 }
 
-async function apiGetSwarmState(token: string, goalId: string) {
-	const res = await fetch(`${GW_URL}/api/goals/${goalId}/swarm`, { headers: headers(token) });
+async function apiGetTeamState(token: string, goalId: string) {
+	const res = await fetch(`${GW_URL}/api/goals/${goalId}/team`, { headers: headers(token) });
 	return { status: res.status, data: res.ok ? await res.json() : null };
 }
 
-async function apiListSwarmAgents(token: string, goalId: string) {
-	const res = await fetch(`${GW_URL}/api/goals/${goalId}/swarm/agents`, { headers: headers(token) });
+async function apiListTeamAgents(token: string, goalId: string) {
+	const res = await fetch(`${GW_URL}/api/goals/${goalId}/team/agents`, { headers: headers(token) });
 	expect(res.ok).toBe(true);
 	const data = await res.json();
 	return data.agents as Array<{
@@ -128,7 +128,7 @@ async function apiListSwarmAgents(token: string, goalId: string) {
 }
 
 async function apiSpawnRole(token: string, goalId: string, role: string, task: string) {
-	const res = await fetch(`${GW_URL}/api/goals/${goalId}/swarm/spawn`, {
+	const res = await fetch(`${GW_URL}/api/goals/${goalId}/team/spawn`, {
 		method: "POST",
 		headers: headers(token),
 		body: JSON.stringify({ role, task }),
@@ -137,7 +137,7 @@ async function apiSpawnRole(token: string, goalId: string, role: string, task: s
 }
 
 async function apiDismissRole(token: string, goalId: string, sessionId: string) {
-	const res = await fetch(`${GW_URL}/api/goals/${goalId}/swarm/dismiss`, {
+	const res = await fetch(`${GW_URL}/api/goals/${goalId}/team/dismiss`, {
 		method: "POST",
 		headers: headers(token),
 		body: JSON.stringify({ sessionId }),
@@ -145,16 +145,16 @@ async function apiDismissRole(token: string, goalId: string, sessionId: string) 
 	return { status: res.status, data: await res.json() };
 }
 
-async function apiCompleteSwarm(token: string, goalId: string) {
-	const res = await fetch(`${GW_URL}/api/goals/${goalId}/swarm/complete`, {
+async function apiCompleteTeam(token: string, goalId: string) {
+	const res = await fetch(`${GW_URL}/api/goals/${goalId}/team/complete`, {
 		method: "POST",
 		headers: headers(token),
 	});
 	return { status: res.status, data: await res.json() };
 }
 
-async function apiTeardownSwarm(token: string, goalId: string) {
-	const res = await fetch(`${GW_URL}/api/goals/${goalId}/swarm/teardown`, {
+async function apiTeardownTeam(token: string, goalId: string) {
+	const res = await fetch(`${GW_URL}/api/goals/${goalId}/team/teardown`, {
 		method: "POST",
 		headers: headers(token),
 	});
@@ -165,7 +165,7 @@ async function apiTeardownSwarm(token: string, goalId: string) {
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe("Swarm & Goal Session Lifecycle", () => {
+test.describe("Team & Goal Session Lifecycle", () => {
 	let token: string;
 	const cleanupGoalIds: string[] = [];
 	const cleanupSessionIds: string[] = [];
@@ -175,9 +175,9 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 	});
 
 	test.afterAll(async () => {
-		// Tear down any swarms first, then sessions, then goals
+		// Tear down any teams first, then sessions, then goals
 		for (const goalId of cleanupGoalIds) {
-			await apiTeardownSwarm(token, goalId).catch(() => {});
+			await apiTeardownTeam(token, goalId).catch(() => {});
 		}
 		for (const id of cleanupSessionIds) {
 			await apiDeleteSession(token, id).catch(() => {});
@@ -189,21 +189,21 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		}
 	});
 
-	// ── Swarm creation & basic lifecycle ──────────────────────────
+	// ── Team creation & basic lifecycle ──────────────────────────
 
-	test("create a swarm goal, start swarm, verify team lead session", async () => {
+	test("create a team goal, start team, verify team lead session", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Swarm Lifecycle Test",
-			swarm: true,
-			spec: "Test swarm lifecycle",
+			title: "Team Lifecycle Test",
+			team: true,
+			spec: "Test team lifecycle",
 		});
 		cleanupGoalIds.push(goal.id);
 
-		expect(goal.swarm).toBe(true);
+		expect(goal.team).toBe(true);
 		expect(goal.state).toBe("todo");
 
-		// Start the swarm — creates a team lead session
-		const startResult = await apiStartSwarm(token, goal.id);
+		// Start the team — creates a team lead session
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		expect(startResult.data.sessionId).toBeTruthy();
 		cleanupSessionIds.push(startResult.data.sessionId);
@@ -212,60 +212,60 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		const updatedGoal = await apiGetGoal(token, goal.id);
 		expect(updatedGoal.state).toBe("in-progress");
 
-		// Swarm state should show the team lead
-		const swarmState = await apiGetSwarmState(token, goal.id);
-		expect(swarmState.status).toBe(200);
-		expect(swarmState.data.teamLeadSessionId).toBe(startResult.data.sessionId);
-		expect(swarmState.data.agents).toHaveLength(0);
+		// Team state should show the team lead
+		const teamState = await apiGetTeamState(token, goal.id);
+		expect(teamState.status).toBe(200);
+		expect(teamState.data.teamLeadSessionId).toBe(startResult.data.sessionId);
+		expect(teamState.data.agents).toHaveLength(0);
 
 		// Team lead session should exist in session list
 		const sessions = await apiListSessions(token);
 		const teamLead = sessions.find((s) => s.id === startResult.data.sessionId);
 		expect(teamLead).toBeTruthy();
 		expect(teamLead!.role).toBe("team-lead");
-		expect(teamLead!.swarmGoalId).toBe(goal.id);
+		expect(teamLead!.teamGoalId).toBe(goal.id);
 	});
 
-	test("cannot start a second swarm on the same goal", async () => {
+	test("cannot start a second team on the same goal", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Double Swarm Prevention",
-			swarm: true,
+			title: "Double Team Prevention",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const first = await apiStartSwarm(token, goal.id);
+		const first = await apiStartTeam(token, goal.id);
 		expect(first.status).toBe(201);
 		cleanupSessionIds.push(first.data.sessionId);
 
 		// Second start should fail
-		const second = await apiStartSwarm(token, goal.id);
+		const second = await apiStartTeam(token, goal.id);
 		expect(second.status).toBe(400);
 		expect(second.data.error).toContain("already active");
 	});
 
-	test("cannot start a swarm on a non-swarm goal", async () => {
+	test("cannot start a team on a non-team goal", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Regular Goal No Swarm",
-			swarm: false,
+			title: "Regular Goal No Team",
+			team: false,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const result = await apiStartSwarm(token, goal.id);
+		const result = await apiStartTeam(token, goal.id);
 		expect(result.status).toBe(400);
-		expect(result.data.error).toContain("swarm mode");
+		expect(result.data.error).toContain("team mode");
 	});
 
 	// ── Spawning role agents ─────────────────────────────────────
 
-	test("spawn role agents and verify they appear in swarm state", async () => {
+	test("spawn role agents and verify they appear in team state", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Swarm Spawn Test",
-			swarm: true,
+			title: "Team Spawn Test",
+			team: true,
 			spec: "Test spawning agents",
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		cleanupSessionIds.push(startResult.data.sessionId);
 
@@ -281,15 +281,15 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(reviewer.status).toBe(201);
 		cleanupSessionIds.push(reviewer.data.sessionId);
 
-		// Verify swarm state shows both agents
-		const swarmState = await apiGetSwarmState(token, goal.id);
-		expect(swarmState.data.agents).toHaveLength(2);
+		// Verify team state shows both agents
+		const teamState = await apiGetTeamState(token, goal.id);
+		expect(teamState.data.agents).toHaveLength(2);
 
-		const roles = swarmState.data.agents.map((a: any) => a.role).sort();
+		const roles = teamState.data.agents.map((a: any) => a.role).sort();
 		expect(roles).toEqual(["coder", "reviewer"]);
 
 		// Verify agents appear in the agents list
-		const agents = await apiListSwarmAgents(token, goal.id);
+		const agents = await apiListTeamAgents(token, goal.id);
 		expect(agents).toHaveLength(2);
 		expect(agents.find((a) => a.role === "coder")).toBeTruthy();
 		expect(agents.find((a) => a.role === "reviewer")).toBeTruthy();
@@ -298,11 +298,11 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 	test("spawn rejects invalid roles", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Invalid Role Test",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		cleanupSessionIds.push(startResult.data.sessionId);
 
@@ -314,11 +314,11 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 	test("spawn rejects team-lead role", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Team Lead Spawn Rejection",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		cleanupSessionIds.push(startResult.data.sessionId);
 
@@ -329,14 +329,14 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 
 	// ── Dismissing role agents ───────────────────────────────────
 
-	test("dismiss a role agent removes it from swarm state", async () => {
+	test("dismiss a role agent removes it from team state", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Dismiss Agent Test",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		cleanupSessionIds.push(startResult.data.sessionId);
 
@@ -348,8 +348,8 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(dismissResult.status).toBe(200);
 		expect(dismissResult.data.ok).toBe(true);
 
-		// Agent should be gone from swarm state
-		const agents = await apiListSwarmAgents(token, goal.id);
+		// Agent should be gone from team state
+		const agents = await apiListTeamAgents(token, goal.id);
 		expect(agents.find((a) => a.sessionId === coder.data.sessionId)).toBeUndefined();
 
 		// Session should be terminated
@@ -362,11 +362,11 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 	test("cannot dismiss the team lead via dismiss endpoint", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Team Lead Dismiss Prevention",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		cleanupSessionIds.push(startResult.data.sessionId);
 
@@ -375,16 +375,16 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(dismissResult.data.error).toContain("team lead");
 	});
 
-	// ── Completing a swarm ───────────────────────────────────────
+	// ── Completing a team ───────────────────────────────────────
 
-	test("completeSwarm dismisses agents but keeps team lead alive", async () => {
+	test("completeTeam dismisses agents but keeps team lead alive", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Complete Swarm Test",
-			swarm: true,
+			title: "Complete Team Test",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		const teamLeadId = startResult.data.sessionId;
 		cleanupSessionIds.push(teamLeadId);
@@ -395,8 +395,8 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		const tester = await apiSpawnRole(token, goal.id, "tester", "Test code");
 		expect(tester.status).toBe(201);
 
-		// Complete the swarm
-		const result = await apiCompleteSwarm(token, goal.id);
+		// Complete the team
+		const result = await apiCompleteTeam(token, goal.id);
 		expect(result.status).toBe(200);
 		expect(result.data.ok).toBe(true);
 
@@ -405,7 +405,7 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(updatedGoal.state).toBe("complete");
 
 		// Agents should be gone
-		const agents = await apiListSwarmAgents(token, goal.id);
+		const agents = await apiListTeamAgents(token, goal.id);
 		expect(agents).toHaveLength(0);
 
 		// Team lead should still exist and be non-terminated
@@ -414,16 +414,16 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(teamLeadSession.data.status).not.toBe("terminated");
 	});
 
-	// ── Tearing down a swarm ─────────────────────────────────────
+	// ── Tearing down a team ─────────────────────────────────────
 
-	test("teardownSwarm terminates everything including team lead", async () => {
+	test("teardownTeam terminates everything including team lead", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Teardown Swarm Test",
-			swarm: true,
+			title: "Teardown Team Test",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		const teamLeadId = startResult.data.sessionId;
 
@@ -431,14 +431,14 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		const coder = await apiSpawnRole(token, goal.id, "coder", "Write code");
 		expect(coder.status).toBe(201);
 
-		// Teardown the swarm
-		const result = await apiTeardownSwarm(token, goal.id);
+		// Teardown the team
+		const result = await apiTeardownTeam(token, goal.id);
 		expect(result.status).toBe(200);
 		expect(result.data.ok).toBe(true);
 
-		// Swarm state should be gone
-		const swarmState = await apiGetSwarmState(token, goal.id);
-		expect(swarmState.status).toBe(404);
+		// Team state should be gone
+		const teamState = await apiGetTeamState(token, goal.id);
+		expect(teamState.status).toBe(404);
 
 		// Team lead session should be terminated
 		const teamLeadSession = await apiGetSession(token, teamLeadId);
@@ -447,17 +447,17 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		}
 	});
 
-	// ── Second swarm after teardown ──────────────────────────────
+	// ── Second team after teardown ──────────────────────────────
 
-	test("can start a new swarm after tearing down the previous one", async () => {
+	test("can start a new team after tearing down the previous one", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Second Swarm Test",
-			swarm: true,
+			title: "Second Team Test",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		// First swarm
-		const first = await apiStartSwarm(token, goal.id);
+		// First team
+		const first = await apiStartTeam(token, goal.id);
 		expect(first.status).toBe(201);
 		const firstTeamLeadId = first.data.sessionId;
 
@@ -465,76 +465,76 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		const coder1 = await apiSpawnRole(token, goal.id, "coder", "First round task");
 		expect(coder1.status).toBe(201);
 
-		// Teardown the first swarm
-		const teardownResult = await apiTeardownSwarm(token, goal.id);
+		// Teardown the first team
+		const teardownResult = await apiTeardownTeam(token, goal.id);
 		expect(teardownResult.status).toBe(200);
 
-		// Reset goal state so we can start a new swarm
+		// Reset goal state so we can start a new team
 		await apiUpdateGoal(token, goal.id, { state: "in-progress" });
 
-		// Start a second swarm on the same goal
-		const second = await apiStartSwarm(token, goal.id);
+		// Start a second team on the same goal
+		const second = await apiStartTeam(token, goal.id);
 		expect(second.status).toBe(201);
 		expect(second.data.sessionId).toBeTruthy();
 		expect(second.data.sessionId).not.toBe(firstTeamLeadId);
 		cleanupSessionIds.push(second.data.sessionId);
 
-		// Second swarm should be functional
+		// Second team should be functional
 		const coder2 = await apiSpawnRole(token, goal.id, "coder", "Second round task");
 		expect(coder2.status).toBe(201);
 		cleanupSessionIds.push(coder2.data.sessionId);
 
-		// Verify second swarm state
-		const swarmState = await apiGetSwarmState(token, goal.id);
-		expect(swarmState.status).toBe(200);
-		expect(swarmState.data.teamLeadSessionId).toBe(second.data.sessionId);
-		expect(swarmState.data.agents).toHaveLength(1);
+		// Verify second team state
+		const teamState = await apiGetTeamState(token, goal.id);
+		expect(teamState.status).toBe(200);
+		expect(teamState.data.teamLeadSessionId).toBe(second.data.sessionId);
+		expect(teamState.data.agents).toHaveLength(1);
 	});
 
-	// ── Second swarm after complete (not teardown) ───────────────
+	// ── Second team after complete (not teardown) ───────────────
 
-	test("can start a new swarm after completing the previous one (with teardown)", async () => {
+	test("can start a new team after completing the previous one (with teardown)", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Second Swarm After Complete",
-			swarm: true,
+			title: "Second Team After Complete",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		// First swarm
-		const first = await apiStartSwarm(token, goal.id);
+		// First team
+		const first = await apiStartTeam(token, goal.id);
 		expect(first.status).toBe(201);
 		cleanupSessionIds.push(first.data.sessionId);
 
 		// Complete (keeps team lead alive)
-		await apiCompleteSwarm(token, goal.id);
+		await apiCompleteTeam(token, goal.id);
 
-		// The swarm entry still exists because team lead is alive.
+		// The team entry still exists because team lead is alive.
 		// We need to teardown to fully clear it before starting another.
-		await apiTeardownSwarm(token, goal.id);
+		await apiTeardownTeam(token, goal.id);
 
 		// Reset goal state
 		await apiUpdateGoal(token, goal.id, { state: "in-progress" });
 
-		// Start a second swarm
-		const second = await apiStartSwarm(token, goal.id);
+		// Start a second team
+		const second = await apiStartTeam(token, goal.id);
 		expect(second.status).toBe(201);
 		cleanupSessionIds.push(second.data.sessionId);
 
-		const swarmState = await apiGetSwarmState(token, goal.id);
-		expect(swarmState.status).toBe(200);
-		expect(swarmState.data.teamLeadSessionId).toBe(second.data.sessionId);
+		const teamState = await apiGetTeamState(token, goal.id);
+		expect(teamState.status).toBe(200);
+		expect(teamState.data.teamLeadSessionId).toBe(second.data.sessionId);
 	});
 
-	// ── Manual sessions in a goal alongside swarm ────────────────
+	// ── Manual sessions in a goal alongside team ────────────────
 
-	test("create a manual session in a swarm goal (no swarm running)", async () => {
+	test("create a manual session in a team goal (no team running)", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Manual Session In Goal",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		// Create a regular session under this goal (no swarm started)
+		// Create a regular session under this goal (no team started)
 		const session = await apiCreateSession(token, { goalId: goal.id });
 		cleanupSessionIds.push(session.id);
 
@@ -554,7 +554,7 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 	test("delete a manual session in a goal", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Delete Manual Session Goal",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
@@ -570,10 +570,10 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		}
 	});
 
-	test("manual session and swarm coexist under the same goal", async () => {
+	test("manual session and team coexist under the same goal", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Coexist Manual And Swarm",
-			swarm: true,
+			title: "Coexist Manual And Team",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
@@ -581,68 +581,68 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		const manual = await apiCreateSession(token, { goalId: goal.id });
 		cleanupSessionIds.push(manual.id);
 
-		// Start a swarm
-		const swarmStart = await apiStartSwarm(token, goal.id);
-		expect(swarmStart.status).toBe(201);
-		cleanupSessionIds.push(swarmStart.data.sessionId);
+		// Start a team
+		const teamStart = await apiStartTeam(token, goal.id);
+		expect(teamStart.status).toBe(201);
+		cleanupSessionIds.push(teamStart.data.sessionId);
 
-		// Spawn a coder in the swarm
+		// Spawn a coder in the team
 		const coder = await apiSpawnRole(token, goal.id, "coder", "Code something");
 		expect(coder.status).toBe(201);
 		cleanupSessionIds.push(coder.data.sessionId);
 
-		// Both manual and swarm sessions should exist under the goal
+		// Both manual and team sessions should exist under the goal
 		const sessions = await apiListSessions(token);
 		const goalSessions = sessions.filter((s) => s.goalId === goal.id);
 		expect(goalSessions.length).toBeGreaterThanOrEqual(2); // manual + team lead + coder
 
-		// Manual session should NOT be in swarm agents list
-		const agents = await apiListSwarmAgents(token, goal.id);
+		// Manual session should NOT be in team agents list
+		const agents = await apiListTeamAgents(token, goal.id);
 		expect(agents.find((a) => a.sessionId === manual.id)).toBeUndefined();
 
-		// Tearing down swarm should not affect manual session
-		await apiTeardownSwarm(token, goal.id);
+		// Tearing down team should not affect manual session
+		await apiTeardownTeam(token, goal.id);
 
 		const manualAfter = await apiGetSession(token, manual.id);
 		expect(manualAfter.status).toBe(200);
 		expect(manualAfter.data.status).not.toBe("terminated");
 	});
 
-	// ── No swarm state for non-swarm goals ───────────────────────
+	// ── No team state for non-team goals ───────────────────────
 
-	test("swarm state returns 404 for a regular goal", async () => {
+	test("team state returns 404 for a regular goal", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Regular Goal Swarm 404",
-			swarm: false,
+			title: "Regular Goal Team 404",
+			team: false,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const state = await apiGetSwarmState(token, goal.id);
+		const state = await apiGetTeamState(token, goal.id);
 		expect(state.status).toBe(404);
 	});
 
-	test("swarm agents returns empty for a goal without a swarm", async () => {
+	test("team agents returns empty for a goal without a team", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "No Swarm Agents",
-			swarm: true,
+			title: "No Team Agents",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		// No swarm started — agents list should be empty
-		const agents = await apiListSwarmAgents(token, goal.id);
+		// No team started — agents list should be empty
+		const agents = await apiListTeamAgents(token, goal.id);
 		expect(agents).toHaveLength(0);
 	});
 
-	// ── Swarm goal with worktree ─────────────────────────────────
+	// ── Team goal with worktree ─────────────────────────────────
 
-	test("swarm goal creates a worktree and branch", async () => {
+	test("team goal creates a worktree and branch", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Swarm Worktree Test",
-			swarm: true,
+			title: "Team Worktree Test",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		// Swarm goals in a git repo should get a worktree
+		// Team goals in a git repo should get a worktree
 		expect(goal.worktreePath).toBeTruthy();
 		expect(goal.branch).toBeTruthy();
 		expect(goal.branch).toMatch(/^goal\//);
@@ -654,38 +654,38 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 
 	// ── Edge cases ───────────────────────────────────────────────
 
-	test("teardown a swarm that has no agents (only team lead)", async () => {
+	test("teardown a team that has no agents (only team lead)", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Teardown Empty Swarm",
-			swarm: true,
+			title: "Teardown Empty Team",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 
 		// Teardown immediately — no agents spawned
-		const result = await apiTeardownSwarm(token, goal.id);
+		const result = await apiTeardownTeam(token, goal.id);
 		expect(result.status).toBe(200);
 		expect(result.data.ok).toBe(true);
 
-		// Swarm should be gone
-		const swarmState = await apiGetSwarmState(token, goal.id);
-		expect(swarmState.status).toBe(404);
+		// Team should be gone
+		const teamState = await apiGetTeamState(token, goal.id);
+		expect(teamState.status).toBe(404);
 	});
 
-	test("complete a swarm with no agents (only team lead)", async () => {
+	test("complete a team with no agents (only team lead)", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Complete Empty Swarm",
-			swarm: true,
+			title: "Complete Empty Team",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		cleanupSessionIds.push(startResult.data.sessionId);
 
-		const result = await apiCompleteSwarm(token, goal.id);
+		const result = await apiCompleteTeam(token, goal.id);
 		expect(result.status).toBe(200);
 
 		// Goal should be complete
@@ -697,32 +697,32 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(session.data.status).not.toBe("terminated");
 	});
 
-	test("teardown a nonexistent swarm returns 400", async () => {
+	test("teardown a nonexistent team returns 400", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Teardown Nonexistent",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const result = await apiTeardownSwarm(token, goal.id);
+		const result = await apiTeardownTeam(token, goal.id);
 		expect(result.status).toBe(400);
 	});
 
-	test("complete a nonexistent swarm returns 400", async () => {
+	test("complete a nonexistent team returns 400", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Complete Nonexistent",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const result = await apiCompleteSwarm(token, goal.id);
+		const result = await apiCompleteTeam(token, goal.id);
 		expect(result.status).toBe(400);
 	});
 
-	test("spawn without active swarm returns 400", async () => {
+	test("spawn without active team returns 400", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Spawn No Swarm",
-			swarm: true,
+			title: "Spawn No Team",
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
@@ -730,22 +730,22 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(result.status).toBe(400);
 	});
 
-	// ── Full lifecycle: create → swarm → agents → complete → teardown → new swarm
+	// ── Full lifecycle: create → team → agents → complete → teardown → new team
 
-	test("full lifecycle: create goal, swarm, spawn agents, complete, teardown, second swarm", async () => {
-		// Step 1: Create a swarm goal
+	test("full lifecycle: create goal, team, spawn agents, complete, teardown, second team", async () => {
+		// Step 1: Create a team goal
 		const goal = await apiCreateGoal(token, {
 			title: "Full Lifecycle Test",
-			swarm: true,
+			team: true,
 			spec: "Complete lifecycle test",
 		});
 		cleanupGoalIds.push(goal.id);
 		expect(goal.state).toBe("todo");
 
-		// Step 2: Start first swarm
-		const firstSwarm = await apiStartSwarm(token, goal.id);
-		expect(firstSwarm.status).toBe(201);
-		const firstTeamLeadId = firstSwarm.data.sessionId;
+		// Step 2: Start first team
+		const firstTeam = await apiStartTeam(token, goal.id);
+		expect(firstTeam.status).toBe(201);
+		const firstTeamLeadId = firstTeam.data.sessionId;
 
 		const goalInProgress = await apiGetGoal(token, goal.id);
 		expect(goalInProgress.state).toBe("in-progress");
@@ -757,23 +757,23 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(tester.status).toBe(201);
 
 		// Verify all 2 agents in state
-		let agents = await apiListSwarmAgents(token, goal.id);
+		let agents = await apiListTeamAgents(token, goal.id);
 		expect(agents).toHaveLength(2);
 
 		// Step 4: Dismiss one agent
 		await apiDismissRole(token, goal.id, coder.data.sessionId);
-		agents = await apiListSwarmAgents(token, goal.id);
+		agents = await apiListTeamAgents(token, goal.id);
 		expect(agents).toHaveLength(1);
 		expect(agents[0].role).toBe("tester");
 
-		// Step 5: Complete the swarm (dismisses remaining agents, keeps team lead)
-		const completeResult = await apiCompleteSwarm(token, goal.id);
+		// Step 5: Complete the team (dismisses remaining agents, keeps team lead)
+		const completeResult = await apiCompleteTeam(token, goal.id);
 		expect(completeResult.status).toBe(200);
 
 		const goalComplete = await apiGetGoal(token, goal.id);
 		expect(goalComplete.state).toBe("complete");
 
-		agents = await apiListSwarmAgents(token, goal.id);
+		agents = await apiListTeamAgents(token, goal.id);
 		expect(agents).toHaveLength(0);
 
 		// Team lead still alive
@@ -781,12 +781,12 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(teamLeadAfterComplete.data.status).not.toBe("terminated");
 
 		// Step 6: Teardown completely
-		const teardownResult = await apiTeardownSwarm(token, goal.id);
+		const teardownResult = await apiTeardownTeam(token, goal.id);
 		expect(teardownResult.status).toBe(200);
 
-		// Swarm gone
-		const swarmAfterTeardown = await apiGetSwarmState(token, goal.id);
-		expect(swarmAfterTeardown.status).toBe(404);
+		// Team gone
+		const teamAfterTeardown = await apiGetTeamState(token, goal.id);
+		expect(teamAfterTeardown.status).toBe(404);
 
 		// Team lead terminated
 		const teamLeadAfterTeardown = await apiGetSession(token, firstTeamLeadId);
@@ -794,48 +794,48 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 			expect(teamLeadAfterTeardown.data.status).toBe("terminated");
 		}
 
-		// Step 7: Reset goal state and start second swarm
+		// Step 7: Reset goal state and start second team
 		await apiUpdateGoal(token, goal.id, { state: "in-progress" });
 
-		const secondSwarm = await apiStartSwarm(token, goal.id);
-		expect(secondSwarm.status).toBe(201);
-		expect(secondSwarm.data.sessionId).not.toBe(firstTeamLeadId);
-		cleanupSessionIds.push(secondSwarm.data.sessionId);
+		const secondTeam = await apiStartTeam(token, goal.id);
+		expect(secondTeam.status).toBe(201);
+		expect(secondTeam.data.sessionId).not.toBe(firstTeamLeadId);
+		cleanupSessionIds.push(secondTeam.data.sessionId);
 
-		// Step 8: Verify second swarm works
+		// Step 8: Verify second team works
 		const coder2 = await apiSpawnRole(token, goal.id, "coder", "New implementation");
 		expect(coder2.status).toBe(201);
 		cleanupSessionIds.push(coder2.data.sessionId);
 
-		const secondState = await apiGetSwarmState(token, goal.id);
+		const secondState = await apiGetTeamState(token, goal.id);
 		expect(secondState.status).toBe(200);
-		expect(secondState.data.teamLeadSessionId).toBe(secondSwarm.data.sessionId);
+		expect(secondState.data.teamLeadSessionId).toBe(secondTeam.data.sessionId);
 		expect(secondState.data.agents).toHaveLength(1);
 	});
 
-	// ── Multiple goals with independent swarms ───────────────────
+	// ── Multiple goals with independent teams ───────────────────
 
-	test("independent swarms on different goals do not interfere", async () => {
+	test("independent teams on different goals do not interfere", async () => {
 		const goal1 = await apiCreateGoal(token, {
-			title: "Independent Swarm A",
-			swarm: true,
+			title: "Independent Team A",
+			team: true,
 		});
 		cleanupGoalIds.push(goal1.id);
 
 		const goal2 = await apiCreateGoal(token, {
-			title: "Independent Swarm B",
-			swarm: true,
+			title: "Independent Team B",
+			team: true,
 		});
 		cleanupGoalIds.push(goal2.id);
 
-		// Start swarms on both goals
-		const swarm1 = await apiStartSwarm(token, goal1.id);
-		expect(swarm1.status).toBe(201);
-		cleanupSessionIds.push(swarm1.data.sessionId);
+		// Start teams on both goals
+		const team1 = await apiStartTeam(token, goal1.id);
+		expect(team1.status).toBe(201);
+		cleanupSessionIds.push(team1.data.sessionId);
 
-		const swarm2 = await apiStartSwarm(token, goal2.id);
-		expect(swarm2.status).toBe(201);
-		cleanupSessionIds.push(swarm2.data.sessionId);
+		const team2 = await apiStartTeam(token, goal2.id);
+		expect(team2.status).toBe(201);
+		cleanupSessionIds.push(team2.data.sessionId);
 
 		// Spawn agents on goal 1
 		const coder1 = await apiSpawnRole(token, goal1.id, "coder", "Task for goal 1");
@@ -847,32 +847,32 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(reviewer2.status).toBe(201);
 		cleanupSessionIds.push(reviewer2.data.sessionId);
 
-		// Verify each swarm has its own agents
-		const agents1 = await apiListSwarmAgents(token, goal1.id);
+		// Verify each team has its own agents
+		const agents1 = await apiListTeamAgents(token, goal1.id);
 		expect(agents1).toHaveLength(1);
 		expect(agents1[0].role).toBe("coder");
 
-		const agents2 = await apiListSwarmAgents(token, goal2.id);
+		const agents2 = await apiListTeamAgents(token, goal2.id);
 		expect(agents2).toHaveLength(1);
 		expect(agents2[0].role).toBe("reviewer");
 
-		// Teardown goal 1's swarm — should not affect goal 2
-		await apiTeardownSwarm(token, goal1.id);
+		// Teardown goal 1's team — should not affect goal 2
+		await apiTeardownTeam(token, goal1.id);
 
-		const state2After = await apiGetSwarmState(token, goal2.id);
+		const state2After = await apiGetTeamState(token, goal2.id);
 		expect(state2After.status).toBe(200);
 		expect(state2After.data.agents).toHaveLength(1);
 	});
 
-	// ── Deleting a goal that had a swarm ─────────────────────────
+	// ── Deleting a goal that had a team ─────────────────────────
 
-	test("deleting a swarm goal does not crash (swarm not running)", async () => {
+	test("deleting a team goal does not crash (team not running)", async () => {
 		const goal = await apiCreateGoal(token, {
-			title: "Delete Swarm Goal",
-			swarm: true,
+			title: "Delete Team Goal",
+			team: true,
 		});
 
-		// Delete without starting a swarm
+		// Delete without starting a team
 		await apiDeleteGoal(token, goal.id);
 
 		// Goal should be gone
@@ -880,16 +880,16 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		expect(res.status).toBe(404);
 	});
 
-	// ── Session listing with swarm metadata ──────────────────────
+	// ── Session listing with team metadata ──────────────────────
 
-	test("session list includes swarm role and goal metadata", async () => {
+	test("session list includes team role and goal metadata", async () => {
 		const goal = await apiCreateGoal(token, {
 			title: "Session Metadata Test",
-			swarm: true,
+			team: true,
 		});
 		cleanupGoalIds.push(goal.id);
 
-		const startResult = await apiStartSwarm(token, goal.id);
+		const startResult = await apiStartTeam(token, goal.id);
 		expect(startResult.status).toBe(201);
 		cleanupSessionIds.push(startResult.data.sessionId);
 
@@ -902,12 +902,12 @@ test.describe("Swarm & Goal Session Lifecycle", () => {
 		const teamLead = sessions.find((s) => s.id === startResult.data.sessionId);
 		expect(teamLead).toBeTruthy();
 		expect(teamLead!.role).toBe("team-lead");
-		expect(teamLead!.swarmGoalId).toBe(goal.id);
+		expect(teamLead!.teamGoalId).toBe(goal.id);
 		expect(teamLead!.goalId).toBe(goal.id);
 
 		const coderSession = sessions.find((s) => s.id === coder.data.sessionId);
 		expect(coderSession).toBeTruthy();
 		expect(coderSession!.role).toBe("coder");
-		expect(coderSession!.swarmGoalId).toBe(goal.id);
+		expect(coderSession!.teamGoalId).toBe(goal.id);
 	});
 });

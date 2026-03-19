@@ -5,20 +5,9 @@ import type { SessionManager } from "../agent/session-manager.js";
 import type { RateLimiter } from "../auth/rate-limit.js";
 import { validateToken } from "../auth/token.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
-import { WorkflowRunner, getWorkflow, listWorkflows } from "../workflows/index.js";
 import type { TaskType, TaskState } from "../agent/task-store.js";
-
-/** Get or restore the workflow runner for a session, caching it on the session object. */
-function getRunner(session: any, sessionId: string): WorkflowRunner | undefined {
-	let wr = session._workflowRunner as WorkflowRunner | undefined;
-	if (!wr) {
-		wr = WorkflowRunner.restore(sessionId, {
-			onChange: (state) => broadcast(session.clients, { type: "workflow_state", data: state }),
-		}) ?? undefined;
-		if (wr) session._workflowRunner = wr;
-	}
-	return wr;
-}
+import { getSkill } from "../skills/registry.js";
+import { runSkillAgent, createSkillRequest } from "../skills/sub-agent.js";
 
 function broadcast(clients: Set<WebSocket>, msg: ServerMessage): void {
 	const data = JSON.stringify(msg);
@@ -231,145 +220,6 @@ export function handleWebSocketConnection(
 						send(ws, { type: "error", message: `Title generation failed: ${err}`, code: "TITLE_GEN_ERROR" });
 					});
 					break;
-				case "start_workflow": {
-					const wf = getWorkflow(msg.workflowId);
-					if (!wf) {
-						send(ws, { type: "error", message: `Unknown workflow: ${msg.workflowId}`, code: "UNKNOWN_WORKFLOW" });
-						break;
-					}
-					const runner = new WorkflowRunner(msg.workflowId, sessionId, {
-						onChange: (state) => broadcast(session.clients, { type: "workflow_state", data: state }),
-					});
-					(session as any)._workflowRunner = runner;
-					send(ws, { type: "workflow_state", data: runner.getState() });
-					break;
-				}
-				case "workflow_status": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) {
-						send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" });
-						break;
-					}
-					send(ws, { type: "workflow_state", data: wr.getState() });
-					break;
-				}
-				case "workflow_advance": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-					wr.advancePhase();
-					const st = wr.getState();
-					if (st.status === "completed" && st.reportPath) {
-						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
-					}
-					break;
-				}
-				case "workflow_reset": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-					wr.resetToPhase(msg.phaseId, msg.context);
-					break;
-				}
-				case "workflow_collect_artifact": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-					wr.collectArtifact(msg.name, msg.content, msg.mimeType);
-					send(ws, { type: "workflow_state", data: wr.getState() });
-					break;
-				}
-				case "workflow_set_context": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-					wr.setContext(msg.key, msg.value);
-					send(ws, { type: "workflow_state", data: wr.getState() });
-					break;
-				}
-				case "workflow_complete": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-					wr.complete();
-					const st = wr.getState();
-					broadcast(session.clients, { type: "workflow_completed", data: st });
-					if (st.reportPath) {
-						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
-					}
-					break;
-				}
-				case "workflow_fail": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-					wr.fail(msg.reason);
-					const st = wr.getState();
-					broadcast(session.clients, { type: "workflow_completed", data: st });
-					if (st.reportPath) {
-						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
-					}
-					break;
-				}
-				case "workflow_cancel": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-					wr.cancel();
-					broadcast(session.clients, { type: "workflow_completed", data: wr.getState() });
-					break;
-				}
-				case "workflow_synthesise_review": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-					wr.synthesiseFindings();
-					send(ws, { type: "workflow_state", data: wr.getState() });
-					break;
-				}
-				case "workflow_batch": {
-					const wr = getRunner(session, sessionId);
-					if (!wr) { send(ws, { type: "error", message: "No active workflow", code: "NO_WORKFLOW" }); break; }
-
-					// Separate batch-able ops (collect_artifact, set_context) from
-					// state-transition ops (advance, complete) which persist on their own.
-					const batchOps: Array<
-						| { op: "collect_artifact"; name: string; content: string | Buffer; mimeType?: string }
-						| { op: "set_context"; key: string; value: string }
-					> = [];
-					const transitionOps: Array<{ op: "advance" } | { op: "complete" }> = [];
-
-					for (const op of msg.operations) {
-						if (op.op === "collect_artifact" || op.op === "set_context") {
-							batchOps.push(op as any);
-						} else {
-							transitionOps.push(op);
-						}
-					}
-
-					// Apply batch ops with a single persist
-					if (batchOps.length > 0) {
-						wr.batchOperations(batchOps);
-					}
-
-					// Apply transition ops in order
-					let didComplete = false;
-					for (const op of transitionOps) {
-						if (op.op === "advance") {
-							wr.advancePhase();
-						} else if (op.op === "complete") {
-							wr.complete();
-							didComplete = true;
-						}
-					}
-
-					// Send state to requester
-					const st = wr.getState();
-					send(ws, { type: "workflow_state", data: st });
-
-					// Broadcast completion and report if applicable
-					if (didComplete) {
-						broadcast(session.clients, { type: "workflow_completed", data: st });
-						if (st.reportPath) {
-							broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
-						}
-					} else if (transitionOps.some(op => op.op === "advance") && st.status === "completed" && st.reportPath) {
-						broadcast(session.clients, { type: "workflow_report", reportUrl: `/api/sessions/${sessionId}/workflow/report` });
-					}
-					break;
-				}
 				case "task_create": {
 					const task = sessionManager.taskManager.createTask(
 						msg.goalId,
@@ -399,6 +249,30 @@ export function handleWebSocketConnection(
 					} else {
 						send(ws, { type: "error", message: `Task ${msg.taskId} not found`, code: "TASK_NOT_FOUND" });
 					}
+					break;
+				}
+				case "invoke_skill": {
+					const skill = getSkill(msg.skillId);
+					if (!skill) {
+						send(ws, { type: "skill_failed", skillId: msg.skillId, error: `Unknown skill: ${msg.skillId}` });
+						break;
+					}
+					const session = sessionManager.getSession(sessionId);
+					if (!session) {
+						send(ws, { type: "skill_failed", skillId: msg.skillId, error: "Session not found" });
+						break;
+					}
+					send(ws, { type: "skill_started", skillId: msg.skillId });
+					const request = createSkillRequest(skill, session.cwd, sessionId, msg.context);
+					runSkillAgent(request).then((result) => {
+						if (result.status === "completed") {
+							broadcast(session.clients, { type: "skill_completed", skillId: msg.skillId, result: result.output });
+						} else {
+							broadcast(session.clients, { type: "skill_failed", skillId: msg.skillId, error: result.error || "Skill execution failed" });
+						}
+					}).catch((err) => {
+						broadcast(session.clients, { type: "skill_failed", skillId: msg.skillId, error: String(err) });
+					});
 					break;
 				}
 				case "ping":

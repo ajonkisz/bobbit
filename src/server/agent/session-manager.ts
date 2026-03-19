@@ -36,10 +36,10 @@ export interface SessionInfo {
 	roleAssistant?: boolean;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
-	/** Role in a swarm goal (e.g., 'coder', 'reviewer', 'tester', 'team-lead') */
+	/** Role in a team goal (e.g., 'coder', 'reviewer', 'tester', 'team-lead') */
 	role?: string;
-	/** The swarm goal ID this agent belongs to */
-	swarmGoalId?: string;
+	/** The team goal ID this agent belongs to */
+	teamGoalId?: string;
 	/** Path to the git worktree for this session */
 	worktreePath?: string;
 	/** Task ID this session is working on */
@@ -457,7 +457,7 @@ export class SessionManager {
 			goalAssistant: ps.goalAssistant,
 			roleAssistant: ps.roleAssistant,
 			role: ps.role,
-			swarmGoalId: ps.swarmGoalId,
+			teamGoalId: ps.teamGoalId,
 			worktreePath: ps.worktreePath,
 			taskId: ps.taskId,
 			accessory: ps.accessory,
@@ -542,7 +542,7 @@ export class SessionManager {
 			// Normal sessions: global base + AGENTS.md from cwd + goal spec
 			const goal = goalId ? this.goalManager.getGoal(goalId) : undefined;
 			let goalSpec = goal?.spec;
-			// Append role prompt for swarm agents (role instructions after goal spec)
+			// Append role prompt for team agents (role instructions after goal spec)
 			if (opts?.rolePrompt) {
 				goalSpec = (goalSpec ? goalSpec + "\n\n---\n\n" : "") + opts.rolePrompt;
 			}
@@ -843,7 +843,7 @@ export class SessionManager {
 			goalAssistant: session.goalAssistant,
 			roleAssistant: session.roleAssistant,
 			role: session.role,
-			swarmGoalId: session.swarmGoalId,
+			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
 			accessory: session.accessory,
@@ -867,7 +867,7 @@ export class SessionManager {
 		goalAssistant?: boolean;
 		delegateOf?: string;
 		role?: string;
-		swarmGoalId?: string;
+		teamGoalId?: string;
 		worktreePath?: string;
 		taskId?: string;
 		accessory?: string;
@@ -886,7 +886,7 @@ export class SessionManager {
 			roleAssistant: s.roleAssistant,
 			delegateOf: s.delegateOf,
 			role: s.role,
-			swarmGoalId: s.swarmGoalId,
+			teamGoalId: s.teamGoalId,
 			worktreePath: s.worktreePath,
 			taskId: s.taskId,
 			accessory: s.accessory,
@@ -918,12 +918,12 @@ export class SessionManager {
 		return true;
 	}
 
-	/** Update session metadata fields (role, swarmGoalId, worktreePath, accessory) and persist. */
-	updateSessionMeta(id: string, updates: { role?: string; swarmGoalId?: string; worktreePath?: string; accessory?: string }): boolean {
+	/** Update session metadata fields (role, teamGoalId, worktreePath, accessory) and persist. */
+	updateSessionMeta(id: string, updates: { role?: string; teamGoalId?: string; worktreePath?: string; accessory?: string }): boolean {
 		const session = this.sessions.get(id);
 		if (!session) return false;
 		if (updates.role !== undefined) session.role = updates.role;
-		if (updates.swarmGoalId !== undefined) session.swarmGoalId = updates.swarmGoalId;
+		if (updates.teamGoalId !== undefined) session.teamGoalId = updates.teamGoalId;
 		if (updates.worktreePath !== undefined) session.worktreePath = updates.worktreePath;
 		if (updates.accessory !== undefined) session.accessory = updates.accessory;
 		this.store.update(id, updates);

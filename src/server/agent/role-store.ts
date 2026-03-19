@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { TEAM_LEAD_PROMPT, CODER_PROMPT, REVIEWER_PROMPT, TESTER_PROMPT } from "./swarm-prompts.js";
+import { TEAM_LEAD_PROMPT, CODER_PROMPT, REVIEWER_PROMPT, TESTER_PROMPT } from "./team-prompts.js";
 
 export interface Role {
 	/** Unique identifier — lowercase alphanumeric + hyphens, immutable after creation */

@@ -341,7 +341,7 @@ test.describe("GET /api/tools", () => {
 		expect(tools).toContain("web_search");
 		expect(tools).toContain("web_fetch");
 		expect(tools).toContain("delegate");
-		expect(tools).toContain("workflow");
+		// "workflow" tool was removed and replaced by the skills system
 	});
 });
 

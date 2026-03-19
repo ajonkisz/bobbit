@@ -822,7 +822,7 @@ test.describe("Goals — UI", () => {
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
-	test("goal assistant: worktree toggle present and auto-enables with swarm", async ({ page }) => {
+	test("goal assistant: worktree toggle present and auto-enables with team", async ({ page }) => {
 		await openApp(page, token);
 
 		// Create goal assistant session
@@ -837,19 +837,19 @@ test.describe("Goals — UI", () => {
 		await expect(worktreeToggle).toBeVisible();
 		expect(await worktreeToggle.isChecked()).toBe(false);
 
-		// Find the swarm toggle (second toggle-switch)
-		const swarmToggle = previewPanel.locator(".toggle-switch").nth(1);
-		await expect(swarmToggle).toBeVisible();
+		// Find the team toggle (second toggle-switch)
+		const teamToggle = previewPanel.locator(".toggle-switch").nth(1);
+		await expect(teamToggle).toBeVisible();
 
-		// Enable swarm — worktree should auto-enable
-		await swarmToggle.click();
-		expect(await swarmToggle.isChecked()).toBe(true);
+		// Enable team — worktree should auto-enable
+		await teamToggle.click();
+		expect(await teamToggle.isChecked()).toBe(true);
 		expect(await worktreeToggle.isChecked()).toBe(true);
 
 		// Worktree can still be independently disabled
 		await worktreeToggle.click();
 		expect(await worktreeToggle.isChecked()).toBe(false);
-		expect(await swarmToggle.isChecked()).toBe(true);
+		expect(await teamToggle.isChecked()).toBe(true);
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);

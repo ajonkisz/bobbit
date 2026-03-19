@@ -667,7 +667,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let cwdValue = proposal.cwd || "";
 	let specValue = proposal.spec;
 	let saving = false;
-	let swarmValue = false;
+	let teamValue = false;
 	let worktreeValue = false;
 	let cwdDropdownOpen = false;
 	let cwdHighlightIndex = -1;
@@ -684,7 +684,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 		renderProposalDialog();
 
 		const sessionId = activeSessionId();
-		await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, swarm: swarmValue, worktree: worktreeValue });
+		await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, team: teamValue, worktree: worktreeValue });
 		state.activeGoalProposal = null;
 		if (sessionId) {
 			const { terminateSession } = await import("./session-manager.js");
@@ -746,12 +746,12 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 									></textarea>
 								</div>
 								<div class="flex items-center gap-2.5">
-									<input type="checkbox" id="swarm-toggle"
-										.checked=${swarmValue}
-										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; if (swarmValue) worktreeValue = true; renderProposalDialog(); }}
+									<input type="checkbox" id="team-toggle"
+										.checked=${teamValue}
+										@change=${(e: Event) => { teamValue = (e.target as HTMLInputElement).checked; if (teamValue) worktreeValue = true; renderProposalDialog(); }}
 										class="toggle-switch" />
-									<label for="swarm-toggle" class="text-xs text-muted-foreground cursor-pointer">
-										🐝 Swarm mode — Team Lead auto-spawns role agents
+									<label for="team-toggle" class="text-xs text-muted-foreground cursor-pointer">
+										🐝 Team mode — Team Lead auto-spawns role agents
 									</label>
 								</div>
 							</div>
@@ -789,7 +789,7 @@ function showGoalEditDialog(existingGoal: Goal): void {
 	let specValue = existingGoal.spec;
 	let stateValue: GoalState = existingGoal.state;
 	let saving = false;
-	let swarmValue = (existingGoal as any).swarm || false;
+	let teamValue = (existingGoal as any).team || false;
 	let cwdDropdownOpenEdit = false;
 	let cwdHighlightIndexEdit = -1;
 
@@ -809,7 +809,7 @@ function showGoalEditDialog(existingGoal: Goal): void {
 			cwd: cwdValue.trim() || undefined,
 			state: stateValue,
 			spec: specValue,
-			swarm: swarmValue,
+			team: teamValue,
 		});
 		saving = false;
 		cleanup();
@@ -884,12 +884,12 @@ function showGoalEditDialog(existingGoal: Goal): void {
 									<p class="text-[10px] text-muted-foreground mt-1">Injected into the context window of all sessions under this goal.</p>
 								</div>
 								<div class="flex items-center gap-2.5">
-									<input type="checkbox" id="swarm-toggle-edit"
-										.checked=${swarmValue}
-										@change=${(e: Event) => { swarmValue = (e.target as HTMLInputElement).checked; renderDialog(); }}
+									<input type="checkbox" id="team-toggle-edit"
+										.checked=${teamValue}
+										@change=${(e: Event) => { teamValue = (e.target as HTMLInputElement).checked; renderDialog(); }}
 										class="toggle-switch" />
-									<label for="swarm-toggle-edit" class="text-xs text-muted-foreground cursor-pointer">
-										🐝 Swarm mode — Team Lead auto-spawns role agents
+									<label for="team-toggle-edit" class="text-xs text-muted-foreground cursor-pointer">
+										🐝 Team mode — Team Lead auto-spawns role agents
 									</label>
 								</div>
 							</div>
