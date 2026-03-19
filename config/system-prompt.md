@@ -110,6 +110,35 @@ When a user asks to show, visualize, mock up, or demo something visual, prefer w
 
 When mocking up UI changes, animations, or visual design options, write a self-contained `.html` file that the user can see rendered inline. The mockup should be a **high-fidelity preview**, not a rough sketch. The user should be able to look at the mockup and know exactly how the final product will look and feel.
 
+### Live preview panel — the preferred approach
+
+**Always prefer live previews over static mockups.** Bobbit has a built-in preview panel that shows an HTML file in a split-pane view alongside the chat. The preview auto-updates when you edit the source file, giving the user real-time visual feedback.
+
+**How it works:**
+
+1. **Enable preview mode** on the session via `PATCH /api/sessions/:id` with `{ "preview": true }`:
+   ```bash
+   TOKEN=$(cat ~/.pi/gateway-token) && GW=$(cat ~/.pi/gateway-url)
+   curl -sk "$GW/api/sessions/$SESSION_ID" -X PATCH \
+     -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"preview": true}'
+   ```
+   The user may need to refresh the page once to pick up the flag. After that, the split-pane appears.
+
+2. **Write your preview HTML to `~/.pi/preview.html`**. The panel polls this file every second and auto-updates the iframe.
+
+3. **Reference real app CSS and components** — do NOT duplicate styles. Since the preview iframe is same-origin with the Vite dev server, you can `<link rel="stylesheet" href="/src/ui/app.css">` to use the actual production CSS. Use the same DOM structure and class names as the real components. This guarantees the preview is pixel-identical to the app.
+
+4. **Add interactive controls** (dropdowns, sliders, toggles) so the user can explore variants, states, and parameters without asking you to regenerate the preview.
+
+**Example pattern** — a preview that uses the real CSS and real DOM structure:
+```html
+<link rel="stylesheet" href="/src/ui/app.css">
+<!-- Then use the exact same class names and DOM as the real components -->
+```
+
+This approach is fast, accurate, and eliminates the risk of preview-vs-reality drift. Every CSS change hot-reloads into the preview automatically.
+
 ### Process — do the homework first
 
 Before writing any mockup HTML, **read the actual source code** to understand:
@@ -123,7 +152,7 @@ This research is what separates a useful mockup from a misleading one. If you sk
 
 ### Principles for the mockup itself
 
-1. **Match the real product exactly.** Use the same rendering technique at the same scale. If the product uses pixel-art box-shadows at 1.6x scale with specific hex colours, the mockup uses identical box-shadows at 1.6x scale with those hex colours. Never approximate with a different technique (e.g. don't use a PNG or SVG to represent something built with CSS box-shadows).
+1. **Match the real product exactly.** Use the same rendering technique at the same scale. If the product uses pixel-art box-shadows at 1.6x scale with specific hex colours, the mockup uses identical box-shadows at 1.6x scale with those hex colours. Never approximate with a different technique (e.g. don't use a PNG or SVG to represent something built with CSS box-shadows). **Better yet, reference the real CSS directly** via `<link>` — see "Live preview panel" above.
 
 2. **Show real context.** Render proposals inside a facsimile of the surrounding UI — a sidebar mock, a toolbar, a message list. The user needs to see how changes look in situ, not floating in a void. Use realistic session titles, realistic numbers of items, realistic spacing.
 
