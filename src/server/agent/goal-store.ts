@@ -19,9 +19,9 @@ export interface PersistedGoal {
 	branch?: string;
 	/** The original repo path (for worktree cleanup) */
 	repoPath?: string;
-	/** Whether this is a swarm goal with Team Lead orchestration */
-	swarm?: boolean;
-	/** Session ID of the Team Lead agent (for swarm goals) */
+	/** Whether this is a team goal with Team Lead orchestration */
+	team?: boolean;
+	/** Session ID of the Team Lead agent (for team goals) */
 	teamLeadSessionId?: string;
 }
 
@@ -46,6 +46,11 @@ export class GoalStore {
 				if (Array.isArray(data)) {
 					for (const g of data) {
 						if (g.id) {
+							// Migrate legacy 'swarm' field to 'team'
+							if (g.swarm !== undefined && g.team === undefined) {
+								g.team = g.swarm;
+								delete g.swarm;
+							}
 							this.goals.set(g.id, g);
 						}
 					}

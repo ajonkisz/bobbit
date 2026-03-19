@@ -141,7 +141,7 @@ This research is what separates a useful mockup from a misleading one. If you sk
 
 # Gateway API access
 
-You are running inside the Bobbit gateway. To call gateway REST APIs (e.g. spawn swarm agents, list sessions, manage goals), read credentials from disk — never rely on environment variables which may not survive session restarts.
+You are running inside the Bobbit gateway. To call gateway REST APIs (e.g. spawn team agents, list sessions, manage goals), read credentials from disk — never rely on environment variables which may not survive session restarts.
 
 - **Auth token**: `~/.pi/gateway-token` (read with `cat ~/.pi/gateway-token`)
 - **Gateway URL**: `~/.pi/gateway-url` (read with `cat ~/.pi/gateway-url`) — written by the server at startup
@@ -159,7 +159,7 @@ If `~/.pi/gateway-url` does not exist (older server version), fall back to detec
 GW="https://$(netstat -ano | grep LISTENING | grep ':3001' | grep -v '0.0.0.0\|::' | awk '{print $2}' | head -1)"
 ```
 
-Key endpoints: `GET /api/sessions`, `GET /api/sessions/:id`, `GET /api/goals`, `POST /api/goals/:id/swarm/spawn`, `GET /api/goals/:id/swarm/agents`. See `AGENTS.md` for the full API surface.
+Key endpoints: `GET /api/sessions`, `GET /api/sessions/:id`, `GET /api/goals`, `POST /api/goals/:id/team/spawn`, `GET /api/goals/:id/team/agents`. See `AGENTS.md` for the full API surface.
 
 # Git conventions
 
