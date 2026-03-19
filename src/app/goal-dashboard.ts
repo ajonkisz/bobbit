@@ -50,6 +50,9 @@ export interface CommitInfo {
 // DASHBOARD STATE
 // ============================================================================
 
+let previousStatValues: { done: number; inProgress: number; failed: number; agents: number } | null = null;
+let statChangeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
 let currentGoalId: string | null = null;
 let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
@@ -134,6 +137,9 @@ export function clearDashboardState(): void {
 	teamStopping = false;
 	loading = true;
 	error = "";
+	previousStatValues = null;
+	for (const timer of statChangeTimers.values()) clearTimeout(timer);
+	statChangeTimers.clear();
 	stopAgentPolling();
 	stopTaskPolling();
 	stopArtifactPolling();
@@ -327,15 +333,8 @@ function formatRelativeTime(timestamp: string): string {
 	return `${days}d ago`;
 }
 
-const badgeIcons: Record<BadgeStatus, string> = {
-	pass: "\u2713",
-	fail: "\u2717",
-	stale: "\u27F3",
-	pending: "\u23F3",
-};
-
 function renderCommitBadge(label: string, status: BadgeStatus): TemplateResult {
-	return html`<span class="commit-badge commit-badge--${status}" title="${label}: ${status}">${badgeIcons[status]} ${label}</span>`;
+	return html`<span class="commit-status-dot commit-status-dot--${status}" title="${label}: ${status}"></span>`;
 }
 
 function renderCommitTimeline(commitList: CommitInfo[], taskList: Task[]): TemplateResult {
@@ -457,11 +456,11 @@ function agentStatusLabel(status: string): "working" | "idle" | "blocked" {
 }
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-	coder: { bg: "rgba(59, 130, 246, 0.15)", text: "#3b82f6" },
-	tester: { bg: "rgba(34, 197, 94, 0.15)", text: "#22c55e" },
-	reviewer: { bg: "rgba(245, 158, 11, 0.15)", text: "#f59e0b" },
-	lead: { bg: "rgba(168, 85, 247, 0.15)", text: "#a855f7" },
-	"team-lead": { bg: "rgba(168, 85, 247, 0.15)", text: "#a855f7" },
+	coder: { bg: "oklch(0.62 0.15 250 / 0.15)", text: "oklch(0.62 0.15 250)" },
+	tester: { bg: "oklch(0.65 0.15 145 / 0.15)", text: "oklch(0.65 0.15 145)" },
+	reviewer: { bg: "oklch(0.70 0.14 75 / 0.15)", text: "oklch(0.70 0.14 75)" },
+	lead: { bg: "oklch(0.60 0.15 300 / 0.15)", text: "oklch(0.60 0.15 300)" },
+	"team-lead": { bg: "oklch(0.60 0.15 300 / 0.15)", text: "oklch(0.60 0.15 300)" },
 };
 
 function getRoleColor(role: string): { bg: string; text: string } {
@@ -474,8 +473,8 @@ function getRoleLabel(role: string): string {
 }
 
 const AVATAR_COLORS = [
-	"#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ef4444",
-	"#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#8b5cf6",
+	"oklch(0.62 0.15 250)", "oklch(0.65 0.15 145)", "oklch(0.70 0.14 75)", "oklch(0.60 0.15 300)", "oklch(0.60 0.20 25)",
+	"oklch(0.65 0.15 220)", "oklch(0.65 0.18 350)", "oklch(0.65 0.12 175)", "oklch(0.70 0.14 55)", "oklch(0.55 0.15 300)",
 ];
 
 function getAvatarColor(sessionId: string): string {
@@ -514,13 +513,12 @@ export function renderAgentPanel(agentList: TeamAgent[]): TemplateResult {
 			${agentList.map((agent) => {
 				const statusLabel = agentStatusLabel(agent.status);
 				const roleColor = getRoleColor(agent.role);
-				const avatarColor = getAvatarColor(agent.sessionId);
-				const initials = getInitials(agent.role);
+				const session = state.gatewaySessions.find(s => s.id === agent.sessionId);
 
 				return html`
 					<div class="agent-row" @click=${() => connectToSession(agent.sessionId, true)} title="Open session">
-						<div class="agent-avatar" style="background: ${avatarColor}">
-							${initials}
+						<div class="agent-bobbit">
+							${statusBobbit(session?.status ?? agent.status, session?.isCompacting ?? false, agent.sessionId, false, session?.isAborting ?? false, agent.role === "team-lead", agent.role === "coder", session?.accessory)}
 						</div>
 						<div class="agent-info">
 							<div class="agent-name-row">
@@ -598,11 +596,11 @@ function derivePhase(artifactList: GoalArtifact[]): GoalPhase {
 }
 
 const PHASE_COLORS: Record<GoalPhase, string> = {
-	planning: "#6b7280",
-	design: "#8b5cf6",
-	implementation: "#3b82f6",
-	review: "#f59e0b",
-	complete: "#22c55e",
+	planning: "var(--muted-foreground)",
+	design: "oklch(0.60 0.15 300)",
+	implementation: "oklch(0.62 0.15 250)",
+	review: "oklch(0.70 0.14 75)",
+	complete: "oklch(0.65 0.15 145)",
 };
 
 function renderPhaseIndicator(artifactList: GoalArtifact[]): TemplateResult {
@@ -616,10 +614,11 @@ function renderPhaseIndicator(artifactList: GoalArtifact[]): TemplateResult {
 				${PHASES.map((p, i) => {
 					const isActive = i === currentIdx;
 					const isPast = i < currentIdx;
+					const isFuture = i > currentIdx;
 					const color = isPast || isActive ? PHASE_COLORS[p.phase] : "hsl(var(--border))";
 					return html`
-						<div class="phase-step ${isActive ? "phase-step--active" : ""} ${isPast ? "phase-step--past" : ""}">
-							<div class="phase-dot" style="background: ${color}; ${isActive ? `box-shadow: 0 0 0 3px ${color}40;` : ""}"></div>
+						<div class="phase-step ${isActive ? "phase-step--active" : ""} ${isPast ? "phase-step--past" : ""} ${isFuture ? "phase-step--future" : ""}">
+							<div class="phase-dot ${isActive ? "phase-dot--active" : ""}" style="background: ${color};"></div>
 							${i < PHASES.length - 1 ? html`<div class="phase-line" style="background: ${isPast ? PHASE_COLORS[PHASES[i + 1].phase] : "hsl(var(--border))"};"></div>` : nothing}
 							<div class="phase-label" style="color: ${isActive ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))"}">${p.label}</div>
 						</div>
@@ -723,6 +722,8 @@ function renderArtifactStatus(status: ArtifactRequirementStatus): TemplateResult
 	const iconStr = ARTIFACT_TYPE_ICONS[type] || "\uD83D\uDCCB";
 	const exists = artifact != null;
 	const isExpanded = artifact ? expandedArtifactIds.has(artifact.id) : false;
+	const isNew = artifact != null && (Date.now() - artifact.updatedAt) < 5 * 60_000;
+	const isRevised = artifact != null && artifact.version > 1;
 
 	return html`
 		<div class="artifact-row ${exists ? "artifact-row--exists" : "artifact-row--missing"}"
@@ -732,6 +733,8 @@ function renderArtifactStatus(status: ArtifactRequirementStatus): TemplateResult
 				<div class="artifact-name">
 					${label}
 					${required ? html`<span class="artifact-required-badge">Required</span>` : nothing}
+					${isRevised ? html`<span class="artifact-revised-badge">Revised</span>` : nothing}
+					${isNew ? html`<span class="artifact-new-badge">New</span>` : nothing}
 				</div>
 				<div class="artifact-meta">
 					${exists
@@ -742,7 +745,7 @@ function renderArtifactStatus(status: ArtifactRequirementStatus): TemplateResult
 				</div>
 			</div>
 			${exists ? html`
-				<div class="artifact-expand-icon">${isExpanded ? "\u25B2" : "\u25BC"}</div>
+				<span class="artifact-chevron ${isExpanded ? "artifact-chevron--open" : ""}">›</span>
 			` : nothing}
 		</div>
 		${isExpanded && artifact ? html`
@@ -791,6 +794,8 @@ function renderArtifactTimeline(artifactList: GoalArtifact[]): TemplateResult {
 					const isExpanded = expandedArtifactIds.has(artifact.id);
 					const session = state.gatewaySessions.find((s) => s.id === artifact.producedBy);
 					const producerName = session?.title || artifact.producedBy.slice(0, 8);
+					const isNew = (Date.now() - artifact.updatedAt) < 5 * 60_000;
+					const isRevised = artifact.version > 1;
 
 					return html`
 						<div class="artifact-timeline-item" @click=${() => toggleArtifactExpand(artifact.id)}>
@@ -800,10 +805,12 @@ function renderArtifactTimeline(artifactList: GoalArtifact[]): TemplateResult {
 									<span class="artifact-timeline-icon">${iconStr}</span>
 									<span class="artifact-timeline-name">${ARTIFACT_TYPE_LABELS[artifact.type] || artifact.name}</span>
 									<span class="artifact-timeline-version">v${artifact.version}</span>
+									${isRevised ? html`<span class="artifact-revised-badge">Revised</span>` : nothing}
+									${isNew ? html`<span class="artifact-new-badge">New</span>` : nothing}
 									<span class="artifact-timeline-time">${formatArtifactTime(artifact.updatedAt)}</span>
 								</div>
 								<div class="artifact-timeline-meta">
-									${artifact.version > 1 ? html`<span>Revised</span><span>\u00B7</span>` : html`<span>Created</span><span>\u00B7</span>`}
+									${isRevised ? html`<span>Revised</span><span>\u00B7</span>` : html`<span>Created</span><span>\u00B7</span>`}
 									<span>by ${producerName}</span>
 									${artifact.skillId ? html`<span>\u00B7</span><span>via ${artifact.skillId}</span>` : nothing}
 								</div>
@@ -811,6 +818,7 @@ function renderArtifactTimeline(artifactList: GoalArtifact[]): TemplateResult {
 									<pre class="artifact-content-body artifact-timeline-body">${artifact.content}</pre>
 								` : nothing}
 							</div>
+							<span class="artifact-chevron ${isExpanded ? "artifact-chevron--open" : ""}">›</span>
 						</div>
 					`;
 				})}
@@ -888,6 +896,41 @@ function renderNavBar(goal: Goal): TemplateResult {
 	`;
 }
 
+function checkStatChanges(done: number, inProgress: number, failed: number, agents: number): void {
+	if (!previousStatValues) {
+		previousStatValues = { done, inProgress, failed, agents };
+		return;
+	}
+
+	const checks: Array<[string, number, number]> = [
+		["stat-done", previousStatValues.done, done],
+		["stat-progress", previousStatValues.inProgress, inProgress],
+		["stat-failed", previousStatValues.failed, failed],
+		["stat-agents", previousStatValues.agents, agents],
+	];
+
+	for (const [id, prev, curr] of checks) {
+		if (prev !== curr) {
+			const el = document.getElementById(id);
+			if (!el) continue;
+			// Clear any pending timer
+			const existing = statChangeTimers.get(id);
+			if (existing) clearTimeout(existing);
+			// Remove and re-add class to retrigger animation
+			el.classList.remove("dashboard-stat-value--changed");
+			// Force reflow to restart animation
+			void el.offsetWidth;
+			el.classList.add("dashboard-stat-value--changed");
+			statChangeTimers.set(id, setTimeout(() => {
+				el.classList.remove("dashboard-stat-value--changed");
+				statChangeTimers.delete(id);
+			}, 400));
+		}
+	}
+
+	previousStatValues = { done, inProgress, failed, agents };
+}
+
 function renderSummaryHeader(goal: Goal, taskList: Task[]): TemplateResult {
 	const total = taskList.length;
 	const done = taskList.filter((t) => t.state === "complete").length;
@@ -897,22 +940,25 @@ function renderSummaryHeader(goal: Goal, taskList: Task[]): TemplateResult {
 		(s) => s.goalId === goal.id && !s.delegateOf && (s.status === "streaming" || s.status === "busy"),
 	).length;
 
+	// Schedule stat change detection after render
+	setTimeout(() => checkStatChanges(done, inProgress, failed, activeAgents), 0);
+
 	return html`
 		<div class="dashboard-summary">
-			<div class="dashboard-stat">
-				<span class="dashboard-stat-value">${done}/${total}</span>
+			<div class="dashboard-stat dashboard-stat--done">
+				<span class="dashboard-stat-value" id="stat-done">${done}/${total}</span>
 				<span class="dashboard-stat-label">Tasks done</span>
 			</div>
-			<div class="dashboard-stat">
-				<span class="dashboard-stat-value">${inProgress}</span>
+			<div class="dashboard-stat dashboard-stat--progress">
+				<span class="dashboard-stat-value" id="stat-progress">${inProgress}</span>
 				<span class="dashboard-stat-label">In progress</span>
 			</div>
-			<div class="dashboard-stat">
-				<span class="dashboard-stat-value">${failed}</span>
+			<div class="dashboard-stat dashboard-stat--failed">
+				<span class="dashboard-stat-value" id="stat-failed">${failed}</span>
 				<span class="dashboard-stat-label">Failed</span>
 			</div>
-			<div class="dashboard-stat">
-				<span class="dashboard-stat-value">${activeAgents}</span>
+			<div class="dashboard-stat dashboard-stat--agents">
+				<span class="dashboard-stat-value" id="stat-agents">${activeAgents}</span>
 				<span class="dashboard-stat-label">Active agents</span>
 			</div>
 		</div>
