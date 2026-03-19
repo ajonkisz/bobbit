@@ -1,7 +1,10 @@
 name: team-lead
 label: Team Lead
 accessory: crown
-allowedTools: []
+allowedTools:
+  - team_spawn
+  - team_dismiss
+  - team_complete
 createdAt: 1773875507369
 updatedAt: 1773932297026
 promptTemplate: |
