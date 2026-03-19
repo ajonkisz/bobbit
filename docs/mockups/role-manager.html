@@ -3,631 +3,449 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Role Manager — UI Mockup</title>
+<title>Role Manager — Redesigned List View</title>
 <style>
-  :root {
-    --background: #0a0a0a;
-    --foreground: #fafafa;
-    --card: #0a0a0a;
-    --muted: #171717;
-    --muted-foreground: #a3a3a3;
-    --border: #262626;
-    --ring: #d4d4d4;
-    --primary: #fafafa;
-    --primary-foreground: #171717;
-    --secondary: #262626;
-    --secondary-foreground: #fafafa;
-    --destructive: #dc2626;
-    --sidebar: #111;
-    --radius: 0.375rem;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: var(--foreground);
-    background: var(--background);
-    font-size: 14px;
-    line-height: 1.5;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* ========================================================================
+   * RESET & DARK THEME (matches Bobbit's HSL custom property palette)
+   * ======================================================================== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* Shared components */
-  .backdrop {
-    position: relative;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 0.5rem; overflow: hidden;
+  :root {
+    --background:    222 47% 8%;
+    --foreground:    210 40% 92%;
+    --secondary:     217 33% 14%;
+    --border:        217 33% 18%;
+    --muted-fg:      215 20% 55%;
+    --accent:        217 33% 17%;
+    --ring:          213 94% 58%;
+    --destructive:   0 84% 60%;
+    --font-mono:     'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   }
-  .dialog {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    box-shadow: 0 25px 50px -12px rgba(0,0,0,.5);
-    display: flex; flex-direction: column;
-    overflow: hidden;
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    line-height: 1.5;
+    min-height: 100vh;
   }
-  .dialog-content { padding: 1.5rem; overflow-y: auto; flex: 1; }
-  .dialog-footer { padding: 0 1.5rem 1rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
-  .dialog-header { font-size: 1.05rem; font-weight: 600; }
+
+  /* ========================================================================
+   * PAGE CONTAINER
+   * ======================================================================== */
+  .roles-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ========================================================================
+   * STICKY NAV BAR — unchanged from current design
+   * ======================================================================== */
+  .roles-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    gap: 12px;
+  }
+
+  .roles-nav-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .roles-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .roles-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: hsl(var(--muted-fg));
+    cursor: pointer;
+    transition: background 150ms, color 150ms;
+  }
+  .roles-back:hover {
+    background: hsl(var(--secondary));
+    color: hsl(var(--foreground));
+  }
+
+  .roles-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+  }
 
   .btn {
-    display: inline-flex; align-items: center; gap: 0.375rem;
-    padding: 0.375rem 0.875rem; border-radius: var(--radius);
-    font-size: 0.8125rem; font-weight: 500;
-    cursor: pointer; border: none; transition: all 0.15s; white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--secondary));
+    color: hsl(var(--foreground));
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 150ms, border-color 150ms;
+    white-space: nowrap;
   }
-  .btn-default { background: var(--primary); color: var(--primary-foreground); }
-  .btn-default:hover { opacity: 0.9; }
-  .btn-ghost { background: transparent; color: var(--muted-foreground); }
-  .btn-ghost:hover { background: var(--secondary); color: var(--foreground); }
-  .btn-sm { padding: 0.25rem 0.625rem; font-size: 0.75rem; }
-  .btn:disabled { opacity: 0.5; pointer-events: none; }
-
-  .input, textarea {
-    width: 100%; padding: 0.5rem 0.75rem;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    background: var(--background); color: var(--foreground);
-    font-size: 0.8125rem; outline: none;
+  .btn:hover {
+    background: hsl(var(--accent));
+    border-color: hsl(var(--muted-fg) / 0.4);
   }
-  .input:focus, textarea:focus { box-shadow: 0 0 0 1px var(--ring); }
-  textarea { font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; resize: vertical; }
 
-  .label { display: block; font-size: 0.6875rem; color: var(--muted-foreground); margin-bottom: 0.25rem; }
-
-  /* Layout */
-  .mockup-layout { display: flex; flex-direction: column; gap: 2rem; padding: 2rem; max-width: 1400px; margin: 0 auto; }
-  .section-title {
-    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--muted-foreground); font-weight: 600; margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+  /* ========================================================================
+   * BODY / LIST
+   * ======================================================================== */
+  .roles-body {
+    flex: 1;
+    padding: 16px 20px;
   }
-  .section-desc { font-size: 0.75rem; color: var(--muted-foreground); margin-bottom: 1rem; line-height: 1.6; }
 
-  /* Role list */
-  .role-list { display: flex; flex-direction: column; gap: 0.25rem; }
+  .roles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 720px;
+  }
+
+  /* ========================================================================
+   * ROLE ROW
+   * Subtle card-like rows with slight background lift from the page.
+   * ======================================================================== */
   .role-row {
-    display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.625rem 0.75rem; border-radius: var(--radius);
-    cursor: pointer; transition: background 0.15s;
-    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    background: hsl(var(--secondary));
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    transition: background 150ms, border-color 150ms;
   }
-  .role-row:hover { background: var(--secondary); }
+  .role-row:hover {
+    background: hsl(var(--accent));
+    border-color: hsl(var(--muted-fg) / 0.3);
+  }
+
+  /* --- Avatar cell --- */
   .role-avatar {
-    width: 32px; height: 32px; border-radius: 0.375rem;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; position: relative; overflow: hidden;
-    background: var(--muted);
+    flex-shrink: 0;
+    width: 28px;
+    height: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
   }
-  .role-info { flex: 1; min-width: 0; }
-  .role-name { font-size: 0.8125rem; font-weight: 500; }
-  .role-meta { font-size: 0.6875rem; color: var(--muted-foreground); display: flex; align-items: center; gap: 0.5rem; margin-top: 0.125rem; }
 
-  .tool-count { font-size: 0.625rem; color: var(--muted-foreground); }
-
-  /* Tool chips */
-  .tool-grid { display: flex; flex-wrap: wrap; gap: 0.375rem; }
-  .tool-chip {
-    display: inline-flex; align-items: center; gap: 0.25rem;
-    padding: 0.25rem 0.5rem; border-radius: var(--radius);
-    font-size: 0.6875rem; font-family: monospace;
-    border: 1px solid var(--border); background: var(--muted);
-    color: var(--muted-foreground); cursor: pointer; transition: all 0.15s; user-select: none;
-  }
-  .tool-chip.active { border-color: #22c55e; color: #4ade80; background: rgba(34,197,94,0.1); }
-  .tool-chip:hover { border-color: var(--muted-foreground); }
-  .tool-chip .check { font-size: 0.5rem; }
-
-  /* Accessory selector */
-  .accessory-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-  .accessory-option {
-    width: 48px; height: 48px; border-radius: 0.5rem;
-    border: 2px solid var(--border); background: var(--muted);
-    cursor: pointer; transition: all 0.15s;
-    display: flex; align-items: center; justify-content: center;
-    position: relative; overflow: hidden;
-  }
-  .accessory-option:hover { border-color: var(--muted-foreground); transform: scale(1.05); }
-  .accessory-option.selected { border-color: var(--foreground); transform: scale(1.05); background: rgba(255,255,255,0.05); }
-  .accessory-label {
-    font-size: 0.5625rem; color: var(--muted-foreground); text-align: center;
-    margin-top: 0.125rem; line-height: 1.2;
-  }
-  .accessory-item { display: flex; flex-direction: column; align-items: center; }
-
-  /* Pixel art at larger scale for accessory previews */
-  .bobbit-lg {
-    display: block; width: 1px; height: 1px;
+  /* Pixel-art Bobbit sprite via CSS box-shadow, scale 1.6 */
+  .bobbit-sprite {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    width: 1px;
+    height: 1px;
     image-rendering: pixelated;
-    position: absolute; left: 4px; top: 6px;
+    transform: scale(1.6);
+    transform-origin: 0 0;
+    filter: saturate(0.4); /* idle state */
   }
-  /* Sidebar Bobbit at small scale */
-  .bobbit-sm {
-    display: block; width: 1px; height: 1px;
+  .bobbit-accessory {
+    position: absolute;
+    left: 0;
+    display: block;
+    width: 1px;
+    height: 1px;
     image-rendering: pixelated;
-    position: absolute; left: 0; top: 0;
+    transform: scale(1.6);
+    transform-origin: 0 0;
   }
 
-  /* Sidebar mock */
-  .sidebar-mock {
-    width: 240px; background: var(--sidebar);
-    border: 1px solid var(--border); border-radius: 0.5rem;
-    padding: 0.5rem 0.25rem; font-size: 0.75rem;
-  }
-  .sidebar-section-label {
-    font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.05em;
-    color: var(--muted-foreground); font-weight: 600;
-    padding: 0.25rem 0.5rem; margin-bottom: 0.125rem;
-    display: flex; align-items: center; gap: 0.25rem;
-  }
-  .sidebar-row {
-    display: flex; align-items: center; gap: 0.5rem;
-    padding: 0.25rem 0.375rem; border-radius: 0.25rem;
-    cursor: pointer; transition: background 0.1s;
-  }
-  .sidebar-row:hover { background: rgba(255,255,255,0.04); }
-  .sidebar-row.active-row { background: rgba(255,255,255,0.08); }
-  .sidebar-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; }
-  .sidebar-role-badge {
-    font-size: 0.5625rem; padding: 0.0625rem 0.3125rem;
-    border-radius: 9999px; font-weight: 500; white-space: nowrap;
-  }
-  .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.06); margin: 0.375rem 0.25rem; }
-  .bobbit-icon {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 16px; flex-shrink: 0; position: relative; overflow: hidden; margin-top: 2px;
+  /* --- Label cell --- */
+  .role-label {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* Annotations */
-  .annotation {
-    margin-top: 1rem; padding: 0.75rem 1rem;
-    border-left: 3px solid #3b82f6; background: rgba(59,130,246,0.06);
-    border-radius: 0 var(--radius) var(--radius) 0;
-    font-size: 0.75rem; color: var(--muted-foreground); line-height: 1.6;
-  }
-  .annotation strong { color: var(--foreground); }
-
-  .detail-footer {
-    padding: 0.75rem 1.25rem; border-top: 1px solid var(--border);
-    display: flex; justify-content: space-between; align-items: center;
+  /* --- Action buttons --- */
+  .role-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
   }
 
-  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
-  h1 + p { font-size: 0.8125rem; color: var(--muted-foreground); margin-bottom: 2rem; }
+  .icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: hsl(var(--muted-fg));
+    cursor: pointer;
+    transition: background 150ms, color 150ms;
+  }
+  .icon-btn:hover {
+    background: hsl(var(--secondary));
+    color: hsl(var(--foreground));
+  }
+  .icon-btn.delete:hover {
+    background: hsl(var(--destructive) / 0.12);
+    color: hsl(var(--destructive));
+  }
 
-  @keyframes bobbit-breathe { 0%,100% { opacity:0.4 } 50% { opacity:0.55 } }
+  /* ========================================================================
+   * EMPTY STATE (kept from original)
+   * ======================================================================== */
+  .roles-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: hsl(var(--muted-fg));
+    font-size: 14px;
+    padding: 80px 0;
+  }
+
+  /* ========================================================================
+   * RESPONSIVE
+   * ======================================================================== */
+  @media (max-width: 640px) {
+    .roles-nav { padding: 10px 14px; }
+    .roles-body { padding: 12px 14px; }
+    .role-row { padding: 10px 12px; gap: 10px; }
+    .role-label { font-size: 13px; }
+  }
+
+  /* ========================================================================
+   * INLINE SVG ICONS (Lucide)
+   * ======================================================================== */
+  .lucide { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ========================================================================
+   * ANNOTATION BANNER (mockup-only)
+   * ======================================================================== */
+  .mockup-banner {
+    background: hsl(213 94% 58% / 0.1);
+    border-bottom: 1px solid hsl(213 94% 58% / 0.25);
+    padding: 10px 20px;
+    font-size: 12px;
+    color: hsl(213 94% 70%);
+    text-align: center;
+  }
 </style>
 </head>
 <body>
 
-<div class="mockup-layout">
-
-<div>
-  <h1>Role Manager — UI Mockup</h1>
-  <p>Roles are identified by pixel-art accessories (crown, bandana, magnifying glass, etc.), not by color. Color is session identity (Aurora Borealis palette), accessories are role identity.</p>
+<!-- Mockup annotation -->
+<div class="mockup-banner">
+  Mockup: Role Manager List View Redesign — no summary stats bar, clean list rows with avatar + name + edit + delete
 </div>
 
-<!-- ================================================================
-     SECTION 1: Accessory System Explanation
-     ================================================================ -->
-<div>
-  <div class="section-title">1. Role Identity = Accessories</div>
-  <div class="section-desc">
-    Each role gets a unique pixel-art accessory overlay rendered on top of the Bobbit sprite. Accessories are counter-hue-rotated so they keep their fixed colors regardless of the session's identity hue. Currently: crown (team-lead), bandana (coder). New accessories needed for reviewer, tester, and any new roles.
-  </div>
+<div class="roles-container">
 
-  <div style="display:flex; flex-wrap:wrap; gap:1.5rem; padding:1.25rem; background:var(--muted); border-radius:0.5rem; border:1px solid var(--border);">
-
-    <!-- Crown - Team Lead -->
-    <div class="accessory-item">
-      <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
-        <!-- Bobbit body -->
-        <span class="bobbit-lg" style="top:10px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-        <!-- Crown overlay -->
-        <span class="bobbit-lg" style="top:4px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000;"></span>
-      </div>
-      <div class="accessory-label">Crown<br><span style="color:#fde047;">team-lead</span></div>
+  <!-- ====================================================================
+       STICKY NAV BAR (kept from current design)
+       ==================================================================== -->
+  <div class="roles-nav">
+    <div class="roles-nav-left">
+      <button class="roles-back" title="Back to sessions">
+        <!-- Lucide ArrowLeft -->
+        <svg class="lucide" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      </button>
+      <h1 class="roles-title">Roles</h1>
     </div>
-
-    <!-- Bandana - Coder -->
-    <div class="accessory-item">
-      <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
-        <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-        <!-- Bandana overlay -->
-        <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,0 3px 0 #000,1px 3px 0 #b91c1c,2px 3px 0 #dc2626,3px 3px 0 #ef4444,4px 3px 0 #ef4444,5px 3px 0 #ef4444,6px 3px 0 #ef4444,7px 3px 0 #ef4444,8px 3px 0 #f87171,9px 3px 0 #000,0 4px 0 #000,1px 4px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,10px 3px 0 #000,10px 4px 0 #b91c1c,11px 4px 0 #000,10px 5px 0 #991b1b,11px 5px 0 #000,10px 6px 0 #000;"></span>
-      </div>
-      <div class="accessory-label">Bandana<br><span style="color:#ef4444;">coder</span></div>
-    </div>
-
-    <!-- Magnifying glass - Reviewer (proposed) -->
-    <div class="accessory-item">
-      <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
-        <span class="bobbit-lg" style="top:6px;left:4px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-        <!-- Magnifying glass held to the right -->
-        <span class="bobbit-lg" style="top:6px;left:4px;transform:scale(3.2);transform-origin:0 0;box-shadow:11px 2px 0 #000,12px 2px 0 #000,10px 3px 0 #000,10px 3px 0 #000,11px 3px 0 #60a5fa,12px 3px 0 #93c5fd,13px 3px 0 #000,10px 4px 0 #000,11px 4px 0 #93c5fd,12px 4px 0 #60a5fa,13px 4px 0 #000,11px 5px 0 #000,12px 5px 0 #000,13px 5px 0 #000,10px 6px 0 #000,9px 7px 0 #000,10px 6px 0 #7c5c2e,10px 7px 0 #000;"></span>
-      </div>
-      <div class="accessory-label">Magnifier<br><span style="color:#60a5fa;">reviewer</span></div>
-    </div>
-
-    <!-- Goggles/Safety glasses - Tester (proposed) -->
-    <div class="accessory-item">
-      <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
-        <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-        <!-- Safety goggles overlay on eyes area -->
-        <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:2px 3px 0 #000,3px 3px 0 #22d3ee,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #22d3ee,7px 3px 0 #000,2px 4px 0 #000,3px 4px 0 #67e8f9,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #67e8f9,7px 4px 0 #000,2px 5px 0 #000,3px 5px 0 #000,7px 5px 0 #000;"></span>
-      </div>
-      <div class="accessory-label">Goggles<br><span style="color:#22d3ee;">tester</span></div>
-    </div>
-
-    <!-- Headphones -->
-    <div class="accessory-item">
-      <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
-        <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-        <!-- Headphones overlay -->
-        <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #a855f7,4px 0px 0 #a855f7,5px 0px 0 #a855f7,6px 0px 0 #a855f7,7px 0px 0 #a855f7,2px 1px 0 #000,8px 1px 0 #000,1px 2px 0 #000,9px 2px 0 #000,0px 3px 0 #7c3aed,0px 4px 0 #7c3aed,0px 5px 0 #7c3aed,9px 3px 0 #7c3aed,9px 4px 0 #7c3aed,9px 5px 0 #7c3aed;"></span>
-      </div>
-      <div class="accessory-label">Headphones<br><span style="color:#a855f7;">example</span></div>
-    </div>
-
-    <!-- Pencil -->
-    <div class="accessory-item">
-      <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
-        <span class="bobbit-lg" style="top:6px;left:4px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-        <!-- Pencil held to the right -->
-        <span class="bobbit-lg" style="top:6px;left:4px;transform:scale(3.2);transform-origin:0 0;box-shadow:12px 1px 0 #fbbf24,12px 2px 0 #fbbf24,11px 3px 0 #000,12px 3px 0 #fbbf24,11px 4px 0 #000,12px 4px 0 #fbbf24,10px 5px 0 #000,11px 5px 0 #fbbf24,10px 6px 0 #000,11px 6px 0 #d97706,10px 7px 0 #fef3c7,10px 8px 0 #000;"></span>
-      </div>
-      <div class="accessory-label">Pencil<br><span style="color:#fbbf24;">docs-writer</span></div>
-    </div>
-
-    <!-- Book -->
-    <div class="accessory-item">
-      <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
-        <span class="bobbit-lg" style="top:6px;left:4px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-        <!-- Open book held in front -->
-        <span class="bobbit-lg" style="top:6px;left:4px;transform:scale(3.2);transform-origin:0 0;box-shadow:10px 4px 0 #000,11px 4px 0 #000,12px 4px 0 #000,13px 4px 0 #000,10px 5px 0 #000,11px 5px 0 #f5f5f4,12px 5px 0 #e7e5e4,13px 5px 0 #000,10px 6px 0 #000,11px 6px 0 #f5f5f4,12px 6px 0 #e7e5e4,13px 6px 0 #000,10px 7px 0 #000,11px 7px 0 #000,12px 7px 0 #000,13px 7px 0 #000;"></span>
-      </div>
-      <div class="accessory-label">Book<br><span style="color:#e7e5e4;">architect</span></div>
-    </div>
-
-    <!-- Glasses -->
-    <div class="accessory-item">
-      <div style="width:56px;height:56px;position:relative;overflow:hidden;background:var(--background);border-radius:0.375rem;border:1px solid var(--border);">
-        <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-        <!-- Glasses overlay across eyes -->
-        <span class="bobbit-lg" style="top:6px;left:6px;transform:scale(3.2);transform-origin:0 0;box-shadow:2px 4px 0 #000,3px 4px 0 #d4d4d8,4px 4px 0 #000,5px 4px 0 #d4d4d8,6px 4px 0 #d4d4d8,7px 4px 0 #000,8px 4px 0 #000;"></span>
-      </div>
-      <div class="accessory-label">Glasses<br><span style="color:#d4d4d8;">example</span></div>
-    </div>
-
-  </div>
-
-  <div class="annotation">
-    <strong>Accessory system:</strong> Each accessory is a pixel-art box-shadow overlay, rendered as a separate <code>&lt;span&gt;</code> layered on top of the base Bobbit sprite. Accessories are counter-hue-rotated (<code>filter:hue-rotate(-N deg)</code>) so they keep fixed colors regardless of the session's Aurora Borealis identity hue. This is the exact technique already used for the crown and bandana. New accessories (magnifier, goggles, headphones, pencil, book, glasses) follow the same pattern.
-  </div>
-</div>
-
-<!-- ================================================================
-     SECTION 2: Role Manager Dialog — List View
-     ================================================================ -->
-<div>
-  <div class="section-title">2. Role Manager Dialog — List View</div>
-  <div class="section-desc">
-    Launched from the sidebar "Roles" button. Each role row shows the Bobbit with its accessory at small scale, the role name, and tool restriction summary. All roles are treated equally — Bobbit ships with 4 default roles (team-lead, coder, reviewer, tester) but they're fully editable and deletable like any other.
-  </div>
-
-  <div class="backdrop" style="height:520px;">
-    <div class="dialog" style="width:min(600px, 90vw); height:460px;">
-      <div class="dialog-content" style="padding-bottom:0;">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
-          <div class="dialog-header">Roles</div>
-          <button class="btn btn-default btn-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-            New Role
-          </button>
-        </div>
-
-        <div class="role-list">
-          <div class="role-row">
-            <div class="role-avatar">
-              <span style="font-size:1rem;line-height:1;">👑</span>
-            </div>
-            <div class="role-info">
-              <div class="role-name">Team Lead</div>
-              <div class="role-meta">
-                
-                <span class="tool-count">All tools</span>
-                <span class="tool-count" style="color:#fde047;">crown</span>
-              </div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-          </div>
-
-          <div class="role-row">
-            <div class="role-avatar">
-              <span style="font-size:1rem;line-height:1;">🔴</span>
-            </div>
-            <div class="role-info">
-              <div class="role-name">Coder</div>
-              <div class="role-meta">
-                
-                <span class="tool-count">All tools</span>
-                <span class="tool-count" style="color:#ef4444;">bandana</span>
-              </div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-          </div>
-
-          <div class="role-row">
-            <div class="role-avatar">
-              <span style="font-size:1rem;line-height:1;">🔍</span>
-            </div>
-            <div class="role-info">
-              <div class="role-name">Reviewer</div>
-              <div class="role-meta">
-                
-                <span class="tool-count">Write/Edit disabled</span>
-                <span class="tool-count" style="color:#60a5fa;">magnifier</span>
-              </div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-          </div>
-
-          <div class="role-row">
-            <div class="role-avatar">
-              <span style="font-size:1rem;line-height:1;">🥽</span>
-            </div>
-            <div class="role-info">
-              <div class="role-name">Tester</div>
-              <div class="role-meta">
-                
-                <span class="tool-count">All tools</span>
-                <span class="tool-count" style="color:#22d3ee;">goggles</span>
-              </div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-          </div>
-
-          <div class="role-row">
-            <div class="role-avatar">
-              <span style="font-size:1rem;line-height:1;">✏️</span>
-            </div>
-            <div class="role-info">
-              <div class="role-name">Documentation Writer</div>
-              <div class="role-meta">
-                
-                <span class="tool-count">4 tools allowed</span>
-                <span class="tool-count" style="color:#fbbf24;">pencil</span>
-              </div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-          </div>
-
-          <div class="role-row">
-            <div class="role-avatar">
-              <span style="font-size:1rem;line-height:1;">📖</span>
-            </div>
-            <div class="role-info">
-              <div class="role-name">Architect</div>
-              <div class="role-meta">
-                
-                <span class="tool-count">6 tools allowed</span>
-                <span class="tool-count" style="color:#e7e5e4;">book</span>
-              </div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted-foreground)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-          </div>
-        </div>
-      </div>
-      <div class="dialog-footer">
-        <button class="btn btn-ghost">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ================================================================
-     SECTION 3: Role Detail / Edit View
-     ================================================================ -->
-<div>
-  <div class="section-title">3. Role Detail / Edit View</div>
-  <div class="section-desc">
-    Clicking a role transitions to the detail view. Accessory selector replaces the old color picker. Each accessory option shows a large-scale Bobbit preview with that accessory applied.
-  </div>
-
-  <div class="backdrop" style="height:720px;">
-    <div class="dialog" style="width:min(600px, 90vw); height:680px;">
-      <div class="dialog-content" style="padding-bottom:0;">
-        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1.25rem;">
-          <button class="btn btn-ghost btn-sm" style="padding:0.25rem;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
-          </button>
-          <div class="dialog-header">Edit Role</div>
-        </div>
-
-        <div style="display:flex; flex-direction:column; gap:1.125rem;">
-          <div>
-            <label class="label">Name (identifier)</label>
-            <input class="input" value="reviewer" disabled style="opacity:0.6;cursor:not-allowed;" />
-            <span style="font-size:0.625rem;color:var(--muted-foreground);margin-top:0.25rem;display:block;">URL-safe, lowercase. Set at creation time, cannot be changed later.</span>
-          </div>
-
-          <div>
-            <label class="label">Display Label</label>
-            <input class="input" value="Reviewer" />
-          </div>
-
-          <div>
-            <label class="label">System Prompt Template</label>
-            <textarea style="min-height:120px;max-height:200px;font-size:0.75rem;line-height:1.5;">You are a **Reviewer** agent (id: {{AGENT_ID}}) in a swarm.
-
-## Your Role
-You review code written by coder agents. You read, analyze, and report — you do NOT modify production code.
-...</textarea>
-            <span style="font-size:0.625rem;color:var(--muted-foreground);margin-top:0.25rem;display:block;">
-              Supports <code style="background:var(--secondary);padding:0 0.25rem;border-radius:2px;font-size:0.625rem;">{{GOAL_BRANCH}}</code> and
-              <code style="background:var(--secondary);padding:0 0.25rem;border-radius:2px;font-size:0.625rem;">{{AGENT_ID}}</code> placeholders.
-            </span>
-          </div>
-
-          <div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.375rem;">
-              <label class="label" style="margin-bottom:0;">Allowed Tools</label>
-              <div style="display:flex;gap:0.5rem;">
-                <button class="btn btn-ghost btn-sm" style="font-size:0.625rem;padding:0.125rem 0.5rem;">Select All</button>
-                <button class="btn btn-ghost btn-sm" style="font-size:0.625rem;padding:0.125rem 0.5rem;">Select None</button>
-              </div>
-            </div>
-            <div class="tool-grid">
-              <div class="tool-chip active" onclick="this.classList.toggle('active')"><span class="check">&#10003;</span> Read</div>
-              <div class="tool-chip active" onclick="this.classList.toggle('active')"><span class="check">&#10003;</span> Bash</div>
-              <div class="tool-chip active" onclick="this.classList.toggle('active')"><span class="check">&#10003;</span> Grep</div>
-              <div class="tool-chip" onclick="this.classList.toggle('active')"><span class="check"></span> Write</div>
-              <div class="tool-chip" onclick="this.classList.toggle('active')"><span class="check"></span> Edit</div>
-              <div class="tool-chip active" onclick="this.classList.toggle('active')"><span class="check">&#10003;</span> WebSearch</div>
-              <div class="tool-chip active" onclick="this.classList.toggle('active')"><span class="check">&#10003;</span> WebFetch</div>
-              <div class="tool-chip" onclick="this.classList.toggle('active')"><span class="check"></span> Delegate</div>
-              <div class="tool-chip" onclick="this.classList.toggle('active')"><span class="check"></span> Browser</div>
-              <div class="tool-chip active" onclick="this.classList.toggle('active')"><span class="check">&#10003;</span> Workflow</div>
-            </div>
-            <span style="font-size:0.625rem;color:var(--muted-foreground);margin-top:0.375rem;display:block;">Empty = all tools allowed.</span>
-          </div>
-
-          <!-- ACCESSORY SELECTOR (replaces old color picker) -->
-          <div>
-            <label class="label">Accessory</label>
-            <div class="accessory-grid">
-              <div class="accessory-option" title="None" onclick="selectAccessory(this)">
-                <span style="font-size:0.625rem;color:var(--muted-foreground);">none</span>
-              </div>
-              <div class="accessory-option" title="Crown" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">👑</span>
-              </div>
-              <div class="accessory-option" title="Bandana" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">🔴</span>
-              </div>
-              <div class="accessory-option selected" title="Magnifying Glass" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">🔍</span>
-              </div>
-              <div class="accessory-option" title="Goggles" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">🥽</span>
-              </div>
-              <div class="accessory-option" title="Headphones" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">🎧</span>
-              </div>
-              <div class="accessory-option" title="Pencil" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">✏️</span>
-              </div>
-              <div class="accessory-option" title="Book" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">📖</span>
-              </div>
-              <div class="accessory-option" title="Glasses" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">👓</span>
-              </div>
-              <div class="accessory-option" title="Shield" onclick="selectAccessory(this)">
-                <span style="font-size:1.25rem;">🛡️</span>
-              </div>
-            </div>
-            <span style="font-size:0.625rem;color:var(--muted-foreground);margin-top:0.375rem;display:block;">
-              Pixel-art accessory rendered on the Bobbit sprite. Counter-hue-rotated to keep fixed colors across all session identity hues.
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div class="detail-footer">
-        <div>
-          <button class="btn btn-ghost btn-sm" style="color:var(--destructive);">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-            Delete Role
-          </button>
-        </div>
-        <div style="display:flex;gap:0.5rem;">
-          <button class="btn btn-ghost">Cancel</button>
-          <button class="btn btn-default">Save</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ================================================================
-     SECTION 4: Accessory Gallery (pixel-art reference)
-     ================================================================ -->
-<div>
-  <div class="section-title">4. Accessory Gallery — Pixel Art at Multiple Hues</div>
-  <div class="section-desc">
-    Each accessory must look correct across the full Aurora Borealis palette. The accessory overlay keeps fixed colors while the Bobbit body rotates through hues. These are the actual CSS box-shadow pixel-art renders, not emoji placeholders.
-  </div>
-
-  <div style="display:flex; flex-wrap:wrap; gap:1rem;">
-    <!-- Crown at 3 hues -->
-    <div style="background:var(--muted);border:1px solid var(--border);border-radius:0.5rem;padding:1rem;">
-      <div style="font-size:0.6875rem;color:var(--muted-foreground);margin-bottom:0.5rem;font-weight:600;">Crown (team-lead) across hues</div>
-      <div style="display:flex;gap:0.75rem;">
-        <div style="width:48px;height:52px;position:relative;overflow:hidden;background:var(--background);border-radius:0.25rem;">
-          <span class="bobbit-lg" style="top:10px;left:4px;transform:scale(2.8);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;filter:hue-rotate(0deg);"></span>
-          <span class="bobbit-lg" style="top:4px;left:4px;transform:scale(2.8);transform-origin:0 0;box-shadow:3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000;filter:hue-rotate(0deg);"></span>
-          <div style="text-align:center;font-size:0.5rem;color:var(--muted-foreground);position:absolute;bottom:1px;width:100%;">0°</div>
-        </div>
-        <div style="width:48px;height:52px;position:relative;overflow:hidden;background:var(--background);border-radius:0.25rem;">
-          <span class="bobbit-lg" style="top:10px;left:4px;transform:scale(2.8);transform-origin:0 0;filter:hue-rotate(150deg);box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-          <span class="bobbit-lg" style="top:4px;left:4px;transform:scale(2.8);transform-origin:0 0;filter:hue-rotate(0deg);box-shadow:3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000;"></span>
-          <div style="text-align:center;font-size:0.5rem;color:var(--muted-foreground);position:absolute;bottom:1px;width:100%;">150°</div>
-        </div>
-        <div style="width:48px;height:52px;position:relative;overflow:hidden;background:var(--background);border-radius:0.25rem;">
-          <span class="bobbit-lg" style="top:10px;left:4px;transform:scale(2.8);transform-origin:0 0;filter:hue-rotate(-85deg);box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-          <span class="bobbit-lg" style="top:4px;left:4px;transform:scale(2.8);transform-origin:0 0;filter:hue-rotate(0deg);box-shadow:3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000;"></span>
-          <div style="text-align:center;font-size:0.5rem;color:var(--muted-foreground);position:absolute;bottom:1px;width:100%;">-85°</div>
-        </div>
-      </div>
+    <div class="roles-nav-right">
+      <button class="btn">
+        <svg class="lucide" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        New Role
+      </button>
     </div>
   </div>
 
-  <div class="annotation" style="margin-top:1rem;">
-    <strong>Key principle:</strong> The crown stays gold, the bandana stays red, the magnifying glass stays blue — regardless of whether the Bobbit body is green, purple, or teal. This is achieved by counter-rotating the accessory layer: if the body has <code>hue-rotate(150deg)</code>, the accessory gets <code>hue-rotate(-150deg)</code> to cancel it out. Already implemented for crown and bandana in <code>session-colors.ts</code>.
-  </div>
-</div>
-
-<!-- ================================================================
-     SECTION 5: Design Rationale
-     ================================================================ -->
-<div>
-  <div class="section-title">5. Design Rationale</div>
-  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
-    <div class="annotation" style="margin-top:0;">
-      <strong>Accessory = role identity. Color = session identity.</strong> These are orthogonal axes. A coder always has a bandana whether the session is green, blue, or purple. This separation is already established by the crown/bandana system — the role manager just extends it with more accessories and makes it user-configurable.
-    </div>
-    <div class="annotation" style="margin-top:0;">
-      <strong>Accessory overlay technique.</strong> Each accessory is a CSS box-shadow pixel grid rendered as a separate <code>&lt;span&gt;</code> positioned over the base Bobbit. Counter-hue-rotated to stay fixed. The role definition stores an accessory ID (e.g. <code>"crown"</code>, <code>"magnifier"</code>), and <code>statusBobbit()</code> renders the matching overlay.
-    </div>
-    <div class="annotation" style="margin-top:0;">
-      <strong>Accessory gallery in the selector.</strong> The edit dialog shows each accessory option as an emoji placeholder (fast to render, universally supported). The actual rendered pixel-art is visible in the sidebar and session list. Alternatively, the selector could render mini pixel-art previews — but emoji is simpler for a picker UI.
-    </div>
-    <div class="annotation" style="margin-top:0;">
-      <strong>Roles pick from an accessory gallery.</strong> The shipped set (crown, bandana, magnifier, goggles, headphones, pencil, book, glasses, shield) covers common archetypes. All roles pick from this gallery equally. Adding new pixel-art accessories is a code change (adding a box-shadow definition), not a UI configuration.
-    </div>
-    <div class="annotation" style="margin-top:0;">
-      <strong>No color picker in role editor.</strong> Color is managed per-session in the rename dialog (existing Aurora Borealis palette picker). The role editor only manages: name, label, prompt, tools, and accessory. This keeps the two identity axes cleanly separated.
-    </div>
-    <div class="annotation" style="margin-top:0;">
-      <strong>Same dialog patterns as before.</strong> Imperative render-in-container, mini-lit Dialog/Button/Input, list-to-detail navigation with back arrow. Tool chips are interactive toggles. Role names are immutable after creation (URL-safe identifiers). All roles are deletable.
+  <!-- ====================================================================
+       LIST VIEW — replaces card grid + stats bar
+       ==================================================================== -->
+  <div class="roles-body">
+    <div class="roles-list" id="role-list">
+      <!-- Rows injected by JS below -->
     </div>
   </div>
-</div>
 
 </div>
 
 <script>
-function selectAccessory(el) {
-  el.closest('.accessory-grid').querySelectorAll('.accessory-option').forEach(o => o.classList.remove('selected'));
-  el.classList.add('selected');
-}
+// ============================================================================
+// Bobbit pixel-art sprite data (same box-shadow technique as production)
+// ============================================================================
 
-// Make tool chips toggle their check marks
-document.querySelectorAll('.tool-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    chip.classList.toggle('active');
-    const check = chip.querySelector('.check');
-    if (check) check.textContent = chip.classList.contains('active') ? '\u2713' : '';
-  });
+// Canonical green palette (idle)
+const P = { main: '#8ec63f', light: '#b5d98a', dark: '#6b9930', eye: '#1a3010' };
+
+const BOBBIT_SHADOW = `
+  3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,
+  2px 1px 0 #000,3px 1px 0 ${P.main},4px 1px 0 ${P.main},5px 1px 0 ${P.main},6px 1px 0 ${P.light},7px 1px 0 ${P.light},8px 1px 0 #000,
+  1px 2px 0 #000,2px 2px 0 ${P.main},3px 2px 0 ${P.main},4px 2px 0 ${P.main},5px 2px 0 ${P.main},6px 2px 0 ${P.main},7px 2px 0 ${P.light},8px 2px 0 ${P.main},9px 2px 0 #000,
+  0px 3px 0 #000,1px 3px 0 ${P.main},2px 3px 0 ${P.main},3px 3px 0 ${P.main},4px 3px 0 ${P.main},5px 3px 0 ${P.main},6px 3px 0 ${P.main},7px 3px 0 ${P.main},8px 3px 0 ${P.main},9px 3px 0 #000,
+  0px 4px 0 #000,1px 4px 0 ${P.main},2px 4px 0 ${P.main},3px 4px 0 ${P.eye},4px 4px 0 ${P.main},5px 4px 0 ${P.main},6px 4px 0 ${P.eye},7px 4px 0 ${P.main},8px 4px 0 ${P.main},9px 4px 0 #000,
+  0px 5px 0 #000,1px 5px 0 ${P.main},2px 5px 0 ${P.main},3px 5px 0 ${P.eye},4px 5px 0 ${P.main},5px 5px 0 ${P.main},6px 5px 0 ${P.eye},7px 5px 0 ${P.main},8px 5px 0 ${P.main},9px 5px 0 #000,
+  0px 6px 0 #000,1px 6px 0 ${P.dark},2px 6px 0 ${P.main},3px 6px 0 ${P.main},4px 6px 0 ${P.main},5px 6px 0 ${P.main},6px 6px 0 ${P.main},7px 6px 0 ${P.main},8px 6px 0 ${P.main},9px 6px 0 #000,
+  1px 7px 0 #000,2px 7px 0 ${P.dark},3px 7px 0 ${P.main},4px 7px 0 ${P.main},5px 7px 0 ${P.main},6px 7px 0 ${P.main},7px 7px 0 ${P.main},8px 7px 0 #000,
+  2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000
+`;
+
+// Accessories (copied from session-colors.ts)
+const ACCESSORIES = {
+  none: { shadow: '', top: '0', addsHeight: false },
+  crown: {
+    shadow: `
+      2px -4px 0 #000,4px -4px 0 #000,7px -4px 0 #000,
+      2px -3px 0 #fbbf24,4px -3px 0 #fbbf24,7px -3px 0 #fbbf24,
+      2px -2px 0 #fbbf24,3px -2px 0 #fbbf24,4px -2px 0 #fbbf24,5px -2px 0 #fbbf24,6px -2px 0 #fbbf24,7px -2px 0 #fbbf24,
+      2px -1px 0 #f59e0b,3px -1px 0 #fbbf24,4px -1px 0 #f59e0b,5px -1px 0 #fbbf24,6px -1px 0 #f59e0b,7px -1px 0 #fbbf24,
+      2px -3px 0 #000,4px -3px 0 #000,7px -3px 0 #000,
+      2px -4px 0 #fbbf24,4px -4px 0 #fbbf24,7px -4px 0 #fbbf24
+    `,
+    top: '0',
+    addsHeight: true,
+  },
+  bandana: {
+    shadow: `
+      0 4px 0 #000,1px 4px 0 #dc2626,2px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #dc2626,10px 4px 0 #000,
+      1px 5px 0 #000,2px 5px 0 #000,8px 5px 0 #000,9px 5px 0 #000
+    `,
+    top: '0',
+    addsHeight: false,
+  },
+  pencil: {
+    shadow: `
+      9px -2px 0 #000,10px -2px 0 #000,
+      8px -1px 0 #000,9px -1px 0 #fde047,10px -1px 0 #fbbf24,11px -1px 0 #000,
+      7px 0 0 #000,8px 0 0 #fde047,9px 0 0 #fbbf24,10px 0 0 #000,
+      6px 1px 0 #000,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,
+      5px 2px 0 #000,6px 2px 0 #fde047,7px 2px 0 #000,
+      4px 3px 0 #000,5px 3px 0 #f4a460,6px 3px 0 #000,
+      3px 4px 0 #000,4px 4px 0 #2d2d2d,5px 4px 0 #000
+    `,
+    top: '0',
+    addsHeight: false,
+  },
+  glasses: {
+    shadow: `
+      2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,
+      1px 3px 0 #000,2px 3px 0 #e0e7ff,3px 3px 0 #c7d2fe,4px 3px 0 #000,5px 3px 0 #4b5563,6px 3px 0 #000,7px 3px 0 #e0e7ff,8px 3px 0 #c7d2fe,9px 3px 0 #000,
+      1px 4px 0 #000,2px 4px 0 #c7d2fe,3px 4px 0 #e0e7ff,4px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #c7d2fe,8px 4px 0 #e0e7ff,9px 4px 0 #000,
+      2px 5px 0 #000,3px 5px 0 #000,4px 5px 0 #000,7px 5px 0 #000,8px 5px 0 #000,9px 5px 0 #000,
+      0 3px 0 #000,10px 3px 0 #000,0 4px 0 #4b5563,10px 4px 0 #4b5563,11px 4px 0 #000
+    `,
+    top: '0',
+    addsHeight: false,
+  },
+  shield: {
+    shadow: `
+      3px -1px 0 #000,4px -1px 0 #000,5px -1px 0 #000,6px -1px 0 #000,7px -1px 0 #000,
+      2px 0 0 #000,3px 0 0 #6b7280,4px 0 0 #9ca3af,5px 0 0 #d1d5db,6px 0 0 #9ca3af,7px 0 0 #6b7280,8px 0 0 #000,
+      2px 1px 0 #000,3px 1px 0 #9ca3af,4px 1px 0 #d1d5db,5px 1px 0 #f3f4f6,6px 1px 0 #d1d5db,7px 1px 0 #9ca3af,8px 1px 0 #000,
+      2px 2px 0 #000,3px 2px 0 #6b7280,4px 2px 0 #9ca3af,5px 2px 0 #d1d5db,6px 2px 0 #9ca3af,7px 2px 0 #6b7280,8px 2px 0 #000,
+      3px 3px 0 #000,4px 3px 0 #6b7280,5px 3px 0 #9ca3af,6px 3px 0 #6b7280,7px 3px 0 #000,
+      4px 4px 0 #000,5px 4px 0 #6b7280,6px 4px 0 #000,
+      5px 5px 0 #000
+    `,
+    top: '0',
+    addsHeight: false,
+  },
+  book: {
+    shadow: `
+      2px 0 0 #000,3px 0 0 #000,4px 0 0 #000,5px 0 0 #000,6px 0 0 #000,7px 0 0 #000,
+      1px 1px 0 #000,2px 1px 0 #3b82f6,3px 1px 0 #60a5fa,4px 1px 0 #60a5fa,5px 1px 0 #60a5fa,6px 1px 0 #60a5fa,7px 1px 0 #3b82f6,8px 1px 0 #000,
+      1px 2px 0 #000,2px 2px 0 #2563eb,3px 2px 0 #f5f5f5,4px 2px 0 #d4d4d4,5px 2px 0 #f5f5f5,6px 2px 0 #d4d4d4,7px 2px 0 #2563eb,8px 2px 0 #000,
+      1px 3px 0 #000,2px 3px 0 #3b82f6,3px 3px 0 #60a5fa,4px 3px 0 #60a5fa,5px 3px 0 #60a5fa,6px 3px 0 #60a5fa,7px 3px 0 #3b82f6,8px 3px 0 #000,
+      2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000
+    `,
+    top: '0',
+    addsHeight: false,
+  },
+};
+
+// Hue rotations from the Aurora Borealis palette
+const HUES = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, -135, -110, -85, -60, -35, -10, 15, 40, 65, 250];
+
+// Example roles to render
+const ROLES = [
+  { label: 'Team Lead',           accessory: 'crown',   hueIdx: 0 },
+  { label: 'Coder',               accessory: 'bandana', hueIdx: 2 },
+  { label: 'Documentation Writer',accessory: 'pencil',  hueIdx: 5 },
+  { label: 'Security Reviewer',   accessory: 'shield',  hueIdx: 8 },
+  { label: 'Researcher',          accessory: 'glasses', hueIdx: 11 },
+  { label: 'Librarian',           accessory: 'book',    hueIdx: 14 },
+];
+
+// Build the list
+const list = document.getElementById('role-list');
+
+ROLES.forEach(role => {
+  const hue = HUES[role.hueIdx];
+  const acc = ACCESSORIES[role.accessory] || ACCESSORIES.none;
+  const hasAcc = acc.shadow.trim().length > 0;
+  const addsHeight = acc.addsHeight;
+
+  // Container heights
+  const containerH = addsHeight ? '19px' : '15px';
+  const innerTop = addsHeight ? '4px' : '0';
+
+  // Hue filter on the body sprite
+  const bodyFilter = hue ? `filter: hue-rotate(${hue}deg) saturate(0.4);` : 'filter: saturate(0.4);';
+  // Accessory counter-rotates to keep its own colours
+  const accFilter = hue ? `filter: hue-rotate(${-hue}deg);` : '';
+
+  const row = document.createElement('div');
+  row.className = 'role-row';
+  row.innerHTML = `
+    <div class="role-avatar" style="height:${containerH}">
+      <span class="bobbit-sprite" style="top:${innerTop};box-shadow:${BOBBIT_SHADOW};${bodyFilter}"></span>
+      ${hasAcc ? `<span class="bobbit-accessory" style="top:${addsHeight ? '0' : innerTop};box-shadow:${acc.shadow};${accFilter}"></span>` : ''}
+    </div>
+    <span class="role-label">${role.label}</span>
+    <div class="role-actions">
+      <button class="icon-btn" title="Edit role">
+        <svg class="lucide" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+      </button>
+      <button class="icon-btn delete" title="Delete role">
+        <svg class="lucide" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+      </button>
+    </div>
+  `;
+  list.appendChild(row);
 });
 </script>
 
