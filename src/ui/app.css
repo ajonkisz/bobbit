@@ -941,17 +941,17 @@ html {
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
 		/* Cork */
-		8px 2px 0 #000, 9px 2px 0 #8b4513, 10px 2px 0 #000,
+		8px 2px 0 #e0e0e0, 9px 2px 0 #8b4513, 10px 2px 0 #e0e0e0,
 		/* Neck with liquid */
-		8px 3px 0 #000, 9px 3px 0 #7dd3fc, 10px 3px 0 #000,
+		8px 3px 0 #e0e0e0, 9px 3px 0 #7dd3fc, 10px 3px 0 #e0e0e0,
 		/* Shoulder */
-		7px 4px 0 #000, 8px 4px 0 #1e3a5f, 9px 4px 0 #38bdf8, 10px 4px 0 #0ea5e9, 11px 4px 0 #000,
+		7px 4px 0 #e0e0e0, 8px 4px 0 #1e3a5f, 9px 4px 0 #38bdf8, 10px 4px 0 #0ea5e9, 11px 4px 0 #e0e0e0,
 		/* Upper body */
-		6px 5px 0 #000, 7px 5px 0 #1e3a5f, 8px 5px 0 #0ea5e9, 9px 5px 0 #0284c7, 10px 5px 0 #0369a1, 11px 5px 0 #1e3a5f, 12px 5px 0 #000,
+		6px 5px 0 #e0e0e0, 7px 5px 0 #1e3a5f, 8px 5px 0 #0ea5e9, 9px 5px 0 #0284c7, 10px 5px 0 #0369a1, 11px 5px 0 #1e3a5f, 12px 5px 0 #e0e0e0,
 		/* Lower body — deeper */
-		6px 6px 0 #000, 7px 6px 0 #1e3a5f, 8px 6px 0 #0284c7, 9px 6px 0 #0c4a6e, 10px 6px 0 #082f49, 11px 6px 0 #1e3a5f, 12px 6px 0 #000,
+		6px 6px 0 #e0e0e0, 7px 6px 0 #1e3a5f, 8px 6px 0 #0284c7, 9px 6px 0 #0c4a6e, 10px 6px 0 #082f49, 11px 6px 0 #1e3a5f, 12px 6px 0 #e0e0e0,
 		/* Bottom */
-		6px 7px 0 #000, 7px 7px 0 #000, 8px 7px 0 #000, 9px 7px 0 #000, 10px 7px 0 #000, 11px 7px 0 #000, 12px 7px 0 #000;
+		6px 7px 0 #e0e0e0, 7px 7px 0 #e0e0e0, 8px 7px 0 #e0e0e0, 9px 7px 0 #e0e0e0, 10px 7px 0 #e0e0e0, 11px 7px 0 #e0e0e0, 12px 7px 0 #e0e0e0;
 	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 
