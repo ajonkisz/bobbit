@@ -4,9 +4,38 @@ import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
 import { fetchRoles, fetchTools, createRole, updateRole, deleteRole, gatewayFetch, type RoleData } from "./api.js";
-import { ACCESSORY_IDS, getAccessory, statusBobbit } from "./session-colors.js";
+import { ACCESSORY_IDS, getAccessory } from "./session-colors.js";
 import { state, renderApp } from "./state.js";
 import { setHashRoute } from "./routing.js";
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Render an idle in-chat blob with the given accessory, at a custom scale */
+function idleBlob(accId: string, scale = 1): TemplateResult {
+	const accClass = accId && accId !== "none"
+		? `bobbit-${accId === "crown" ? "crowned" : accId}`
+		: "";
+	const cls = `bobbit-blob bobbit-blob--idle ${accClass}`.trim();
+	const scaleStyle = scale !== 1 ? `transform: scale(${scale}); transform-origin: bottom center;` : "";
+	return html`
+		<div class="${cls}" style="${scaleStyle}">
+			<div class="bobbit-blob__sprite"></div>
+			<div class="bobbit-blob__crown"></div>
+			<div class="bobbit-blob__bandana"></div>
+			<div class="bobbit-blob__magnifier"></div>
+			<div class="bobbit-blob__goggles"></div>
+			<div class="bobbit-blob__headphones"></div>
+			<div class="bobbit-blob__pencil"></div>
+			<div class="bobbit-blob__book"></div>
+			<div class="bobbit-blob__glasses"></div>
+			<div class="bobbit-blob__shield"></div>
+			<div class="bobbit-blob__flask"></div>
+			<div class="bobbit-blob__shadow"></div>
+		</div>
+	`;
+}
 
 // ============================================================================
 // STATE
@@ -262,7 +291,7 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 function renderRoleRow(role: RoleData): TemplateResult {
 	return html`
 		<div class="role-row" tabindex="0" role="button" @click=${() => showEdit(role)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showEdit(role); } }}>
-			${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}
+			${idleBlob(role.accessory ?? "none", 0.6)}
 			<div class="role-row-info">
 				<span class="role-row-label">${role.label}</span>
 				<span class="role-row-slug">${role.name}</span>
@@ -294,7 +323,7 @@ function renderListView(): TemplateResult {
 	if (roles.length === 0) {
 		return html`
 			<div class="roles-empty">
-				<div class="roles-empty-bobbit">${statusBobbit("idle", false, undefined, false, false, false, false, "none", true)}</div>
+				<div class="roles-empty-bobbit">${idleBlob("none")}</div>
 				<p class="roles-empty-title">No roles yet</p>
 				<p class="roles-empty-desc">Roles give agents a persona, system prompt, and tool restrictions.</p>
 				${Button({
@@ -396,7 +425,7 @@ function renderEditView(): TemplateResult {
 									<span class="roles-accessory-preview">
 										${accId === "none"
 											? html`<span class="text-xs text-muted-foreground">\u2014</span>`
-											: statusBobbit("idle", false, undefined, false, false, false, false, accId, true)}
+											: idleBlob(accId, 0.6)}
 									</span>
 									<span class="roles-accessory-label">${acc.label}</span>
 								</button>
