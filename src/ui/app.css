@@ -940,19 +940,22 @@ html {
 	image-rendering: pixelated;
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
-		/* Narrow neck */
-		8px 1px 0 #000, 9px 1px 0 #000,
-		8px 2px 0 #000, 9px 2px 0 #93c5fd, 10px 2px 0 #000,
-		/* Shoulder — starts widening */
-		7px 3px 0 #000, 8px 3px 0 #c4c4c4, 9px 3px 0 #60a5fa, 10px 3px 0 #c4c4c4, 11px 3px 0 #000,
-		/* Conical body — widens each row */
-		7px 4px 0 #000, 8px 4px 0 #c4c4c4, 9px 4px 0 #3b82f6, 10px 4px 0 #60a5fa, 11px 4px 0 #c4c4c4, 12px 4px 0 #000,
-		6px 5px 0 #000, 7px 5px 0 #c4c4c4, 8px 5px 0 #3b82f6, 9px 5px 0 #2563eb, 10px 5px 0 #3b82f6, 11px 5px 0 #60a5fa, 12px 5px 0 #c4c4c4, 13px 5px 0 #000,
-		5px 6px 0 #000, 6px 6px 0 #c4c4c4, 7px 6px 0 #2563eb, 8px 6px 0 #1d4ed8, 9px 6px 0 #1e40af, 10px 6px 0 #1d4ed8, 11px 6px 0 #2563eb, 12px 6px 0 #3b82f6, 13px 6px 0 #c4c4c4, 14px 6px 0 #000,
-		/* Bottom outline */
-		5px 7px 0 #000, 6px 7px 0 #000, 7px 7px 0 #000, 8px 7px 0 #000, 9px 7px 0 #000, 10px 7px 0 #000, 11px 7px 0 #000, 12px 7px 0 #000, 13px 7px 0 #000, 14px 7px 0 #000,
-		/* Glass base */
-		4px 8px 0 #000, 5px 8px 0 #c4c4c4, 6px 8px 0 #c4c4c4, 7px 8px 0 #c4c4c4, 8px 8px 0 #c4c4c4, 9px 8px 0 #c4c4c4, 10px 8px 0 #c4c4c4, 11px 8px 0 #c4c4c4, 12px 8px 0 #c4c4c4, 13px 8px 0 #c4c4c4, 14px 8px 0 #c4c4c4, 15px 8px 0 #000;
+		/* Cork */
+		8px 0px 0 #000, 9px 0px 0 #8b4513, 10px 0px 0 #a0522d, 11px 0px 0 #000,
+		/* Narrow glass neck */
+		8px 1px 0 #000, 9px 1px 0 #1e3a5f, 10px 1px 0 #2563eb, 11px 1px 0 #000,
+		8px 2px 0 #000, 9px 2px 0 #1e3a5f, 10px 2px 0 #3b82f6, 11px 2px 0 #000,
+		/* Shoulder — glass widens, light liquid visible */
+		7px 3px 0 #000, 8px 3px 0 #1e3a5f, 9px 3px 0 #7dd3fc, 10px 3px 0 #bae6fd, 11px 3px 0 #38bdf8, 12px 3px 0 #000,
+		/* Body — cyan to blue gradient */
+		6px 4px 0 #000, 7px 4px 0 #1e3a5f, 8px 4px 0 #38bdf8, 9px 4px 0 #7dd3fc, 10px 4px 0 #38bdf8, 11px 4px 0 #0ea5e9, 12px 4px 0 #1e3a5f, 13px 4px 0 #000,
+		6px 5px 0 #000, 7px 5px 0 #1e3a5f, 8px 5px 0 #0284c7, 9px 5px 0 #0ea5e9, 10px 5px 0 #0284c7, 11px 5px 0 #0369a1, 12px 5px 0 #1e3a5f, 13px 5px 0 #000,
+		/* Deep liquid */
+		5px 6px 0 #000, 6px 6px 0 #1e3a5f, 7px 6px 0 #0c4a6e, 8px 6px 0 #0369a1, 9px 6px 0 #0c4a6e, 10px 6px 0 #082f49, 11px 6px 0 #0c4a6e, 12px 6px 0 #172554, 13px 6px 0 #1e3a5f, 14px 6px 0 #000,
+		5px 7px 0 #000, 6px 7px 0 #1e3a5f, 7px 7px 0 #082f49, 8px 7px 0 #0c4a6e, 9px 7px 0 #082f49, 10px 7px 0 #172554, 11px 7px 0 #082f49, 12px 7px 0 #172554, 13px 7px 0 #1e3a5f, 14px 7px 0 #000,
+		/* Bottom + glass base */
+		5px 8px 0 #000, 6px 8px 0 #000, 7px 8px 0 #000, 8px 8px 0 #000, 9px 8px 0 #000, 10px 8px 0 #000, 11px 8px 0 #000, 12px 8px 0 #000, 13px 8px 0 #000, 14px 8px 0 #000,
+		4px 9px 0 #000, 5px 9px 0 #1e3a5f, 6px 9px 0 #2c5282, 7px 9px 0 #2c5282, 8px 9px 0 #2c5282, 9px 9px 0 #2c5282, 10px 9px 0 #2c5282, 11px 9px 0 #2c5282, 12px 9px 0 #2c5282, 13px 9px 0 #2c5282, 14px 9px 0 #1e3a5f, 15px 9px 0 #000;
 	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 
@@ -963,7 +966,7 @@ html {
 	width: 1px;
 	height: 1px;
 	box-shadow:
-		9px 0px 0 rgba(147, 197, 253, 0.9);
+		10px -1px 0 rgba(125, 211, 252, 0.9);
 	animation: flask-bubbles 2.5s ease-in-out infinite;
 }
 .bobbit-flask .bobbit-blob__flask::after {
@@ -972,7 +975,7 @@ html {
 	width: 1px;
 	height: 1px;
 	box-shadow:
-		8px 0px 0 rgba(96, 165, 250, 0.8);
+		9px -1px 0 rgba(56, 189, 248, 0.8);
 	animation: flask-bubbles 2.5s ease-in-out 1s infinite;
 }
 
