@@ -58,7 +58,7 @@ export function clearRolePageState(): void {
 function showList(): void {
 	currentView = "list";
 	selectedRole = null;
-	renderApp();
+	setHashRoute("roles");
 }
 
 function showEdit(role: RoleData): void {
@@ -71,6 +71,26 @@ function showEdit(role: RoleData): void {
 	editName = role.name;
 	saving = false;
 	deleting = false;
+	setHashRoute("role-edit", role.name);
+}
+
+/** Called by the main router when navigating to #/roles/:name */
+export function navigateToRoleEdit(roleName: string): void {
+	const role = roles.find((r) => r.name === roleName);
+	if (role) {
+		currentView = "edit";
+		selectedRole = role;
+		editLabel = role.label;
+		editPrompt = role.promptTemplate;
+		editTools = [...role.allowedTools];
+		editAccessory = role.accessory;
+		editName = role.name;
+		saving = false;
+		deleting = false;
+	} else {
+		currentView = "list";
+		selectedRole = null;
+	}
 	renderApp();
 }
 
@@ -174,31 +194,40 @@ function selectNoTools(): void {
 // ============================================================================
 
 function renderNavBar(): TemplateResult {
-	const title = currentView === "list" ? "Roles" : `Edit: ${selectedRole?.label || ""}`;
+	if (currentView !== "list" && selectedRole) {
+		// Edit view: back goes to roles list, breadcrumb shows hierarchy
+		return html`
+			<div class="roles-nav">
+				<div class="roles-nav-left">
+					<button class="roles-back" @click=${showList} title="Back to roles">
+						${icon(ArrowLeft, "sm")}
+					</button>
+					<div class="roles-title-group">
+						<span class="roles-breadcrumb" @click=${showList}>Roles</span>
+						<span class="roles-breadcrumb-sep">/</span>
+						<h1 class="roles-title">${selectedRole.label}</h1>
+					</div>
+				</div>
+			</div>
+		`;
+	}
 
+	// List view: back goes to sessions
 	return html`
 		<div class="roles-nav">
 			<div class="roles-nav-left">
-				<button class="roles-back" @click=${() => currentView === "list" ? setHashRoute("landing") : showList()} title="${currentView === "list" ? "Back to sessions" : "Back to roles"}">
+				<button class="roles-back" @click=${() => setHashRoute("landing")} title="Back to sessions">
 					${icon(ArrowLeft, "sm")}
 				</button>
-				<div class="roles-title-group">
-					${currentView !== "list" && selectedRole ? html`
-						<span class="roles-breadcrumb" @click=${showList}>Roles</span>
-						<span class="roles-breadcrumb-sep">/</span>
-					` : nothing}
-					<h1 class="roles-title">${title}</h1>
-				</div>
+				<h1 class="roles-title">Roles</h1>
 			</div>
 			<div class="roles-nav-right">
-				${currentView === "list" ? html`
-					${Button({
-						variant: "default",
-						size: "sm",
-						onClick: createRoleAssistantSession,
-						children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Role</span>`,
-					})}
-				` : nothing}
+				${Button({
+					variant: "default",
+					size: "sm",
+					onClick: createRoleAssistantSession,
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Role</span>`,
+				})}
 			</div>
 		</div>
 	`;

@@ -2,9 +2,9 @@
 // URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected, #/goal/{id} = dashboard)
 // ============================================================================
 
-export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles";
+export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles" | "role-edit";
 
-export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string } {
+export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string; roleName?: string } {
 	const hash = window.location.hash || "";
 	const sessionMatch = hash.match(/^#\/session\/([a-f0-9-]+)$/i);
 	if (sessionMatch) {
@@ -13,6 +13,10 @@ export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalI
 	const goalMatch = hash.match(/^#\/goal\/([a-f0-9-]+)$/i);
 	if (goalMatch) {
 		return { view: "goal-dashboard", goalId: goalMatch[1] };
+	}
+	const roleEditMatch = hash.match(/^#\/roles\/([a-zA-Z0-9_-]+)$/);
+	if (roleEditMatch) {
+		return { view: "role-edit", roleName: roleEditMatch[1] };
 	}
 	if (hash === "#/roles") {
 		return { view: "roles" };
@@ -26,6 +30,8 @@ export function setHashRoute(view: RouteView, id?: string, replace?: boolean): v
 		newHash = `#/session/${id}`;
 	} else if (view === "goal-dashboard" && id) {
 		newHash = `#/goal/${id}`;
+	} else if (view === "role-edit" && id) {
+		newHash = `#/roles/${id}`;
 	} else if (view === "roles") {
 		newHash = "#/roles";
 	} else {

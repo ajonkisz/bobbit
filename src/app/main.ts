@@ -94,6 +94,19 @@ async function handleHashChange(): Promise<void> {
 			loadRolePageData();
 			renderApp();
 			await refreshSessions();
+		} else if (route.view === "role-edit" && route.roleName) {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadRolePageData, navigateToRoleEdit } = await import("./role-manager-page.js");
+			await loadRolePageData();
+			navigateToRoleEdit(route.roleName);
+			await refreshSessions();
 		} else {
 			clearDashboardState();
 			if (state.remoteAgent) {
@@ -153,6 +166,10 @@ async function initApp() {
 			} else if (route.view === "roles") {
 				const { loadRolePageData } = await import("./role-manager-page.js");
 				loadRolePageData();
+			} else if (route.view === "role-edit" && route.roleName) {
+				const { loadRolePageData, navigateToRoleEdit } = await import("./role-manager-page.js");
+				await loadRolePageData();
+				navigateToRoleEdit(route.roleName);
 			}
 		} catch {
 			renderApp();
