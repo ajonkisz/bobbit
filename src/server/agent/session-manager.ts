@@ -874,6 +874,7 @@ export class SessionManager {
 		worktreePath?: string;
 		taskId?: string;
 		accessory?: string;
+		preview?: boolean;
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -893,6 +894,7 @@ export class SessionManager {
 			worktreePath: s.worktreePath,
 			taskId: s.taskId,
 			accessory: s.accessory,
+			preview: s.preview,
 		}));
 	}
 
