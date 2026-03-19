@@ -52,11 +52,11 @@ function renderMobileLanding() {
 		<div class="flex-1 flex flex-col overflow-y-auto">
 			<div class="w-full max-w-xl mx-auto px-2 py-4 flex flex-col gap-1">
 				<div class="flex items-center gap-1 px-1 pb-2 mb-1 border-b border-border/30">
-					<button class="text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center gap-1"
+					<button class="flex-1 text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}>
 						${icon(Users, "xs")} Roles
 					</button>
-					<button class="text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center gap-1"
+					<button class="flex-1 text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => showGoalDialog()}>
 						${icon(Crosshair, "xs")} New Goal
 					</button>
