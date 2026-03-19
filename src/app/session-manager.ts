@@ -1,4 +1,5 @@
 import { ChatPanel } from "../ui/index.js";
+import { startPreviewPolling, stopPreviewPolling } from "./preview-panel.js";
 import type { GoalDraft } from "../ui/storage/stores/goal-draft-store.js";
 import type { RoleDraft } from "../ui/storage/stores/role-draft-store.js";
 import type { ConnectionStatus } from "./remote-agent.js";
@@ -185,7 +186,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 // CONNECT TO SESSION
 // ============================================================================
 
-export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean }): Promise<void> {
+export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isPreview?: boolean }): Promise<void> {
 	if (state.connectingSessionId) return;
 	state.connectingSessionId = sessionId;
 
@@ -320,6 +321,9 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
 		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
 		state.isRoleAssistantSession = options?.isRoleAssistant || sessionData?.roleAssistant || false;
+		state.isPreviewSession = options?.isPreview || sessionData?.preview || false;
+		if (state.isPreviewSession) startPreviewPolling();
+		else stopPreviewPolling();
 
 		// Render immediately so the mobile header appears without waiting
 		// for ChatPanel setup or other async work below.  This fixes a race
@@ -520,6 +524,8 @@ export function backToSessions(): void {
 	state.isGoalAssistantSession = false;
 	state.activeRoleProposal = null;
 	state.isRoleAssistantSession = false;
+	state.isPreviewSession = false;
+	stopPreviewPolling();
 	state.cwdDropdownOpen = false;
 	localStorage.removeItem(GW_SESSION_KEY);
 	state.appView = "authenticated";
@@ -535,6 +541,8 @@ export function disconnectGateway(): void {
 	state.connectionStatus = "disconnected";
 	state.isGoalAssistantSession = false;
 	state.isRoleAssistantSession = false;
+	state.isPreviewSession = false;
+	stopPreviewPolling();
 	state.appView = "disconnected";
 	localStorage.removeItem(GW_SESSION_KEY);
 	teardownMobileScrollTracking();

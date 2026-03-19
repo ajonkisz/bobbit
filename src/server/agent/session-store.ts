@@ -32,6 +32,8 @@ export interface PersistedSession {
 	taskId?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory?: string;
+	/** Whether this session has a live HTML preview panel */
+	preview?: boolean;
 	/** Persisted prompt queue */
 	messageQueue?: QueuedMessage[];
 }
@@ -103,7 +105,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "goalAssistant" | "roleAssistant" | "taskId" | "accessory" | "messageQueue">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "goalAssistant" | "roleAssistant" | "taskId" | "accessory" | "preview" | "messageQueue">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);

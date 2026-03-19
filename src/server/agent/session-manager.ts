@@ -34,6 +34,8 @@ export interface SessionInfo {
 	goalAssistant?: boolean;
 	/** True if this is a role-creation assistant session */
 	roleAssistant?: boolean;
+	/** Whether this session has a live HTML preview panel */
+	preview?: boolean;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
 	/** Role in a team goal (e.g., 'coder', 'reviewer', 'tester', 'team-lead') */
@@ -825,7 +827,7 @@ export class SessionManager {
 		}
 	}
 
-	private async persistSessionMetadata(session: SessionInfo): Promise<void> {
+	async persistSessionMetadata(session: SessionInfo): Promise<void> {
 		const stateResp = await session.rpcClient.getState();
 		if (!stateResp.success || !stateResp.data?.sessionFile) {
 			console.warn(`[session-manager] Could not get agent session file for ${session.id}`);
@@ -847,6 +849,7 @@ export class SessionManager {
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
 			accessory: session.accessory,
+			preview: session.preview,
 		});
 	}
 

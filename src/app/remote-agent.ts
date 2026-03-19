@@ -633,10 +633,6 @@ export class RemoteAgent {
 				this.onQueueUpdate?.(this._serverQueue);
 				break;
 
-			case "open_preview":
-				import("./preview-panel.js").then(m => m.startPreviewPolling());
-				break;
-
 			case "error":
 				console.error(`[RemoteAgent] Server error: ${msg.message} (${msg.code})`);
 				// If we were streaming, stop. If there's a pending prompt that

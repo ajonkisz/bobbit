@@ -29,6 +29,8 @@ export interface GatewaySession {
 	worktreePath?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory?: string;
+	/** Whether this session has a live HTML preview panel */
+	preview?: boolean;
 }
 
 export type GoalState = "todo" | "in-progress" | "complete" | "shelved";
@@ -110,10 +112,10 @@ export const state = {
 	hasReceivedRoleProposal: false,
 	rolePreviewPromptEditMode: false,
 
-	// HTML preview panel (for live visual iteration)
-	previewPanelHtml: "" as string,
-	previewPanelVisible: false,
+	// HTML preview panel (for live visual iteration — same pattern as goal/role assistant)
+	isPreviewSession: false,
 	previewPanelTab: "chat" as "chat" | "preview",
+	previewPanelHtml: "" as string,
 
 	/** Currently viewed goal dashboard (null = not on dashboard) */
 	goalDashboardId: null as string | null,

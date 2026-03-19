@@ -589,13 +589,13 @@ html {
 	image-rendering: pixelated;
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
-		11px 2px 0 #000, 12px 2px 0 #000, 13px 2px 0 #000,
-		10px 3px 0 #000, 11px 3px 0 #87ceeb, 12px 3px 0 #b0e0f0, 13px 3px 0 #87ceeb, 14px 3px 0 #000,
-		10px 4px 0 #000, 11px 4px 0 #b0e0f0, 12px 4px 0 #e0f4ff, 13px 4px 0 #87ceeb, 14px 4px 0 #000,
-		10px 5px 0 #000, 11px 5px 0 #87ceeb, 12px 5px 0 #b0e0f0, 13px 5px 0 #87ceeb, 14px 5px 0 #000,
-		10px 6px 0 #000, 11px 6px 0 #000, 12px 6px 0 #000, 13px 6px 0 #000,
-		9px 7px 0 #000, 10px 7px 0 #8b4513,
-		8px 8px 0 #000, 9px 8px 0 #8b4513;
+		9px 2px 0 #000, 10px 2px 0 #000, 11px 2px 0 #000,
+		8px 3px 0 #000, 9px 3px 0 #87ceeb, 10px 3px 0 #b0e0f0, 11px 3px 0 #87ceeb, 12px 3px 0 #000,
+		8px 4px 0 #000, 9px 4px 0 #b0e0f0, 10px 4px 0 #e0f4ff, 11px 4px 0 #87ceeb, 12px 4px 0 #000,
+		8px 5px 0 #000, 9px 5px 0 #87ceeb, 10px 5px 0 #b0e0f0, 11px 5px 0 #87ceeb, 12px 5px 0 #000,
+		8px 6px 0 #000, 9px 6px 0 #000, 10px 6px 0 #000, 11px 6px 0 #000,
+		7px 7px 0 #000, 8px 7px 0 #8b4513,
+		6px 8px 0 #000, 7px 8px 0 #8b4513;
 	animation: blob-busy-move 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__magnifier {

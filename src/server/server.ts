@@ -244,6 +244,7 @@ async function handleApiRoute(
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
 			colorIndex: colorStore.get(session.id),
+			preview: session.preview,
 		});
 		return;
 	}
@@ -912,6 +913,13 @@ async function handleApiRoute(
 			colorStore.set(id, body.colorIndex);
 		}
 
+		if (typeof body.preview === "boolean") {
+			const session = sessionManager.getSession(id);
+			if (!session) { json({ error: "Session not found" }, 404); return; }
+			session.preview = body.preview;
+			sessionManager.persistSessionMetadata(session).catch(() => {});
+		}
+
 		if (typeof body.roleId === "string") {
 			const role = roleManager.getRole(body.roleId);
 			if (!role) { json({ error: `Role "${body.roleId}" not found` }, 404); return; }
@@ -1207,7 +1215,7 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/preview — set preview HTML
+	// POST /api/preview — set preview HTML content
 	if (url.pathname === "/api/preview" && req.method === "POST") {
 		const body = await readBody(req);
 		const previewPath = path.join(os.homedir(), ".pi", "preview.html");
