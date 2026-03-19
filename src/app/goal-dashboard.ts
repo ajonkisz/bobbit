@@ -327,15 +327,8 @@ function formatRelativeTime(timestamp: string): string {
 	return `${days}d ago`;
 }
 
-const badgeIcons: Record<BadgeStatus, string> = {
-	pass: "\u2713",
-	fail: "\u2717",
-	stale: "\u27F3",
-	pending: "\u23F3",
-};
-
 function renderCommitBadge(label: string, status: BadgeStatus): TemplateResult {
-	return html`<span class="commit-badge commit-badge--${status}" title="${label}: ${status}">${badgeIcons[status]} ${label}</span>`;
+	return html`<span class="commit-status-dot commit-status-dot--${status}" title="${label}: ${status}"></span>`;
 }
 
 function renderCommitTimeline(commitList: CommitInfo[], taskList: Task[]): TemplateResult {
@@ -514,13 +507,12 @@ export function renderAgentPanel(agentList: TeamAgent[]): TemplateResult {
 			${agentList.map((agent) => {
 				const statusLabel = agentStatusLabel(agent.status);
 				const roleColor = getRoleColor(agent.role);
-				const avatarColor = getAvatarColor(agent.sessionId);
-				const initials = getInitials(agent.role);
+				const session = state.gatewaySessions.find(s => s.id === agent.sessionId);
 
 				return html`
 					<div class="agent-row" @click=${() => connectToSession(agent.sessionId, true)} title="Open session">
-						<div class="agent-avatar" style="background: ${avatarColor}">
-							${initials}
+						<div class="agent-bobbit">
+							${statusBobbit(session?.status ?? agent.status, session?.isCompacting ?? false, agent.sessionId, false, session?.isAborting ?? false, agent.role === "team-lead", agent.role === "coder", session?.accessory)}
 						</div>
 						<div class="agent-info">
 							<div class="agent-name-row">
@@ -616,10 +608,11 @@ function renderPhaseIndicator(artifactList: GoalArtifact[]): TemplateResult {
 				${PHASES.map((p, i) => {
 					const isActive = i === currentIdx;
 					const isPast = i < currentIdx;
+					const isFuture = i > currentIdx;
 					const color = isPast || isActive ? PHASE_COLORS[p.phase] : "hsl(var(--border))";
 					return html`
-						<div class="phase-step ${isActive ? "phase-step--active" : ""} ${isPast ? "phase-step--past" : ""}">
-							<div class="phase-dot" style="background: ${color}; ${isActive ? `box-shadow: 0 0 0 3px ${color}40;` : ""}"></div>
+						<div class="phase-step ${isActive ? "phase-step--active" : ""} ${isPast ? "phase-step--past" : ""} ${isFuture ? "phase-step--future" : ""}">
+							<div class="phase-dot ${isActive ? "phase-dot--active" : ""}" style="background: ${color};"></div>
 							${i < PHASES.length - 1 ? html`<div class="phase-line" style="background: ${isPast ? PHASE_COLORS[PHASES[i + 1].phase] : "hsl(var(--border))"};"></div>` : nothing}
 							<div class="phase-label" style="color: ${isActive ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))"}">${p.label}</div>
 						</div>
@@ -723,6 +716,8 @@ function renderArtifactStatus(status: ArtifactRequirementStatus): TemplateResult
 	const iconStr = ARTIFACT_TYPE_ICONS[type] || "\uD83D\uDCCB";
 	const exists = artifact != null;
 	const isExpanded = artifact ? expandedArtifactIds.has(artifact.id) : false;
+	const isNew = artifact != null && (Date.now() - artifact.updatedAt) < 5 * 60_000;
+	const isRevised = artifact != null && artifact.version > 1;
 
 	return html`
 		<div class="artifact-row ${exists ? "artifact-row--exists" : "artifact-row--missing"}"
@@ -732,6 +727,8 @@ function renderArtifactStatus(status: ArtifactRequirementStatus): TemplateResult
 				<div class="artifact-name">
 					${label}
 					${required ? html`<span class="artifact-required-badge">Required</span>` : nothing}
+					${isRevised ? html`<span class="artifact-revised-badge">Revised</span>` : nothing}
+					${isNew ? html`<span class="artifact-new-badge">New</span>` : nothing}
 				</div>
 				<div class="artifact-meta">
 					${exists
@@ -742,7 +739,7 @@ function renderArtifactStatus(status: ArtifactRequirementStatus): TemplateResult
 				</div>
 			</div>
 			${exists ? html`
-				<div class="artifact-expand-icon">${isExpanded ? "\u25B2" : "\u25BC"}</div>
+				<span class="artifact-chevron ${isExpanded ? "artifact-chevron--open" : ""}">›</span>
 			` : nothing}
 		</div>
 		${isExpanded && artifact ? html`
@@ -791,6 +788,8 @@ function renderArtifactTimeline(artifactList: GoalArtifact[]): TemplateResult {
 					const isExpanded = expandedArtifactIds.has(artifact.id);
 					const session = state.gatewaySessions.find((s) => s.id === artifact.producedBy);
 					const producerName = session?.title || artifact.producedBy.slice(0, 8);
+					const isNew = (Date.now() - artifact.updatedAt) < 5 * 60_000;
+					const isRevised = artifact.version > 1;
 
 					return html`
 						<div class="artifact-timeline-item" @click=${() => toggleArtifactExpand(artifact.id)}>
@@ -800,10 +799,12 @@ function renderArtifactTimeline(artifactList: GoalArtifact[]): TemplateResult {
 									<span class="artifact-timeline-icon">${iconStr}</span>
 									<span class="artifact-timeline-name">${ARTIFACT_TYPE_LABELS[artifact.type] || artifact.name}</span>
 									<span class="artifact-timeline-version">v${artifact.version}</span>
+									${isRevised ? html`<span class="artifact-revised-badge">Revised</span>` : nothing}
+									${isNew ? html`<span class="artifact-new-badge">New</span>` : nothing}
 									<span class="artifact-timeline-time">${formatArtifactTime(artifact.updatedAt)}</span>
 								</div>
 								<div class="artifact-timeline-meta">
-									${artifact.version > 1 ? html`<span>Revised</span><span>\u00B7</span>` : html`<span>Created</span><span>\u00B7</span>`}
+									${isRevised ? html`<span>Revised</span><span>\u00B7</span>` : html`<span>Created</span><span>\u00B7</span>`}
 									<span>by ${producerName}</span>
 									${artifact.skillId ? html`<span>\u00B7</span><span>via ${artifact.skillId}</span>` : nothing}
 								</div>
@@ -811,6 +812,7 @@ function renderArtifactTimeline(artifactList: GoalArtifact[]): TemplateResult {
 									<pre class="artifact-content-body artifact-timeline-body">${artifact.content}</pre>
 								` : nothing}
 							</div>
+							<span class="artifact-chevron ${isExpanded ? "artifact-chevron--open" : ""}">›</span>
 						</div>
 					`;
 				})}
@@ -899,19 +901,19 @@ function renderSummaryHeader(goal: Goal, taskList: Task[]): TemplateResult {
 
 	return html`
 		<div class="dashboard-summary">
-			<div class="dashboard-stat">
+			<div class="dashboard-stat dashboard-stat--done">
 				<span class="dashboard-stat-value">${done}/${total}</span>
 				<span class="dashboard-stat-label">Tasks done</span>
 			</div>
-			<div class="dashboard-stat">
+			<div class="dashboard-stat dashboard-stat--progress">
 				<span class="dashboard-stat-value">${inProgress}</span>
 				<span class="dashboard-stat-label">In progress</span>
 			</div>
-			<div class="dashboard-stat">
+			<div class="dashboard-stat dashboard-stat--failed">
 				<span class="dashboard-stat-value">${failed}</span>
 				<span class="dashboard-stat-label">Failed</span>
 			</div>
-			<div class="dashboard-stat">
+			<div class="dashboard-stat dashboard-stat--agents">
 				<span class="dashboard-stat-value">${activeAgents}</span>
 				<span class="dashboard-stat-label">Active agents</span>
 			</div>
