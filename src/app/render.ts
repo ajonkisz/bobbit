@@ -5,8 +5,6 @@ import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
 import { ArrowLeft, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users } from "lucide";
-import "../ui/components/WorkflowStatusBar.js";
-import { extractWorkflowStatus } from "../ui/components/WorkflowStatusBar.js";
 import {
 	state,
 	renderApp,
@@ -34,9 +32,6 @@ import { renderGoalDashboard } from "./goal-dashboard.js";
 import "./goal-dashboard.css";
 import { renderRoleManagerPage, loadRolePageData } from "./role-manager-page.js";
 import "./role-manager.css";
-
-// Expose for testing
-(window as any).__extractWorkflowStatus = extractWorkflowStatus;
 
 // ============================================================================
 // MOBILE LANDING PAGE
@@ -690,21 +685,6 @@ export function doRenderApp(): void {
 		`;
 	};
 
-	const workflowBar = (position: "desktop" | "mobile" = "desktop") => {
-		if (!state.remoteAgent) return html``;
-		const wfStatus = extractWorkflowStatus(
-			state.remoteAgent.state.messages,
-			activeSessionId(),
-			state.remoteAgent.state.streamMessage,
-			state.remoteAgent.state.toolPartialResults,
-		);
-		if (!wfStatus) return html``;
-		const borderClass = position === "desktop"
-			? "border-b border-border bg-card/80 backdrop-blur-sm"
-			: "border-t border-border";
-		return html`<div class="${borderClass}"><workflow-status-bar .status=${wfStatus}></workflow-status-bar></div>`;
-	};
-
 	const mainArea = () => {
 		// Goal dashboard route
 		const route = getRouteFromHash();
@@ -799,7 +779,6 @@ export function doRenderApp(): void {
 				<div class="flex-1 flex min-h-0">
 					${renderSidebar()}
 					<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">
-						${workflowBar()}
 						${mainArea()}
 					</div>
 				</div>
@@ -815,7 +794,6 @@ export function doRenderApp(): void {
 						${headerLeft()}
 						${headerRight()}
 					</div>
-					${workflowBar("mobile")}
 					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
 					${state.isRoleAssistantSession ? roleAssistantTabBar() : ""}
 				</div>

@@ -11,7 +11,7 @@ import { RateLimiter } from "./auth/rate-limit.js";
 import { validateToken } from "./auth/token.js";
 import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
-import { listWorkflows, getWorkflow, readArtifact, listArtifactFiles, WorkflowRunner, exportDefinitions, generateReport } from "./workflows/index.js";
+import { exportSkillDefinitions, listSkills } from "./skills/index.js";
 import { TeamManager } from "./agent/team-manager.js";
 import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
@@ -39,8 +39,8 @@ export interface GatewayConfig {
 }
 
 export function createGateway(config: GatewayConfig) {
-	// Export workflow definitions so agent-side extensions can discover them
-	exportDefinitions();
+	// Export skill definitions so agent-side extensions can discover them
+	exportSkillDefinitions();
 
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
@@ -1098,90 +1098,9 @@ async function handleApiRoute(
 		return;
 	}
 
-	// GET /api/workflows — list available workflow definitions
-	if (url.pathname === "/api/workflows" && req.method === "GET") {
-		json({ workflows: listWorkflows().map((w) => ({ id: w.id, name: w.name, description: w.description, phaseCount: w.phases.length })) });
-		return;
-	}
-
-	// GET /api/sessions/:id/workflow — get workflow state for a session
-	const workflowStateMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow$/);
-	if (workflowStateMatch && req.method === "GET") {
-		const id = workflowStateMatch[1];
-		const session = sessionManager.getSession(id);
-		const runner = (session as any)?._workflowRunner as InstanceType<typeof WorkflowRunner> | undefined
-			?? WorkflowRunner.restore(id);
-		if (!runner) {
-			json({ error: "No workflow for this session" }, 404);
-			return;
-		}
-		json(runner.getState());
-		return;
-	}
-
-	// The server is the single source of truth for report rendering.
-	// The agent extension writes state + artifacts; the server renders the report.
-	const workflowReportMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/report$/);
-	if (workflowReportMatch && req.method === "GET") {
-		const id = workflowReportMatch[1];
-
-		const resolvedReportId = resolveWorkflowSessionId(id, sessionManager);
-
-		// Try to load workflow state and regenerate the report from it
-		const runner = (sessionManager.getSession(id) as any)?._workflowRunner as InstanceType<typeof WorkflowRunner> | undefined
-			?? WorkflowRunner.restore(id)
-			?? WorkflowRunner.restore(resolvedReportId);
-		if (runner) {
-			const state = runner.getState();
-			const workflow = getWorkflow(state.workflowId);
-			if (workflow) {
-				try {
-					const html = generateReport(workflow, state);
-					res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-					res.end(html);
-					return;
-				} catch (err) {
-					console.error("[report] Failed to generate report:", err);
-					json({ error: `Report generation failed: ${err instanceof Error ? err.message : String(err)}` }, 500);
-					return;
-				}
-			}
-		}
-
-		// Fallback: serve pre-generated report if it exists on disk
-		const html = readArtifact(resolvedReportId, "report.html");
-		if (!html) {
-			json({ error: "Report not found" }, 404);
-			return;
-		}
-		res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-		res.end(html);
-		return;
-	}
-
-	// GET /api/sessions/:id/workflow/artifacts — list artifacts
-	const artifactListMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/artifacts$/);
-	if (artifactListMatch && req.method === "GET") {
-		const id = artifactListMatch[1];
-		const resolvedId = resolveWorkflowSessionId(id, sessionManager);
-		json({ artifacts: listArtifactFiles(resolvedId) });
-		return;
-	}
-
-	// GET /api/sessions/:id/workflow/artifacts/:filename — serve an artifact
-	const artifactMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/workflow\/artifacts\/([^/]+)$/);
-	if (artifactMatch && req.method === "GET") {
-		const [, id, filename] = artifactMatch;
-		const resolvedId = resolveWorkflowSessionId(id, sessionManager);
-		const content = readArtifact(resolvedId, decodeURIComponent(filename));
-		if (!content) {
-			json({ error: "Artifact not found" }, 404);
-			return;
-		}
-		const ext = filename.split(".").pop()?.toLowerCase() || "";
-		const mimeType = MIME_TYPES[`.${ext}`] || "application/octet-stream";
-		res.writeHead(200, { "Content-Type": mimeType });
-		res.end(content);
+	// GET /api/skills — list available skill definitions
+	if (url.pathname === "/api/skills" && req.method === "GET") {
+		json({ skills: listSkills().map((s) => ({ id: s.id, name: s.name, description: s.description })) });
 		return;
 	}
 
@@ -1234,94 +1153,6 @@ async function handleApiRoute(
 	}
 
 	json({ error: "Not found" }, 404);
-}
-
-/**
- * Resolve the workflow session ID used for artifact storage.
- *
- * The gateway uses UUIDs for session IDs, but the workflow extension stores
- * artifacts under the agent's session directory name (extracted from the
- * agent session file path, e.g., "--C--Users-jsubr-w-bobbit--").
- *
- * Resolution order:
- *   1. Gateway session ID directly
- *   2. Agent session directory name (from persisted session data)
- *   3. Scan all workflow-artifacts dirs for matching workflow state
- */
-function resolveWorkflowSessionId(gatewaySessionId: string, sessionManager: SessionManager): string {
-	// 1. Check if artifacts exist directly under the gateway session ID
-	const directFiles = listArtifactFiles(gatewaySessionId);
-	if (directFiles.length > 0) return gatewaySessionId;
-
-	// 2. Extract agent session directory name from persisted session data
-	const agentDirName = getAgentSessionDirName(gatewaySessionId, sessionManager);
-	if (agentDirName) {
-		const agentFiles = listArtifactFiles(agentDirName);
-		if (agentFiles.length > 0) return agentDirName;
-	}
-
-	// 3. Scan workflow-state files for one referencing this gateway session or agent dir
-	const stateDir = path.join(os.homedir(), ".pi", "workflow-state");
-	try {
-		for (const file of fs.readdirSync(stateDir)) {
-			if (!file.endsWith(".json")) continue;
-			const candidateId = file.replace(/\.json$/, "");
-			const candidateFiles = listArtifactFiles(candidateId);
-			if (candidateFiles.length > 0) {
-				// Check if this state file's sessionId matches something we know
-				if (agentDirName && candidateId === agentDirName) return candidateId;
-				// Also check if the state file itself references our gateway or agent dir
-				try {
-					const stateData = JSON.parse(fs.readFileSync(path.join(stateDir, file), "utf-8"));
-					if (stateData.sessionId === gatewaySessionId || stateData.sessionId === agentDirName) {
-						return stateData.sessionId;
-					}
-				} catch { /* ignore */ }
-			}
-		}
-	} catch { /* ignore */ }
-
-	return gatewaySessionId;
-}
-
-/** Extract the agent session directory name from persisted gateway session data */
-function getAgentSessionDirName(gatewaySessionId: string, sessionManager: SessionManager): string | null {
-	// Try live session first
-	const session = sessionManager.getSession(gatewaySessionId);
-	if (session) {
-		try {
-			// RPC bridge state may have the session file
-			const rpc = session.rpcClient as any;
-			const sf = rpc._lastSessionFile ?? rpc.sessionFile;
-			if (sf) {
-				const dir = extractSessionDirFromPath(sf);
-				if (dir) return dir;
-			}
-		} catch { /* ignore */ }
-	}
-
-	// Try persisted session store
-	try {
-		const storeFile = path.join(os.homedir(), ".pi", "gateway-sessions.json");
-		const data = JSON.parse(fs.readFileSync(storeFile, "utf-8"));
-		const sessions = Array.isArray(data) ? data : [];
-		for (const s of sessions) {
-			if (s.id === gatewaySessionId && s.agentSessionFile) {
-				const dir = extractSessionDirFromPath(s.agentSessionFile);
-				if (dir) return dir;
-			}
-		}
-	} catch { /* ignore */ }
-
-	return null;
-}
-
-/** Extract session directory name from a session file path like ".../sessions/dirname/file.jsonl" */
-function extractSessionDirFromPath(sessionFilePath: string): string | null {
-	const parts = String(sessionFilePath).replace(/\\/g, "/").split("/");
-	const idx = parts.indexOf("sessions");
-	if (idx >= 0 && idx + 1 < parts.length) return parts[idx + 1];
-	return null;
 }
 
 function readBody(req: http.IncomingMessage): Promise<any> {
