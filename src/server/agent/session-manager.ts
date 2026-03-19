@@ -463,6 +463,7 @@ export class SessionManager {
 			worktreePath: ps.worktreePath,
 			taskId: ps.taskId,
 			accessory: ps.accessory,
+			preview: ps.preview,
 			promptQueue: new PromptQueue(ps.messageQueue),
 		};
 
