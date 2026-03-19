@@ -32,6 +32,8 @@ import { teardownMobileScrollTracking, ensureMobileScrollTracking } from "./mobi
 import { getRouteFromHash, setHashRoute } from "./routing.js";
 import { renderGoalDashboard } from "./goal-dashboard.js";
 import "./goal-dashboard.css";
+import { renderRoleManagerPage, loadRolePageData } from "./role-manager-page.js";
+import "./role-manager.css";
 
 // Expose for testing
 (window as any).__extractWorkflowStatus = extractWorkflowStatus;
@@ -53,7 +55,7 @@ function renderMobileLanding() {
 			<div class="w-full max-w-xl mx-auto px-2 py-4 flex flex-col gap-1">
 				<div class="flex items-center gap-1 px-1 pb-2 mb-1 border-b border-border/30">
 					<button class="flex-1 text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-						@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}>
+						@click=${() => { import("./role-manager-page.js").then((m) => m.loadRolePageData()); setHashRoute("roles"); }}>
 						${icon(Users, "xs")} Roles
 					</button>
 					<button class="flex-1 text-xs text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
@@ -485,6 +487,9 @@ export function doRenderApp(): void {
 		const route = getRouteFromHash();
 		if (route.view === "goal-dashboard" && route.goalId) {
 			return renderGoalDashboard();
+		}
+		if (route.view === "roles") {
+			return renderRoleManagerPage();
 		}
 
 		if (connected && state.isGoalAssistantSession) {

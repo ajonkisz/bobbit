@@ -2,7 +2,7 @@
 // URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected, #/goal/{id} = dashboard)
 // ============================================================================
 
-export type RouteView = "landing" | "session" | "goal" | "goal-dashboard";
+export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles";
 
 export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string } {
 	const hash = window.location.hash || "";
@@ -14,6 +14,9 @@ export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalI
 	if (goalMatch) {
 		return { view: "goal-dashboard", goalId: goalMatch[1] };
 	}
+	if (hash === "#/roles") {
+		return { view: "roles" };
+	}
 	return { view: "landing" };
 }
 
@@ -23,6 +26,8 @@ export function setHashRoute(view: RouteView, id?: string, replace?: boolean): v
 		newHash = `#/session/${id}`;
 	} else if (view === "goal-dashboard" && id) {
 		newHash = `#/goal/${id}`;
+	} else if (view === "roles") {
+		newHash = "#/roles";
 	} else {
 		newHash = "#/";
 	}

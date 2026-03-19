@@ -81,6 +81,19 @@ async function handleHashChange(): Promise<void> {
 			loadDashboardData(route.goalId);
 			renderApp();
 			await refreshSessions();
+		} else if (route.view === "roles") {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadRolePageData } = await import("./role-manager-page.js");
+			loadRolePageData();
+			renderApp();
+			await refreshSessions();
 		} else {
 			clearDashboardState();
 			if (state.remoteAgent) {
@@ -137,6 +150,9 @@ async function initApp() {
 			} else if (route.view === "goal-dashboard" && route.goalId) {
 				state.goalDashboardId = route.goalId;
 				renderApp();
+			} else if (route.view === "roles") {
+				const { loadRolePageData } = await import("./role-manager-page.js");
+				loadRolePageData();
 			}
 		} catch {
 			renderApp();

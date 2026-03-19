@@ -53,7 +53,7 @@ export function renderSidebar() {
 			<div class="flex items-center border-b border-border/50 px-1 py-1">
 				<button
 					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
-					@click=${() => import("./role-manager-dialog.js").then((m) => m.showRoleManagerDialog())}
+					@click=${() => { import("./role-manager-page.js").then((m) => m.loadRolePageData()); import("./routing.js").then((m) => m.setHashRoute("roles")); }}
 					title="Manage roles"
 				>
 					${icon(Users, "sm")}
