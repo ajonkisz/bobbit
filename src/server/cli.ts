@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadOrCreateToken, readToken } from "./auth/token.js";
 import { ensureTlsCert } from "./auth/tls.js";
+import { loadDesecConfig, updateDesecIp } from "./auth/desec.js";
 import { createGateway } from "./server.js";
 
 interface CliArgs {
@@ -135,6 +136,12 @@ async function main() {
 
 	// TLS setup — auto-generate cert (mkcert CA preferred, openssl fallback)
 	const tls = args.tls ? await ensureTlsCert(args.host) : undefined;
+
+	// Update deSEC dynDNS if configured (keeps domain pointing to current mesh IP)
+	const desecConfig = loadDesecConfig();
+	if (desecConfig) {
+		updateDesecIp(desecConfig, args.host); // fire and forget
+	}
 
 	const gateway = createGateway({
 		host: args.host,

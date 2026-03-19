@@ -208,17 +208,53 @@ function generateSelfSignedCert(host: string): TlsFiles {
 	return { cert: CERT_PATH, key: KEY_PATH };
 }
 
-/** Check if an existing cert's SAN includes the given host IP. */
+/** Check if an existing cert's SAN includes the given host IP or if it's a still-valid non-self-signed cert. */
 function certCoversHost(certPath: string, host: string): boolean {
 	try {
 		const openssl = resolveOpenssl();
+
+		// Check if cert is still valid (not expired)
+		try {
+			execSync(
+				`${openssl} x509 -in "${certPath}" -noout -checkend 86400`,
+				{ stdio: ["pipe", "pipe", "pipe"], shell: true as unknown as string },
+			);
+		} catch {
+			// Cert expires within 24 hours or is already expired
+			return false;
+		}
+
 		const out = execSync(
 			`${openssl} x509 -in "${certPath}" -noout -ext subjectAltName`,
 			{ encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], shell: true as unknown as string },
 		);
-		// Output looks like: "IP Address:100.64.x.x, IP Address:127.0.0.1, DNS:localhost"
-		return out.includes(`IP Address:${host}`);
+		// Check for IP match (self-signed/mkcert certs)
+		if (out.includes(`IP Address:${host}`)) return true;
+
+		// Check for DNS name match (Let's Encrypt certs accessed via hostname)
+		// A valid LE cert for any DNS name is usable — don't regenerate it
+		if (out.includes("DNS:") && !isSelfSigned(certPath, openssl)) return true;
+
+		return false;
 	} catch {
 		return false;
+	}
+}
+
+/** Check if a certificate is self-signed (issuer == subject). */
+function isSelfSigned(certPath: string, openssl: string): boolean {
+	try {
+		const subject = execSync(
+			`${openssl} x509 -in "${certPath}" -noout -subject`,
+			{ encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], shell: true as unknown as string },
+		).trim();
+		const issuer = execSync(
+			`${openssl} x509 -in "${certPath}" -noout -issuer`,
+			{ encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], shell: true as unknown as string },
+		).trim();
+		// Self-signed: subject and issuer have the same CN
+		return subject.replace("subject=", "") === issuer.replace("issuer=", "");
+	} catch {
+		return true; // assume self-signed on error
 	}
 }
