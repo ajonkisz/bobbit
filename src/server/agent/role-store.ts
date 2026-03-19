@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { TEAM_LEAD_PROMPT, CODER_PROMPT, REVIEWER_PROMPT, TESTER_PROMPT } from "./team-prompts.js";
+import { fileURLToPath } from "node:url";
+import { stringify, parse } from "yaml";
 
 export interface Role {
 	/** Unique identifier — lowercase alphanumeric + hyphens, immutable after creation */
@@ -18,105 +19,83 @@ export interface Role {
 	updatedAt: number;
 }
 
-const STORE_DIR = path.join(os.homedir(), ".pi");
-const STORE_FILE = path.join(STORE_DIR, "gateway-roles.json");
+/** roles/ directory at the repo root — version controlled */
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROLES_DIR = path.resolve(__dirname, "../../../roles");
 
 /**
- * Simple JSON file store for roles.
- * Roles persist across server restarts.
- * Seeds with default roles on first run.
+ * File-backed role store. Each role is a YAML file in roles/<name>.yaml
+ * at the repo root. Version controlled — edits via the UI write back
+ * to the same files so they can be committed.
  */
 export class RoleStore {
 	private roles: Map<string, Role> = new Map();
 
 	constructor() {
-		this.load();
-		if (this.roles.size === 0) {
-			this.seed();
+		fs.mkdirSync(ROLES_DIR, { recursive: true });
+		this.loadAll();
+		// Migrate: remove legacy JSON blob if YAML files now exist
+		const legacyPath = path.join(os.homedir(), ".pi", "gateway-roles.json");
+		if (fs.existsSync(legacyPath) && this.roles.size > 0) {
+			try { fs.unlinkSync(legacyPath); } catch { /* ignore */ }
 		}
 	}
 
-	private load(): void {
+	private roleFilePath(name: string): string {
+		return path.join(ROLES_DIR, `${name}.yaml`);
+	}
+
+	private loadAll(): void {
+		let entries: fs.Dirent[];
 		try {
-			if (fs.existsSync(STORE_FILE)) {
-				const data = JSON.parse(fs.readFileSync(STORE_FILE, "utf-8"));
-				if (Array.isArray(data)) {
-					for (const r of data) {
-						if (r.name) {
-							this.roles.set(r.name, r);
-						}
-					}
+			entries = fs.readdirSync(ROLES_DIR, { withFileTypes: true });
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			if (!entry.isFile() || !entry.name.endsWith(".yaml")) continue;
+			const filePath = path.join(ROLES_DIR, entry.name);
+			try {
+				const raw = fs.readFileSync(filePath, "utf-8");
+				const data = parse(raw);
+				if (data && typeof data === "object" && data.name) {
+					this.roles.set(data.name, {
+						name: data.name,
+						label: data.label ?? data.name,
+						promptTemplate: data.promptTemplate ?? "",
+						allowedTools: Array.isArray(data.allowedTools) ? data.allowedTools : [],
+						accessory: data.accessory ?? "none",
+						createdAt: data.createdAt ?? 0,
+						updatedAt: data.updatedAt ?? 0,
+					});
 				}
+			} catch (err) {
+				console.error(`[role-store] Failed to load ${filePath}:`, err);
 			}
-		} catch (err) {
-			console.error("[role-store] Failed to load persisted roles:", err);
 		}
 	}
 
-	private save(): void {
+	private saveOne(role: Role): void {
+		const filePath = this.roleFilePath(role.name);
 		try {
-			if (!fs.existsSync(STORE_DIR)) {
-				fs.mkdirSync(STORE_DIR, { recursive: true });
-			}
-			const data = Array.from(this.roles.values());
-			fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), "utf-8");
+			const content = stringify({
+				name: role.name,
+				label: role.label,
+				accessory: role.accessory,
+				allowedTools: role.allowedTools,
+				createdAt: role.createdAt,
+				updatedAt: role.updatedAt,
+				promptTemplate: role.promptTemplate,
+			}, { lineWidth: 0 });
+			fs.writeFileSync(filePath, content, "utf-8");
 		} catch (err) {
-			console.error("[role-store] Failed to save roles:", err);
+			console.error(`[role-store] Failed to save ${filePath}:`, err);
 		}
-	}
-
-	private seed(): void {
-		const now = Date.now();
-
-		const defaults: Role[] = [
-			{
-				name: "team-lead",
-				label: "Team Lead",
-				promptTemplate: TEAM_LEAD_PROMPT,
-				allowedTools: [],
-				accessory: "crown",
-				createdAt: now,
-				updatedAt: now,
-			},
-			{
-				name: "coder",
-				label: "Coder",
-				promptTemplate: CODER_PROMPT,
-				allowedTools: [],
-				accessory: "bandana",
-				createdAt: now,
-				updatedAt: now,
-			},
-			{
-				name: "reviewer",
-				label: "Reviewer",
-				promptTemplate: REVIEWER_PROMPT,
-				allowedTools: [],
-				accessory: "magnifier",
-				createdAt: now,
-				updatedAt: now,
-			},
-			{
-				name: "tester",
-				label: "Tester",
-				promptTemplate: TESTER_PROMPT,
-				allowedTools: [],
-				accessory: "goggles",
-				createdAt: now,
-				updatedAt: now,
-			},
-		];
-
-		for (const role of defaults) {
-			this.roles.set(role.name, role);
-		}
-		this.save();
-		console.log("[role-store] Seeded default roles: team-lead, coder, reviewer, tester");
 	}
 
 	put(role: Role): void {
 		this.roles.set(role.name, role);
-		this.save();
+		this.saveOne(role);
 	}
 
 	get(name: string): Role | undefined {
@@ -125,7 +104,8 @@ export class RoleStore {
 
 	remove(name: string): void {
 		this.roles.delete(name);
-		this.save();
+		const filePath = this.roleFilePath(name);
+		try { fs.unlinkSync(filePath); } catch { /* ignore */ }
 	}
 
 	getAll(): Role[] {
@@ -140,7 +120,7 @@ export class RoleStore {
 			if (v !== undefined) cleaned[k] = v;
 		}
 		Object.assign(existing, cleaned, { updatedAt: Date.now() });
-		this.save();
+		this.saveOne(existing);
 		return true;
 	}
 }

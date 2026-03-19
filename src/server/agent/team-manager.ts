@@ -4,9 +4,8 @@ import { fileURLToPath } from "node:url";
 import type { SessionManager, SessionInfo } from "./session-manager.js";
 import type { GoalManager } from "./goal-manager.js";
 import { createWorktree, cleanupWorktree } from "../skills/git.js";
-import { getRolePrompt, VALID_ROLES } from "./team-prompts.js";
-import { TeamStore } from "./team-store.js";
 import type { RoleStore } from "./role-store.js";
+import { TeamStore } from "./team-store.js";
 import type { PersistedTeamEntry } from "./team-store.js";
 import { generateTeamName } from "./team-names.js";
 import type { ColorStore } from "./color-store.js";
@@ -197,7 +196,10 @@ export class TeamManager {
 		// Secrets (gateway URL, auth token, goal ID) are passed as env vars, NOT embedded in prompt text
 		const roleStore = this.config.roleStore;
 		const storedRole = roleStore?.get("team-lead");
-		const teamLeadPromptTemplate = storedRole?.promptTemplate || getRolePrompt("team-lead") || "";
+		if (!storedRole) {
+			throw new Error('Role "team-lead" not found. Ensure roles/team-lead.yaml exists.');
+		}
+		const teamLeadPromptTemplate = storedRole.promptTemplate;
 		const teamLeadPrompt = teamLeadPromptTemplate
 			.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
 			.replace(/\{\{AGENT_ID\}\}/g, `team-lead-${goalId.slice(0, 8)}`);
@@ -263,11 +265,11 @@ export class TeamManager {
 		role: string,
 		task: string,
 	): Promise<{ sessionId: string; worktreePath: string }> {
-		// Validate role — check RoleStore first, then fall back to hardcoded list
 		const roleStore = this.config.roleStore;
 		const storedRoleDef = roleStore?.get(role);
-		if (!storedRoleDef && !VALID_ROLES.includes(role)) {
-			throw new Error(`Invalid role "${role}". Valid roles: ${VALID_ROLES.join(", ")}`);
+		if (!storedRoleDef) {
+			const available = roleStore?.getAll().map(r => r.name).join(", ") ?? "none";
+			throw new Error(`Role "${role}" not found. Available roles: ${available}`);
 		}
 
 		if (role === 'team-lead') {
@@ -302,15 +304,14 @@ export class TeamManager {
 		const worktreeResult = createWorktree(goal.repoPath, branchName);
 
 		try {
-			// Build role system prompt — prefer RoleStore, fall back to hardcoded
 			const agentId = `${role}-${shortId}`;
-			const rolePromptTemplate = storedRoleDef?.promptTemplate || getRolePrompt(role) || "";
+			const rolePromptTemplate = storedRoleDef.promptTemplate;
 			const rolePrompt = rolePromptTemplate
 				.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
 				.replace(/\{\{AGENT_ID\}\}/g, agentId);
 
 			// Read allowed tools from role definition (empty = all tools allowed)
-			const allowedTools = storedRoleDef?.allowedTools ?? [];
+			const allowedTools = storedRoleDef.allowedTools;
 
 			// Create the session with the role's worktree as cwd, role prompt appended to goal spec
 			const session = await this.sessionManager.createSession(
@@ -327,7 +328,7 @@ export class TeamManager {
 			const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 			this.sessionManager.setTitle(session.id, `${roleLabel}: ${roleName}`);
 			session.titleGenerated = true;
-			const roleAccessory = storedRoleDef?.accessory ?? "";
+			const roleAccessory = storedRoleDef.accessory;
 			this.sessionManager.updateSessionMeta(session.id, {
 				role,
 				teamGoalId: goalId,
