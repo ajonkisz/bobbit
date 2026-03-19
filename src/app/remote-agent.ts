@@ -14,6 +14,8 @@ export interface QueuedMessage {
 	images?: Array<{ type: "image"; data: string; mimeType: string }>;
 	attachments?: unknown[];
 	isSteered: boolean;
+	/** True if already dispatched mid-turn via steer RPC (kept in queue for UI) */
+	dispatched?: boolean;
 	createdAt: number;
 }
 

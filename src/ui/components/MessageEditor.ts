@@ -20,6 +20,7 @@ export interface QueuedMessage {
 	images?: Array<{ type: "image"; data: string; mimeType: string }>;
 	attachments?: unknown[];
 	isSteered: boolean;
+	dispatched?: boolean;
 	createdAt: number;
 }
 
@@ -644,20 +645,27 @@ export class MessageEditor extends LitElement {
 						${this.queuedMessages.map((msg) => html`
 							<div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${msg.isSteered ? "bg-amber-500/10 border border-amber-500/30" : "bg-muted/50 border border-border/50"} text-xs text-muted-foreground">
 								<span class="flex-1 truncate font-mono">${msg.text}</span>
-								${msg.isSteered
+								${msg.dispatched
 									? html`<span class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[0.65rem] font-medium text-amber-600 dark:text-amber-400">${icon(Zap, "xs")} Sent</span>`
-									: html`
-										<button
-											@click=${() => this.onSteer?.(msg)}
-											class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.65rem] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors cursor-pointer"
-											title="Send now — interrupts the current turn"
-										>${icon(Zap, "xs")} Steer</button>
-										<button
-											@click=${() => this.onRemoveQueued?.(msg.id)}
-											class="shrink-0 p-0.5 rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-											title="Remove from queue"
-										>${icon(X, "xs")}</button>
-									`}
+									: msg.isSteered
+										? html`<span class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 text-[0.65rem] font-medium text-amber-600 dark:text-amber-400">${icon(Zap, "xs")} Queued</span>
+											<button
+												@click=${() => this.onRemoveQueued?.(msg.id)}
+												class="shrink-0 p-0.5 rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+												title="Remove from queue"
+											>${icon(X, "xs")}</button>`
+										: html`
+											<button
+												@click=${() => this.onSteer?.(msg)}
+												class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.65rem] font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors cursor-pointer"
+												title="Send now — interrupts the current turn"
+											>${icon(Zap, "xs")} Steer</button>
+											<button
+												@click=${() => this.onRemoveQueued?.(msg.id)}
+												class="shrink-0 p-0.5 rounded text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+												title="Remove from queue"
+											>${icon(X, "xs")}</button>
+										`}
 							</div>
 						`)}
 					</div>

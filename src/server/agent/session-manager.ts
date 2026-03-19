@@ -166,11 +166,13 @@ export class SessionManager {
 		if (!ok) return false;
 
 		// If agent is streaming, dispatch the steered message immediately
-		// so it gets picked up between tool calls via getSteeringMessages()
+		// so it gets picked up between tool calls via getSteeringMessages().
+		// Keep the message in the queue (marked dispatched) so the UI shows
+		// "Sent" until the turn ends and the message appears in chat.
 		if (session.status === "streaming") {
 			const front = session.promptQueue.peek();
-			if (front?.isSteered) {
-				session.promptQueue.dequeue();
+			if (front?.isSteered && !front.dispatched) {
+				session.promptQueue.markDispatched(front.id);
 				session.rpcClient.steer(front.text).catch((err: any) => {
 					console.error(`[session-manager] Failed to dispatch steered message for ${session.id}:`, err);
 				});
@@ -203,8 +205,10 @@ export class SessionManager {
 	private drainQueue(session: SessionInfo): void {
 		if (session.promptQueue.isEmpty) return;
 
-		const next = session.promptQueue.dequeue()!;
+		// Skip already-dispatched messages (steered mid-turn), then pop the next
+		const next = session.promptQueue.dequeueUndispatched();
 		this.broadcastQueue(session);
+		if (!next) return;
 
 		// Title generation for the first real prompt
 		this.tryGenerateTitleFromPrompt(session.id, next.text);

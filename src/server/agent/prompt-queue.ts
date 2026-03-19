@@ -62,6 +62,26 @@ export class PromptQueue {
 		return this.queue.shift();
 	}
 
+	/**
+	 * Pop the next undispatched message, removing any already-dispatched
+	 * messages from the front. Used by drainQueue to skip steered messages
+	 * that were already sent mid-turn.
+	 */
+	dequeueUndispatched(): QueuedMessage | undefined {
+		while (this.queue.length > 0 && this.queue[0].dispatched) {
+			this.queue.shift();
+		}
+		return this.queue.shift();
+	}
+
+	/** Mark a message as dispatched (sent mid-turn, kept for UI display). */
+	markDispatched(messageId: string): boolean {
+		const msg = this.queue.find(m => m.id === messageId);
+		if (!msg) return false;
+		msg.dispatched = true;
+		return true;
+	}
+
 	/** Peek at the front of the queue without removing. */
 	peek(): QueuedMessage | undefined {
 		return this.queue[0];
