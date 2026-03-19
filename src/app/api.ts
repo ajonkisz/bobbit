@@ -286,6 +286,46 @@ export async function teardownTeam(goalId: string): Promise<boolean> {
 }
 
 // ============================================================================
+// GOAL ARTIFACT API
+// ============================================================================
+
+export type ArtifactType = "design-doc" | "test-plan" | "review-findings" | "gap-analysis" | "security-findings" | "custom";
+
+export interface GoalArtifact {
+	id: string;
+	goalId: string;
+	name: string;
+	type: ArtifactType;
+	content: string;
+	producedBy: string;
+	skillId?: string;
+	version: number;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export async function fetchGoalArtifacts(goalId: string): Promise<GoalArtifact[]> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/artifacts`);
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.artifacts || [];
+	} catch {
+		return [];
+	}
+}
+
+export async function fetchGoalArtifact(goalId: string, artifactId: string): Promise<GoalArtifact | null> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/artifacts/${artifactId}`);
+		if (!res.ok) return null;
+		return await res.json();
+	} catch {
+		return null;
+	}
+}
+
+// ============================================================================
 // ROLE API
 // ============================================================================
 
