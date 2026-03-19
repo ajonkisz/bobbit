@@ -304,7 +304,14 @@ export async function fetchRoles(): Promise<RoleData[]> {
 		const res = await gatewayFetch("/api/roles");
 		if (!res.ok) throw new Error(`Failed to fetch roles: ${res.status}`);
 		const data = await res.json();
-		return data.roles || data || [];
+		const roles: RoleData[] = data.roles || data || [];
+		// Also cache into state for the role picker sidebar
+		state.roles = roles.map((r) => ({
+			name: r.name,
+			label: r.label,
+			accessory: r.accessory,
+		}));
+		return roles;
 	} catch (err) {
 		console.error("[role-api] fetchRoles failed:", err);
 		return [];

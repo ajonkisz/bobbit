@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Crosshair, PanelLeftClose, PanelLeftOpen, Plus, Users } from "lucide";
+import { ChevronDown, Crosshair, PanelLeftClose, PanelLeftOpen, Plus, Users } from "lucide";
 import {
 	state,
 	renderApp,
@@ -16,10 +16,53 @@ import {
 } from "./state.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
-import { refreshSessions } from "./api.js";
+import { refreshSessions, fetchRoles } from "./api.js";
 import { statusBobbit, sessionAcronym } from "./session-colors.js";
 import { renderGoalGroup, renderSessionRow, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
+
+// ============================================================================
+// ROLE PICKER
+// ============================================================================
+
+/** Toggle role picker dropdown, fetching roles if needed. */
+async function toggleRolePicker(e: Event): Promise<void> {
+	e.stopPropagation();
+	if (state.rolePickerOpen) {
+		state.rolePickerOpen = false;
+		renderApp();
+		return;
+	}
+	if (state.roles.length === 0) await fetchRoles();
+	state.rolePickerOpen = true;
+	renderApp();
+}
+
+function renderRolePickerDropdown() {
+	if (!state.rolePickerOpen) return "";
+	return html`
+		<div class="absolute right-0 top-full mt-1 z-50 rounded-md shadow-lg py-1 min-w-[140px]"
+			style="background: var(--popover); border: 1px solid var(--border);"
+			@click=${(e: Event) => e.stopPropagation()}>
+			${state.roles.length === 0
+				? html`<div class="px-3 py-1.5 text-xs text-muted-foreground">No roles defined</div>`
+				: state.roles.map(role => html`
+					<button class="w-full text-left px-3 py-1.5 text-xs hover:bg-secondary/50 text-foreground"
+						@click=${() => { state.rolePickerOpen = false; createAndConnectSession(undefined, role.name); }}>
+						${role.label}
+					</button>
+				`)}
+		</div>
+	`;
+}
+
+// Close role picker on outside click
+document.addEventListener("click", () => {
+	if (state.rolePickerOpen) {
+		state.rolePickerOpen = false;
+		renderApp();
+	}
+});
 
 // ============================================================================
 // SIDEBAR TOGGLE
@@ -90,16 +133,24 @@ export function renderSidebar() {
 											<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
 											<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
 										</div>
-										<button
-											class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"
-											@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(); }}
-											title="New session"
-											?disabled=${state.creatingSession}
-										>
-											${state.creatingSession && !state.creatingSessionForGoalId
-												? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-												: icon(Plus, "xs")}
-										</button>
+										<div class="flex items-center relative">
+											<button
+												class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"
+												@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(); }}
+												title="New session"
+												?disabled=${state.creatingSession}
+											>
+												${state.creatingSession && !state.creatingSessionForGoalId
+													? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+													: icon(Plus, "xs")}
+											</button>
+											<button
+												class="p-0 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+												@click=${toggleRolePicker}
+												title="New session with role"
+											>${icon(ChevronDown, "xs")}</button>
+											${renderRolePickerDropdown()}
+										</div>
 									</div>
 									${ungroupedExpanded ? ungroupedSessions.map(renderSessionRow) : ""}
 								</div>
@@ -107,16 +158,24 @@ export function renderSidebar() {
 								<div class="flex flex-col gap-0.5">
 									<div class="flex items-center gap-1 px-1 py-0.5">
 										<span class="flex-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:13px;">Sessions</span>
-										<button
-											class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"
-											@click=${() => createAndConnectSession()}
-											title="New session"
-											?disabled=${state.creatingSession}
-										>
-											${state.creatingSession && !state.creatingSessionForGoalId
-												? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-												: icon(Plus, "xs")}
-										</button>
+										<div class="flex items-center relative">
+											<button
+												class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"
+												@click=${() => createAndConnectSession()}
+												title="New session"
+												?disabled=${state.creatingSession}
+											>
+												${state.creatingSession && !state.creatingSessionForGoalId
+													? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
+													: icon(Plus, "xs")}
+											</button>
+											<button
+												class="p-0 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+												@click=${toggleRolePicker}
+												title="New session with role"
+											>${icon(ChevronDown, "xs")}</button>
+											${renderRolePickerDropdown()}
+										</div>
 									</div>
 									${ungroupedSessions.length === 0
 										? html`<div class="text-center py-6">

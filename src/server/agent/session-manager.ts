@@ -931,6 +931,100 @@ export class SessionManager {
 	}
 
 	/**
+	 * Assign a role to an existing session by killing the agent, reassembling
+	 * the system prompt with the role instructions, and respawning with
+	 * `switch_session` to preserve conversation history.
+	 */
+	async assignRole(id: string, role: { name: string; promptTemplate: string; allowedTools: string[]; accessory: string }): Promise<boolean> {
+		const session = this.sessions.get(id);
+		if (!session) return false;
+		if (session.status === "streaming") throw new Error("Cannot assign role while agent is streaming");
+
+		// Get the agent session file so we can restore conversation
+		let agentSessionFile: string | undefined;
+		try {
+			const stateResp = await session.rpcClient.getState();
+			if (stateResp.success) agentSessionFile = stateResp.data?.sessionFile;
+		} catch {
+			const persisted = this.store.get(id);
+			agentSessionFile = persisted?.agentSessionFile;
+		}
+
+		// Kill the current process
+		session.unsubscribe();
+		await session.rpcClient.stop();
+
+		// Reassemble system prompt with role instructions appended
+		const goal = session.goalId ? this.goalManager.getGoal(session.goalId) : undefined;
+		let goalSpec = goal?.spec;
+		goalSpec = (goalSpec ? goalSpec + "\n\n---\n\n" : "") + role.promptTemplate;
+		if (role.allowedTools.length > 0) {
+			const toolList = role.allowedTools.join(", ");
+			goalSpec += `\n\n---\n\n## Tool Restrictions\n\nYou are ONLY allowed to use the following tools: ${toolList}\n\nDo NOT use any other tools. If a task requires a tool you don't have access to, explain what you need and ask for help instead of attempting to use the restricted tool.`;
+		}
+
+		const promptPath = assembleSystemPrompt(id, {
+			baseSystemPromptPath: this.systemPromptPath,
+			cwd: session.cwd,
+			goalTitle: goal?.title,
+			goalState: goal?.state,
+			goalSpec,
+		});
+
+		// Respawn with new system prompt
+		const bridgeOptions: RpcBridgeOptions = { cwd: session.cwd };
+		if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
+		if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		bridgeOptions.env = { BOBBIT_SESSION_ID: id };
+
+		const rpcClient = new RpcBridge(bridgeOptions);
+		const unsub = rpcClient.onEvent((event: any) => {
+			session.lastActivity = Date.now();
+			this.store.update(id, { lastActivity: session.lastActivity });
+			this.handleAgentLifecycle(session, event);
+			session.eventBuffer.push(event);
+			broadcast(session.clients, { type: "event", data: event });
+			this.trackCostFromEvent(session, event);
+		});
+
+		await rpcClient.start();
+
+		// Restore conversation from session file
+		if (agentSessionFile && fs.existsSync(agentSessionFile)) {
+			const switchResp = await rpcClient.sendCommand(
+				{ type: "switch_session", sessionPath: agentSessionFile },
+				15_000,
+			);
+			if (!switchResp.success) {
+				console.error(`[session-manager] switch_session failed after role assignment: ${switchResp.error}`);
+			}
+		}
+
+		// Swap in the new bridge and update metadata
+		session.rpcClient = rpcClient;
+		session.unsubscribe = unsub;
+		session.status = "idle";
+		session.role = role.name;
+		session.accessory = role.accessory;
+		session.allowedTools = role.allowedTools.length > 0 ? role.allowedTools : undefined;
+
+		this.store.update(id, { role: role.name, accessory: role.accessory });
+
+		broadcast(session.clients, { type: "session_status", status: "idle" } as any);
+
+		// Refresh messages and state for connected clients
+		try {
+			const msgs = await rpcClient.getMessages();
+			if (msgs.success) broadcast(session.clients, { type: "messages", data: msgs.data });
+			const st = await rpcClient.getState();
+			if (st.success) broadcast(session.clients, { type: "state", data: st.data });
+		} catch { /* best-effort */ }
+
+		console.log(`[session-manager] Assigned role "${role.name}" to session ${id}`);
+		return true;
+	}
+
+	/**
 	 * Generate a title for a session on the first user prompt.
 	 * Called immediately when the user sends a message, not after the agent replies.
 	 */

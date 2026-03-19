@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html, svg } from "lit";
-import { LayoutDashboard, Pencil, Trash2 } from "lucide";
+import { LayoutDashboard, Pencil, Shield, Trash2 } from "lucide";
 import {
 	state,
 	renderApp,
@@ -16,7 +16,7 @@ import {
 } from "./state.js";
 import { statusBobbit } from "./session-colors.js";
 import { connectToSession, terminateSession, createAndConnectSession } from "./session-manager.js";
-import { showRenameDialog } from "./dialogs.js";
+import { showRenameDialog, showAssignRoleDialog } from "./dialogs.js";
 import { setHashRoute } from "./routing.js";
 import { startSwarm, teardownSwarm, refreshSessions } from "./api.js";
 
@@ -112,6 +112,9 @@ export function renderSessionRow(session: GatewaySession) {
 
 	// Desktop: hover-revealed gradient overlay. Mobile: always-visible inline buttons.
 	const buttons = html`
+		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
+			@click=${(e: Event) => { e.stopPropagation(); showAssignRoleDialog(session.id); }}
+			title="Assign Role">${icon(Shield, "xs")}</button>
 		<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
 			@click=${(e: Event) => { e.stopPropagation(); showRenameDialog(session.id, displayTitle); }}
 			title="Rename">${icon(Pencil, "xs")}</button>

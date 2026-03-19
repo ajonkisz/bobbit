@@ -112,6 +112,11 @@ export const state = {
 
 	/** Currently viewed goal dashboard (null = not on dashboard) */
 	goalDashboardId: null as string | null,
+
+	/** Cached roles for the role picker menu */
+	roles: [] as Array<{ name: string; label: string; accessory: string }>,
+	/** Whether the new-session role picker dropdown is open */
+	rolePickerOpen: false,
 };
 
 // ============================================================================

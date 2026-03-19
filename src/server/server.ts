@@ -291,8 +291,36 @@ async function handleApiRoute(
 
 		const args = body?.args;
 
+		// If a roleId is provided, look up the role and pass its prompt/tools/accessory
+		const roleId = body?.roleId;
+		let createOpts: { rolePrompt?: string; allowedTools?: string[]; roleAssistant?: boolean } | undefined;
+		let roleForMeta: { name: string; accessory: string } | undefined;
+
+		if (roleAssistant) {
+			createOpts = { roleAssistant: true };
+		} else if (roleId && typeof roleId === "string") {
+			const role = roleManager.getRole(roleId);
+			if (!role) {
+				json({ error: `Role "${roleId}" not found` }, 404);
+				return;
+			}
+			createOpts = {
+				rolePrompt: role.promptTemplate,
+				allowedTools: role.allowedTools.length > 0 ? role.allowedTools : undefined,
+			};
+			roleForMeta = { name: role.name, accessory: role.accessory };
+		}
+
 		try {
-			const session = await sessionManager.createSession(cwd, args, goalId, goalAssistant, roleAssistant ? { roleAssistant: true } : undefined);
+			const session = await sessionManager.createSession(cwd, args, goalId, goalAssistant, createOpts);
+
+			// Set role metadata if a role was specified
+			if (roleForMeta) {
+				sessionManager.updateSessionMeta(session.id, { role: roleForMeta.name, accessory: roleForMeta.accessory });
+				session.role = roleForMeta.name;
+				session.accessory = roleForMeta.accessory;
+			}
+
 			json({
 				id: session.id,
 				cwd: session.cwd,
@@ -300,6 +328,8 @@ async function handleApiRoute(
 				goalId: session.goalId,
 				goalAssistant: session.goalAssistant,
 				roleAssistant: session.roleAssistant,
+				role: session.role,
+				accessory: session.accessory,
 			}, 201);
 		} catch (err) {
 			json({ error: String(err) }, 500);
@@ -789,6 +819,18 @@ async function handleApiRoute(
 				return;
 			}
 			colorStore.set(id, body.colorIndex);
+		}
+
+		if (typeof body.roleId === "string") {
+			const role = roleManager.getRole(body.roleId);
+			if (!role) { json({ error: `Role "${body.roleId}" not found` }, 404); return; }
+			try {
+				const ok = await sessionManager.assignRole(id, role);
+				if (!ok) { json({ error: "Session not found" }, 404); return; }
+			} catch (err) {
+				json({ error: String(err) }, 400);
+				return;
+			}
 		}
 
 		json({ ok: true });
