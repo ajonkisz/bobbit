@@ -13,7 +13,7 @@ src/
 │   ├── server.ts    # HTTP server, REST API, static serving, WS upgrade
 │   ├── harness.ts   # Dev server wrapper (watches sentinel file, auto-restarts)
 │   ├── harness-signal.ts  # Touches sentinel to trigger harness restart
-│   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, title generation
+│   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, teams, title generation
 │   │   ├── session-manager.ts  # Create/destroy/restore sessions, broadcast events, force abort
 │   │   ├── session-store.ts    # Disk persistence (~/.pi/gateway-sessions.json)
 │   │   ├── rpc-bridge.ts       # JSONL stdin/stdout bridge to agent subprocess
@@ -22,7 +22,17 @@ src/
 │   │   ├── system-prompt.ts    # Assemble system prompt from global + AGENTS.md + goal spec
 │   │   ├── goal-manager.ts     # Goal CRUD operations
 │   │   ├── goal-store.ts       # Disk persistence (~/.pi/gateway-goals.json)
+│   │   ├── goal-artifact-store.ts  # Goal artifact storage (~/.pi/gateway-goal-artifacts.json)
 │   │   ├── goal-assistant.ts   # System prompt for the goal creation assistant
+│   │   ├── task-manager.ts     # Task CRUD and state transitions
+│   │   ├── task-store.ts       # Disk persistence (~/.pi/gateway-tasks.json)
+│   │   ├── team-manager.ts     # Team lifecycle (spawn/dismiss agents, start/complete/teardown)
+│   │   ├── team-store.ts       # Disk persistence (~/.pi/gateway-team-state.json)
+│   │   ├── team-names.ts       # Random name generator for team agents
+│   │   ├── team-prompts.ts     # System prompts for team lead and role agents
+│   │   ├── role-manager.ts     # Role definitions and management
+│   │   ├── role-store.ts       # Role persistence
+│   │   ├── role-assistant.ts   # System prompt for role assistant
 │   │   └── color-store.ts      # Per-session color index persistence (~/.pi/gateway-session-colors.json)
 │   ├── auth/        # Token auth, rate limiting, TLS, OAuth
 │   │   ├── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
@@ -31,20 +41,17 @@ src/
 │   │   └── oauth.ts       # OAuth flow (start, complete, status)
 │   ├── ws/          # WebSocket protocol types and message handler
 │   │   ├── protocol.ts   # ClientMessage / ServerMessage type unions
-│   │   └── handler.ts    # Auth handshake, command routing, workflow dispatch
-│   └── workflows/   # Multi-phase workflow engine with sub-agent delegation
-│       ├── types.ts           # Phase, Workflow, WorkflowState interfaces
-│       ├── engine.ts          # WorkflowRunner state machine (~/.pi/workflow-state/)
-│       ├── registry.ts        # In-memory workflow definition registry
-│       ├── artifact-store.ts  # Workflow artifact storage (~/.pi/workflow-artifacts/)
-│       ├── report.ts          # HTML report generation from workflow results
-│       ├── sub-agent.ts       # Spawn isolated agent subprocesses for phases
-│       ├── git.ts             # Git worktree helpers for workflow phases
-│       ├── definitions-sync.ts  # Export definitions to ~/.pi/workflow-definitions.json
-│       ├── index.ts           # Barrel export + auto-registration of built-in workflows
-│       └── definitions/       # Built-in workflow templates
-│           ├── code-review.ts       # 4-phase code review with parallel sub-agents
-│           └── test-suite-report.ts # Test suite analysis workflow
+│   │   └── handler.ts    # Auth handshake, command routing, skill dispatch
+│   └── skills/      # Reusable skill definitions with isolated sub-agent execution
+│       ├── types.ts           # Skill interface
+│       ├── registry.ts        # In-memory skill definition registry
+│       ├── sub-agent.ts       # Spawn isolated agent subprocesses for skill execution
+│       ├── git.ts             # Git worktree helpers
+│       ├── definitions-sync.ts  # Export definitions to ~/.pi/skill-definitions.json
+│       ├── index.ts           # Barrel export + auto-registration of built-in skills
+│       └── definitions/       # Built-in skill templates
+│           ├── code-review.ts       # Correctness, security, and design review skills
+│           └── test-suite-report.ts # Test suite analysis skill
 ├── ui/              # Lit web components (forked from pi-web-ui, NOT an npm dep)
 │   ├── ChatPanel.ts # Top-level UI orchestrator
 │   ├── components/  # MessageList, StreamingMessageContainer, AgentInterface, etc.
@@ -53,12 +60,11 @@ src/
 │   │   ├── StreamingMessageContainer.ts  # Renders state.streamMessage (in-progress)
 │   │   ├── Messages.ts          # Message rendering by role
 │   │   ├── Input.ts             # Chat input with attachments
-│   │   ├── WorkflowStatusBar.ts # Real-time workflow progress display
 │   │   ├── message-renderer-registry.ts  # Custom message type renderers
 │   │   └── sandbox/             # Sandboxed iframe runtime providers
 │   ├── dialogs/     # ModelSelector, Settings, Sessions, AttachmentOverlay
 │   ├── tools/       # Tool call renderers
-│   │   ├── renderers/    # Per-tool renderers (Bash, Read, Write, Edit, Delegate, Workflow, etc.)
+│   │   ├── renderers/    # Per-tool renderers (Bash, Read, Write, Edit, Delegate, etc.)
 │   │   ├── artifacts/    # Artifact display (HTML, SVG, PDF, Markdown, etc.)
 │   │   └── renderer-registry.ts  # Tool name → renderer mapping
 │   ├── storage/     # IndexedDB persistence (settings, provider keys, sessions)
@@ -153,44 +159,95 @@ Goals are a task-tracking layer on top of sessions. A goal has a title, spec (ma
 
 **Goal assistant**: Sessions created with `goalAssistant: true` get a special system prompt (`GOAL_ASSISTANT_PROMPT`) that instructs the agent to help the user define a clear goal. The assistant outputs structured `<goal_proposal>` blocks with `<title>`, `<spec>`, and optional `<cwd>` tags. `RemoteAgent` parses these from assistant messages and fires the `onGoalProposal` callback.
 
-## Workflows
+## Skills
 
-A multi-phase workflow engine for structured tasks like code review and test analysis. Workflows consist of ordered phases, some of which spawn isolated sub-agent processes.
+A skill is a named, reusable template for spawning an isolated sub-agent that produces a structured artifact. Skills replace the multi-phase workflow engine with a simpler, single-invocation model.
 
 ### Architecture
 
-- **Definitions** (`src/server/workflows/definitions/`): Workflow templates declaring phases, instructions, and context isolation levels. Registered at import time via `registerWorkflow()`.
-- **Engine** (`WorkflowRunner`): State machine that tracks current phase, phase history, artifacts, and context. Persists to `~/.pi/workflow-state/{sessionId}.json`. Fires `onChange` on every transition.
-- **Artifacts** (`artifact-store.ts`): Files stored at `~/.pi/workflow-artifacts/{workflowId}/`. Track name, MIME type, and originating phase.
-- **Sub-agents** (`sub-agent.ts`): Isolated agent subprocesses for workflow phases. Receive only phase instructions + explicit context + `AGENTS.md` — never the parent conversation. 10-minute default timeout.
-- **Reports** (`report.ts`): Standalone HTML reports with embedded CSS summarizing phase history, timing, artifacts, and status. Generated on workflow completion/failure/cancel.
-- **Definition sync** (`definitions-sync.ts`): Exports registered workflows to `~/.pi/workflow-definitions.json` at startup so agent-side tool extensions can discover available workflows.
+- **Types** (`src/server/skills/types.ts`): The `Skill` interface defines a skill template:
+  ```typescript
+  interface Skill {
+    id: string;                    // e.g. "code-review", "gap-analysis"
+    name: string;                  // Human-readable name
+    description: string;           // What this skill does
+    instructions: string;          // System prompt for the isolated sub-agent
+    isolation: "full" | "partial"; // Whether the sub-agent sees parent context
+    expectedOutput: string;        // Description of expected artifact format
+    timeoutMs?: number;            // Max execution time (default 10min)
+  }
+  ```
+- **Registry** (`src/server/skills/registry.ts`): In-memory store of skill definitions. Register at import time via `registerSkill()`. List/get skills at runtime.
+- **Sub-agents** (`src/server/skills/sub-agent.ts`): Isolated agent subprocesses for skill execution. Receive only skill instructions + explicit context + `AGENTS.md` — never the parent conversation. 10-minute default timeout.
+- **Git helpers** (`src/server/skills/git.ts`): Git worktree utilities for skills that need isolated repo access.
+- **Definition sync** (`src/server/skills/definitions-sync.ts`): Exports registered skills to `~/.pi/skill-definitions.json` at startup so agent-side tool extensions can discover available skills.
 
-### Built-in workflows
+### Built-in skills
 
-- **Code Review** (`code-review.ts`): 4 phases — gather diff, spawn 3 parallel isolated sub-agents (Correctness, Security, Design), merge/deduplicate findings, generate report. Expects `base_branch`, `feature_branch`, `repo_path` context.
-- **Test Suite Report** (`test-suite-report.ts`): Test suite analysis workflow.
+- **Code Review** (`code-review.ts`): Three independent review skills — `correctness-review`, `security-review`, and `design-review`. Each reviews a different aspect of a branch diff. The Team Lead invokes them individually and synthesises findings.
+- **Test Suite Report** (`test-suite-report.ts`): Single skill that analyses a test suite — creates a worktree, runs tests, and produces a structured report.
 
 ### WebSocket protocol
 
-13 workflow-related message types in `protocol.ts`:
+4 skill-related message types in `protocol.ts`:
 
-**Client → Server**: `start_workflow`, `workflow_advance`, `workflow_reset`, `workflow_collect_artifact`, `workflow_set_context`, `workflow_complete`, `workflow_fail`, `workflow_cancel`, `workflow_status`
+**Client → Server**: `invoke_skill` (with `skillId` and optional `context`)
 
-**Server → Client**: `workflow_state`, `workflow_phase_changed`, `workflow_completed`, `workflow_report`
+**Server → Client**: `skill_started`, `skill_completed`, `skill_failed`
+
+### REST endpoint
+
+- `GET /api/skills` — list available skill definitions
+
+## Goal Artifacts
+
+Goals can have **artifacts** — structured documents (design docs, test plans, review findings) that serve as both a process record and an enforcement mechanism.
+
+### GoalArtifact interface
+
+```typescript
+interface GoalArtifact {
+  id: string;
+  goalId: string;
+  name: string;              // e.g. "design-doc", "test-plan", "code-review-findings"
+  type: ArtifactType;        // "design-doc" | "test-plan" | "review-findings" | "gap-analysis" | "security-findings" | "custom"
+  content: string;           // The artifact content (markdown, JSON, etc.)
+  producedBy: string;        // Session ID that created it
+  skillId?: string;          // Skill that produced it (if applicable)
+  version: number;           // Incremented on revision
+  createdAt: number;
+  updatedAt: number;
+}
+```
+
+### Artifact requirements and enforcement
+
+Goals can declare which artifacts must exist before certain task types are allowed:
+
+```typescript
+interface ArtifactRequirement {
+  artifactType: ArtifactType;
+  blocksTaskTypes: string[];   // e.g. ["implementation"]
+  description: string;
+}
+```
+
+**Default requirements** (applied to all team goals unless overridden):
+- `design-doc` blocks `implementation` — a design document must exist before implementation tasks can be created
+- `review-findings` blocks goal completion — code review findings must exist before the goal can be completed
+
+When an agent tries to create a task via `POST /api/goals/:id/tasks`, the server checks artifact requirements. If a required artifact is missing, the request is rejected with **409 Conflict** and a message explaining which artifacts are needed. This is a hard gate — the agent must produce the required artifact first.
+
+### Storage
+
+`GoalArtifactStore` persists to `~/.pi/gateway-goal-artifacts.json` (same load-on-construct, write-on-mutate pattern as other stores). Artifact content is stored inline since artifacts are typically markdown/JSON documents.
 
 ### REST endpoints
 
-- `GET /api/workflows` — list available workflow definitions
-- `GET /api/sessions/:id/workflow` — get workflow state for a session
-- `GET /api/sessions/:id/workflow/report` — render HTML report (regenerated from state, with fallback to stored `report.html`)
-- `GET /api/sessions/:id/workflow/artifacts` — list artifacts
-- `GET /api/sessions/:id/workflow/artifacts/:filename` — serve an artifact
-
-
-### Workflow artifact resolution
-
-The gateway uses UUIDs for session IDs, but the workflow extension stores artifacts under the agent's session directory name. `resolveWorkflowSessionId()` in `server.ts` resolves this mismatch by checking: (1) gateway session ID directly, (2) agent session directory name from persisted data, (3) scanning `~/.pi/workflow-state/` files.
+- `GET /api/goals/:id/artifacts` — list artifacts for a goal
+- `POST /api/goals/:id/artifacts` — create an artifact (`{ name, type, content, producedBy, skillId? }`)
+- `GET /api/goals/:id/artifacts/:artifactId` — get a specific artifact
+- `PUT /api/goals/:id/artifacts/:artifactId` — revise an artifact (increments version)
 
 ## Compaction
 
@@ -229,7 +286,7 @@ Notification permission is requested on first user prompt (has user gesture cont
 `RemoteAgent` auto-reconnects on unexpected disconnects with exponential backoff (1s base, 30s max). On reconnect:
 1. Re-authenticates via `auth` message
 2. Requests current messages (`get_messages`) and state (`get_state`) to resync
-3. Server replays the latest `tool_execution_update` per tool call ID from the `EventBuffer` so reconnecting clients see delegate/workflow progress immediately
+3. Server replays the latest `tool_execution_update` per tool call ID from the `EventBuffer` so reconnecting clients see delegate/skill progress immediately
 4. If the agent is streaming and no `streamMessage` exists (late join), the last assistant message is promoted to the streaming container and removed from `messages[]` to avoid duplicate rendering
 
 ## Dual TypeScript configs
@@ -273,9 +330,10 @@ All persistent state lives under `~/.pi/`:
 | `gateway-session-colors.json` | `ColorStore` | Session → color index (0-19) mapping |
 | `gateway-tls/` | `tls.ts` | Self-signed TLS cert + key |
 | `session-prompts/{sessionId}.md` | `system-prompt.ts` | Assembled system prompts (cleaned up on session terminate) |
-| `workflow-state/{sessionId}.json` | `WorkflowRunner` | Workflow execution state |
-| `workflow-artifacts/{workflowId}/` | `artifact-store.ts` | Workflow output files |
-| `workflow-definitions.json` | `definitions-sync.ts` | Exported workflow definitions for agent discovery |
+| `gateway-goal-artifacts.json` | `GoalArtifactStore` | Goal artifact content and metadata |
+| `gateway-team-state.json` | `TeamStore` | Team state (agents, roles, goal associations) |
+| `gateway-tasks.json` | `TaskStore` | Task definitions, state, assignments |
+| `skill-definitions.json` | `definitions-sync.ts` | Exported skill definitions for agent discovery |
 
 | `agent/auth.json` | (external) | API auth credentials (read by title-generator) |
 | `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
@@ -331,7 +389,7 @@ The server starts on port 3099 (not 3001) to avoid conflicting with the running 
 
 **Add a new tool renderer**: Create in `src/ui/tools/renderers/`, register in `src/ui/tools/index.ts`.
 
-**Add a new workflow definition**: Create in `src/server/workflows/definitions/`, import and register in `src/server/workflows/index.ts`. Define phases with instructions, context isolation, and optional parallel sub-phases. Run `exportDefinitions()` to sync to disk.
+**Add a new skill definition**: Create in `src/server/skills/definitions/`, import and register in `src/server/skills/index.ts`. Define a `Skill` object with id, instructions, isolation level, and expected output. Run `exportDefinitions()` to sync to disk.
 
 **Add a goal-related feature**: Goal CRUD is in `goal-manager.ts`/`goal-store.ts`. REST endpoints in `server.ts`. Goal assistant prompt in `goal-assistant.ts`. Client-side proposal parsing in `remote-agent.ts` `_checkForGoalProposal()`.
 
@@ -343,4 +401,4 @@ The server starts on port 3099 (not 3001) to avoid conflicting with the running 
 
 **Debug compaction issues**: Check `_isCompacting`, `_compactionSyntheticMessages`, and `_usageStaleAfterCompaction` in `remote-agent.ts`. The `compacting_placeholder` message must be filtered out and re-added correctly across server refreshes. Manual compaction is fire-and-forget from the WS handler's perspective.
 
-**Debug workflow artifact resolution**: If reports/artifacts 404, check `resolveWorkflowSessionId()` in `server.ts` — it maps gateway UUIDs to agent session directory names via three fallback strategies.
+**Debug goal artifacts**: Goal artifacts are stored in `GoalArtifactStore` (`~/.pi/gateway-goal-artifacts.json`). Artifact requirements are enforced on task creation — if the server returns 409, check which artifacts are missing via `GET /api/goals/:id/artifacts`.
