@@ -457,11 +457,11 @@ function agentStatusLabel(status: string): "working" | "idle" | "blocked" {
 }
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-	coder: { bg: "rgba(59, 130, 246, 0.15)", text: "#3b82f6" },
-	tester: { bg: "rgba(34, 197, 94, 0.15)", text: "#22c55e" },
-	reviewer: { bg: "rgba(245, 158, 11, 0.15)", text: "#f59e0b" },
-	lead: { bg: "rgba(168, 85, 247, 0.15)", text: "#a855f7" },
-	"team-lead": { bg: "rgba(168, 85, 247, 0.15)", text: "#a855f7" },
+	coder: { bg: "oklch(0.62 0.15 250 / 0.15)", text: "oklch(0.62 0.15 250)" },
+	tester: { bg: "oklch(0.65 0.15 145 / 0.15)", text: "oklch(0.65 0.15 145)" },
+	reviewer: { bg: "oklch(0.70 0.14 75 / 0.15)", text: "oklch(0.70 0.14 75)" },
+	lead: { bg: "oklch(0.60 0.15 300 / 0.15)", text: "oklch(0.60 0.15 300)" },
+	"team-lead": { bg: "oklch(0.60 0.15 300 / 0.15)", text: "oklch(0.60 0.15 300)" },
 };
 
 function getRoleColor(role: string): { bg: string; text: string } {
@@ -598,11 +598,11 @@ function derivePhase(artifactList: GoalArtifact[]): GoalPhase {
 }
 
 const PHASE_COLORS: Record<GoalPhase, string> = {
-	planning: "#6b7280",
-	design: "#8b5cf6",
-	implementation: "#3b82f6",
-	review: "#f59e0b",
-	complete: "#22c55e",
+	planning: "var(--muted-foreground)",
+	design: "oklch(0.60 0.15 300)",
+	implementation: "oklch(0.62 0.15 250)",
+	review: "oklch(0.70 0.14 75)",
+	complete: "oklch(0.65 0.15 145)",
 };
 
 function renderPhaseIndicator(artifactList: GoalArtifact[]): TemplateResult {
@@ -616,12 +616,12 @@ function renderPhaseIndicator(artifactList: GoalArtifact[]): TemplateResult {
 				${PHASES.map((p, i) => {
 					const isActive = i === currentIdx;
 					const isPast = i < currentIdx;
-					const color = isPast || isActive ? PHASE_COLORS[p.phase] : "hsl(var(--border))";
+					const color = isPast || isActive ? PHASE_COLORS[p.phase] : "var(--border)";
 					return html`
 						<div class="phase-step ${isActive ? "phase-step--active" : ""} ${isPast ? "phase-step--past" : ""}">
 							<div class="phase-dot" style="background: ${color}; ${isActive ? `box-shadow: 0 0 0 3px ${color}40;` : ""}"></div>
-							${i < PHASES.length - 1 ? html`<div class="phase-line" style="background: ${isPast ? PHASE_COLORS[PHASES[i + 1].phase] : "hsl(var(--border))"};"></div>` : nothing}
-							<div class="phase-label" style="color: ${isActive ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))"}">${p.label}</div>
+							${i < PHASES.length - 1 ? html`<div class="phase-line" style="background: ${isPast ? PHASE_COLORS[PHASES[i + 1].phase] : "var(--border)"};"></div>` : nothing}
+							<div class="phase-label" style="color: ${isActive ? "var(--foreground)" : "var(--muted-foreground)"}">${p.label}</div>
 						</div>
 					`;
 				})}
