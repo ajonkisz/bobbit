@@ -17,9 +17,9 @@ import {
 	setUngroupedExpanded,
 	type GoalState,
 } from "./state.js";
-import { createGoal, gatewayFetch, refreshSessions } from "./api.js";
+import { createGoal, createRole, gatewayFetch, refreshSessions } from "./api.js";
 import { clearSessionModel } from "./routing.js";
-import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft } from "./session-manager.js";
+import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft, saveRoleDraft, deleteRoleDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog } from "./dialogs.js";
 import { renderSidebar } from "./sidebar.js";
 
@@ -270,6 +270,212 @@ function goalPreviewPanel() {
 }
 
 // ============================================================================
+// ROLE PREVIEW PANEL (role assistant split-screen)
+// ============================================================================
+
+import { ACCESSORY_IDS, getAccessory, statusBobbit } from "./session-colors.js";
+import { fetchTools } from "./api.js";
+
+/** Cached available tools list (loaded once). */
+let _availableTools: string[] = [];
+let _toolsLoaded = false;
+
+function ensureToolsLoaded(): void {
+	if (_toolsLoaded) return;
+	_toolsLoaded = true;
+	fetchTools().then((tools) => { _availableTools = tools; renderApp(); });
+}
+
+function rolePreviewPanel() {
+	ensureToolsLoaded();
+
+	const handleCreateRole = async () => {
+		const trimmedName = state.rolePreviewName.trim();
+		const trimmedLabel = state.rolePreviewLabel.trim();
+		if (!trimmedName || !trimmedLabel) return;
+		const sessionId = activeSessionId();
+		if (state.remoteAgent) {
+			state.remoteAgent.disconnect();
+			state.remoteAgent = null;
+			state.connectionStatus = "disconnected";
+		}
+		state.isRoleAssistantSession = false;
+		state.activeRoleProposal = null;
+		// Clean up persisted draft
+		if (sessionId) {
+			deleteRoleDraft(sessionId);
+		}
+		localStorage.removeItem("gateway.sessionId");
+
+		// Parse tools: comma-separated string -> array
+		const toolsList = state.rolePreviewTools
+			.split(",")
+			.map((t) => t.trim())
+			.filter(Boolean);
+
+		await createRole({
+			name: trimmedName,
+			label: trimmedLabel,
+			promptTemplate: state.rolePreviewPrompt,
+			allowedTools: toolsList,
+			accessory: state.rolePreviewAccessory,
+		});
+
+		if (sessionId) {
+			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+			clearSessionModel(sessionId);
+		}
+
+		// Navigate to the roles page
+		const { loadRolePageData } = await import("./role-manager-page.js");
+		await loadRolePageData();
+		setHashRoute("roles");
+		renderApp();
+	};
+
+	const handleCancel = () => {
+		backToSessions();
+	};
+
+	// Parse current tools string into array for display
+	const currentTools = state.rolePreviewTools
+		.split(",")
+		.map((t) => t.trim())
+		.filter(Boolean);
+
+	return html`
+		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
+			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Name</label>
+					${Input({
+						type: "text",
+						value: state.rolePreviewName,
+						placeholder: "role-name (lowercase, hyphens)",
+						onInput: (e: Event) => {
+							state.rolePreviewName = (e.target as HTMLInputElement).value;
+							state.rolePreviewNameEdited = true;
+							const sid = activeSessionId();
+							if (sid) saveRoleDraft(sid);
+						},
+					})}
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Label</label>
+					${Input({
+						type: "text",
+						value: state.rolePreviewLabel,
+						placeholder: "Display Label",
+						onInput: (e: Event) => {
+							state.rolePreviewLabel = (e.target as HTMLInputElement).value;
+							state.rolePreviewLabelEdited = true;
+							const sid = activeSessionId();
+							if (sid) saveRoleDraft(sid);
+						},
+					})}
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Accessory</label>
+					<div class="flex flex-wrap gap-2">
+						${ACCESSORY_IDS.map((accId) => {
+							const acc = getAccessory(accId);
+							const isSelected = state.rolePreviewAccessory === accId;
+							return html`
+								<button
+									class="flex flex-col items-center gap-1 px-2 py-1.5 rounded border transition-colors ${isSelected ? "border-primary bg-primary/10" : "border-border hover:border-muted-foreground/50"}"
+									@click=${() => {
+										state.rolePreviewAccessory = accId;
+										state.rolePreviewAccessoryEdited = true;
+										const sid = activeSessionId();
+										if (sid) saveRoleDraft(sid);
+										renderApp();
+									}}
+									title=${acc.label}
+								>
+									${statusBobbit("idle", false, undefined, isSelected, false, accId === "crown", accId === "bandana", accId)}
+									<span class="text-[10px] text-muted-foreground">${acc.label}</span>
+								</button>
+							`;
+						})}
+					</div>
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Tools</label>
+					<div class="flex flex-wrap gap-1 mb-2">
+						${currentTools.map((tool) => html`
+							<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-secondary text-secondary-foreground">
+								${tool}
+								<button class="hover:text-destructive" @click=${() => {
+									const remaining = currentTools.filter((t) => t !== tool);
+									state.rolePreviewTools = remaining.join(", ");
+									state.rolePreviewToolsEdited = true;
+									const sid = activeSessionId();
+									if (sid) saveRoleDraft(sid);
+									renderApp();
+								}}>&times;</button>
+							</span>
+						`)}
+						${currentTools.length === 0 ? html`<span class="text-xs text-muted-foreground italic">All tools allowed</span>` : ""}
+					</div>
+					${_availableTools.length > 0 ? html`
+						<div class="flex flex-wrap gap-1">
+							${_availableTools.filter((t) => !currentTools.includes(t)).map((tool) => html`
+								<button
+									class="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+									@click=${() => {
+										const newTools = [...currentTools, tool];
+										state.rolePreviewTools = newTools.join(", ");
+										state.rolePreviewToolsEdited = true;
+										const sid = activeSessionId();
+										if (sid) saveRoleDraft(sid);
+										renderApp();
+									}}
+								>+ ${tool}</button>
+							`)}
+						</div>
+					` : ""}
+				</div>
+				<div class="flex-1 flex flex-col min-h-0">
+					<div class="flex items-center justify-between mb-1.5">
+						<label class="text-xs text-muted-foreground font-medium">System Prompt</label>
+						<button
+							class="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+							@click=${() => { state.rolePreviewPromptEditMode = !state.rolePreviewPromptEditMode; renderApp(); }}
+						>
+							${state.rolePreviewPromptEditMode ? "Preview" : "Edit"}
+						</button>
+					</div>
+					${state.rolePreviewPromptEditMode
+						? html`<textarea
+								class="flex-1 min-h-[200px] p-3 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+								.value=${state.rolePreviewPrompt}
+								@input=${(e: Event) => {
+									state.rolePreviewPrompt = (e.target as HTMLTextAreaElement).value;
+									state.rolePreviewPromptEdited = true;
+									const sid = activeSessionId();
+									if (sid) saveRoleDraft(sid);
+								}}
+							></textarea>`
+						: html`<div class="flex-1 min-h-[200px] p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm">
+								<markdown-block .content=${state.rolePreviewPrompt || "_No prompt content yet_"}></markdown-block>
+							</div>`
+					}
+				</div>
+			</div>
+			<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+				${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
+				${Button({
+					variant: "default",
+					onClick: handleCreateRole,
+					disabled: !state.rolePreviewName.trim() || !state.rolePreviewLabel.trim(),
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(Users, "sm")} Create Role</span>`,
+				})}
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
 // RENDER APP
 // ============================================================================
 
@@ -467,6 +673,23 @@ export function doRenderApp(): void {
 		`;
 	};
 
+	const roleAssistantTabBar = () => {
+		return html`
+			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
+				<button
+					class="goal-tab-pill ${state.roleAssistantTab === "chat" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.roleAssistantTab = "chat"; renderApp(); }}
+				>Chat</button>
+				<button
+					class="goal-tab-pill ${state.roleAssistantTab === "preview" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.roleAssistantTab = "preview"; renderApp(); }}
+				>
+					Preview${state.hasReceivedRoleProposal ? html` <span class="goal-tab-dot"></span>` : ""}
+				</button>
+			</div>
+		`;
+	};
+
 	const workflowBar = (position: "desktop" | "mobile" = "desktop") => {
 		if (!state.remoteAgent) return html``;
 		const wfStatus = extractWorkflowStatus(
@@ -507,6 +730,24 @@ export function doRenderApp(): void {
 				${state.goalAssistantTab === "chat"
 					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
 					: html`<div class="flex-1 min-h-0 flex flex-col">${goalPreviewPanel()}</div>`
+				}
+			`;
+		}
+		if (connected && state.isRoleAssistantSession) {
+			if (desktop) {
+				return html`
+					${reconnectBanner()}
+					<div class="flex-1 flex min-h-0 overflow-hidden">
+						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
+						${rolePreviewPanel()}
+					</div>
+				`;
+			}
+			return html`
+				${reconnectBanner()}
+				${state.roleAssistantTab === "chat"
+					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
+					: html`<div class="flex-1 min-h-0 flex flex-col">${rolePreviewPanel()}</div>`
 				}
 			`;
 		}
@@ -576,6 +817,7 @@ export function doRenderApp(): void {
 					</div>
 					${workflowBar("mobile")}
 					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
+					${state.isRoleAssistantSession ? roleAssistantTabBar() : ""}
 				</div>
 				<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>

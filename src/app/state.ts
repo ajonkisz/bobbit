@@ -17,6 +17,7 @@ export interface GatewaySession {
 	isAborting?: boolean;
 	goalId?: string;
 	goalAssistant?: boolean;
+	roleAssistant?: boolean;
 	colorIndex?: number;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
@@ -89,6 +90,25 @@ export const state = {
 	previewWorktree: false,
 	cwdDropdownOpen: false,
 	cwdHighlightIndex: -1,
+
+	/** Active role proposal from a role-assistant session */
+	activeRoleProposal: null as { name: string; label: string; prompt: string; tools: string; accessory: string } | null,
+
+	// Role assistant split-screen state
+	isRoleAssistantSession: false,
+	roleAssistantTab: "chat" as "chat" | "preview",
+	rolePreviewName: "",
+	rolePreviewLabel: "",
+	rolePreviewPrompt: "",
+	rolePreviewTools: "",
+	rolePreviewAccessory: "none",
+	rolePreviewNameEdited: false,
+	rolePreviewLabelEdited: false,
+	rolePreviewPromptEdited: false,
+	rolePreviewToolsEdited: false,
+	rolePreviewAccessoryEdited: false,
+	hasReceivedRoleProposal: false,
+	rolePreviewPromptEditMode: false,
 
 	/** Currently viewed goal dashboard (null = not on dashboard) */
 	goalDashboardId: null as string | null,
