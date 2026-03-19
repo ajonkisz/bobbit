@@ -12,6 +12,17 @@ const AVAILABLE_TOOLS = [
 	"web_search",
 	"web_fetch",
 	"delegate",
+	"team_spawn",
+	"team_list",
+	"team_dismiss",
+	"team_complete",
+	"task_list",
+	"task_create",
+	"task_update",
+	"artifact_list",
+	"artifact_create",
+	"artifact_get",
+	"artifact_update",
 ];
 
 export class RoleManager {
