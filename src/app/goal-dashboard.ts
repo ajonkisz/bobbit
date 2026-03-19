@@ -50,6 +50,9 @@ export interface CommitInfo {
 // DASHBOARD STATE
 // ============================================================================
 
+let previousStatValues: { done: number; inProgress: number; failed: number; agents: number } | null = null;
+let statChangeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
 let currentGoalId: string | null = null;
 let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
@@ -134,6 +137,9 @@ export function clearDashboardState(): void {
 	teamStopping = false;
 	loading = true;
 	error = "";
+	previousStatValues = null;
+	for (const timer of statChangeTimers.values()) clearTimeout(timer);
+	statChangeTimers.clear();
 	stopAgentPolling();
 	stopTaskPolling();
 	stopArtifactPolling();
@@ -890,6 +896,41 @@ function renderNavBar(goal: Goal): TemplateResult {
 	`;
 }
 
+function checkStatChanges(done: number, inProgress: number, failed: number, agents: number): void {
+	if (!previousStatValues) {
+		previousStatValues = { done, inProgress, failed, agents };
+		return;
+	}
+
+	const checks: Array<[string, number, number]> = [
+		["stat-done", previousStatValues.done, done],
+		["stat-progress", previousStatValues.inProgress, inProgress],
+		["stat-failed", previousStatValues.failed, failed],
+		["stat-agents", previousStatValues.agents, agents],
+	];
+
+	for (const [id, prev, curr] of checks) {
+		if (prev !== curr) {
+			const el = document.getElementById(id);
+			if (!el) continue;
+			// Clear any pending timer
+			const existing = statChangeTimers.get(id);
+			if (existing) clearTimeout(existing);
+			// Remove and re-add class to retrigger animation
+			el.classList.remove("dashboard-stat-value--changed");
+			// Force reflow to restart animation
+			void el.offsetWidth;
+			el.classList.add("dashboard-stat-value--changed");
+			statChangeTimers.set(id, setTimeout(() => {
+				el.classList.remove("dashboard-stat-value--changed");
+				statChangeTimers.delete(id);
+			}, 400));
+		}
+	}
+
+	previousStatValues = { done, inProgress, failed, agents };
+}
+
 function renderSummaryHeader(goal: Goal, taskList: Task[]): TemplateResult {
 	const total = taskList.length;
 	const done = taskList.filter((t) => t.state === "complete").length;
@@ -899,22 +940,25 @@ function renderSummaryHeader(goal: Goal, taskList: Task[]): TemplateResult {
 		(s) => s.goalId === goal.id && !s.delegateOf && (s.status === "streaming" || s.status === "busy"),
 	).length;
 
+	// Schedule stat change detection after render
+	setTimeout(() => checkStatChanges(done, inProgress, failed, activeAgents), 0);
+
 	return html`
 		<div class="dashboard-summary">
 			<div class="dashboard-stat dashboard-stat--done">
-				<span class="dashboard-stat-value">${done}/${total}</span>
+				<span class="dashboard-stat-value" id="stat-done">${done}/${total}</span>
 				<span class="dashboard-stat-label">Tasks done</span>
 			</div>
 			<div class="dashboard-stat dashboard-stat--progress">
-				<span class="dashboard-stat-value">${inProgress}</span>
+				<span class="dashboard-stat-value" id="stat-progress">${inProgress}</span>
 				<span class="dashboard-stat-label">In progress</span>
 			</div>
 			<div class="dashboard-stat dashboard-stat--failed">
-				<span class="dashboard-stat-value">${failed}</span>
+				<span class="dashboard-stat-value" id="stat-failed">${failed}</span>
 				<span class="dashboard-stat-label">Failed</span>
 			</div>
 			<div class="dashboard-stat dashboard-stat--agents">
-				<span class="dashboard-stat-value">${activeAgents}</span>
+				<span class="dashboard-stat-value" id="stat-agents">${activeAgents}</span>
 				<span class="dashboard-stat-label">Active agents</span>
 			</div>
 		</div>
