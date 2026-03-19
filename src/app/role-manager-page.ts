@@ -261,7 +261,7 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 
 function renderRoleRow(role: RoleData): TemplateResult {
 	return html`
-		<div class="role-row" @click=${() => showEdit(role)}>
+		<div class="role-row" tabindex="0" role="button" @click=${() => showEdit(role)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showEdit(role); } }}>
 			${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}
 			<div class="role-row-info">
 				<span class="role-row-label">${role.label}</span>
