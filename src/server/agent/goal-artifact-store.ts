@@ -37,6 +37,11 @@ const DEFAULT_REQUIREMENTS: ArtifactRequirement[] = [
 		description: "A design document must exist before implementation tasks can be created",
 	},
 	{
+		artifactType: "test-plan",
+		blocksTaskTypes: ["implementation"],
+		description: "A test plan must exist before implementation tasks can be created",
+	},
+	{
 		artifactType: "review-findings",
 		blocksTaskTypes: ["goal-completion"],
 		description: "Code review findings must exist before the goal can be completed",
