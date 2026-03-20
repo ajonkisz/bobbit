@@ -492,6 +492,10 @@ export class SessionManager {
 			promptQueue: new PromptQueue(ps.messageQueue),
 		};
 
+		// Skip cost tracking during session restore (switch_session replays
+		// all historical message_update events which would double-count costs)
+		let restoring = true;
+
 		const unsub = rpcClient.onEvent((event: any) => {
 			session.lastActivity = Date.now();
 			this.store.update(ps.id, { lastActivity: session.lastActivity });
@@ -500,7 +504,7 @@ export class SessionManager {
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
-			this.trackCostFromEvent(session, event);
+			if (!restoring) this.trackCostFromEvent(session, event);
 		});
 
 		session.unsubscribe = unsub;
@@ -512,6 +516,7 @@ export class SessionManager {
 			{ type: "switch_session", sessionPath: ps.agentSessionFile },
 			15_000,
 		);
+		restoring = false;
 		if (!switchResp.success) {
 			await rpcClient.stop();
 			throw new Error(`switch_session failed: ${switchResp.error}`);
@@ -1022,13 +1027,14 @@ export class SessionManager {
 		bridgeOptions.env = { BOBBIT_SESSION_ID: id };
 
 		const rpcClient = new RpcBridge(bridgeOptions);
+		let switchingSession = true;
 		const unsub = rpcClient.onEvent((event: any) => {
 			session.lastActivity = Date.now();
 			this.store.update(id, { lastActivity: session.lastActivity });
 			this.handleAgentLifecycle(session, event);
 			session.eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
-			this.trackCostFromEvent(session, event);
+			if (!switchingSession) this.trackCostFromEvent(session, event);
 		});
 
 		await rpcClient.start();
@@ -1043,6 +1049,7 @@ export class SessionManager {
 				console.error(`[session-manager] switch_session failed after role assignment: ${switchResp.error}`);
 			}
 		}
+		switchingSession = false;
 
 		// Swap in the new bridge and update metadata
 		session.rpcClient = rpcClient;
@@ -1258,6 +1265,7 @@ export class SessionManager {
 			if (this.systemPromptPath) bridgeOptions.systemPromptPath = this.systemPromptPath;
 
 			const rpcClient = new RpcBridge(bridgeOptions);
+			let switchingSession = true;
 			const unsub = rpcClient.onEvent((event: any) => {
 				session.lastActivity = Date.now();
 				this.store.update(id, { lastActivity: session.lastActivity });
@@ -1266,7 +1274,7 @@ export class SessionManager {
 
 				session.eventBuffer.push(event);
 				broadcast(session.clients, { type: "event", data: event });
-				this.trackCostFromEvent(session, event);
+				if (!switchingSession) this.trackCostFromEvent(session, event);
 			});
 
 			await rpcClient.start();
@@ -1281,6 +1289,7 @@ export class SessionManager {
 					console.error(`[session-manager] switch_session failed after force abort: ${switchResp.error}`);
 				}
 			}
+			switchingSession = false;
 
 			// Swap in the new bridge
 			session.rpcClient = rpcClient;
