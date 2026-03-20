@@ -670,10 +670,39 @@ document.addEventListener("click", () => {
 // RENDER: METADATA ROWS
 // ============================================================================
 
+function formatCost(cost: number): string {
+	if (cost < 0.01) return "<$0.01";
+	if (cost < 1) return `$${cost.toFixed(2)}`;
+	return `$${cost.toFixed(2)}`;
+}
+
+function formatTokens(n: number): string {
+	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+	if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+	return String(n);
+}
+
 function renderMetaRows(goal: Goal): TemplateResult {
 	const isTeamGoal = !!goal.team;
 	const worktreePath = goal.worktreePath || "";
 	const branch = goal.branch || "";
+
+	// Derive git status display
+	const gs = gitStatus;
+	let gitMergeTag: TemplateResult | typeof nothing = nothing;
+	if (gs) {
+		if (gs.mergedIntoPrimary) {
+			gitMergeTag = html`<span class="meta-tag merge-merged">Merged into ${gs.primaryBranch}</span>`;
+		} else if (gs.aheadOfPrimary > 0 && gs.behindPrimary > 0) {
+			gitMergeTag = html`<span class="meta-tag merge-diverged">\u2191${gs.aheadOfPrimary} \u2193${gs.behindPrimary} vs ${gs.primaryBranch}</span>`;
+		} else if (gs.aheadOfPrimary > 0) {
+			gitMergeTag = html`<span class="meta-tag merge-ahead">\u2191${gs.aheadOfPrimary} ahead of ${gs.primaryBranch}</span>`;
+		} else if (gs.behindPrimary > 0) {
+			gitMergeTag = html`<span class="meta-tag merge-behind">\u2193${gs.behindPrimary} behind ${gs.primaryBranch}</span>`;
+		} else {
+			gitMergeTag = html`<span class="meta-tag merge-clean">Up to date with ${gs.primaryBranch}</span>`;
+		}
+	}
 
 	return html`
 		<div class="meta-rows">
@@ -682,15 +711,16 @@ function renderMetaRows(goal: Goal): TemplateResult {
 					${svgTeam}
 					<span class="meta-tag ${isTeamGoal ? "team-on" : "solo"}">${isTeamGoal ? "Team Mode" : "Solo Mode"}</span>
 				</div>
-				${branch ? html`
+				${goalCost && goalCost.totalCost > 0 ? html`
 					<span class="meta-sep">\u00B7</span>
-					<div class="meta-item">
-						${svgMerge}
-						<span class="meta-tag merge-clean">On branch</span>
+					<div class="meta-item" title="Input: ${formatTokens(goalCost.inputTokens)} | Output: ${formatTokens(goalCost.outputTokens)} | Cache read: ${formatTokens(goalCost.cacheReadTokens)} | Cache write: ${formatTokens(goalCost.cacheWriteTokens)}">
+						${svgDollar}
+						<span class="meta-tag cost-tag">${formatCost(goalCost.totalCost)}</span>
+						<span class="meta-label">${formatTokens(goalCost.inputTokens + goalCost.outputTokens)} tokens</span>
 					</div>
 				` : nothing}
 			</div>
-			${branch || worktreePath ? html`
+			${branch || worktreePath || gs ? html`
 				<div class="meta-row">
 					${branch ? html`
 						<div class="meta-item">
@@ -699,8 +729,15 @@ function renderMetaRows(goal: Goal): TemplateResult {
 							<span class="meta-value mono">${branch}</span>
 						</div>
 					` : nothing}
-					${branch && worktreePath ? html`<span class="meta-sep">\u00B7</span>` : nothing}
+					${gitMergeTag !== nothing ? html`
+						${branch ? html`<span class="meta-sep">\u00B7</span>` : nothing}
+						<div class="meta-item">
+							${svgMerge}
+							${gitMergeTag}
+						</div>
+					` : nothing}
 					${worktreePath ? html`
+						${branch || gitMergeTag !== nothing ? html`<span class="meta-sep">\u00B7</span>` : nothing}
 						<div class="meta-item">
 							${svgFolder}
 							<span class="meta-label">worktree</span>
