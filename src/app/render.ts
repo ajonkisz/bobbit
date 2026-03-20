@@ -491,72 +491,114 @@ function rolePreviewPanel() {
 // PREVIEW SWIPE (mobile)
 // ============================================================================
 
-/** Attach swipe gesture to the preview slider track.
- *  Drags the track in real-time during touchmove, snaps on release. */
+/** Core swipe logic shared between #app handler (chat side) and overlay (iframe side). */
+let _swipeStartX = 0;
+let _swipeStartY = 0;
+let _swipeTracking = false;
+let _swipeLocked = false;
+
+function swipeStart(x: number, y: number): void {
+	_swipeStartX = x;
+	_swipeStartY = y;
+	_swipeTracking = false;
+	_swipeLocked = false;
+	const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+	if (track) track.style.transition = "none";
+}
+
+function swipeMove(x: number, y: number): void {
+	const dx = x - _swipeStartX;
+	const dy = y - _swipeStartY;
+	if (!_swipeLocked && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+		_swipeLocked = true;
+		_swipeTracking = Math.abs(dx) > Math.abs(dy);
+	}
+	if (!_swipeTracking) return;
+	const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+	if (!track) return;
+	const basePercent = state.previewPanelTab === "chat" ? 0 : -50;
+	const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
+	track.style.transform = `translateX(${Math.max(-50, Math.min(0, basePercent + dragPercent))}%)`;
+}
+
+function swipeEnd(x: number): void {
+	const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+	if (!track) return;
+	track.style.transition = "transform 0.3s ease-out";
+	if (!_swipeTracking) return;
+	const dx = x - _swipeStartX;
+	const threshold = track.parentElement!.clientWidth * 0.2;
+	if (dx < -threshold && state.previewPanelTab === "chat") state.previewPanelTab = "preview";
+	else if (dx > threshold && state.previewPanelTab === "preview") state.previewPanelTab = "chat";
+	track.style.transform = `translateX(${state.previewPanelTab === "chat" ? 0 : -50}%)`;
+	renderApp();
+}
+
+/** Attach swipe handlers: #app for chat-side swipes, programmatic overlay for iframe-side. */
 function setupPreviewSwipe(): void {
 	const el = document.getElementById("app");
 	if (!el || (el as any).__swipeAttached) return;
 	(el as any).__swipeAttached = true;
 
-	let startX = 0;
-	let startY = 0;
-	let tracking = false;
-	let directionLocked = false;
-
+	// Chat-side swipes bubble to #app naturally
 	el.addEventListener("touchstart", (e: TouchEvent) => {
 		if (!state.isPreviewSession) return;
-		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-		if (!track) return;
-		startX = e.touches[0].clientX;
-		startY = e.touches[0].clientY;
-		tracking = false;
-		directionLocked = false;
-		// Remove transition during drag for immediate response
-		track.style.transition = "none";
+		swipeStart(e.touches[0].clientX, e.touches[0].clientY);
 	}, { passive: true });
-
 	el.addEventListener("touchmove", (e: TouchEvent) => {
 		if (!state.isPreviewSession) return;
-		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-		if (!track) return;
-		const dx = e.touches[0].clientX - startX;
-		const dy = e.touches[0].clientY - startY;
-
-		// Lock direction on first significant move
-		if (!directionLocked && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-			directionLocked = true;
-			tracking = Math.abs(dx) > Math.abs(dy);
-		}
-		if (!tracking) return;
-
-		// Base offset: 0% for chat, -50% for preview (of track width = 2x viewport)
-		const basePercent = state.previewPanelTab === "chat" ? 0 : -50;
-		const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
-		const clamped = Math.max(-50, Math.min(0, basePercent + dragPercent));
-		track.style.transform = `translateX(${clamped}%)`;
+		swipeMove(e.touches[0].clientX, e.touches[0].clientY);
 	}, { passive: true });
-
 	el.addEventListener("touchend", (e: TouchEvent) => {
-		if (!state.isPreviewSession || !directionLocked) return;
-		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-		if (!track) return;
-		// Restore transition for snap animation
-		track.style.transition = "transform 0.3s ease-out";
-
-		if (!tracking) return;
-		const dx = e.changedTouches[0].clientX - startX;
-		const threshold = track.parentElement!.clientWidth * 0.2; // 20% of viewport width
-
-		if (dx < -threshold && state.previewPanelTab === "chat") {
-			state.previewPanelTab = "preview";
-		} else if (dx > threshold && state.previewPanelTab === "preview") {
-			state.previewPanelTab = "chat";
-		}
-		// Snap to final position
-		const finalPercent = state.previewPanelTab === "chat" ? 0 : -50;
-		track.style.transform = `translateX(${finalPercent}%)`;
-		renderApp();
+		if (!state.isPreviewSession || !_swipeLocked) return;
+		swipeEnd(e.changedTouches[0].clientX);
 	}, { passive: true });
+}
+
+/** Ensure a transparent overlay exists on top of the preview iframe to capture touches.
+ *  Called after each render. */
+function ensurePreviewOverlay(): void {
+	if (!state.isPreviewSession || isDesktop()) return;
+	const wrap = document.querySelector(".preview-iframe-wrap") as HTMLElement | null;
+	if (!wrap) return;
+	if (wrap.querySelector(".preview-touch-overlay")) return;
+
+	const overlay = document.createElement("div");
+	overlay.className = "preview-touch-overlay";
+	overlay.style.cssText = "position:absolute;inset:0;z-index:1;";
+
+	let locked = "";
+
+	overlay.addEventListener("touchstart", (e: TouchEvent) => {
+		locked = "";
+		overlay.style.pointerEvents = "auto";
+		swipeStart(e.touches[0].clientX, e.touches[0].clientY);
+	}, { passive: true });
+
+	overlay.addEventListener("touchmove", (e: TouchEvent) => {
+		const dx = e.touches[0].clientX - _swipeStartX;
+		const dy = e.touches[0].clientY - _swipeStartY;
+		if (locked === "" && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+			locked = Math.abs(dy) > Math.abs(dx) ? "vertical" : "horizontal";
+			if (locked === "vertical") {
+				overlay.style.pointerEvents = "none";
+				return;
+			}
+		}
+		if (locked === "horizontal") {
+			swipeMove(e.touches[0].clientX, e.touches[0].clientY);
+		}
+	}, { passive: true });
+
+	overlay.addEventListener("touchend", (e: TouchEvent) => {
+		overlay.style.pointerEvents = "auto";
+		if (locked === "horizontal") {
+			swipeEnd(e.changedTouches[0].clientX);
+		}
+		locked = "";
+	}, { passive: true });
+
+	wrap.appendChild(overlay);
 }
 
 // ============================================================================
@@ -795,66 +837,13 @@ export function doRenderApp(): void {
 				<div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
 					<span class="text-xs font-medium text-muted-foreground">Live Preview</span>
 				</div>
-				<div style="position:relative;flex:1;min-height:0;">
+				<div class="preview-iframe-wrap" style="position:relative;flex:1;min-height:0;">
 					<iframe
 						class="w-full border-0"
 						style="position:absolute;inset:0;height:100%;"
 						sandbox="allow-scripts allow-same-origin"
 						.srcdoc=${state.previewPanelHtml}
 					></iframe>
-					<div class="preview-touch-overlay"
-						style="position:absolute;inset:0;z-index:1;"
-						@touchstart=${(e: TouchEvent) => {
-							const overlay = e.currentTarget as HTMLElement;
-							overlay.dataset.startX = String(e.touches[0].clientX);
-							overlay.dataset.startY = String(e.touches[0].clientY);
-							overlay.dataset.locked = "";
-							overlay.style.pointerEvents = "auto";
-						}}
-						@touchmove=${(e: TouchEvent) => {
-							const overlay = e.currentTarget as HTMLElement;
-							const sx = Number(overlay.dataset.startX);
-							const sy = Number(overlay.dataset.startY);
-							const dx = e.touches[0].clientX - sx;
-							const dy = e.touches[0].clientY - sy;
-							if (overlay.dataset.locked === "") {
-								if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-									if (Math.abs(dy) > Math.abs(dx)) {
-										overlay.style.pointerEvents = "none";
-										overlay.dataset.locked = "vertical";
-									} else {
-										overlay.dataset.locked = "horizontal";
-									}
-								}
-							}
-							if (overlay.dataset.locked === "horizontal") {
-								const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-								if (track) {
-									track.style.transition = "none";
-									const basePercent = state.previewPanelTab === "chat" ? 0 : -50;
-									const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
-									track.style.transform = `translateX(${Math.max(-50, Math.min(0, basePercent + dragPercent))}%)`;
-								}
-							}
-						}}
-						@touchend=${(e: TouchEvent) => {
-							const overlay = e.currentTarget as HTMLElement;
-							overlay.style.pointerEvents = "auto";
-							if (overlay.dataset.locked !== "horizontal") return;
-							const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-							if (track) track.style.transition = "transform 0.3s ease-out";
-							const dx = e.changedTouches[0].clientX - Number(overlay.dataset.startX);
-							const threshold = (track?.parentElement?.clientWidth ?? 300) * 0.2;
-							if (dx > threshold && state.previewPanelTab === "preview") {
-								state.previewPanelTab = "chat";
-							} else if (dx < -threshold && state.previewPanelTab === "chat") {
-								state.previewPanelTab = "preview";
-							}
-							const finalPercent = state.previewPanelTab === "chat" ? 0 : -50;
-							if (track) track.style.transform = `translateX(${finalPercent}%)`;
-							renderApp();
-						}}
-					></div>
 				</div>
 			</div>
 		`;
@@ -999,6 +988,7 @@ export function doRenderApp(): void {
 		`, app);
 		ensureMobileScrollTracking();
 		setupPreviewSwipe();
+		ensurePreviewOverlay();
 		requestAnimationFrame(() => {
 			const headerEl = document.getElementById("app-header");
 			if (headerEl) {
