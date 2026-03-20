@@ -134,6 +134,32 @@ async function handleHashChange(): Promise<void> {
 			await loadToolPageData();
 			navigateToToolEdit(route.toolName);
 			await refreshSessions();
+		} else if (route.view === "artifact-specs") {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadArtifactSpecPageData } = await import("./artifact-spec-page.js");
+			loadArtifactSpecPageData();
+			renderApp();
+			await refreshSessions();
+		} else if (route.view === "artifact-spec-edit" && route.artifactSpecId) {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadArtifactSpecPageData, navigateToArtifactSpecEdit } = await import("./artifact-spec-page.js");
+			await loadArtifactSpecPageData();
+			navigateToArtifactSpecEdit(route.artifactSpecId);
+			await refreshSessions();
 		} else {
 			clearDashboardState();
 			if (state.remoteAgent) {

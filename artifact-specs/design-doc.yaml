@@ -1,0 +1,16 @@
+id: design-doc
+name: Design Document
+description: Architecture decisions, file changes, component breakdown, risks
+kind: analysis
+format: markdown
+mustHave:
+  - Overview section
+  - Architecture decisions with rationale
+  - File changes list
+  - Risk assessment
+shouldHave:
+  - Diagrams or data flow descriptions
+  - Task breakdown
+mustNotHave: []
+createdAt: 1774047381110
+updatedAt: 1774047381110

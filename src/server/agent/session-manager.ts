@@ -13,6 +13,7 @@ import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
 import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
 import { TOOL_ASSISTANT_PROMPT } from "./tool-assistant.js";
+import { ARTIFACT_SPEC_ASSISTANT_PROMPT } from "./artifact-spec-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 import { CostTracker } from "./cost-tracker.js";
@@ -45,6 +46,8 @@ export interface SessionInfo {
 	roleAssistant?: boolean;
 	/** True if this is a tool-management assistant session */
 	toolAssistant?: boolean;
+	/** True if this is an artifact-spec-creation assistant session */
+	artifactSpecAssistant?: boolean;
 	/** Whether this session has a live HTML preview panel */
 	preview?: boolean;
 	/** If this is a delegate session, the parent session ID */
@@ -505,6 +508,7 @@ export class SessionManager {
 			goalAssistant: ps.goalAssistant,
 			roleAssistant: ps.roleAssistant,
 			toolAssistant: ps.toolAssistant,
+			artifactSpecAssistant: ps.artifactSpecAssistant,
 			role: ps.role,
 			teamGoalId: ps.teamGoalId,
 			worktreePath: ps.worktreePath,
@@ -561,7 +565,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; toolAssistant?: boolean; allowedTools?: string[] }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; toolAssistant?: boolean; artifactSpecAssistant?: boolean; allowedTools?: string[] }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -576,7 +580,7 @@ export class SessionManager {
 		// Auto-load goal tools extension for any goal-associated session
 		// (unless it's a goal/role assistant, or already has an extension —
 		// team-lead-tools.ts imports goal-tools internally, so no double-load)
-		if (goalId && !goalAssistant && !opts?.roleAssistant && !opts?.toolAssistant) {
+		if (goalId && !goalAssistant && !opts?.roleAssistant && !opts?.toolAssistant && !opts?.artifactSpecAssistant) {
 			const alreadyHasExtension = bridgeOptions.args?.includes("--extension");
 			if (!alreadyHasExtension) {
 				bridgeOptions.args = bridgeOptions.args || [];
@@ -613,6 +617,16 @@ export class SessionManager {
 				cwd,
 				goalSpec: TOOL_ASSISTANT_PROMPT,
 				goalTitle: "Tool Management Assistant",
+				goalState: "active",
+			});
+			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		} else if (opts?.artifactSpecAssistant) {
+			// Artifact spec assistant sessions get a special system prompt
+			const promptPath = assembleSystemPrompt(id, {
+				baseSystemPromptPath: undefined,
+				cwd,
+				goalSpec: ARTIFACT_SPEC_ASSISTANT_PROMPT,
+				goalTitle: "Artifact Spec Assistant",
 				goalState: "active",
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
@@ -671,7 +685,7 @@ export class SessionManager {
 		const now = Date.now();
 		const session: SessionInfo = {
 			id,
-			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : opts?.toolAssistant ? "Tool Assistant" : "New session",
+			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : opts?.toolAssistant ? "Tool Assistant" : opts?.artifactSpecAssistant ? "Artifact Spec Assistant" : "New session",
 			cwd,
 			status: "starting",
 			createdAt: now,
@@ -681,11 +695,12 @@ export class SessionManager {
 			eventBuffer,
 			unsubscribe: () => {},
 			isCompacting: false,
-			titleGenerated: (goalAssistant || opts?.roleAssistant || opts?.toolAssistant) ? true : false,
+			titleGenerated: (goalAssistant || opts?.roleAssistant || opts?.toolAssistant || opts?.artifactSpecAssistant) ? true : false,
 			goalId,
 			goalAssistant,
 			roleAssistant: opts?.roleAssistant,
 			toolAssistant: opts?.toolAssistant,
+			artifactSpecAssistant: opts?.artifactSpecAssistant,
 			taskId: opts?.taskId,
 			allowedTools: opts?.allowedTools,
 			promptQueue: new PromptQueue(),
@@ -922,6 +937,7 @@ export class SessionManager {
 			goalAssistant: session.goalAssistant,
 			roleAssistant: session.roleAssistant,
 			toolAssistant: session.toolAssistant,
+			artifactSpecAssistant: session.artifactSpecAssistant,
 			role: session.role,
 			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
@@ -967,6 +983,7 @@ export class SessionManager {
 			goalAssistant: s.goalAssistant,
 			roleAssistant: s.roleAssistant,
 			toolAssistant: s.toolAssistant,
+			artifactSpecAssistant: s.artifactSpecAssistant,
 			delegateOf: s.delegateOf,
 			role: s.role,
 			teamGoalId: s.teamGoalId,

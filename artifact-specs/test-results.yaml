@@ -1,0 +1,15 @@
+id: test-results
+name: Test Results
+description: Test execution results and pass/fail summary
+kind: verification
+format: markdown
+mustHave:
+  - Test command and output
+  - Pass/fail summary
+  - Failure details if any
+shouldHave: []
+mustNotHave: []
+requires:
+  - implementation
+createdAt: 1774047381110
+updatedAt: 1774047381110

@@ -5,7 +5,7 @@ import type { SessionManager } from "../agent/session-manager.js";
 import type { RateLimiter } from "../auth/rate-limit.js";
 import { validateToken } from "../auth/token.js";
 import type { ClientMessage, ServerMessage } from "./protocol.js";
-import type { TaskType, TaskState } from "../agent/task-store.js";
+import type { TaskState } from "../agent/task-store.js";
 import { getSkill } from "../skills/registry.js";
 import { runSkillAgent, createSkillRequest } from "../skills/sub-agent.js";
 
@@ -224,7 +224,7 @@ export function handleWebSocketConnection(
 					const task = sessionManager.taskManager.createTask(
 						msg.goalId,
 						msg.title,
-						msg.taskType as TaskType,
+						msg.taskType,
 						{ parentTaskId: msg.parentTaskId, spec: msg.spec, dependsOn: msg.dependsOn },
 					);
 					broadcast(session.clients, { type: "task_changed", task });

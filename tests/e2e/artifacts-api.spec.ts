@@ -121,46 +121,9 @@ test.describe("Goal Artifacts API", () => {
 	});
 });
 
-test.describe("Artifact Requirement Enforcement", () => {
-	test("blocks implementation task when design-doc is missing", async () => {
-		// Try to create an implementation task without a design-doc artifact
-		const resp = await apiFetch(`/api/goals/${goalId}/tasks`, {
-			method: "POST",
-			body: JSON.stringify({
-				title: "Implement feature X",
-				type: "implementation",
-				spec: "Build the thing",
-			}),
-		});
-		expect(resp.status).toBe(409);
-		const body = await resp.json();
-		expect(body.error).toBeTruthy();
-		expect(body.missingArtifacts).toBeTruthy();
-		expect(body.missingArtifacts.some((a: any) => a.type === "design-doc")).toBe(true);
-	});
-
-	test("allows implementation task after required artifacts exist", async () => {
-		// Both design-doc AND test-plan are required before implementation tasks
-		await apiFetch(`/api/goals/${goalId}/artifacts`, {
-			method: "POST",
-			body: JSON.stringify({
-				name: "design-doc",
-				type: "design-doc",
-				content: "# Design\nThe plan.",
-				producedBy: "test-session",
-			}),
-		});
-		await apiFetch(`/api/goals/${goalId}/artifacts`, {
-			method: "POST",
-			body: JSON.stringify({
-				name: "test-plan",
-				type: "test-plan",
-				content: "# Test Plan\nThe tests.",
-				producedBy: "test-session",
-			}),
-		});
-
-		// Now implementation task should succeed
+test.describe("Task creation — no artifact enforcement", () => {
+	test("allows any task type without artifact requirements", async () => {
+		// Task creation no longer enforces artifact requirements
 		const resp = await apiFetch(`/api/goals/${goalId}/tasks`, {
 			method: "POST",
 			body: JSON.stringify({
@@ -174,17 +137,14 @@ test.describe("Artifact Requirement Enforcement", () => {
 		expect(task.id).toBeTruthy();
 	});
 
-	test("allows non-implementation tasks without design-doc", async () => {
-		// A refactor task should not be blocked by missing design-doc
+	test("accepts any task type string", async () => {
 		const resp = await apiFetch(`/api/goals/${goalId}/tasks`, {
 			method: "POST",
 			body: JSON.stringify({
-				title: "Refactor something",
-				type: "refactor",
-				spec: "Clean up code",
+				title: "Custom type",
+				type: "my-custom-type",
 			}),
 		});
-		// Should succeed (refactor is not blocked by design-doc requirement)
 		expect(resp.status).toBe(201);
 	});
 });

@@ -2,20 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { piDir } from "../pi-dir.js";
 
-export type TaskType =
-	| "architecture"
-	| "design-review"
-	| "mock-generation"
-	| "tdd-tests"
-	| "implementation"
-	| "code-review"
-	| "security-review"
-	| "documentation"
-	| "testing"
-	| "bug-fix"
-	| "refactor"
-	| "custom";
-
 export type TaskState = "todo" | "in-progress" | "blocked" | "complete" | "skipped";
 
 export interface PersistedTask {
@@ -23,7 +9,7 @@ export interface PersistedTask {
 	goalId: string;
 	parentTaskId?: string;
 	title: string;
-	type: TaskType;
+	type: string;
 	state: TaskState;
 	assignedSessionId?: string;
 	spec?: string;

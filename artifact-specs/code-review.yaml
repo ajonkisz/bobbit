@@ -1,0 +1,15 @@
+id: code-review
+name: Code Review
+description: Expert evaluation of code changes against criteria
+kind: review
+format: markdown
+mustHave:
+  - File:line references
+  - Severity ratings
+  - Whether issues were fixed
+shouldHave: []
+mustNotHave: []
+requires:
+  - implementation
+createdAt: 1774047381110
+updatedAt: 1774047381110
