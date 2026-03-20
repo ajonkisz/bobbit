@@ -88,12 +88,42 @@
 }
 
 @keyframes bobbit-squish {
-	0%, 100% { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px); }
-	50% { transform: scale(1.6) scaleX(1.08) scaleY(0.65) translateY(5.5px); }
+	/* Start tall — anticipation crouch */
+	0%   { transform: scale(1.6) scaleX(0.95) scaleY(1.05) translateY(-0.5px); }
+	/* SLAM 1 */
+	8%   { transform: scale(1.6) scaleX(1.15) scaleY(0.72) translateY(2px); }
+	/* Hold */
+	18%  { transform: scale(1.6) scaleX(1.1)  scaleY(0.78) translateY(1.5px); }
+	/* Partial recovery */
+	28%  { transform: scale(1.6) scaleX(1.03) scaleY(0.9)  translateY(0.5px); }
+	/* SLAM 2 — deeper */
+	38%  { transform: scale(1.6) scaleX(1.2)  scaleY(0.62) translateY(2.5px); }
+	/* Hold */
+	48%  { transform: scale(1.6) scaleX(1.15) scaleY(0.68) translateY(2px); }
+	/* Tiny recovery */
+	55%  { transform: scale(1.6) scaleX(1.08) scaleY(0.78) translateY(1px); }
+	/* SLAM 3 — deepest */
+	65%  { transform: scale(1.6) scaleX(1.3)  scaleY(0.52) translateY(3.5px); }
+	/* Wobble at max squash */
+	72%  { transform: scale(1.6) scaleX(1.33) scaleY(0.5)  translateY(3.5px); }
+	80%  { transform: scale(1.6) scaleX(1.28) scaleY(0.54) translateY(3px); }
+	/* Ease back up for loop */
+	92%  { transform: scale(1.6) scaleX(1.08) scaleY(0.85) translateY(1px); }
+	100% { transform: scale(1.6) scaleX(1)    scaleY(1)    translateY(0); }
 }
 @keyframes bobbit-squish-crown {
-	0%, 100% { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px) translateX(-0.5px); }
-	50% { transform: scale(1.6) scaleX(1.08) scaleY(0.65) translateY(5.5px) translateX(-0.5px); }
+	0%   { transform: scale(1.6) scaleX(0.95) scaleY(1.05) translateY(-0.5px) translateX(-0.5px); }
+	8%   { transform: scale(1.6) scaleX(1.15) scaleY(0.72) translateY(2px) translateX(-0.5px); }
+	18%  { transform: scale(1.6) scaleX(1.1)  scaleY(0.78) translateY(1.5px) translateX(-0.5px); }
+	28%  { transform: scale(1.6) scaleX(1.03) scaleY(0.9)  translateY(0.5px) translateX(-0.5px); }
+	38%  { transform: scale(1.6) scaleX(1.2)  scaleY(0.62) translateY(2.5px) translateX(-0.5px); }
+	48%  { transform: scale(1.6) scaleX(1.15) scaleY(0.68) translateY(2px) translateX(-0.5px); }
+	55%  { transform: scale(1.6) scaleX(1.08) scaleY(0.78) translateY(1px) translateX(-0.5px); }
+	65%  { transform: scale(1.6) scaleX(1.3)  scaleY(0.52) translateY(3.5px) translateX(-0.5px); }
+	72%  { transform: scale(1.6) scaleX(1.33) scaleY(0.5)  translateY(3.5px) translateX(-0.5px); }
+	80%  { transform: scale(1.6) scaleX(1.28) scaleY(0.54) translateY(3px) translateX(-0.5px); }
+	92%  { transform: scale(1.6) scaleX(1.08) scaleY(0.85) translateY(1px) translateX(-0.5px); }
+	100% { transform: scale(1.6) scaleX(1)    scaleY(1)    translateY(0) translateX(-0.5px); }
 }
 
 /* ============================================================================
