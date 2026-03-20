@@ -457,21 +457,23 @@ function renderEditView(): TemplateResult {
 
 				<!-- Tools section -->
 				<div class="roles-edit-section">
-					<h2 class="roles-section-title">Tool Access</h2>
-					<div class="roles-tools-mode">
-						<button
-							class="roles-tools-mode-btn ${!editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
-							@click=${() => setRestricted(false)}
-						>All tools</button>
-						<button
-							class="roles-tools-mode-btn ${editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
-							@click=${() => setRestricted(true)}
-						>Restricted</button>
+					<div class="roles-tools-top">
+						<h2 class="roles-section-title">Tool Access</h2>
+						<div class="roles-tools-mode">
+							<button
+								class="roles-tools-mode-btn ${!editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
+								@click=${() => setRestricted(false)}
+							>All tools</button>
+							<button
+								class="roles-tools-mode-btn ${editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
+								@click=${() => setRestricted(true)}
+							>Restricted</button>
+						</div>
 					</div>
 					${!editRestrictTools
 						? html`<p class="roles-tools-note">This role can use every available tool.</p>`
 						: html`
-							<p class="roles-tools-note">${editTools.length} of ${availableTools.length} tools enabled.</p>
+							<p class="roles-tools-note">${editTools.length} of ${availableTools.length} tools enabled</p>
 							${renderToolGroups()}
 						`}
 				</div>

@@ -281,6 +281,14 @@
 }
 
 /* Tools */
+/* Tool access — header row with title + mode toggle */
+.roles-tools-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
 /* Tool access mode toggle */
 .roles-tools-mode {
 	display: flex;
@@ -289,7 +297,6 @@
 	border-radius: 6px;
 	overflow: hidden;
 	width: fit-content;
-	margin-bottom: 8px;
 }
 
 .roles-tools-mode-btn {
@@ -319,50 +326,63 @@
 .roles-tools-note {
 	font-size: 11px;
 	color: var(--muted-foreground);
-	margin: 0 0 10px 0;
+	margin: 0;
 	line-height: 1.4;
 }
 
-/* Tool groups */
+/* Tool groups container */
 .roles-tool-groups {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 2px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	overflow: hidden;
 }
 
+/* Each group: header row + chip tray */
+.roles-tool-group {
+	/* groups stack flush inside the rounded container */
+}
+
+.roles-tool-group + .roles-tool-group {
+	border-top: 1px solid var(--border);
+}
+
+/* Group header — looks like a row you can click */
 .roles-tool-group-header {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
 	width: 100%;
-	padding: 0;
-	margin-bottom: 4px;
-	font-size: 11px;
+	padding: 7px 10px;
+	font-size: 12px;
 	font-weight: 600;
-	color: var(--muted-foreground);
-	background: none;
+	color: var(--foreground);
+	background: color-mix(in oklch, var(--secondary) 40%, transparent);
 	border: none;
 	cursor: pointer;
 	text-align: left;
-	transition: color 150ms;
+	transition: background 120ms;
 }
 
 .roles-tool-group-header:hover {
-	color: var(--foreground);
+	background: var(--secondary);
 }
 
+/* Checkbox in group header */
 .roles-tool-group-check {
-	width: 14px;
-	height: 14px;
+	width: 15px;
+	height: 15px;
 	border-radius: 3px;
-	border: 1.5px solid var(--border);
+	border: 1.5px solid color-mix(in oklch, var(--muted-foreground) 40%, transparent);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 9px;
+	font-size: 10px;
 	flex-shrink: 0;
 	color: transparent;
-	transition: all 150ms;
+	transition: all 120ms;
 }
 
 .roles-tool-group-check.checked {
@@ -372,8 +392,8 @@
 }
 
 .roles-tool-group-check.partial {
-	background: color-mix(in oklch, #22c55e 30%, transparent);
-	border-color: #22c55e;
+	background: color-mix(in oklch, #22c55e 25%, transparent);
+	border-color: color-mix(in oklch, #22c55e 60%, transparent);
 	color: #22c55e;
 }
 
@@ -388,14 +408,17 @@
 	font-variant-numeric: tabular-nums;
 }
 
+/* Chip tray inside group */
 .roles-tool-group-items {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px;
+	gap: 5px;
+	padding: 6px 10px 8px;
 }
 
+/* Individual tool chip */
 .roles-tool-chip {
-	padding: 3px 8px;
+	padding: 3px 9px;
 	border-radius: 5px;
 	font-size: 11px;
 	font-weight: 500;
@@ -404,13 +427,13 @@
 	background: transparent;
 	color: var(--muted-foreground);
 	cursor: pointer;
-	transition: all 150ms;
+	transition: all 120ms;
 	white-space: nowrap;
 }
 
 .roles-tool-chip:hover {
 	border-color: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
-	background: color-mix(in oklch, var(--secondary) 50%, transparent);
+	background: color-mix(in oklch, var(--secondary) 60%, transparent);
 }
 
 .roles-tool-chip--active {
