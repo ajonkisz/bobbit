@@ -764,13 +764,18 @@ html {
 	image-rendering: pixelated;
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
-		13px 0 0 #000, 14px 0 0 #000,
-		12px 1px 0 #000, 13px 1px 0 #fde047, 14px 1px 0 #fbbf24, 15px 1px 0 #000,
-		11px 2px 0 #000, 12px 2px 0 #fde047, 13px 2px 0 #fbbf24, 14px 2px 0 #000,
-		10px 3px 0 #000, 11px 3px 0 #fde047, 12px 3px 0 #fbbf24, 13px 3px 0 #000,
-		9px 4px 0 #000, 10px 4px 0 #fde047, 11px 4px 0 #000,
-		8px 5px 0 #000, 9px 5px 0 #f4a460, 10px 5px 0 #000,
-		7px 6px 0 #000, 8px 6px 0 #2d2d2d, 9px 6px 0 #000;
+		/* Eraser (pink) */
+		14px 0 0 #000, 15px 0 0 #000,
+		13px 1px 0 #000, 14px 1px 0 #f9a8d4, 15px 1px 0 #ec4899, 16px 1px 0 #000,
+		/* Ferrule (silver band) */
+		12px 2px 0 #000, 13px 2px 0 #9ca3af, 14px 2px 0 #d1d5db, 15px 2px 0 #000,
+		/* Yellow body */
+		11px 3px 0 #000, 12px 3px 0 #fde047, 13px 3px 0 #fbbf24, 14px 3px 0 #000,
+		10px 4px 0 #000, 11px 4px 0 #fde047, 12px 4px 0 #fbbf24, 13px 4px 0 #000,
+		/* Wood */
+		9px 5px 0 #000, 10px 5px 0 #f4a460, 11px 5px 0 #cd853f, 12px 5px 0 #000,
+		/* Graphite tip */
+		8px 6px 0 #000, 9px 6px 0 #4b5563, 10px 6px 0 #000;
 	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
 }
 .bobbit-blob--idle .bobbit-blob__pencil {
