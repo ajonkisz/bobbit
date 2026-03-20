@@ -12,12 +12,12 @@ export interface ToolInfo {
 /** All known agent tools with descriptions and groupings */
 const AVAILABLE_TOOLS: ToolInfo[] = [
 	// File system
-	{ name: "Read", description: "Read file contents (text or images)", group: "File System" },
-	{ name: "Write", description: "Create or overwrite a file", group: "File System" },
-	{ name: "Edit", description: "Replace exact text in a file", group: "File System" },
+	{ name: "read", description: "Read file contents (text or images)", group: "File System" },
+	{ name: "write", description: "Create or overwrite a file", group: "File System" },
+	{ name: "edit", description: "Replace exact text in a file", group: "File System" },
 
 	// Shell
-	{ name: "Bash", description: "Execute shell commands", group: "Shell" },
+	{ name: "bash", description: "Execute shell commands", group: "Shell" },
 
 	// Web
 	{ name: "web_search", description: "Search the web via DuckDuckGo", group: "Web" },

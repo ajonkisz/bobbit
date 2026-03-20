@@ -2,12 +2,14 @@ name: coder
 label: Coder
 accessory: bandana
 allowedTools:
-  - Read
-  - Write
-  - Edit
-  - Bash
+  - read
+  - write
+  - edit
+  - bash
   - web_search
   - web_fetch
+  - artifact_list
+  - artifact_get
 createdAt: 1773875507369
 updatedAt: 1773932297029
 promptTemplate: |
