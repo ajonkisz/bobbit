@@ -395,14 +395,17 @@ const PHASES: { phase: GoalPhase; label: string }[] = [
 	{ phase: "complete", label: "Complete" },
 ];
 
-function derivePhase(artifactList: GoalArtifact[]): GoalPhase {
+function derivePhase(artifactList: GoalArtifact[], taskList: Task[]): GoalPhase {
 	const types = new Set(artifactList.map((a) => a.type));
 	const hasDesign = types.has("design-doc");
 	const hasTestPlan = types.has("test-plan");
 	const hasReview = types.has("review-findings");
+	const hasSummary = types.has("summary-report");
 
-	if (hasDesign && hasTestPlan && hasReview) return "complete";
-	if (hasReview) return "review";
+	if (hasDesign && hasTestPlan && hasReview && hasSummary) return "complete";
+
+	const allTasksDone = taskList.length > 0 && taskList.every(t => t.state === "complete" || t.state === "skipped");
+	if (hasReview || (allTasksDone && taskList.length > 0)) return "review";
 	if (hasDesign && hasTestPlan) return "implementation";
 	if (hasDesign) return "design";
 	return "planning";
@@ -418,6 +421,7 @@ const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
 	"review-findings": "Review Findings",
 	"gap-analysis": "Gap Analysis",
 	"security-findings": "Security Findings",
+	"summary-report": "Summary Report",
 	"custom": "Custom",
 };
 
@@ -427,10 +431,11 @@ const ARTIFACT_TYPE_ICONS: Record<ArtifactType, string> = {
 	"review-findings": "\uD83D\uDD0D",
 	"gap-analysis": "\uD83D\uDCCA",
 	"security-findings": "\uD83D\uDD12",
+	"summary-report": "\uD83D\uDCDD",
 	"custom": "\uD83D\uDCCB",
 };
 
-const REQUIRED_ARTIFACT_TYPES: ArtifactType[] = ["design-doc", "test-plan", "review-findings"];
+const REQUIRED_ARTIFACT_TYPES: ArtifactType[] = ["design-doc", "test-plan", "review-findings", "summary-report"];
 
 interface ArtifactRequirementStatus {
 	type: ArtifactType;
@@ -780,7 +785,7 @@ function renderSummaryRow(taskList: Task[], agentList: TeamAgent[]): TemplateRes
 // ============================================================================
 
 function renderPhasePipeline(artifactList: GoalArtifact[]): TemplateResult {
-	const currentPhase = derivePhase(artifactList);
+	const currentPhase = derivePhase(artifactList, tasks);
 	const currentIdx = PHASES.findIndex((p) => p.phase === currentPhase);
 
 	return html`

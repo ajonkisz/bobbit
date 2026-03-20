@@ -9,6 +9,7 @@ export type ArtifactType =
 	| "review-findings"
 	| "gap-analysis"
 	| "security-findings"
+	| "summary-report"
 	| "custom";
 
 export interface GoalArtifact {

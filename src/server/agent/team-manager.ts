@@ -15,6 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Resolve the absolute path to the team-lead-tools extension (raw .ts, loaded by jiti). */
 const TEAM_LEAD_EXTENSION_PATH = path.resolve(__dirname, "../../../extensions/team-lead-tools.ts");
 import type { TaskManager } from "./task-manager.js";
+import type { GoalArtifactStore } from "./goal-artifact-store.js";
 
 
 export interface TeamAgent {
@@ -66,6 +67,8 @@ export interface TeamManagerConfig {
 	taskManager: TaskManager;
 	/** Role store for looking up role definitions (prompts, accessories, tools) */
 	roleStore?: RoleStore;
+	/** Goal artifact store for checking artifact requirements before team completion */
+	goalArtifactStore?: GoalArtifactStore;
 }
 
 export class TeamManager {
@@ -74,6 +77,11 @@ export class TeamManager {
 	private taskManager: TaskManager;
 	private teams = new Map<string, TeamEntry>();
 	private store: TeamStore;
+
+	/** Timers for the idle-nudge mechanism (goalId → timer). */
+	private idleNudgeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	/** Delay before nudging the idle team lead (ms). */
+	private static readonly IDLE_NUDGE_DELAY_MS = 30_000;
 
 	/** Reverse lookup: sessionId → goalId for quick dismissal. */
 	private sessionToGoal = new Map<string, string>();
@@ -251,6 +259,9 @@ export class TeamManager {
 			console.error("[team-manager] Failed to send team lead kickoff prompt:", err);
 		});
 
+		// Subscribe to team lead agent_end events for idle nudging
+		this.subscribeTeamLeadIdleNudge(goalId, session);
+
 		console.log(`[team-manager] Started team for goal "${goal.title}" — team lead: ${session.id}`);
 		return session;
 	}
@@ -421,6 +432,72 @@ export class TeamManager {
 	}
 
 	/**
+	 * Subscribe to the team lead's agent_end events.
+	 * When the lead finishes a turn, schedule an idle-nudge check.
+	 */
+	private subscribeTeamLeadIdleNudge(goalId: string, session: SessionInfo): void {
+		session.rpcClient.onEvent((event: any) => {
+			if (event.type !== "agent_end") return;
+			this.scheduleIdleNudge(goalId);
+		});
+	}
+
+	/**
+	 * Schedule an idle-nudge check after a delay.
+	 * If the team lead and all workers are idle when the timer fires,
+	 * and the goal is still incomplete, nudge the team lead to keep going.
+	 */
+	private scheduleIdleNudge(goalId: string): void {
+		// Clear any existing timer for this goal
+		const existing = this.idleNudgeTimers.get(goalId);
+		if (existing) clearTimeout(existing);
+
+		const timer = setTimeout(() => {
+			this.idleNudgeTimers.delete(goalId);
+			this.checkAndNudge(goalId).catch((err) => {
+				console.error(`[team-manager] Idle nudge failed for goal ${goalId}:`, err);
+			});
+		}, TeamManager.IDLE_NUDGE_DELAY_MS);
+
+		this.idleNudgeTimers.set(goalId, timer);
+	}
+
+	/**
+	 * Check if the team is fully idle with an incomplete goal, and nudge the lead.
+	 */
+	private async checkAndNudge(goalId: string): Promise<void> {
+		const entry = this.teams.get(goalId);
+		if (!entry?.teamLeadSessionId) return;
+
+		const goal = this.goalManager.getGoal(goalId);
+		if (!goal || goal.state === "complete") return;
+
+		const leadSession = this.sessionManager.getSession(entry.teamLeadSessionId);
+		if (!leadSession || leadSession.status === "terminated") return;
+		if (leadSession.status === "streaming") return; // lead is busy
+
+		// Check if any workers are busy
+		for (const agent of entry.agents) {
+			const workerSession = this.sessionManager.getSession(agent.sessionId);
+			if (workerSession && workerSession.status === "streaming") return; // worker is busy
+		}
+
+		// Everyone is idle, goal incomplete — nudge the team lead
+		const tasks = this.taskManager.getTasksForGoal(goalId);
+		const todo = tasks.filter(t => t.state === "todo" || t.state === "blocked").length;
+		const inProgress = tasks.filter(t => t.state === "in-progress").length;
+		const done = tasks.filter(t => t.state === "complete" || t.state === "skipped").length;
+
+		const message = `[AUTO-NUDGE] The entire team is idle but the goal is not complete. ` +
+			`Tasks: ${done} done, ${inProgress} in-progress, ${todo} todo/blocked (${tasks.length} total). ` +
+			`Review task_list and artifact_list, then take the next action to drive the goal to completion. ` +
+			`If all work is done, produce required artifacts and call team_complete.`;
+
+		this.sessionManager.enqueuePrompt(entry.teamLeadSessionId, message, { isSteered: true });
+		console.log(`[team-manager] Idle-nudged team lead for goal ${goalId}: ${done}/${tasks.length} tasks done`);
+	}
+
+	/**
 	 * Notify the team lead when a task transitions to a terminal state.
 	 * Called from the task transition REST endpoint so the team lead wakes up
 	 * even if the worker continues with another task without going idle.
@@ -529,6 +606,26 @@ export class TeamManager {
 		const entry = this.teams.get(goalId);
 		if (!entry) {
 			throw new Error(`No active team for goal: ${goalId}`);
+		}
+
+		// Check artifact requirements before allowing completion
+		const artifactStore = this.config.goalArtifactStore;
+		if (artifactStore) {
+			const artifacts = artifactStore.getByGoalId(goalId);
+			const artifactTypes = new Set(artifacts.map((a) => a.type));
+			const missing: string[] = [];
+			if (!artifactTypes.has("summary-report")) {
+				missing.push("summary-report");
+			}
+			if (!artifactTypes.has("review-findings")) {
+				missing.push("review-findings");
+			}
+			if (missing.length > 0) {
+				throw new Error(
+					`Cannot complete team for goal ${goalId}: missing required artifacts: ${missing.join(", ")}. ` +
+					`Create these artifacts via POST /api/goals/${goalId}/artifacts before completing the team.`
+				);
+			}
 		}
 
 		// Dismiss all role agents

@@ -163,6 +163,7 @@ async function initApp() {
 				}
 			} else if (route.view === "goal-dashboard" && route.goalId) {
 				state.goalDashboardId = route.goalId;
+				loadDashboardData(route.goalId);
 				renderApp();
 			} else if (route.view === "roles") {
 				const { loadRolePageData } = await import("./role-manager-page.js");

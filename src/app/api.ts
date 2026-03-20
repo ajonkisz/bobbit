@@ -292,7 +292,7 @@ export async function teardownTeam(goalId: string): Promise<boolean> {
 // GOAL ARTIFACT API
 // ============================================================================
 
-export type ArtifactType = "design-doc" | "test-plan" | "review-findings" | "gap-analysis" | "security-findings" | "custom";
+export type ArtifactType = "design-doc" | "test-plan" | "review-findings" | "gap-analysis" | "security-findings" | "summary-report" | "custom";
 
 export interface GoalArtifact {
 	id: string;
