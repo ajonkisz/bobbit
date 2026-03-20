@@ -1,10 +1,10 @@
 import { gatewayFetch } from "./api.js";
-import { state, renderApp } from "./state.js";
+import { state, renderApp, activeSessionId } from "./state.js";
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let lastMtime = 0;
 
-/** Start polling ~/.pi/preview.html for changes. */
+/** Start polling ~/.pi/preview-{sessionId}.html for changes. */
 export function startPreviewPolling(): void {
 	if (pollTimer) return;
 	lastMtime = 0;
@@ -27,7 +27,9 @@ async function pollNow(): Promise<void> {
 		return;
 	}
 	try {
-		const res = await gatewayFetch("/api/preview");
+		const sessionId = activeSessionId();
+		const qs = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
+		const res = await gatewayFetch(`/api/preview${qs}`);
 		if (!res.ok) return;
 		const data = await res.json();
 		if (data.mtime && data.mtime !== lastMtime && data.html) {
