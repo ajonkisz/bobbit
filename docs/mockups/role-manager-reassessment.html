@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Role Manager — UX Reassessment</title>
+<style>
+/* ========================================================================
+   DESIGN TOKENS (matching Bobbit dark theme)
+   ======================================================================== */
+:root {
+  --background: #0a0a0b;
+  --foreground: #e4e4e7;
+  --muted-foreground: #71717a;
+  --secondary: #1c1c1f;
+  --accent: #27272a;
+  --border: #27272a;
+  --ring: #3b82f6;
+  --primary: #3b82f6;
+  --destructive: #ef4444;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --green-active-bg: rgba(34, 197, 94, 0.12);
+  --green-active-fg: #22c55e;
+  --green-active-border: rgba(34, 197, 94, 0.35);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: #111;
+  color: var(--foreground);
+  line-height: 1.5;
+}
+
+/* ========================================================================
+   REPORT LAYOUT
+   ======================================================================== */
+.report { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+
+h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+.subtitle { font-size: 14px; color: var(--muted-foreground); margin-bottom: 40px; line-height: 1.6; }
+
+h2 {
+  font-size: 18px; font-weight: 600; margin: 48px 0 6px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  letter-spacing: -0.01em;
+}
+h2 .issue-num { color: var(--muted-foreground); font-weight: 400; margin-right: 6px; }
+
+h3 { font-size: 14px; font-weight: 600; margin: 20px 0 8px; }
+
+p, li { font-size: 13px; color: #a1a1aa; line-height: 1.7; }
+ul { padding-left: 20px; margin: 8px 0; }
+li { margin-bottom: 4px; }
+
+.severity {
+  display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 2px 8px; border-radius: 4px; margin-left: 8px;
+  vertical-align: middle;
+}
+.severity.high { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.severity.medium { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.severity.low { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.severity.nit { background: rgba(113, 113, 122, 0.15); color: #71717a; }
+
+.tag {
+  display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px;
+  background: var(--secondary); color: var(--muted-foreground); margin-left: 4px;
+  font-family: var(--font-mono); vertical-align: middle;
+}
+
+code {
+  font-family: var(--font-mono); font-size: 12px;
+  background: var(--secondary); padding: 1px 5px; border-radius: 3px;
+  color: #d4d4d8;
+}
+
+.description { margin: 8px 0 16px; }
+
+/* ========================================================================
+   COMPARISON PANELS
+   ======================================================================== */
+.comparison {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 24px;
+}
+@media (max-width: 800px) { .comparison { grid-template-columns: 1fr; } }
+
+.panel {
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  background: var(--background);
+}
+.panel-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 8px 14px; border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground); background: var(--secondary);
+}
+.panel-label.current { color: #71717a; }
+.panel-label.proposed { color: var(--green-active-fg); }
+.panel-body { padding: 0; }
+
+/* DEMO CONTAINER — simulates the role page viewport */
+.demo {
+  background: var(--background); color: var(--foreground); font-family: var(--font-sans);
+  min-height: 120px; position: relative;
+}
+
+/* ========================================================================
+   PIXEL-ART BOBBIT SPRITE (simplified for mockup)
+   ======================================================================== */
+.bobbit-sprite {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 15px; flex-shrink: 0; position: relative; overflow: hidden;
+  filter: saturate(0.4);
+}
+.bobbit-sprite .body {
+  position: absolute; left: 0; top: 0; display: block; width: 1px; height: 1px;
+  image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0;
+  box-shadow:
+    3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,
+    2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,
+    1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,
+    0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,
+    0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,
+    0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,
+    0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,
+    1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,
+    2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;
+}
+/* Crown accessory */
+.bobbit-sprite.with-crown { height: 19px; }
+.bobbit-sprite.with-crown .body { top: 4px; }
+.bobbit-sprite .crown {
+  position: absolute; left: 0; top: 0; display: block; width: 1px; height: 1px;
+  image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0;
+  box-shadow:
+    3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,
+    2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,
+    1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,
+    1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,
+    1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000;
+}
+/* Bandana accessory */
+.bobbit-sprite .bandana {
+  position: absolute; left: 0; top: 0; display: block; width: 1px; height: 1px;
+  image-rendering: pixelated; transform: scale(1.6) translateY(-0.5px); transform-origin: 0 0;
+  box-shadow:
+    1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,
+    0 3px 0 #000,1px 3px 0 #b91c1c,2px 3px 0 #dc2626,3px 3px 0 #ef4444,4px 3px 0 #ef4444,5px 3px 0 #ef4444,6px 3px 0 #ef4444,7px 3px 0 #ef4444,8px 3px 0 #f87171,9px 3px 0 #000,
+    0 4px 0 #000,1px 4px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,
+    10px 3px 0 #000,10px 4px 0 #b91c1c,11px 4px 0 #000,
+    10px 5px 0 #991b1b,11px 5px 0 #000,10px 6px 0 #000;
+}
+/* Hue-shifted variant */
+.bobbit-sprite.hue1 { filter: saturate(0.4) hue-rotate(90deg); }
+.bobbit-sprite.hue2 { filter: saturate(0.4) hue-rotate(200deg); }
+.bobbit-sprite.hue3 { filter: saturate(0.4) hue-rotate(300deg); }
+
+/* ========================================================================
+   MINI LUCIDE ICONS (inline SVG)
+   ======================================================================== */
+.icon { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.icon.sm { width: 16px; height: 16px; }
+
+/* ========================================================================
+   SIMULATED ROLE PAGE STYLES — CURRENT STATE
+   ======================================================================== */
+
+/* Nav bar */
+.sim-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px; border-bottom: 1px solid var(--border);
+  background: var(--background); position: sticky; top: 0; z-index: 10; gap: 12px;
+}
+.sim-nav-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.sim-nav-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.sim-back {
+  display: flex; align-items: center; justify-content: center;
+  padding: 6px; border-radius: 6px; border: none; background: transparent;
+  color: var(--muted-foreground); cursor: pointer; transition: background 150ms, color 150ms;
+}
+.sim-back:hover { background: var(--secondary); color: var(--foreground); }
+.sim-title { font-size: 16px; font-weight: 600; margin: 0; white-space: nowrap; }
+.sim-breadcrumb { font-size: 14px; color: var(--muted-foreground); cursor: pointer; }
+.sim-breadcrumb:hover { color: var(--foreground); }
+.sim-breadcrumb-sep { font-size: 14px; color: var(--muted-foreground); }
+.sim-title-group { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+
+/* Button */
+.sim-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--secondary); color: var(--foreground); font-size: 13px;
+  font-weight: 500; cursor: pointer; transition: background 150ms;
+  font-family: var(--font-sans); white-space: nowrap;
+}
+.sim-btn:hover { background: var(--accent); }
+
+/* Body */
+.sim-body { padding: 20px; }
+
+/* Role list */
+.sim-list {
+  display: flex; flex-direction: column; max-width: 600px; margin: 0 auto;
+}
+
+/* Role row — CURRENT (gap: 2px, no cursor) */
+.sim-list.current { gap: 2px; }
+
+/* Role row — PROPOSED (gap: 6px, cursor: pointer, focus ring) */
+.sim-list.proposed { gap: 6px; }
+
+.sim-row {
+  display: flex; align-items: center; gap: 14px; padding: 10px 16px;
+  background: var(--secondary); border: 1px solid var(--border); border-radius: 8px;
+  transition: background 150ms, border-color 150ms, box-shadow 150ms;
+}
+.sim-row.current-style { cursor: default; /* BUG: missing cursor: pointer */ }
+.sim-row.proposed-style { cursor: pointer; }
+.sim-row.proposed-style:hover {
+  background: var(--accent);
+  border-color: color-mix(in oklch, var(--muted-foreground) 25%, transparent);
+}
+.sim-row.proposed-style:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+.sim-row.current-style:hover {
+  background: var(--accent);
+  border-color: color-mix(in oklch, var(--muted-foreground) 25%, transparent);
+}
+
+.sim-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.sim-row-label { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-row-slug {
+  font-size: 11px; font-family: var(--font-mono); color: var(--muted-foreground);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sim-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.sim-row-action {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; border: none; background: transparent;
+  color: var(--muted-foreground); cursor: pointer; transition: background 150ms, color 150ms;
+}
+.sim-row-action:hover { background: var(--secondary); color: var(--foreground); }
+.sim-row-action.delete:hover { color: var(--destructive); background: color-mix(in oklch, var(--destructive) 10%, transparent); }
+
+/* Proposed: actions hidden by default, shown on row hover */
+.sim-row.proposed-style .sim-row-actions.hover-reveal { opacity: 0; transition: opacity 150ms; }
+.sim-row.proposed-style:hover .sim-row-actions.hover-reveal { opacity: 1; }
+
+/* ========================================================================
+   TOOL CHIP STYLES
+   ======================================================================== */
+.sim-chip {
+  padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  font-family: var(--font-mono); border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--secondary) 50%, transparent);
+  color: var(--muted-foreground); cursor: pointer; transition: all 150ms;
+  display: inline-block;
+}
+.sim-chip:hover { border-color: color-mix(in oklch, var(--muted-foreground) 50%, transparent); }
+/* Current: hardcoded rgba green */
+.sim-chip.active-current {
+  background: rgba(34, 197, 94, 0.12); color: #22c55e; border-color: rgba(34, 197, 94, 0.35);
+}
+/* Proposed: oklch-compatible green using color-mix */
+.sim-chip.active-proposed {
+  background: color-mix(in oklch, #22c55e 12%, transparent);
+  color: #22c55e;
+  border-color: color-mix(in oklch, #22c55e 35%, transparent);
+}
+
+/* ========================================================================
+   EMPTY STATE
+   ======================================================================== */
+.sim-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 80px 24px; text-align: center;
+}
+.sim-empty-bobbit { margin-bottom: 4px; }
+.sim-empty-bobbit.current { opacity: 0.3; }
+.sim-empty-bobbit.proposed { opacity: 0.45; }
+.sim-empty-title { font-size: 14px; font-weight: 600; color: var(--foreground); }
+.sim-empty-desc { font-size: 12px; color: var(--muted-foreground); max-width: 280px; line-height: 1.5; }
+
+/* ========================================================================
+   EDIT VIEW STYLES
+   ======================================================================== */
+.sim-edit-container { display: flex; gap: 0; }
+.sim-edit-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; padding-right: 24px; }
+.sim-edit-sidebar {
+  width: 300px; flex-shrink: 0; border-left: 1px solid var(--border);
+  padding-left: 24px; display: flex; flex-direction: column; gap: 24px;
+}
+.sim-section { display: flex; flex-direction: column; gap: 12px; }
+.sim-section-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted-foreground); margin: 0;
+}
+
+.sim-field { display: flex; flex-direction: column; gap: 4px; }
+.sim-field-label { font-size: 12px; color: var(--muted-foreground); }
+.sim-field-readonly {
+  font-size: 13px; font-family: var(--font-mono); color: var(--muted-foreground);
+  padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border);
+}
+.sim-field-readonly.current { background: color-mix(in oklch, var(--secondary) 50%, transparent); }
+.sim-field-readonly.proposed { background: var(--secondary); }
+
+.sim-input {
+  font-size: 13px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--background); color: var(--foreground); font-family: var(--font-sans);
+  outline: none; transition: border-color 150ms;
+}
+.sim-input:focus { border-color: var(--ring); }
+
+.sim-textarea {
+  width: 100%; min-height: 180px; padding: 12px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--background); color: var(--foreground);
+  font-size: 13px; font-family: var(--font-mono); line-height: 1.6;
+  outline: none; resize: vertical; transition: border-color 150ms;
+}
+.sim-textarea:focus { border-color: var(--ring); }
+
+/* ========================================================================
+   ANNOTATION CALLOUTS
+   ======================================================================== */
+.callout {
+  margin: 12px 0; padding: 10px 14px; border-radius: 6px; font-size: 12px; line-height: 1.6;
+  border-left: 3px solid;
+}
+.callout.bug { background: rgba(239, 68, 68, 0.06); border-color: #ef4444; color: #fca5a5; }
+.callout.fix { background: rgba(34, 197, 94, 0.06); border-color: #22c55e; color: #86efac; }
+.callout.info { background: rgba(59, 130, 246, 0.06); border-color: #3b82f6; color: #93c5fd; }
+
+/* ========================================================================
+   HIGHLIGHTED DIFF INDICATORS
+   ======================================================================== */
+.diff-marker {
+  position: absolute; right: 8px; top: 8px; font-size: 9px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 6px;
+  border-radius: 3px; background: rgba(239, 68, 68, 0.15); color: #ef4444;
+}
+.diff-marker.fix { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+
+/* ========================================================================
+   MOBILE SIMULATION
+   ======================================================================== */
+.mobile-frame {
+  width: 375px; max-width: 100%; border: 2px solid var(--border); border-radius: 20px;
+  overflow: hidden; background: var(--background); margin: 16px auto;
+}
+.mobile-frame .sim-body { padding: 14px; }
+.mobile-frame .sim-nav { padding: 10px 14px; }
+.mobile-frame .sim-row { padding: 8px 12px; gap: 10px; }
+.mobile-frame .sim-row-slug.current-mobile { display: none; }
+.mobile-frame .sim-row-slug.proposed-mobile {
+  display: block; font-size: 10px; max-width: 120px;
+}
+.mobile-frame .sim-row-action { width: 28px; height: 28px; }
+
+/* ========================================================================
+   SECTION DIVIDERS
+   ======================================================================== */
+.section-divider {
+  border: none; border-top: 1px solid var(--border); margin: 48px 0 0;
+}
+
+/* ========================================================================
+   SUMMARY TABLE
+   ======================================================================== */
+.summary-table {
+  width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 13px;
+}
+.summary-table th {
+  text-align: left; padding: 8px 12px; border-bottom: 2px solid var(--border);
+  color: var(--muted-foreground); font-weight: 600; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.summary-table td {
+  padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--foreground);
+  vertical-align: top;
+}
+.summary-table tr:last-child td { border-bottom: none; }
+
+/* Focus demo */
+.focus-demo-row:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px var(--ring);
+}
+</style>
+</head>
+<body>
+<div class="report">
+
+<!-- ====================================================================
+     HEADER
+     ==================================================================== -->
+<h1>Role Manager — UX Reassessment</h1>
+<p class="subtitle">
+  Critical review of <code>role-manager-page.ts</code> + <code>role-manager.css</code> after the list layout, breadcrumb nav, slug display, and oklch migration changes.
+  This document identifies 9 remaining issues — from accessibility bugs to polish opportunities — with side-by-side current vs. proposed comparisons.
+</p>
+
+<!-- ====================================================================
+     EXECUTIVE SUMMARY
+     ==================================================================== -->
+<h2>Executive Summary</h2>
+<table class="summary-table">
+  <thead>
+    <tr><th>#</th><th>Issue</th><th>Severity</th><th>Category</th><th>Fix effort</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>Missing <code>cursor: pointer</code> on clickable rows</td><td><span class="severity high">high</span></td><td>Interaction</td><td>1 line CSS</td></tr>
+    <tr><td>2</td><td>No keyboard focus ring on role rows</td><td><span class="severity high">high</span></td><td>Accessibility</td><td>~5 lines</td></tr>
+    <tr><td>3</td><td>Hardcoded rgba green on active tool chips</td><td><span class="severity medium">medium</span></td><td>Consistency</td><td>3 lines CSS</td></tr>
+    <tr><td>4</td><td>List gap too tight (2px) — rows merge visually</td><td><span class="severity medium">medium</span></td><td>Spacing</td><td>1 line CSS</td></tr>
+    <tr><td>5</td><td>Mobile slug hidden entirely — loses context</td><td><span class="severity medium">medium</span></td><td>Mobile UX</td><td>~3 lines CSS</td></tr>
+    <tr><td>6</td><td>Action buttons always visible — visual noise</td><td><span class="severity low">low</span></td><td>Polish</td><td>~5 lines CSS</td></tr>
+    <tr><td>7</td><td>Empty state bobbit too faint (opacity 0.3)</td><td><span class="severity low">low</span></td><td>Polish</td><td>1 line CSS</td></tr>
+    <tr><td>8</td><td>Readonly field background inconsistent with oklch migration</td><td><span class="severity nit">nit</span></td><td>Consistency</td><td>1 line CSS</td></tr>
+    <tr><td>9</td><td>Edit view breadcrumb label doesn't truncate on narrow screens</td><td><span class="severity low">low</span></td><td>Responsive</td><td>~4 lines CSS</td></tr>
+  </tbody>
+</table>
+
+
+<!-- ====================================================================
+     ISSUE 1: MISSING CURSOR POINTER
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#1</span> Missing <code>cursor: pointer</code> on clickable rows <span class="severity high">high</span></h2>
+
+<p class="description">
+  The <code>.role-row</code> has an <code>@click</code> handler in the template that navigates to the edit view, and a <code>:hover</code> style with background change — but the CSS never sets <code>cursor: pointer</code>. This breaks the fundamental affordance that tells users the row is clickable. The hover background change alone is insufficient because it only signals "interactive" after the cursor is already over the element; the pointer cursor signals it <em>before</em> the user commits.
+</p>
+
+<div class="callout bug">
+  <strong>Bug:</strong> <code>.role-row</code> in <code>role-manager.css</code> line 117 — no <code>cursor: pointer</code>. The individual <code>.role-row-action-btn</code> does have it (line 176), creating an inconsistency where the buttons feel clickable but the row itself doesn't.
+</div>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current — default cursor on row hover</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-body">
+          <div class="sim-list current">
+            <div class="sim-row current-style" style="position: relative;">
+              <span class="diff-marker">cursor: default</span>
+              <span class="bobbit-sprite"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Documentation Writer</span>
+                <span class="sim-row-slug">doc-writer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action" title="Edit">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                </button>
+                <button class="sim-row-action delete" title="Delete">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed — pointer cursor</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-body">
+          <div class="sim-list proposed">
+            <div class="sim-row proposed-style" style="position: relative;">
+              <span class="diff-marker fix">cursor: pointer</span>
+              <span class="bobbit-sprite"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Documentation Writer</span>
+                <span class="sim-row-slug">doc-writer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action" title="Edit">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                </button>
+                <button class="sim-row-action delete" title="Delete">
+                  <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix:</strong> Add <code>cursor: pointer;</code> to <code>.role-row</code> in role-manager.css.
+</div>
+
+
+<!-- ====================================================================
+     ISSUE 2: NO KEYBOARD FOCUS RING
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#2</span> No keyboard focus ring on role rows <span class="severity high">high</span></h2>
+
+<p class="description">
+  Role rows are <code>&lt;div&gt;</code> elements with click handlers but no <code>tabindex</code>, no <code>role="button"</code>, and no <code>:focus-visible</code> styles. Keyboard users cannot tab to or activate role rows. This is an accessibility failure — the entire primary interaction (navigating to edit) is mouse-only.
+</p>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current — no focus indicator, not tabbable</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-body">
+          <div class="sim-list" style="gap: 6px;">
+            <div class="sim-row" style="position: relative;">
+              <span class="diff-marker">no tabindex</span>
+              <span class="bobbit-sprite"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Code Reviewer</span>
+                <span class="sim-row-slug">code-reviewer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed — tabbable with focus ring</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-body">
+          <div class="sim-list" style="gap: 6px;">
+            <div class="sim-row proposed-style focus-demo-row" tabindex="0" role="button" style="box-shadow: 0 0 0 2px var(--ring); position: relative;">
+              <span class="diff-marker fix">:focus-visible</span>
+              <span class="bobbit-sprite"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Code Reviewer</span>
+                <span class="sim-row-slug">code-reviewer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row proposed-style focus-demo-row" tabindex="0" role="button">
+              <span class="bobbit-sprite hue1"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Security Auditor</span>
+                <span class="sim-row-slug">security-auditor</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix (template):</strong> Add <code>tabindex="0"</code> and <code>role="button"</code> to the <code>.role-row</code> div. Add a <code>@keydown</code> handler that calls <code>showEdit</code> on Enter/Space.<br>
+  <strong>Fix (CSS):</strong> Add <code>.role-row:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }</code>
+</div>
+
+
+<!-- ====================================================================
+     ISSUE 3: HARDCODED RGBA ON TOOL CHIPS
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#3</span> Hardcoded <code>rgba</code> green on active tool chips <span class="severity medium">medium</span></h2>
+
+<p class="description">
+  The rest of the stylesheet was migrated to <code>color-mix(in oklch, ...)</code>, but <code>.roles-tool-chip--active</code> still uses raw <code>rgba(34, 197, 94, 0.12)</code> for background and <code>rgba(34, 197, 94, 0.35)</code> for border. This is inconsistent with the oklch direction and will look wrong if the design system ever shifts its green token.
+</p>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current — hardcoded rgba</div>
+    <div class="panel-body" style="padding: 16px;">
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <span class="sim-chip active-current">✓ Read</span>
+        <span class="sim-chip active-current">✓ Write</span>
+        <span class="sim-chip">Edit</span>
+        <span class="sim-chip active-current">✓ Bash</span>
+        <span class="sim-chip">Delegate</span>
+      </div>
+      <div style="margin-top: 10px; font-size: 11px; font-family: var(--font-mono); color: var(--muted-foreground);">
+        background: rgba(34, 197, 94, 0.12);<br>
+        border-color: rgba(34, 197, 94, 0.35);
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed — oklch color-mix</div>
+    <div class="panel-body" style="padding: 16px;">
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <span class="sim-chip active-proposed">✓ Read</span>
+        <span class="sim-chip active-proposed">✓ Write</span>
+        <span class="sim-chip">Edit</span>
+        <span class="sim-chip active-proposed">✓ Bash</span>
+        <span class="sim-chip">Delegate</span>
+      </div>
+      <div style="margin-top: 10px; font-size: 11px; font-family: var(--font-mono); color: var(--muted-foreground);">
+        background: color-mix(in oklch, #22c55e 12%, transparent);<br>
+        border-color: color-mix(in oklch, #22c55e 35%, transparent);
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix:</strong> Replace the three hardcoded values in <code>.roles-tool-chip--active</code> with <code>color-mix(in oklch, ...)</code> equivalents.
+</div>
+
+
+<!-- ====================================================================
+     ISSUE 4: LIST GAP TOO TIGHT
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#4</span> List gap too tight (2px) — rows merge visually <span class="severity medium">medium</span></h2>
+
+<p class="description">
+  <code>.roles-list { gap: 2px; }</code> creates a near-continuous surface where individual rows are hard to distinguish. The 1px borders blend together. The original intent of "tighter spacing" overcorrected — rows need enough breathing room to be scannable as discrete items. 6px gap maintains the compact feel while giving each row clear separation.
+</p>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current — gap: 2px (rows merge)</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-body">
+          <div class="sim-list current">
+            <div class="sim-row">
+              <span class="bobbit-sprite"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Documentation Writer</span>
+                <span class="sim-row-slug">doc-writer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row">
+              <span class="bobbit-sprite hue1"><span class="body"></span><span class="crown"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Code Reviewer</span>
+                <span class="sim-row-slug">code-reviewer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row">
+              <span class="bobbit-sprite hue2"><span class="body"></span><span class="bandana"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Security Auditor</span>
+                <span class="sim-row-slug">security-auditor</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row">
+              <span class="bobbit-sprite hue3"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Test Engineer</span>
+                <span class="sim-row-slug">test-engineer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed — gap: 6px (scannable)</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-body">
+          <div class="sim-list proposed">
+            <div class="sim-row proposed-style">
+              <span class="bobbit-sprite"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Documentation Writer</span>
+                <span class="sim-row-slug">doc-writer</span>
+              </div>
+              <div class="sim-row-actions hover-reveal">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row proposed-style">
+              <span class="bobbit-sprite hue1"><span class="body"></span><span class="crown"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Code Reviewer</span>
+                <span class="sim-row-slug">code-reviewer</span>
+              </div>
+              <div class="sim-row-actions hover-reveal">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row proposed-style">
+              <span class="bobbit-sprite hue2"><span class="body"></span><span class="bandana"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Security Auditor</span>
+                <span class="sim-row-slug">security-auditor</span>
+              </div>
+              <div class="sim-row-actions hover-reveal">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row proposed-style">
+              <span class="bobbit-sprite hue3"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Test Engineer</span>
+                <span class="sim-row-slug">test-engineer</span>
+              </div>
+              <div class="sim-row-actions hover-reveal">
+                <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix:</strong> Change <code>.roles-list { gap: 2px; }</code> to <code>gap: 6px;</code>
+</div>
+
+
+<!-- ====================================================================
+     ISSUE 5: MOBILE SLUG HIDDEN ENTIRELY
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#5</span> Mobile slug hidden entirely — loses context <span class="severity medium">medium</span></h2>
+
+<p class="description">
+  The <code>@media (max-width: 768px)</code> block sets <code>.role-row-slug { display: none; }</code>. On mobile, users only see the display label (e.g. "Documentation Writer") with no way to distinguish roles that might have similar names. The slug is valuable context — it's the machine identifier used in team config. Instead of hiding it completely, truncate it to fit.
+</p>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current mobile — slug hidden</div>
+    <div class="panel-body">
+      <div class="mobile-frame">
+        <div class="sim-nav">
+          <div class="sim-nav-left">
+            <button class="sim-back"><svg class="icon sm" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+            <h1 class="sim-title">Roles</h1>
+          </div>
+          <div class="sim-nav-right">
+            <button class="sim-btn"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M5 12h14"/><path d="M12 5v14"/></svg> New</button>
+          </div>
+        </div>
+        <div class="sim-body">
+          <div class="sim-list" style="gap: 6px;">
+            <div class="sim-row" style="padding: 8px 12px; gap: 10px;">
+              <span class="bobbit-sprite"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Documentation Writer</span>
+                <span class="sim-row-slug current-mobile">doc-writer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action" style="width:28px;height:28px;"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete" style="width:28px;height:28px;"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row" style="padding: 8px 12px; gap: 10px;">
+              <span class="bobbit-sprite hue2"><span class="body"></span><span class="bandana"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Security Auditor</span>
+                <span class="sim-row-slug current-mobile">security-auditor</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action" style="width:28px;height:28px;"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete" style="width:28px;height:28px;"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed mobile — slug visible, truncated</div>
+    <div class="panel-body">
+      <div class="mobile-frame">
+        <div class="sim-nav">
+          <div class="sim-nav-left">
+            <button class="sim-back"><svg class="icon sm" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+            <h1 class="sim-title">Roles</h1>
+          </div>
+          <div class="sim-nav-right">
+            <button class="sim-btn"><svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M5 12h14"/><path d="M12 5v14"/></svg> New</button>
+          </div>
+        </div>
+        <div class="sim-body">
+          <div class="sim-list" style="gap: 6px;">
+            <div class="sim-row proposed-style" style="padding: 8px 12px; gap: 10px;">
+              <span class="bobbit-sprite"><span class="body"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Documentation Writer</span>
+                <span class="sim-row-slug proposed-mobile">doc-writer</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action" style="width:28px;height:28px;"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete" style="width:28px;height:28px;"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+            <div class="sim-row proposed-style" style="padding: 8px 12px; gap: 10px;">
+              <span class="bobbit-sprite hue2"><span class="body"></span><span class="bandana"></span></span>
+              <div class="sim-row-info">
+                <span class="sim-row-label">Security Auditor</span>
+                <span class="sim-row-slug proposed-mobile">security-auditor</span>
+              </div>
+              <div class="sim-row-actions">
+                <button class="sim-row-action" style="width:28px;height:28px;"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                <button class="sim-row-action delete" style="width:28px;height:28px;"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix:</strong> Replace <code>.role-row-slug { display: none; }</code> in the mobile breakpoint with:<br>
+  <code>.role-row-slug { font-size: 10px; max-width: 140px; }</code> — keeps slug visible but compact.
+</div>
+
+
+<!-- ====================================================================
+     ISSUE 6: ACTION BUTTONS ALWAYS VISIBLE
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#6</span> Action buttons always visible — visual noise on desktop <span class="severity low">low</span></h2>
+
+<p class="description">
+  Edit and delete buttons are always visible on every row. With 5+ roles, the repeated icon pairs add visual clutter. Since the entire row is clickable (navigates to edit), the edit button is redundant at rest. Hiding actions until hover reduces noise while keeping them instantly accessible. On mobile/touch, actions must remain always-visible since there's no hover.
+</p>
+
+<div class="callout info">
+  <strong>Trade-off:</strong> Hover-reveal actions are less discoverable for new users. However, the row-level click already handles the primary action (edit), and the delete action is destructive enough that requiring an explicit hover isn't a usability cost — it's a feature. Add <code>@media (hover: none)</code> fallback to keep actions visible on touch devices.
+</div>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current — always visible</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-body">
+          <div class="sim-list" style="gap: 6px;">
+            <div class="sim-row"><span class="bobbit-sprite"><span class="body"></span></span><div class="sim-row-info"><span class="sim-row-label">Documentation Writer</span><span class="sim-row-slug">doc-writer</span></div><div class="sim-row-actions"><button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button><button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></div></div>
+            <div class="sim-row"><span class="bobbit-sprite hue1"><span class="body"></span></span><div class="sim-row-info"><span class="sim-row-label">Code Reviewer</span><span class="sim-row-slug">code-reviewer</span></div><div class="sim-row-actions"><button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button><button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></div></div>
+            <div class="sim-row"><span class="bobbit-sprite hue2"><span class="body"></span></span><div class="sim-row-info"><span class="sim-row-label">Security Auditor</span><span class="sim-row-slug">security-auditor</span></div><div class="sim-row-actions"><button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button><button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed — hover to reveal (try hovering)</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-body">
+          <div class="sim-list proposed">
+            <div class="sim-row proposed-style"><span class="bobbit-sprite"><span class="body"></span></span><div class="sim-row-info"><span class="sim-row-label">Documentation Writer</span><span class="sim-row-slug">doc-writer</span></div><div class="sim-row-actions hover-reveal"><button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button><button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></div></div>
+            <div class="sim-row proposed-style"><span class="bobbit-sprite hue1"><span class="body"></span></span><div class="sim-row-info"><span class="sim-row-label">Code Reviewer</span><span class="sim-row-slug">code-reviewer</span></div><div class="sim-row-actions hover-reveal"><button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button><button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></div></div>
+            <div class="sim-row proposed-style"><span class="bobbit-sprite hue2"><span class="body"></span></span><div class="sim-row-info"><span class="sim-row-label">Security Auditor</span><span class="sim-row-slug">security-auditor</span></div><div class="sim-row-actions hover-reveal"><button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button><button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix (CSS):</strong><br>
+  <code>.role-row-actions { opacity: 0; transition: opacity 150ms; }</code><br>
+  <code>.role-row:hover .role-row-actions, .role-row:focus-within .role-row-actions { opacity: 1; }</code><br>
+  <code>@media (hover: none) { .role-row-actions { opacity: 1; } }</code>
+</div>
+
+
+<!-- ====================================================================
+     ISSUE 7: EMPTY STATE BOBBIT TOO FAINT
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#7</span> Empty state bobbit too faint (opacity 0.3) <span class="severity low">low</span></h2>
+
+<p class="description">
+  The branded empty state is a good pattern, but <code>opacity: 0.3</code> on the bobbit sprite makes it nearly invisible against the dark background. At that opacity, the pixel art loses its character — it reads as a smudge rather than a friendly mascot. Bumping to 0.45 keeps it muted while remaining recognisable.
+</p>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current — opacity: 0.3</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-empty">
+          <div class="sim-empty-bobbit current"><span class="bobbit-sprite" style="filter: none; transform: scale(2);"><span class="body"></span></span></div>
+          <p class="sim-empty-title">No roles yet</p>
+          <p class="sim-empty-desc">Roles give agents a persona, system prompt, and tool restrictions.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed — opacity: 0.45</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-empty">
+          <div class="sim-empty-bobbit proposed"><span class="bobbit-sprite" style="filter: none; transform: scale(2);"><span class="body"></span></span></div>
+          <p class="sim-empty-title">No roles yet</p>
+          <p class="sim-empty-desc">Roles give agents a persona, system prompt, and tool restrictions.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix:</strong> Change <code>.roles-empty-bobbit { opacity: 0.3; }</code> to <code>opacity: 0.45;</code>
+</div>
+
+
+<!-- ====================================================================
+     ISSUE 8: READONLY FIELD BACKGROUND
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#8</span> Readonly field background uses <code>color-mix</code> at 50% — too transparent <span class="severity nit">nit</span></h2>
+
+<p class="description">
+  The readonly "Name" field in the edit view uses <code>background: color-mix(in oklch, var(--secondary) 50%, transparent)</code>. This makes it nearly invisible against the page background, barely distinguishable from a missing field. A full <code>var(--secondary)</code> background communicates "this field exists but isn't editable" more clearly, matching the disabled input convention used elsewhere in the app.
+</p>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current — 50% transparent secondary</div>
+    <div class="panel-body" style="padding: 20px;">
+      <div class="sim-field">
+        <label class="sim-field-label">Name</label>
+        <div class="sim-field-readonly current">doc-writer</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed — solid secondary</div>
+    <div class="panel-body" style="padding: 20px;">
+      <div class="sim-field">
+        <label class="sim-field-label">Name</label>
+        <div class="sim-field-readonly proposed">doc-writer</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix:</strong> Change <code>.roles-field-readonly</code> background to <code>var(--secondary)</code>.
+</div>
+
+
+<!-- ====================================================================
+     ISSUE 9: BREADCRUMB TRUNCATION
+     ==================================================================== -->
+<hr class="section-divider">
+<h2><span class="issue-num">#9</span> Edit view breadcrumb label doesn't truncate on narrow screens <span class="severity low">low</span></h2>
+
+<p class="description">
+  The breadcrumb in edit view renders as <code>Roles / {role.label}</code> with the label in an <code>&lt;h1&gt;</code> that has <code>text-overflow: ellipsis</code>. But the parent <code>.roles-title-group</code> uses <code>display: flex</code> with <code>min-width: 0</code> — the h1 won't truncate unless it also has <code>min-width: 0</code> and <code>overflow: hidden</code> is inherited properly through the flex chain. On very narrow viewports (or long role labels like "Senior Full-Stack Documentation Writer"), the breadcrumb can overflow the nav bar.
+</p>
+
+<div class="comparison">
+  <div class="panel">
+    <div class="panel-label current">Current — long label overflows</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-nav" style="max-width: 380px;">
+          <div class="sim-nav-left" style="overflow: visible;">
+            <button class="sim-back"><svg class="icon sm" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+            <div class="sim-title-group" style="overflow: visible;">
+              <span class="sim-breadcrumb">Roles</span>
+              <span class="sim-breadcrumb-sep">/</span>
+              <h1 class="sim-title" style="overflow: visible; white-space: nowrap;">Senior Full-Stack Documentation Writer</h1>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-label proposed">Proposed — truncates cleanly</div>
+    <div class="panel-body">
+      <div class="demo">
+        <div class="sim-nav" style="max-width: 380px;">
+          <div class="sim-nav-left" style="min-width: 0;">
+            <button class="sim-back" style="flex-shrink: 0;"><svg class="icon sm" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+            <div class="sim-title-group" style="min-width: 0; overflow: hidden;">
+              <span class="sim-breadcrumb" style="flex-shrink: 0;">Roles</span>
+              <span class="sim-breadcrumb-sep" style="flex-shrink: 0;">/</span>
+              <h1 class="sim-title" style="min-width: 0; overflow: hidden; text-overflow: ellipsis;">Senior Full-Stack Documentation Writer</h1>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="callout fix">
+  <strong>Fix (CSS):</strong><br>
+  <code>.roles-breadcrumb, .roles-breadcrumb-sep { flex-shrink: 0; }</code><br>
+  <code>.roles-back { flex-shrink: 0; }</code><br>
+  These are likely already correct but worth verifying — the key fix is ensuring the flex chain from <code>.roles-nav-left</code> → <code>.roles-title-group</code> → <code>.roles-title</code> all have <code>min-width: 0</code> so ellipsis propagates.
+</div>
+
+
+<!-- ====================================================================
+     COMBINED VIEW — FULL PROPOSED STATE
+     ==================================================================== -->
+<hr class="section-divider">
+<h2>Combined View — All Fixes Applied</h2>
+
+<p class="description">
+  Below is a faithful simulation of the role list with all 9 fixes applied. Hover over rows to see the interaction model. Tab into the list to see focus rings. Compare the spacing, cursor, and visual weight against the current implementation.
+</p>
+
+<div class="panel" style="max-width: 700px; margin: 20px auto;">
+  <div class="panel-label proposed">Proposed — all fixes applied</div>
+  <div class="panel-body">
+    <div class="demo">
+      <!-- Nav -->
+      <div class="sim-nav">
+        <div class="sim-nav-left">
+          <button class="sim-back" style="flex-shrink: 0;"><svg class="icon sm" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+          <h1 class="sim-title">Roles</h1>
+        </div>
+        <div class="sim-nav-right">
+          <button class="sim-btn">
+            <svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            New Role
+          </button>
+        </div>
+      </div>
+      <!-- List -->
+      <div class="sim-body">
+        <div class="sim-list proposed" style="max-width: 600px;">
+          <div class="sim-row proposed-style focus-demo-row" tabindex="0" role="button">
+            <span class="bobbit-sprite"><span class="body"></span></span>
+            <div class="sim-row-info">
+              <span class="sim-row-label">Documentation Writer</span>
+              <span class="sim-row-slug">doc-writer</span>
+            </div>
+            <div class="sim-row-actions hover-reveal">
+              <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+              <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+            </div>
+          </div>
+          <div class="sim-row proposed-style focus-demo-row" tabindex="0" role="button">
+            <span class="bobbit-sprite hue1 with-crown"><span class="body" style="top: 4px;"></span><span class="crown"></span></span>
+            <div class="sim-row-info">
+              <span class="sim-row-label">Code Reviewer</span>
+              <span class="sim-row-slug">code-reviewer</span>
+            </div>
+            <div class="sim-row-actions hover-reveal">
+              <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+              <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+            </div>
+          </div>
+          <div class="sim-row proposed-style focus-demo-row" tabindex="0" role="button">
+            <span class="bobbit-sprite hue2"><span class="body"></span><span class="bandana"></span></span>
+            <div class="sim-row-info">
+              <span class="sim-row-label">Security Auditor</span>
+              <span class="sim-row-slug">security-auditor</span>
+            </div>
+            <div class="sim-row-actions hover-reveal">
+              <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+              <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+            </div>
+          </div>
+          <div class="sim-row proposed-style focus-demo-row" tabindex="0" role="button">
+            <span class="bobbit-sprite hue3"><span class="body"></span></span>
+            <div class="sim-row-info">
+              <span class="sim-row-label">Test Engineer</span>
+              <span class="sim-row-slug">test-engineer</span>
+            </div>
+            <div class="sim-row-actions hover-reveal">
+              <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+              <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+            </div>
+          </div>
+          <div class="sim-row proposed-style focus-demo-row" tabindex="0" role="button">
+            <span class="bobbit-sprite" style="filter: saturate(0.4) hue-rotate(45deg);"><span class="body"></span></span>
+            <div class="sim-row-info">
+              <span class="sim-row-label">API Integration Specialist</span>
+              <span class="sim-row-slug">api-integration</span>
+            </div>
+            <div class="sim-row-actions hover-reveal">
+              <button class="sim-row-action"><svg class="icon" viewBox="0 0 24 24"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+              <button class="sim-row-action delete"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ====================================================================
+     WHAT'S WORKING WELL
+     ==================================================================== -->
+<hr class="section-divider">
+<h2>What's Working Well</h2>
+
+<p class="description">The recent changes addressed the major structural issues. These are solid and should not be touched:</p>
+
+<ul>
+  <li><strong>List layout with bare sprites</strong> — cleaner than the old card grid; appropriate information density for a settings page</li>
+  <li><strong>Slug below label</strong> — useful context without taking too much space; mono font differentiates it clearly</li>
+  <li><strong>Hash routing with browser back</strong> — <code>#/roles</code> and <code>#/roles/:name</code> is clean; <code>popstate</code> works correctly</li>
+  <li><strong>Breadcrumb nav in edit view</strong> — <code>Roles / {label}</code> communicates hierarchy without wasting space</li>
+  <li><strong>oklch color-mix migration</strong> — modern, perceptually uniform; hover borders and destructive backgrounds look good</li>
+  <li><strong>Edit view two-column layout</strong> — identity/prompt/tools on left, accessory/actions on right is logical grouping</li>
+  <li><strong>Branded empty state</strong> — bobbit sprite + clear CTA is friendly and informative</li>
+  <li><strong>Responsive column collapse</strong> — edit sidebar stacks below main content on mobile; correct breakpoint</li>
+</ul>
+
+
+<!-- ====================================================================
+     IMPLEMENTATION PRIORITY
+     ==================================================================== -->
+<hr class="section-divider">
+<h2>Implementation Priority</h2>
+
+<p class="description">Recommended order of implementation, grouped by impact and effort:</p>
+
+<h3>Do first (high impact, trivial effort)</h3>
+<ul>
+  <li>#1 — Add <code>cursor: pointer</code> to <code>.role-row</code> (1 line)</li>
+  <li>#4 — Increase list gap to 6px (1 line)</li>
+  <li>#7 — Bump empty state opacity to 0.45 (1 line)</li>
+  <li>#8 — Solid secondary on readonly field (1 line)</li>
+</ul>
+
+<h3>Do second (high impact, small effort)</h3>
+<ul>
+  <li>#2 — Add tabindex, role, keydown handler, and focus ring (5 lines CSS + 3 lines template)</li>
+  <li>#3 — Migrate tool chip active state to oklch (3 lines CSS)</li>
+  <li>#5 — Keep slug visible on mobile with truncation (3 lines CSS)</li>
+</ul>
+
+<h3>Do if time permits (polish)</h3>
+<ul>
+  <li>#6 — Hover-reveal action buttons with touch fallback (~8 lines CSS)</li>
+  <li>#9 — Breadcrumb truncation with flex-shrink: 0 on prefix elements (~4 lines CSS)</li>
+</ul>
+
+</div>
+
+<script>
+// Make proposed rows interactive for demo purposes
+document.querySelectorAll('.focus-demo-row').forEach(row => {
+  row.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      row.style.background = 'var(--accent)';
+      setTimeout(() => { row.style.background = ''; }, 200);
+    }
+  });
+});
+</script>
+
+</body>
+</html>

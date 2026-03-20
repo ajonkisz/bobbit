@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Goal Dashboard — Mock B2: Mission Control with Tabs</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d1117;
+  --bg-surface: #151b23;
+  --bg-elevated: #1c2333;
+  --bg-hover: #222d3d;
+  --border: #243040;
+  --border-subtle: #1a2535;
+  --text: #e2e8f0;
+  --text-secondary: #8899aa;
+  --text-tertiary: #5a6a7a;
+  --accent-blue: #60a5fa;
+  --accent-green: #34d399;
+  --accent-yellow: #fbbf24;
+  --accent-red: #f87171;
+  --accent-purple: #a78bfa;
+  --accent-cyan: #22d3ee;
+  --accent-orange: #fb923c;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --radius: 8px;
+  --radius-sm: 5px;
+}
+
+body {
+  font-family: var(--font); background: var(--bg); color: var(--text);
+  line-height: 1.5; -webkit-font-smoothing: antialiased;
+  overflow: hidden; height: 100vh; display: flex; flex-direction: column;
+}
+
+/* ── NAV BAR ── */
+.nav {
+  display: flex; align-items: center;
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+  background: var(--bg); flex-shrink: 0; gap: 10px;
+}
+.nav-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.nav-center { display: flex; align-items: center; gap: 8px; }
+.nav-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+.back-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-secondary); cursor: pointer; transition: all 150ms;
+}
+.back-btn:hover { background: var(--bg-hover); color: var(--text); }
+.nav-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-branch {
+  font-size: 11px; font-family: var(--mono); color: var(--accent-cyan);
+  background: rgba(34,211,238,0.08); padding: 3px 10px; border-radius: 20px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.nav-state {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 20px; letter-spacing: 0.05em;
+  background: rgba(251,191,36,0.12); color: var(--accent-yellow);
+  white-space: nowrap; flex-shrink: 0;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-secondary); transition: all 150ms; white-space: nowrap;
+}
+.btn:hover { background: var(--bg-hover); color: var(--text); }
+.btn-primary { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.btn-primary:hover { background: #4e94e8; }
+.btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-secondary); cursor: pointer; transition: all 150ms;
+}
+.btn-icon:hover { background: var(--bg-hover); color: var(--text); }
+.btn-icon.danger:hover { color: var(--accent-red); border-color: rgba(248,113,113,0.4); }
+.btn-icon[title]::after { content: none; }
+
+/* ── HERO STRIP ── */
+.hero {
+  display: flex; align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface); flex-shrink: 0;
+}
+.hero-progress {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 24px; border-right: 1px solid var(--border);
+}
+.ring-container { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
+.ring-bg, .ring-fg {
+  position: absolute; top: 0; left: 0; width: 64px; height: 64px;
+  fill: none; stroke-width: 5; stroke-linecap: round;
+}
+.ring-bg { stroke: var(--border); }
+.ring-fg {
+  stroke: var(--accent-green); transform: rotate(-90deg); transform-origin: center;
+  transition: stroke-dashoffset 600ms ease;
+}
+.ring-label {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 17px; font-weight: 700; letter-spacing: -0.02em;
+}
+.ring-sub { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+
+.hero-stats {
+  display: flex; gap: 0; flex-shrink: 0; border-right: 1px solid var(--border);
+}
+.mini-stat {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 12px 20px; gap: 3px;
+  border-right: 1px solid var(--border-subtle);
+}
+.mini-stat:last-child { border-right: none; }
+.mini-stat-value { font-size: 20px; font-weight: 700; line-height: 1; }
+.mini-stat-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.hero-agents {
+  flex: 1; padding: 12px 20px; overflow-x: auto; display: flex; flex-direction: column; gap: 6px;
+}
+.hero-agents-header {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-tertiary);
+}
+.agent-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.agent-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px 5px 6px; border-radius: 20px;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  cursor: pointer; transition: all 150ms;
+}
+.agent-chip:hover { border-color: var(--text-tertiary); background: var(--bg-hover); }
+.chip-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: #fff;
+}
+.chip-info { display: flex; flex-direction: column; }
+.chip-name { font-size: 11px; font-weight: 600; line-height: 1.2; }
+.chip-task { font-size: 10px; color: var(--text-tertiary); line-height: 1.2; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-status { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.chip-status.working { background: var(--accent-green); animation: pulse 2s ease-in-out infinite; }
+.chip-status.idle { background: var(--text-tertiary); }
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(52,211,153,0); }
+}
+
+/* ── PHASE BAR ── */
+.phase-strip {
+  display: flex; align-items: center;
+  padding: 10px 20px; gap: 12px;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.phase-strip-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-tertiary); flex-shrink: 0;
+}
+.phase-segments { display: flex; flex: 1; gap: 3px; height: 5px; border-radius: 3px; overflow: hidden; }
+.phase-seg { flex: 1; border-radius: 3px; transition: background 300ms; }
+.phase-seg.done { background: var(--accent-green); }
+.phase-seg.active { background: var(--accent-blue); animation: seg-pulse 2s ease-in-out infinite; }
+.phase-seg.future { background: var(--border); }
+@keyframes seg-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.phase-labels { display: flex; flex: 1; }
+.phase-lbl { flex: 1; text-align: center; font-size: 10px; font-weight: 500; color: var(--text-tertiary); }
+.phase-lbl.done { color: var(--accent-green); }
+.phase-lbl.active { color: var(--accent-blue); font-weight: 600; }
+
+/* ── TAB BAR ── */
+.tab-bar {
+  display: flex; align-items: center;
+  padding: 0 20px; gap: 0;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  background: var(--bg);
+}
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 16px; font-size: 13px; font-weight: 500;
+  color: var(--text-tertiary); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 150ms, border-color 150ms;
+  user-select: none; white-space: nowrap;
+}
+.tab:hover { color: var(--text-secondary); }
+.tab.active { color: var(--text); border-bottom-color: var(--accent-blue); }
+.tab-count {
+  font-size: 10px; font-weight: 600; background: var(--bg-elevated);
+  color: var(--text-tertiary); padding: 1px 7px; border-radius: 10px;
+}
+.tab.active .tab-count { background: rgba(96,165,250,0.15); color: var(--accent-blue); }
+
+/* ── TAB CONTENT AREA ── */
+.tab-content { flex: 1; overflow: hidden; position: relative; }
+.tab-panel { display: none; height: 100%; overflow-y: auto; }
+.tab-panel.active { display: block; }
+.tab-panel-inner { padding: 20px; }
+
+/* ── TASK TABLE ── */
+.task-table { width: 100%; border-collapse: collapse; }
+.task-table th {
+  text-align: left; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-tertiary); padding: 8px 12px;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0;
+  background: var(--bg); z-index: 1;
+}
+.task-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px; vertical-align: middle;
+}
+.task-table tr { transition: background 150ms; }
+.task-table tbody tr:hover { background: var(--bg-surface); }
+.task-title-cell { font-weight: 500; }
+.status-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+}
+.status-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+.chip-todo { background: rgba(90,106,122,0.15); color: var(--text-secondary); }
+.chip-todo .dot { background: var(--text-tertiary); }
+.chip-progress { background: rgba(96,165,250,0.12); color: var(--accent-blue); }
+.chip-progress .dot { background: var(--accent-blue); }
+.chip-done { background: rgba(52,211,153,0.12); color: var(--accent-green); }
+.chip-done .dot { background: var(--accent-green); }
+.chip-failed { background: rgba(248,113,113,0.12); color: var(--accent-red); }
+.chip-failed .dot { background: var(--accent-red); }
+.type-tag {
+  font-size: 10px; font-weight: 600; padding: 2px 7px;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.assignee-cell { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.assignee-cell .mini-avatar {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: #fff;
+}
+.elapsed-cell { font-size: 12px; color: var(--text-tertiary); font-family: var(--mono); }
+.error-row { font-size: 11px; color: var(--accent-red); padding: 4px 12px 10px 12px; }
+
+/* ── COMMIT ROWS ── */
+.commit-list { display: flex; flex-direction: column; }
+.commit-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-bottom: 1px solid var(--border-subtle);
+  transition: background 150ms;
+}
+.commit-row:hover { background: var(--bg-surface); }
+.commit-row:last-child { border-bottom: none; }
+.commit-dot-col { width: 20px; display: flex; justify-content: center; position: relative; }
+.commit-dot-col::before {
+  content: ''; position: absolute; top: -10px; bottom: -10px; left: 50%;
+  width: 2px; background: var(--border-subtle); transform: translateX(-50%);
+}
+.commit-row:first-child .commit-dot-col::before { top: 50%; }
+.commit-row:last-child .commit-dot-col::before { bottom: 50%; }
+.cdot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--bg-elevated); border: 2px solid var(--border);
+  z-index: 1; position: relative;
+}
+.cdot.head { background: var(--accent-cyan); border-color: var(--accent-cyan); box-shadow: 0 0 0 3px rgba(34,211,238,0.2); }
+.commit-sha2 {
+  font-family: var(--mono); font-size: 12px; color: var(--accent-cyan);
+  background: rgba(34,211,238,0.06); padding: 2px 8px; border-radius: 4px;
+  flex-shrink: 0; width: 70px; text-align: center;
+}
+.commit-msg2 { flex: 1; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.commit-badges2 { display: flex; gap: 4px; flex-shrink: 0; }
+.cbadge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+.cbadge-pass { background: rgba(52,211,153,0.12); color: var(--accent-green); }
+.cbadge-fail { background: rgba(248,113,113,0.12); color: var(--accent-red); }
+.cbadge-pending { background: rgba(136,153,170,0.12); color: var(--text-secondary); }
+.commit-author2 { font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; width: 70px; text-align: right; }
+.commit-time2 { font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; width: 50px; text-align: right; }
+
+/* ── ARTIFACT GRID ── */
+.artifact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.artifact-card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 8px;
+  transition: border-color 200ms; cursor: pointer;
+}
+.artifact-card:hover { border-color: var(--text-tertiary); }
+.artifact-card.missing { opacity: 0.4; cursor: default; border-style: dashed; }
+.artifact-card.missing:hover { border-color: var(--border); }
+.artifact-card-top { display: flex; align-items: center; justify-content: space-between; }
+.artifact-card-icon { font-size: 20px; }
+.artifact-card-badge {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 3px;
+}
+.badge-exists { background: rgba(52,211,153,0.12); color: var(--accent-green); }
+.badge-missing { background: rgba(248,113,113,0.12); color: var(--accent-red); }
+.badge-required {
+  background: rgba(251,191,36,0.12); color: var(--accent-yellow);
+  font-size: 9px; font-weight: 600; text-transform: uppercase;
+  padding: 1px 6px; border-radius: 3px; margin-left: 6px;
+}
+.artifact-card-name { font-size: 13px; font-weight: 500; }
+.artifact-card-meta { font-size: 11px; color: var(--text-tertiary); }
+.artifact-card-producer { font-size: 11px; color: var(--text-tertiary); display: flex; align-items: center; gap: 4px; }
+.artifact-card-producer .mini-avatar {
+  width: 16px; height: 16px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 8px; font-weight: 700; color: #fff;
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 60px 20px; color: var(--text-tertiary); gap: 8px;
+}
+.empty-state svg { opacity: 0.3; }
+.empty-state-text { font-size: 13px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .hero { flex-direction: column; }
+  .hero-progress { border-right: none; border-bottom: 1px solid var(--border); justify-content: center; }
+  .hero-stats { border-right: none; border-bottom: 1px solid var(--border); justify-content: center; }
+  .artifact-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .nav { padding: 8px 12px; flex-wrap: wrap; }
+  .nav-left { flex: 1 1 100%; }
+  .nav-right { flex: 1 1 100%; justify-content: flex-end; }
+  .tab-panel-inner { padding: 14px; }
+  .task-table th:nth-child(4), .task-table td:nth-child(4),
+  .task-table th:nth-child(5), .task-table td:nth-child(5) { display: none; }
+  .tab { padding: 10px 12px; font-size: 12px; }
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<div class="nav">
+  <div class="nav-left">
+    <button class="back-btn" title="Back to sessions">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    </button>
+    <span class="nav-title">Refactor authentication module</span>
+    <span class="nav-branch">feat/auth-refactor</span>
+    <span class="nav-state">In Progress</span>
+  </div>
+  <div class="nav-right">
+    <!-- Icon-only secondary actions -->
+    <button class="btn-icon" title="Edit goal">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+    </button>
+    <button class="btn-icon danger" title="Delete goal">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+    </button>
+    <!-- Primary action stays prominent -->
+    <button class="btn btn-primary">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      New Session
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════ HERO STRIP ═══════════════ -->
+<div class="hero">
+  <div class="hero-progress">
+    <div class="ring-container">
+      <svg class="ring-bg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27"/></svg>
+      <svg class="ring-fg" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="27" stroke-dasharray="169.6" stroke-dashoffset="63.6"/>
+      </svg>
+      <div class="ring-label">63%</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <div style="font-size:13px;font-weight:600;">5 of 8 tasks</div>
+      <div class="ring-sub">Completed</div>
+    </div>
+  </div>
+
+  <div class="hero-stats">
+    <div class="mini-stat">
+      <span class="mini-stat-value" style="color:var(--accent-blue)">2</span>
+      <span class="mini-stat-label">Active</span>
+    </div>
+    <div class="mini-stat">
+      <span class="mini-stat-value" style="color:var(--accent-red)">1</span>
+      <span class="mini-stat-label">Failed</span>
+    </div>
+    <div class="mini-stat">
+      <span class="mini-stat-value" style="color:var(--accent-green)">3</span>
+      <span class="mini-stat-label">Agents</span>
+    </div>
+  </div>
+
+  <div class="hero-agents">
+    <div class="hero-agents-header">Active Agents</div>
+    <div class="agent-chips">
+      <div class="agent-chip">
+        <div class="chip-avatar" style="background:var(--accent-purple)">TL</div>
+        <div class="chip-info">
+          <span class="chip-name">Team Lead</span>
+          <span class="chip-task">Coordinating tasks</span>
+        </div>
+        <div class="chip-status idle"></div>
+      </div>
+      <div class="agent-chip">
+        <div class="chip-avatar" style="background:var(--accent-blue)">C1</div>
+        <div class="chip-info">
+          <span class="chip-name">Coder-1</span>
+          <span class="chip-task">OAuth2 PKCE flow</span>
+        </div>
+        <div class="chip-status working"></div>
+      </div>
+      <div class="agent-chip">
+        <div class="chip-avatar" style="background:var(--accent-green)">T</div>
+        <div class="chip-info">
+          <span class="chip-name">Tester</span>
+          <span class="chip-task">Token refresh tests</span>
+        </div>
+        <div class="chip-status working"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ PHASE BAR ═══════════════ -->
+<div class="phase-strip">
+  <span class="phase-strip-label">Phase</span>
+  <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+    <div class="phase-segments">
+      <div class="phase-seg done"></div>
+      <div class="phase-seg done"></div>
+      <div class="phase-seg active"></div>
+      <div class="phase-seg future"></div>
+      <div class="phase-seg future"></div>
+    </div>
+    <div class="phase-labels">
+      <div class="phase-lbl done">Planning</div>
+      <div class="phase-lbl done">Design</div>
+      <div class="phase-lbl active">Implementation</div>
+      <div class="phase-lbl">Review</div>
+      <div class="phase-lbl">Complete</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB BAR ═══════════════ -->
+<div class="tab-bar">
+  <div class="tab active" data-tab="tasks">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+    Tasks
+    <span class="tab-count">8</span>
+  </div>
+  <div class="tab" data-tab="commits">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+    Commits
+    <span class="tab-count">3</span>
+  </div>
+  <div class="tab" data-tab="artifacts">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+    Artifacts
+    <span class="tab-count">4</span>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB CONTENT ═══════════════ -->
+<div class="tab-content">
+
+  <!-- ── TASKS TAB ── -->
+  <div class="tab-panel active" id="tab-tasks">
+    <div class="tab-panel-inner" style="padding-top:0;">
+      <table class="task-table">
+        <thead>
+          <tr>
+            <th style="width:35%">Task</th>
+            <th style="width:10%">Type</th>
+            <th style="width:14%">Status</th>
+            <th style="width:20%">Assignee</th>
+            <th style="width:8%">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="task-title-cell">Implement OAuth2 PKCE flow</td>
+            <td><span class="type-tag" style="background:rgba(96,165,250,0.12);color:var(--accent-blue)">Code</span></td>
+            <td><span class="status-chip chip-progress"><span class="dot"></span>In Progress</span></td>
+            <td><div class="assignee-cell"><span class="mini-avatar" style="background:var(--accent-blue)">C</span>Coder-1</div></td>
+            <td class="elapsed-cell">45m</td>
+          </tr>
+          <tr>
+            <td class="task-title-cell">Integration tests for token refresh</td>
+            <td><span class="type-tag" style="background:rgba(52,211,153,0.12);color:var(--accent-green)">Test</span></td>
+            <td><span class="status-chip chip-progress"><span class="dot"></span>In Progress</span></td>
+            <td><div class="assignee-cell"><span class="mini-avatar" style="background:var(--accent-green)">T</span>Tester</div></td>
+            <td class="elapsed-cell">12m</td>
+          </tr>
+          <tr>
+            <td class="task-title-cell">Write migration guide for API consumers</td>
+            <td><span class="type-tag" style="background:rgba(251,191,36,0.12);color:var(--accent-yellow)">Review</span></td>
+            <td><span class="status-chip chip-todo"><span class="dot"></span>Backlog</span></td>
+            <td><span style="font-size:12px;color:var(--text-tertiary)">Unassigned</span></td>
+            <td class="elapsed-cell">2d</td>
+          </tr>
+          <tr style="opacity:0.55">
+            <td class="task-title-cell">Extract session store interface</td>
+            <td><span class="type-tag" style="background:rgba(96,165,250,0.12);color:var(--accent-blue)">Code</span></td>
+            <td><span class="status-chip chip-done"><span class="dot"></span>Done</span></td>
+            <td><div class="assignee-cell"><span class="mini-avatar" style="background:var(--accent-blue)">C</span>Coder-1</div></td>
+            <td class="elapsed-cell">1h23m</td>
+          </tr>
+          <tr style="opacity:0.55">
+            <td class="task-title-cell">Replace bcrypt with argon2id</td>
+            <td><span class="type-tag" style="background:rgba(96,165,250,0.12);color:var(--accent-blue)">Code</span></td>
+            <td><span class="status-chip chip-done"><span class="dot"></span>Done</span></td>
+            <td><div class="assignee-cell"><span class="mini-avatar" style="background:var(--accent-blue)">C</span>Coder-2</div></td>
+            <td class="elapsed-cell">38m</td>
+          </tr>
+          <tr style="opacity:0.55">
+            <td class="task-title-cell">Unit tests for token validation</td>
+            <td><span class="type-tag" style="background:rgba(52,211,153,0.12);color:var(--accent-green)">Test</span></td>
+            <td><span class="status-chip chip-done"><span class="dot"></span>Done</span></td>
+            <td><div class="assignee-cell"><span class="mini-avatar" style="background:var(--accent-green)">T</span>Tester</div></td>
+            <td class="elapsed-cell">15m</td>
+          </tr>
+          <tr style="opacity:0.55">
+            <td class="task-title-cell">Add CORS configuration tests</td>
+            <td><span class="type-tag" style="background:rgba(52,211,153,0.12);color:var(--accent-green)">Test</span></td>
+            <td><span class="status-chip chip-done"><span class="dot"></span>Done</span></td>
+            <td><div class="assignee-cell"><span class="mini-avatar" style="background:var(--accent-green)">T</span>Tester</div></td>
+            <td class="elapsed-cell">22m</td>
+          </tr>
+          <tr>
+            <td class="task-title-cell">
+              Rate limiter stress test
+              <div style="font-size:11px;color:var(--accent-red);margin-top:3px;">Timeout: Redis connection pool exhausted</div>
+            </td>
+            <td><span class="type-tag" style="background:rgba(52,211,153,0.12);color:var(--accent-green)">Test</span></td>
+            <td><span class="status-chip chip-failed"><span class="dot"></span>Failed</span></td>
+            <td><div class="assignee-cell"><span class="mini-avatar" style="background:var(--accent-green)">T</span>Tester</div></td>
+            <td class="elapsed-cell">8m</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── COMMITS TAB ── -->
+  <div class="tab-panel" id="tab-commits">
+    <div class="tab-panel-inner" style="padding-top:0;">
+      <div class="commit-list">
+        <div class="commit-row">
+          <div class="commit-dot-col"><div class="cdot head"></div></div>
+          <code class="commit-sha2">a3f7c21</code>
+          <div class="commit-msg2">feat: implement PKCE challenge generation</div>
+          <div class="commit-badges2">
+            <span class="cbadge cbadge-pass">&#10003; Tests</span>
+            <span class="cbadge cbadge-pending">&#9203; Review</span>
+          </div>
+          <div class="commit-author2">Coder-1</div>
+          <div class="commit-time2">12m</div>
+        </div>
+        <div class="commit-row">
+          <div class="commit-dot-col"><div class="cdot"></div></div>
+          <code class="commit-sha2">b8e4d10</code>
+          <div class="commit-msg2">refactor: extract session store interface</div>
+          <div class="commit-badges2">
+            <span class="cbadge cbadge-pass">&#10003; Tests</span>
+            <span class="cbadge cbadge-pass">&#10003; Review</span>
+          </div>
+          <div class="commit-author2">Coder-1</div>
+          <div class="commit-time2">1h</div>
+        </div>
+        <div class="commit-row">
+          <div class="commit-dot-col"><div class="cdot"></div></div>
+          <code class="commit-sha2">c1d5a92</code>
+          <div class="commit-msg2">security: replace bcrypt with argon2id for password hashing</div>
+          <div class="commit-badges2">
+            <span class="cbadge cbadge-pass">&#10003; Tests</span>
+            <span class="cbadge cbadge-pass">&#10003; Review</span>
+          </div>
+          <div class="commit-author2">Coder-2</div>
+          <div class="commit-time2">2h</div>
+        </div>
+        <div class="commit-row">
+          <div class="commit-dot-col"><div class="cdot"></div></div>
+          <code class="commit-sha2">d4e8f33</code>
+          <div class="commit-msg2">feat: add rate limiter middleware with Redis backend</div>
+          <div class="commit-badges2">
+            <span class="cbadge cbadge-fail">&#10007; Tests</span>
+          </div>
+          <div class="commit-author2">Coder-2</div>
+          <div class="commit-time2">3h</div>
+        </div>
+        <div class="commit-row">
+          <div class="commit-dot-col"><div class="cdot"></div></div>
+          <code class="commit-sha2">e5a9b77</code>
+          <div class="commit-msg2">chore: initial auth module scaffold</div>
+          <div class="commit-badges2">
+            <span class="cbadge cbadge-pass">&#10003; Tests</span>
+            <span class="cbadge cbadge-pass">&#10003; Review</span>
+          </div>
+          <div class="commit-author2">Coder-1</div>
+          <div class="commit-time2">5h</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ARTIFACTS TAB ── -->
+  <div class="tab-panel" id="tab-artifacts">
+    <div class="tab-panel-inner">
+      <div class="artifact-grid">
+        <div class="artifact-card">
+          <div class="artifact-card-top">
+            <span class="artifact-card-icon">📐</span>
+            <span class="artifact-card-badge badge-exists">v2</span>
+          </div>
+          <div class="artifact-card-name">Design Document <span class="badge-required">Required</span></div>
+          <div class="artifact-card-meta">Updated 3h ago</div>
+          <div class="artifact-card-producer">
+            <span class="mini-avatar" style="background:var(--accent-purple)">TL</span>
+            Produced by Team Lead
+          </div>
+        </div>
+        <div class="artifact-card">
+          <div class="artifact-card-top">
+            <span class="artifact-card-icon">🧪</span>
+            <span class="artifact-card-badge badge-exists">v1</span>
+          </div>
+          <div class="artifact-card-name">Test Plan <span class="badge-required">Required</span></div>
+          <div class="artifact-card-meta">Created 2h ago</div>
+          <div class="artifact-card-producer">
+            <span class="mini-avatar" style="background:var(--accent-purple)">TL</span>
+            Produced by Team Lead
+          </div>
+        </div>
+        <div class="artifact-card missing">
+          <div class="artifact-card-top">
+            <span class="artifact-card-icon">🔍</span>
+            <span class="artifact-card-badge badge-missing">Missing</span>
+          </div>
+          <div class="artifact-card-name">Review Findings <span class="badge-required">Required</span></div>
+          <div class="artifact-card-meta">Blocks goal completion</div>
+        </div>
+        <div class="artifact-card missing">
+          <div class="artifact-card-top">
+            <span class="artifact-card-icon">🔒</span>
+            <span class="artifact-card-badge badge-missing">Missing</span>
+          </div>
+          <div class="artifact-card-name">Security Findings</div>
+          <div class="artifact-card-meta">Optional</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

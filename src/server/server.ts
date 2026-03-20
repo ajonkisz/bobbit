@@ -1202,14 +1202,12 @@ async function handleApiRoute(
 		return;
 	}
 
-	// GET /api/preview — get current preview HTML (per-session via ?sessionId=)
+	// GET /api/preview?sessionId=xxx — get preview HTML for a session
 	if (url.pathname === "/api/preview" && req.method === "GET") {
-		const sid = url.searchParams.get("sessionId");
-		const piDir = path.join(os.homedir(), ".pi");
-		// Try session-specific file first, fall back to legacy shared file
-		const sessionPath = sid ? path.join(piDir, `preview-${sid}.html`) : null;
-		const legacyPath = path.join(piDir, "preview.html");
-		const previewPath = sessionPath && fs.existsSync(sessionPath) ? sessionPath : legacyPath;
+		const sessionId = url.searchParams.get("sessionId");
+		const previewPath = sessionId
+			? path.join(os.homedir(), ".pi", `preview-${sessionId}.html`)
+			: path.join(os.homedir(), ".pi", "preview.html");
 		try {
 			const content = fs.readFileSync(previewPath, "utf-8");
 			const stat = fs.statSync(previewPath);
@@ -1220,14 +1218,13 @@ async function handleApiRoute(
 		return;
 	}
 
-	// POST /api/preview — set preview HTML content (per-session via ?sessionId=)
+	// POST /api/preview?sessionId=xxx — set preview HTML for a session
 	if (url.pathname === "/api/preview" && req.method === "POST") {
 		const body = await readBody(req);
-		const sid = url.searchParams.get("sessionId");
-		const piDir = path.join(os.homedir(), ".pi");
-		const previewPath = sid
-			? path.join(piDir, `preview-${sid}.html`)
-			: path.join(piDir, "preview.html");
+		const sessionId = url.searchParams.get("sessionId");
+		const previewPath = sessionId
+			? path.join(os.homedir(), ".pi", `preview-${sessionId}.html`)
+			: path.join(os.homedir(), ".pi", "preview.html");
 		fs.writeFileSync(previewPath, body?.html || "", "utf-8");
 		json({ ok: true });
 		return;
