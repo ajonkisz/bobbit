@@ -149,6 +149,10 @@ html {
 	overflow: visible;
 	filter: hue-rotate(var(--bobbit-hue-rotate, 0deg));
 }
+/* When chat shares space with a side panel, nudge bobbit right ~20% of its width */
+.goal-chat-panel .bobbit-blob {
+	margin-left: 7px;
+}
 
 /* Pixelated shadow — same coordinate system as sprite, pinned to ground */
 .bobbit-blob__shadow {
