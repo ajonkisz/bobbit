@@ -455,8 +455,8 @@
 		height: 28px;
 	}
 	.bobbit-blob--inline {
-		left: 14px;
-		bottom: 6px;
+		left: 16px;
+		bottom: 3px;
 	}
 	.roles-edit-container {
 		flex-direction: column;
@@ -490,8 +490,8 @@
 	margin-bottom: 0 !important;
 	overflow: visible;
 	position: absolute;
-	left: 16px;
-	bottom: 5px;
+	left: 18px;
+	bottom: 2px;
 }
 
 /* Keep the original 3.5x scale and sprite margins — the blob layout is
