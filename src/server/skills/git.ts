@@ -26,6 +26,17 @@ export function createWorktree(repoPath: string, branchName: string): WorktreeRe
 		stdio: "pipe",
 	});
 
+	// Push the new branch and set upstream tracking so git-status can report ahead/behind
+	// and `git rev-parse @{u}` doesn't emit "fatal: no upstream" errors.
+	try {
+		execFileSync("git", ["push", "-u", "origin", branchName], {
+			cwd: worktreePath,
+			stdio: "pipe",
+		});
+	} catch {
+		// Push may fail (no remote, auth issues, offline) — not fatal
+	}
+
 	return { worktreePath, branchName };
 }
 
