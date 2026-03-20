@@ -215,7 +215,7 @@
 }
 
 .roles-edit-sidebar {
-	width: 300px;
+	width: 340px;
 	flex-shrink: 0;
 	border-left: 1px solid var(--border);
 	padding-left: 24px;

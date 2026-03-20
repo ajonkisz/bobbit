@@ -455,32 +455,6 @@ function renderEditView(): TemplateResult {
 					></textarea>
 				</div>
 
-				<!-- Tools section -->
-				<div class="roles-edit-section">
-					<div class="roles-tools-top">
-						<h2 class="roles-section-title">Tool Access</h2>
-						<div class="roles-tools-mode">
-							<button
-								class="roles-tools-mode-btn ${!editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
-								@click=${() => setRestricted(false)}
-							>All tools</button>
-							<button
-								class="roles-tools-mode-btn ${editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
-								@click=${() => setRestricted(true)}
-							>Restricted</button>
-						</div>
-					</div>
-					${!editRestrictTools
-						? html`<p class="roles-tools-note">This role can use every available tool.</p>`
-						: html`
-							<p class="roles-tools-note">${editTools.length} of ${availableTools.length} tools enabled</p>
-							${renderToolGroups()}
-						`}
-				</div>
-			</div>
-
-			<!-- Right sidebar -->
-			<div class="roles-edit-sidebar">
 				<!-- Accessory selector -->
 				<div class="roles-edit-section">
 					<h2 class="roles-section-title">Accessory</h2>
@@ -503,6 +477,32 @@ function renderEditView(): TemplateResult {
 							`;
 						})}
 					</div>
+				</div>
+			</div>
+
+			<!-- Right sidebar -->
+			<div class="roles-edit-sidebar">
+				<!-- Tools section -->
+				<div class="roles-edit-section">
+					<div class="roles-tools-top">
+						<h2 class="roles-section-title">Tool Access</h2>
+						<div class="roles-tools-mode">
+							<button
+								class="roles-tools-mode-btn ${!editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
+								@click=${() => setRestricted(false)}
+							>All tools</button>
+							<button
+								class="roles-tools-mode-btn ${editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
+								@click=${() => setRestricted(true)}
+							>Restricted</button>
+						</div>
+					</div>
+					${!editRestrictTools
+						? html`<p class="roles-tools-note">This role can use every available tool.</p>`
+						: html`
+							<p class="roles-tools-note">${editTools.length} of ${availableTools.length} tools enabled</p>
+							${renderToolGroups()}
+						`}
 				</div>
 
 				<!-- Actions -->
