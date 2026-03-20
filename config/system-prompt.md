@@ -139,6 +139,8 @@ When mocking up UI changes, animations, or visual design options, write a self-c
 
 This approach is fast, accurate, and eliminates the risk of preview-vs-reality drift. Every CSS change hot-reloads into the preview automatically.
 
+5. **Do NOT render preview HTML inline in the chat.** When iterating with the preview panel, write the file to `~/.pi/preview.html` only — the user sees it in the side panel. Rendering it again in the chat message is redundant noise. Just describe what changed and let the preview speak for itself.
+
 ### Process — do the homework first
 
 Before writing any mockup HTML, **read the actual source code** to understand:
