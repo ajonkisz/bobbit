@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tool Management — Detail View</title>
+<style>
+/* ============================================================================
+ * BOBBIT DESIGN TOKENS (from src/ui/app.css dark mode)
+ * ============================================================================ */
+:root {
+  --background: oklch(0.21 0.008 145);
+  --foreground: oklch(0.96 0.008 140);
+  --card: oklch(0.24 0.01 145);
+  --secondary: oklch(0.27 0.012 145);
+  --secondary-foreground: oklch(0.96 0.008 140);
+  --muted: oklch(0.27 0.012 145);
+  --muted-foreground: oklch(0.65 0.012 140);
+  --accent: oklch(0.32 0.015 145);
+  --border: oklch(0.30 0.012 145);
+  --input: oklch(0.34 0.012 145);
+  --ring: oklch(0.50 0.06 145);
+  --primary: oklch(0.72 0.12 140);
+  --primary-foreground: oklch(0.18 0.01 145);
+  --destructive: oklch(0.65 0.2 25);
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  height: 100vh;
+  display: flex;
+}
+
+/* ============================================================================
+ * TOOLS CONTAINER — mirrors .roles-container
+ * ============================================================================ */
+.tools-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ============================================================================
+ * NAV BAR — mirrors .roles-nav edit mode (breadcrumb + actions)
+ * ============================================================================ */
+.tools-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: 12px;
+}
+
+.tools-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tools-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tools-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.tools-back:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+.tools-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tools-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tools-breadcrumb {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: color 150ms;
+  flex-shrink: 0;
+}
+.tools-breadcrumb:hover {
+  color: var(--foreground);
+}
+
+.tools-breadcrumb-sep {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+/* Buttons */
+.tools-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms, opacity 150ms;
+}
+.tools-btn--primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.tools-btn--primary:hover { opacity: 0.9; }
+.tools-btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tools-btn--ghost {
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.tools-btn--ghost:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+/* ============================================================================
+ * BODY — mirrors .roles-body with :has(.tools-edit-container)
+ * ============================================================================ */
+.tools-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================================
+ * EDIT VIEW — TWO COLUMN mirrors .roles-edit-container
+ * ============================================================================ */
+.tools-edit-container {
+  display: flex;
+  gap: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.tools-edit-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-right: 24px;
+}
+
+/* The last section (docs) stretches to fill remaining space */
+.tools-edit-main > .tools-edit-section:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.tools-edit-sidebar {
+  width: 340px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tools-edit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tools-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+/* ============================================================================
+ * FORM FIELDS — mirrors roles form fields
+ * ============================================================================ */
+.tools-identity-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.tools-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tools-field-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.tools-field-readonly {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  padding: 8px 12px;
+  background: var(--secondary);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.tools-field-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 150ms;
+}
+.tools-field-input:focus {
+  border-color: var(--ring);
+}
+
+.tools-field-select {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 150ms;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+.tools-field-select:focus {
+  border-color: var(--ring);
+}
+
+/* Documentation textarea — mirrors .roles-prompt-editor */
+.tools-docs-editor {
+  width: 100%;
+  min-height: 200px;
+  flex: 1;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+  transition: border-color 150ms;
+}
+.tools-docs-editor:focus {
+  border-color: var(--ring);
+}
+
+/* ============================================================================
+ * SIDEBAR — Renderer info, Role access
+ * ============================================================================ */
+
+/* Renderer status card */
+.tools-renderer-card {
+  padding: 12px;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tools-renderer-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tools-renderer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tools-renderer-dot--custom {
+  background: #22c55e;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.4);
+}
+.tools-renderer-dot--default {
+  background: color-mix(in oklch, var(--muted-foreground) 40%, transparent);
+}
+
+.tools-renderer-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tools-renderer-path {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  padding: 6px 8px;
+  background: color-mix(in oklch, var(--background) 60%, transparent);
+  border-radius: 4px;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+/* Role access list */
+.tools-role-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tools-role-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.tools-role-item:hover {
+  background: var(--accent);
+}
+
+.tools-role-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.tools-role-badge--allowed {
+  background: color-mix(in oklch, #22c55e 15%, transparent);
+  color: #22c55e;
+}
+.tools-role-badge--restricted {
+  background: color-mix(in oklch, var(--destructive) 15%, transparent);
+  color: var(--destructive);
+}
+
+.tools-role-name {
+  font-weight: 500;
+}
+
+.tools-role-arrow {
+  margin-left: auto;
+  width: 12px;
+  height: 12px;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transition: opacity 150ms;
+}
+.tools-role-item:hover .tools-role-arrow {
+  opacity: 1;
+}
+
+/* Tool assistant shortcut in sidebar */
+.tools-assistant-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms, color 150ms;
+}
+.tools-assistant-link:hover {
+  background: var(--accent);
+  border-color: var(--primary);
+  color: var(--foreground);
+}
+.tools-assistant-link svg {
+  flex-shrink: 0;
+}
+
+/* Note text */
+.tools-note {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ============================================================================
+ * RESPONSIVE — mirrors role-manager.css mobile breakpoint
+ * ============================================================================ */
+@media (max-width: 768px) {
+  .tools-nav {
+    padding: 10px 14px;
+  }
+  .tools-body {
+    padding: 14px;
+  }
+  .tools-edit-container {
+    flex-direction: column;
+  }
+  .tools-edit-main {
+    padding-right: 0;
+  }
+  .tools-edit-sidebar {
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 24px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="tools-container">
+  <!-- NAV BAR (edit mode — breadcrumb + save) -->
+  <div class="tools-nav">
+    <div class="tools-nav-left">
+      <button class="tools-back" title="Back to tools" onclick="window.location.href='tool-list.html'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+      </button>
+      <div class="tools-title-group">
+        <span class="tools-breadcrumb" onclick="window.location.href='tool-list.html'">Tools</span>
+        <span class="tools-breadcrumb-sep">/</span>
+        <h1 class="tools-title" id="toolTitle">bash</h1>
+      </div>
+    </div>
+    <div class="tools-nav-right">
+      <button class="tools-btn tools-btn--primary" id="saveBtn" disabled onclick="handleSave()">Save</button>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="tools-body">
+    <div class="tools-edit-container">
+      <!-- LEFT — Main editing area -->
+      <div class="tools-edit-main">
+        <!-- Identity section -->
+        <div class="tools-edit-section">
+          <h2 class="tools-section-title">Identity</h2>
+          <div class="tools-identity-row">
+            <div class="tools-edit-field">
+              <label class="tools-field-label">Name</label>
+              <div class="tools-field-readonly" id="fieldName">bash</div>
+            </div>
+            <div class="tools-edit-field" style="flex:1;min-width:0;">
+              <label class="tools-field-label">Description</label>
+              <input class="tools-field-input" id="fieldDesc" type="text" value="Execute shell commands" oninput="trackChanges()">
+            </div>
+          </div>
+          <div class="tools-edit-field">
+            <label class="tools-field-label">Group</label>
+            <select class="tools-field-select" id="fieldGroup" onchange="trackChanges()">
+              <option value="File System">File System</option>
+              <option value="Shell" selected>Shell</option>
+              <option value="Web">Web</option>
+              <option value="Browser">Browser</option>
+              <option value="Agent">Agent</option>
+              <option value="Team">Team</option>
+              <option value="Tasks">Tasks</option>
+              <option value="Artifacts">Artifacts</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Documentation section (stretches) -->
+        <div class="tools-edit-section">
+          <h2 class="tools-section-title">Documentation</h2>
+          <p class="tools-note">Markdown documentation for this tool — usage examples, parameter descriptions, expected output format.</p>
+          <textarea class="tools-docs-editor" id="fieldDocs" placeholder="# bash
+
+Execute a bash command in the current working directory.
+
+## Parameters
+
+- **command** (required): The bash command to execute
+- **timeout** (optional): Timeout in seconds
+
+## Usage Examples
+
+```
+bash({ command: &quot;ls -la&quot; })
+bash({ command: &quot;npm run build&quot;, timeout: 120 })
+```
+
+## Output
+
+Returns stdout and stderr. Output is truncated to the last 2000 lines or 50KB (whichever is hit first).
+
+## Notes
+
+- Do NOT start background servers manually — backgrounded processes that inherit stdout/stderr FDs cause the bash tool to hang forever.
+- Use Playwright's webServer config for anything that needs a running server." oninput="trackChanges()"></textarea>
+        </div>
+      </div>
+
+      <!-- RIGHT — Sidebar -->
+      <div class="tools-edit-sidebar">
+        <!-- Renderer status -->
+        <div class="tools-edit-section">
+          <h2 class="tools-section-title">Renderer</h2>
+          <div class="tools-renderer-card">
+            <div class="tools-renderer-status">
+              <span class="tools-renderer-dot tools-renderer-dot--custom"></span>
+              <span class="tools-renderer-label">Custom renderer</span>
+            </div>
+            <div class="tools-renderer-path">src/ui/tools/renderers/BashRenderer.ts</div>
+          </div>
+          <p class="tools-note">Renderer code is edited via the Tool Assistant, not directly in this UI.</p>
+        </div>
+
+        <!-- Role access -->
+        <div class="tools-edit-section">
+          <h2 class="tools-section-title">Role Access</h2>
+          <div class="tools-role-list">
+            <div class="tools-role-item" onclick="alert('Navigate to Coder role')">
+              <span class="tools-role-name">Coder</span>
+              <span class="tools-role-badge tools-role-badge--allowed">allowed</span>
+              <svg class="tools-role-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </div>
+            <div class="tools-role-item" onclick="alert('Navigate to Reviewer role')">
+              <span class="tools-role-name">Reviewer</span>
+              <span class="tools-role-badge tools-role-badge--restricted">restricted</span>
+              <svg class="tools-role-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </div>
+            <div class="tools-role-item" onclick="alert('Navigate to Tester role')">
+              <span class="tools-role-name">Tester</span>
+              <span class="tools-role-badge tools-role-badge--allowed">allowed</span>
+              <svg class="tools-role-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </div>
+          </div>
+          <p class="tools-note">Role access is configured on each role's edit page.</p>
+        </div>
+
+        <!-- Tool Assistant shortcut -->
+        <div class="tools-edit-section">
+          <h2 class="tools-section-title">Actions</h2>
+          <div class="tools-assistant-link" onclick="alert('Launch Tool Assistant for bash')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            Ask Tool Assistant about this tool
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+// INTERACTIVE STATE — tracks unsaved changes for Save button
+// ============================================================================
+const original = {
+  desc: document.getElementById('fieldDesc').value,
+  group: document.getElementById('fieldGroup').value,
+  docs: document.getElementById('fieldDocs').value,
+};
+
+function trackChanges() {
+  const desc = document.getElementById('fieldDesc').value;
+  const group = document.getElementById('fieldGroup').value;
+  const docs = document.getElementById('fieldDocs').value;
+  const changed = desc !== original.desc || group !== original.group || docs !== original.docs;
+  document.getElementById('saveBtn').disabled = !changed;
+}
+
+function handleSave() {
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = 'Saving\u2026';
+  btn.disabled = true;
+  setTimeout(() => {
+    // Simulate save
+    original.desc = document.getElementById('fieldDesc').value;
+    original.group = document.getElementById('fieldGroup').value;
+    original.docs = document.getElementById('fieldDocs').value;
+    btn.textContent = 'Save';
+    btn.disabled = true;
+  }, 600);
+}
+
+// Parse URL param to load different tool (optional — for demo linking from list)
+const params = new URLSearchParams(window.location.search);
+const toolName = params.get('tool');
+if (toolName && toolName !== 'bash') {
+  // For the prototype, show the name but keep bash's content as placeholder
+  document.getElementById('toolTitle').textContent = toolName;
+  document.getElementById('fieldName').textContent = toolName;
+}
+</script>
+
+</body>
+</html>
