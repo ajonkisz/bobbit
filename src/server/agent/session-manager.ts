@@ -250,9 +250,10 @@ export class SessionManager {
 		if (event.type === "tool_execution_start") {
 			session.turnHadToolCalls = true;
 
-			// Enforce allowedTools — warn when a disallowed tool is used
+			// Enforce allowedTools — warn when a disallowed tool is used (case-insensitive)
 			if (session.allowedTools && session.allowedTools.length > 0 && event.toolName) {
-				if (!session.allowedTools.includes(event.toolName)) {
+				const toolLower = event.toolName.toLowerCase();
+				if (!session.allowedTools.some((t: string) => t.toLowerCase() === toolLower)) {
 					console.warn(
 						`[session-manager] Session ${session.id} used disallowed tool "${event.toolName}". ` +
 						`Allowed: [${session.allowedTools.join(", ")}]`

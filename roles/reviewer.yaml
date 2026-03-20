@@ -2,8 +2,8 @@ name: reviewer
 label: Reviewer
 accessory: magnifier
 allowedTools:
-  - Read
-  - Bash
+  - read
+  - bash
   - web_search
   - web_fetch
   - artifact_list
