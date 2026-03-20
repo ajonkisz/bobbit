@@ -6,41 +6,42 @@ const STORE_DIR = path.join(os.homedir(), ".pi");
 const STORE_FILE = path.join(STORE_DIR, "gateway-session-colors.json");
 
 /**
- * Mapping from the original 20-colour palette indices to the current
- * 17-colour palette. Removed hues: 200° (old 8), 225° (old 9), 250° (old 19).
+ * Migration mappings between palette versions. Each maps old index → new index.
  *
- * Old palette: [0,25,50,75,100,125,150,175,200,225,-135,-110,-85,-60,-35,-10,15,40,65,250]
- * New palette: [0,25,50,75,100,125,150,175,-135,-110,-85,-60,-35,-10,15,40,65]
- *
- * - 0-7: unchanged
- * - 8 (removed 200°) → 7 (175°, nearest)
- * - 9 (removed 225°) → 7 (175°, nearest)
- * - 10-18: shift down by 2 (10→8, 11→9, ..., 18→16)
- * - 19 (removed 250°) → 8 (-135°, nearest in new palette)
+ * V1 (20 colours): [0,25,50,75,100,125,150,175,200,225,-135,-110,-85,-60,-35,-10,15,40,65,250]
+ * V3 (17 colours): [0,25,50,75,100,125,150,175,-135,-110,-85,-60,-35,-10,15,40,65]
+ * V4 (14 colours): [-110,-85,-60,-35,-10,0,15,25,40,50,65,75,100,125]
  */
+
+// V1 (original 20) → V4 (current 14)
 const V1_TO_CURRENT: number[] = [
-	0, 1, 2, 3, 4, 5, 6, 7, // 0-7: unchanged
-	7,                        // 8 (200°) → 7 (175°)
-	7,                        // 9 (225°) → 7 (175°)
-	8, 9, 10, 11, 12, 13, 14, 15, 16, // 10-18 → 8-16
-	8,                        // 19 (250°) → 8 (-135°)
+	5, 7, 9, 11, 12, 13, // 0-5: 0→5, 25→7, 50→9, 75→11, 100→12, 125→13
+	13, 13,               // 6-7: 150°,175° removed → 13 (125°)
+	13, 13,               // 8-9: 200°,225° removed → 13 (125°)
+	0, 0, 1, 2, 3, 4, 6, 8, 10, // 10-18: -135→0(-110), -110→0, -85→1, -60→2, -35→3, -10→4, 15→6, 40→8, 65→10
+	0,                    // 19: 250° removed → 0 (-110°)
 ];
 
-/**
- * Mapping from the intermediate 18-colour palette (v2) to the current
- * 17-colour palette. Removed hue: 225° (was at index 8 in v2).
- *
- * V2 palette: [0,25,50,75,100,125,150,175,225,-135,-110,-85,-60,-35,-10,15,40,65]
- * New palette: [0,25,50,75,100,125,150,175,-135,-110,-85,-60,-35,-10,15,40,65]
- */
+// V2 (18 colours) → V4 (current 14) — same as V1 but without indices 8(200°) and 19(250°)
+// V2: [0,25,50,75,100,125,150,175,225,-135,-110,-85,-60,-35,-10,15,40,65]
 const V2_TO_CURRENT: number[] = [
-	0, 1, 2, 3, 4, 5, 6, 7, // 0-7: unchanged
-	7,                        // 8 (225°) → 7 (175°)
-	8, 9, 10, 11, 12, 13, 14, 15, 16, // 9-17 → 8-16
+	5, 7, 9, 11, 12, 13, // 0-5: same hue mapping as V1
+	13, 13,               // 6-7: 150°,175° removed → 13 (125°)
+	13,                   // 8: 225° removed → 13 (125°)
+	0, 0, 1, 2, 3, 4, 6, 8, 10, // 9-17: -135→0, -110→0, -85→1, -60→2, -35→3, -10→4, 15→6, 40→8, 65→10
+];
+
+// V3 (17 colours) → V4 (current 14)
+// V3: [0,25,50,75,100,125,150,175,-135,-110,-85,-60,-35,-10,15,40,65]
+const V3_TO_CURRENT: number[] = [
+	5, 7, 9, 11, 12, 13, // 0-5: 0→5, 25→7, 50→9, 75→11, 100→12, 125→13
+	13, 13,               // 6-7: 150°,175° removed → 13 (125°)
+	0,                    // 8: -135° removed → 0 (-110°)
+	0, 1, 2, 3, 4, 6, 8, 10, // 9-16: -110→0, -85→1, -60→2, -35→3, -10→4, 15→6, 40→8, 65→10
 ];
 
 /** Current palette version. Bump when palette changes require migration. */
-const PALETTE_VERSION = 3;
+const PALETTE_VERSION = 4;
 
 /**
  * Persists session → palette index mapping to disk.
@@ -74,9 +75,11 @@ export class ColorStore {
 		}
 	}
 
-	/** Remap all indices from an old palette version to the current 17-colour palette. */
+	/** Remap all indices from an old palette version to the current 14-colour palette. */
 	private migrateFromOldPalette(fromVersion: number): void {
-		const mapping = fromVersion < 2 ? V1_TO_CURRENT : V2_TO_CURRENT;
+		const mapping = fromVersion < 2 ? V1_TO_CURRENT
+			: fromVersion < 3 ? V2_TO_CURRENT
+			: V3_TO_CURRENT;
 		let changed = false;
 		for (const [id, idx] of this.colors) {
 			if (idx >= 0 && idx < mapping.length) {
@@ -85,9 +88,9 @@ export class ColorStore {
 					this.colors.set(id, newIdx);
 					changed = true;
 				}
-			} else if (idx > 16) {
+			} else if (idx > 13) {
 				// Any index out of new range → clamp to max
-				this.colors.set(id, 16);
+				this.colors.set(id, 13);
 				changed = true;
 			}
 		}
