@@ -324,6 +324,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
 		state.isRoleAssistantSession = options?.isRoleAssistant || sessionData?.roleAssistant || false;
 		state.isPreviewSession = options?.isPreview || sessionData?.preview || false;
+		state.previewPanelHtml = ""; // Clear stale preview from previous session
 		if (state.isPreviewSession) startPreviewPolling();
 		else stopPreviewPolling();
 

@@ -159,4 +159,9 @@ export function cleanupSessionPrompt(sessionId: string): void {
 	try {
 		if (fs.existsSync(promptPath)) fs.unlinkSync(promptPath);
 	} catch { /* ignore */ }
+	// Also clean up per-session preview file
+	const previewPath = path.join(os.homedir(), ".pi", `preview-${sessionId}.html`);
+	try {
+		if (fs.existsSync(previewPath)) fs.unlinkSync(previewPath);
+	} catch { /* ignore */ }
 }
