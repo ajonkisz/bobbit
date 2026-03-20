@@ -460,17 +460,6 @@ function renderEditView(): TemplateResult {
 					</div>
 				</div>
 
-				<!-- System prompt section -->
-				<div class="roles-edit-section">
-					<h2 class="roles-section-title">System Prompt</h2>
-					<textarea
-						class="roles-prompt-editor"
-						.value=${editPrompt}
-						placeholder="Markdown system prompt template. Supports {{GOAL_BRANCH}} and {{AGENT_ID}} placeholders."
-						@input=${(e: Event) => { editPrompt = (e.target as HTMLTextAreaElement).value; }}
-					></textarea>
-				</div>
-
 				<!-- Accessory selector -->
 				<div class="roles-edit-section">
 					<h2 class="roles-section-title">Accessory</h2>
@@ -493,6 +482,17 @@ function renderEditView(): TemplateResult {
 							`;
 						})}
 					</div>
+				</div>
+
+				<!-- System prompt section -->
+				<div class="roles-edit-section">
+					<h2 class="roles-section-title">System Prompt</h2>
+					<textarea
+						class="roles-prompt-editor"
+						.value=${editPrompt}
+						placeholder="Markdown system prompt template. Supports {{GOAL_BRANCH}} and {{AGENT_ID}} placeholders."
+						@input=${(e: Event) => { editPrompt = (e.target as HTMLTextAreaElement).value; }}
+					></textarea>
 				</div>
 			</div>
 
