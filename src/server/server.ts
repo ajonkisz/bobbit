@@ -15,6 +15,8 @@ import { exportSkillDefinitions, listSkills } from "./skills/index.js";
 import { TeamManager } from "./agent/team-manager.js";
 import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
+import { ToolStore } from "./agent/tool-store.js";
+import { TOOL_ASSISTANT_PROMPT } from "./agent/tool-assistant.js";
 import type { TaskType, TaskState } from "./agent/task-store.js";
 import { GoalArtifactStore, getDefaultRequirements, type ArtifactType } from "./agent/goal-artifact-store.js";
 
@@ -54,7 +56,8 @@ export function createGateway(config: GatewayConfig) {
 	const piDir = path.join(os.homedir(), ".pi");
 	fs.mkdirSync(piDir, { recursive: true });
 	const roleStore = new RoleStore();
-	const roleManager = new RoleManager(roleStore);
+	const toolStore = new ToolStore();
+	const roleManager = new RoleManager(roleStore, toolStore);
 	const goalArtifactStore = new GoalArtifactStore();
 	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
@@ -278,6 +281,7 @@ async function handleApiRoute(
 		const goalId = body?.goalId;
 		const goalAssistant = body?.goalAssistant === true;
 		const roleAssistant = body?.roleAssistant === true;
+		const toolAssistant = body?.toolAssistant === true;
 
 		// If creating under a goal, use the goal's cwd as default
 		let cwd = body?.cwd || config.defaultCwd;
@@ -296,10 +300,12 @@ async function handleApiRoute(
 
 		// If a roleId is provided, look up the role and pass its prompt/tools/accessory
 		const roleId = body?.roleId;
-		let createOpts: { rolePrompt?: string; allowedTools?: string[]; roleAssistant?: boolean } | undefined;
+		let createOpts: { rolePrompt?: string; allowedTools?: string[]; roleAssistant?: boolean; toolAssistant?: boolean } | undefined;
 		let roleForMeta: { name: string; accessory: string } | undefined;
 
-		if (roleAssistant) {
+		if (toolAssistant) {
+			createOpts = { toolAssistant: true };
+		} else if (roleAssistant) {
 			createOpts = { roleAssistant: true };
 		} else if (roleId && typeof roleId === "string") {
 			const role = roleManager.getRole(roleId);
@@ -331,6 +337,7 @@ async function handleApiRoute(
 				goalId: session.goalId,
 				goalAssistant: session.goalAssistant,
 				roleAssistant: session.roleAssistant,
+				toolAssistant: session.toolAssistant,
 				role: session.role,
 				accessory: session.accessory,
 			}, 201);
@@ -408,6 +415,32 @@ async function handleApiRoute(
 	if (url.pathname === "/api/tools" && req.method === "GET") {
 		json({ tools: roleManager.getAvailableTools() });
 		return;
+	}
+
+	// Routes with tool :name parameter
+	const toolMatch = url.pathname.match(/^\/api\/tools\/([^/]+)$/);
+	if (toolMatch) {
+		const name = decodeURIComponent(toolMatch[1]);
+
+		if (req.method === "GET") {
+			const tool = roleManager.getToolByName(name);
+			if (!tool) { json({ error: "Tool not found" }, 404); return; }
+			json(tool);
+			return;
+		}
+
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			const ok = roleManager.updateToolMetadata(name, {
+				description: body.description,
+				group: body.group,
+				docs: body.docs,
+			});
+			if (!ok) { json({ error: "Tool not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
 	}
 
 	// GET /api/roles
