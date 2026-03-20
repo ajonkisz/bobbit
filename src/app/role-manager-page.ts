@@ -304,7 +304,7 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 function renderRoleRow(role: RoleData, index: number): TemplateResult {
 	return html`
 		<div class="role-row" tabindex="0" role="button" @click=${() => showEdit(role)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showEdit(role); } }}>
-			${idleBlob(role.accessory ?? "none", 32, index)}
+			${idleBlob(role.accessory ?? "none", 42, index)}
 			<div class="role-row-info">
 				<span class="role-row-label">${role.label}</span>
 				<span class="role-row-slug">${role.name}</span>
@@ -336,7 +336,7 @@ function renderListView(): TemplateResult {
 	if (roles.length === 0) {
 		return html`
 			<div class="roles-empty">
-				<div class="roles-empty-bobbit">${idleBlob("none")}</div>
+				<div class="roles-empty-bobbit">${idleBlob("none", 52)}</div>
 				<p class="roles-empty-title">No roles yet</p>
 				<p class="roles-empty-desc">Roles give agents a persona, system prompt, and tool restrictions.</p>
 				${Button({
@@ -438,7 +438,7 @@ function renderEditView(): TemplateResult {
 									<span class="roles-accessory-preview">
 										${accId === "none"
 											? html`<span class="text-xs text-muted-foreground">\u2014</span>`
-											: idleBlob(accId, 32, i)}
+											: idleBlob(accId, 42, i)}
 									</span>
 									<span class="roles-accessory-label">${acc.label}</span>
 								</button>
