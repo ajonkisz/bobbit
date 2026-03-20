@@ -3,7 +3,7 @@ import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
-import { fetchRoles, fetchTools, createRole, updateRole, deleteRole, gatewayFetch, type RoleData } from "./api.js";
+import { fetchRoles, fetchTools, createRole, updateRole, deleteRole, gatewayFetch, type RoleData, type ToolInfo } from "./api.js";
 import { ACCESSORY_IDS, BOBBIT_HUE_ROTATIONS, getAccessory } from "./session-colors.js";
 import { state, renderApp } from "./state.js";
 import { setHashRoute } from "./routing.js";
@@ -56,7 +56,7 @@ type View = "list" | "edit" | "create";
 
 let currentView: View = "list";
 let roles: RoleData[] = [];
-let availableTools: string[] = [];
+let availableTools: ToolInfo[] = [];
 let selectedRole: RoleData | null = null;
 let loading = true;
 
@@ -66,6 +66,7 @@ let editPrompt = "";
 let editTools: string[] = [];
 let editAccessory = "none";
 let editName = "";
+let editRestrictTools = false;
 let saving = false;
 let deleting = false;
 
@@ -113,6 +114,7 @@ function showEdit(role: RoleData): void {
 	editTools = [...role.allowedTools];
 	editAccessory = role.accessory;
 	editName = role.name;
+	editRestrictTools = role.allowedTools.length > 0;
 	saving = false;
 	deleting = false;
 	setHashRoute("role-edit", role.name);
@@ -129,6 +131,7 @@ export function navigateToRoleEdit(roleName: string): void {
 		editTools = [...role.allowedTools];
 		editAccessory = role.accessory;
 		editName = role.name;
+		editRestrictTools = role.allowedTools.length > 0;
 		saving = false;
 		deleting = false;
 	} else {
@@ -173,7 +176,7 @@ async function handleSave(): Promise<void> {
 		const ok = await updateRole(selectedRole.name, {
 			label: editLabel,
 			promptTemplate: editPrompt,
-			allowedTools: editTools,
+			allowedTools: editRestrictTools ? editTools : [],
 			accessory: editAccessory,
 		});
 		if (ok) {
@@ -223,13 +226,23 @@ function toggleTool(tool: string): void {
 	renderApp();
 }
 
-function selectAllTools(): void {
-	editTools = [...availableTools];
+function toggleToolGroup(group: string): void {
+	const groupNames = availableTools.filter(t => t.group === group).map(t => t.name);
+	const allSelected = groupNames.every(n => editTools.includes(n));
+	if (allSelected) {
+		editTools = editTools.filter(t => !groupNames.includes(t));
+	} else {
+		const toAdd = groupNames.filter(n => !editTools.includes(n));
+		editTools = [...editTools, ...toAdd];
+	}
 	renderApp();
 }
 
-function selectNoTools(): void {
-	editTools = [];
+function setRestricted(restricted: boolean): void {
+	editRestrictTools = restricted;
+	if (restricted && editTools.length === 0) {
+		editTools = availableTools.map(t => t.name);
+	}
 	renderApp();
 }
 
@@ -354,14 +367,63 @@ function renderListView(): TemplateResult {
 }
 
 // ============================================================================
+// RENDER: TOOL GROUPS
+// ============================================================================
+
+function renderToolGroups(): TemplateResult {
+	const groups = new Map<string, ToolInfo[]>();
+	for (const tool of availableTools) {
+		const list = groups.get(tool.group) || [];
+		list.push(tool);
+		groups.set(tool.group, list);
+	}
+
+	return html`
+		<div class="roles-tool-groups">
+			${Array.from(groups.entries()).map(([group, tools]) => {
+				const allSelected = tools.every(t => editTools.includes(t.name));
+				const someSelected = tools.some(t => editTools.includes(t.name));
+				return html`
+					<div class="roles-tool-group">
+						<button class="roles-tool-group-header" @click=${() => toggleToolGroup(group)}>
+							<span class="roles-tool-group-check ${allSelected ? "checked" : someSelected ? "partial" : ""}">
+								${allSelected ? "\u2713" : someSelected ? "\u2013" : ""}
+							</span>
+							<span class="roles-tool-group-name">${group}</span>
+							<span class="roles-tool-group-count">${tools.filter(t => editTools.includes(t.name)).length}/${tools.length}</span>
+						</button>
+						<div class="roles-tool-group-items">
+							${tools.map(tool => {
+								const active = editTools.includes(tool.name);
+								return html`
+									<button
+										class="roles-tool-item ${active ? "roles-tool-item--active" : ""}"
+										@click=${() => toggleTool(tool.name)}
+									>
+										<span class="roles-tool-item-check">${active ? "\u2713" : ""}</span>
+										<span class="roles-tool-item-name">${tool.name}</span>
+										<span class="roles-tool-item-desc">${tool.description}</span>
+									</button>
+								`;
+							})}
+						</div>
+					</div>
+				`;
+			})}
+		</div>
+	`;
+}
+
+// ============================================================================
 // RENDER: EDIT VIEW
 // ============================================================================
 
 function renderEditView(): TemplateResult {
+	const effectiveTools = editRestrictTools ? editTools : [];
 	const hasChanges = selectedRole && (
 		editLabel !== selectedRole.label ||
 		editPrompt !== selectedRole.promptTemplate ||
-		JSON.stringify(editTools.sort()) !== JSON.stringify([...selectedRole.allowedTools].sort()) ||
+		JSON.stringify([...effectiveTools].sort()) !== JSON.stringify([...selectedRole.allowedTools].sort()) ||
 		editAccessory !== selectedRole.accessory
 	);
 
@@ -398,24 +460,23 @@ function renderEditView(): TemplateResult {
 
 				<!-- Tools section -->
 				<div class="roles-edit-section">
-					<div class="roles-tools-header">
-						<h2 class="roles-section-title">Allowed Tools</h2>
-						<span class="roles-tools-hint">(empty = all tools)</span>
-						<span class="flex-1"></span>
-						<button class="roles-tools-action" @click=${selectAllTools}>Select All</button>
-						<button class="roles-tools-action" @click=${selectNoTools}>Select None</button>
+					<h2 class="roles-section-title">Tool Access</h2>
+					<div class="roles-tools-mode">
+						<button
+							class="roles-tools-mode-btn ${!editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
+							@click=${() => setRestricted(false)}
+						>All tools</button>
+						<button
+							class="roles-tools-mode-btn ${editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
+							@click=${() => setRestricted(true)}
+						>Restricted</button>
 					</div>
-					<div class="roles-tools-grid">
-						${availableTools.map((tool) => {
-							const active = editTools.includes(tool);
-							return html`
-								<button
-									class="roles-tool-chip ${active ? "roles-tool-chip--active" : ""}"
-									@click=${() => toggleTool(tool)}
-								>${active ? "\u2713 " : ""}${tool}</button>
-							`;
-						})}
-					</div>
+					${!editRestrictTools
+						? html`<p class="roles-tools-note">This role can use every available tool.</p>`
+						: html`
+							<p class="roles-tools-note">${editTools.length} of ${availableTools.length} tools enabled.</p>
+							${renderToolGroups()}
+						`}
 				</div>
 			</div>
 

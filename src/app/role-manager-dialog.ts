@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader } from "@mariozechner
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render, nothing } from "lit";
 import { ArrowLeft, ChevronRight, Plus, Trash2 } from "lucide";
-import { gatewayFetch, fetchRoles, fetchTools, createRole, updateRole, deleteRole, type RoleData } from "./api.js";
+import { gatewayFetch, fetchRoles, fetchTools, createRole, updateRole, deleteRole, type RoleData, type ToolInfo } from "./api.js";
 import { ACCESSORIES, ACCESSORY_IDS, getAccessory, statusBobbit } from "./session-colors.js";
 import { state, renderApp } from "./state.js";
 
@@ -16,7 +16,7 @@ type View = "list" | "edit";
 
 let currentView: View = "list";
 let roles: RoleData[] = [];
-let availableTools: string[] = [];
+let availableTools: ToolInfo[] = [];
 let selectedRole: RoleData | null = null;
 let loading = true;
 
@@ -154,7 +154,7 @@ function toggleTool(tool: string): void {
 }
 
 function selectAllTools(): void {
-	editTools = [...availableTools];
+	editTools = availableTools.map(t => t.name);
 	rerender();
 }
 
@@ -253,18 +253,19 @@ function renderEditView() {
 				</div>
 				<div class="flex flex-wrap gap-1.5">
 					${availableTools.map((tool) => {
-						const active = editTools.includes(tool);
+						const active = editTools.includes(tool.name);
 						return html`
 							<button
 								role="checkbox"
 								aria-checked=${active ? "true" : "false"}
-								aria-label="${tool}"
+								aria-label="${tool.name}"
+								title="${tool.description}"
 								class="px-2.5 py-1 rounded-md text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${active
 									? "bg-green-900/40 text-green-400 border border-green-700/50"
 									: "bg-secondary/50 text-muted-foreground border border-border hover:border-muted-foreground/50"}"
 								style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;"
-								@click=${() => toggleTool(tool)}
-							>${active ? "✓ " : ""}${tool}</button>
+								@click=${() => toggleTool(tool.name)}
+							>${active ? "✓ " : ""}${tool.name}</button>
 						`;
 					})}
 				</div>
@@ -474,18 +475,19 @@ export function showRoleEditDialogFromProposal(proposal: { name: string; label: 
 									<label class="block text-[11px] text-muted-foreground mb-1.5">Allowed Tools</label>
 									<div class="flex flex-wrap gap-1.5">
 										${availableTools.map((tool) => {
-											const active = toolsValue.includes(tool);
+											const active = toolsValue.includes(tool.name);
 											return html`
 												<button
 													role="checkbox"
 													aria-checked=${active ? "true" : "false"}
-													aria-label="${tool}"
+													aria-label="${tool.name}"
+													title="${tool.description}"
 													class="px-2.5 py-1 rounded-md text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${active
 														? "bg-green-900/40 text-green-400 border border-green-700/50"
 														: "bg-secondary/50 text-muted-foreground border border-border hover:border-muted-foreground/50"}"
 													style="font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;"
-													@click=${() => toggleProposalTool(tool)}
-												>${active ? "✓ " : ""}${tool}</button>
+													@click=${() => toggleProposalTool(tool.name)}
+												>${active ? "✓ " : ""}${tool.name}</button>
 											`;
 										})}
 									</div>

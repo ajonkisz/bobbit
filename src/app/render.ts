@@ -286,10 +286,10 @@ function goalPreviewPanel() {
 // ============================================================================
 
 import { ACCESSORY_IDS, getAccessory, statusBobbit } from "./session-colors.js";
-import { fetchTools } from "./api.js";
+import { fetchTools, type ToolInfo } from "./api.js";
 
 /** Cached available tools list (loaded once). */
-let _availableTools: string[] = [];
+let _availableTools: ToolInfo[] = [];
 let _toolsLoaded = false;
 
 function ensureToolsLoaded(): void {
@@ -431,18 +431,19 @@ function rolePreviewPanel() {
 					</div>
 					${_availableTools.length > 0 ? html`
 						<div class="flex flex-wrap gap-1">
-							${_availableTools.filter((t) => !currentTools.includes(t)).map((tool) => html`
+							${_availableTools.filter((t) => !currentTools.includes(t.name)).map((tool) => html`
 								<button
 									class="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+									title="${tool.description}"
 									@click=${() => {
-										const newTools = [...currentTools, tool];
+										const newTools = [...currentTools, tool.name];
 										state.rolePreviewTools = newTools.join(", ");
 										state.rolePreviewToolsEdited = true;
 										const sid = activeSessionId();
 										if (sid) saveRoleDraft(sid);
 										renderApp();
 									}}
-								>+ ${tool}</button>
+								>+ ${tool.name}</button>
 							`)}
 						</div>
 					` : ""}

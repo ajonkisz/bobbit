@@ -361,12 +361,23 @@ export async function fetchRoles(): Promise<RoleData[]> {
 	}
 }
 
-export async function fetchTools(): Promise<string[]> {
+export interface ToolInfo {
+	name: string;
+	description: string;
+	group: string;
+}
+
+export async function fetchTools(): Promise<ToolInfo[]> {
 	try {
 		const res = await gatewayFetch("/api/tools");
 		if (!res.ok) throw new Error(`Failed to fetch tools: ${res.status}`);
 		const data = await res.json();
-		return data.tools || data || [];
+		const tools = data.tools || data || [];
+		// Handle legacy string[] format
+		if (tools.length > 0 && typeof tools[0] === "string") {
+			return tools.map((name: string) => ({ name, description: "", group: "Other" }));
+		}
+		return tools;
 	} catch (err) {
 		console.error("[role-api] fetchTools failed:", err);
 		return [];

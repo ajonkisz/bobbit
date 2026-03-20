@@ -1,7 +1,11 @@
 name: reviewer
 label: Reviewer
 accessory: magnifier
-allowedTools: []
+allowedTools:
+  - Read
+  - Bash
+  - web_search
+  - web_fetch
 createdAt: 1773875507369
 updatedAt: 1773932297029
 promptTemplate: |
