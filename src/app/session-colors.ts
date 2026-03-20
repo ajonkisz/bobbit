@@ -78,12 +78,11 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		id: "palette",
 		label: "Paint Palette",
 		shadow: `
-			9px 4px 0 #000,10px 4px 0 #000,11px 4px 0 #000,
-			8px 5px 0 #000,9px 5px 0 #a16207,10px 5px 0 #a16207,11px 5px 0 #a16207,12px 5px 0 #000,
-			7px 6px 0 #000,8px 6px 0 #a16207,9px 6px 0 #ef4444,10px 6px 0 #ef4444,11px 6px 0 #a16207,12px 6px 0 #000,
-			6px 7px 0 #000,7px 7px 0 #22c55e,8px 7px 0 #22c55e,9px 7px 0 #a16207,10px 7px 0 #a16207,11px 7px 0 #a16207,12px 7px 0 #000,
-			6px 8px 0 #000,7px 8px 0 #a16207,8px 8px 0 #a16207,9px 8px 0 #a16207,10px 8px 0 #3b82f6,11px 8px 0 #3b82f6,12px 8px 0 #000,
-			7px 9px 0 #000,8px 9px 0 #000,9px 9px 0 #000,10px 9px 0 #000,11px 9px 0 #000
+			9px 5px 0 #000,10px 5px 0 #000,
+			8px 6px 0 #000,9px 6px 0 #a16207,10px 6px 0 #ef4444,11px 6px 0 #000,
+			7px 7px 0 #000,8px 7px 0 #4ade80,9px 7px 0 #a16207,10px 7px 0 #a16207,11px 7px 0 #000,
+			7px 8px 0 #000,8px 8px 0 #a16207,9px 8px 0 #a16207,10px 8px 0 #60a5fa,11px 8px 0 #000,
+			8px 9px 0 #000,9px 9px 0 #000,10px 9px 0 #000
 		`,
 		yOffset: 0,
 		addsHeight: false,
