@@ -117,14 +117,23 @@ test.describe("Artifact Requirement Enforcement", () => {
 		expect(body.missingArtifacts.some((a: any) => a.type === "design-doc")).toBe(true);
 	});
 
-	test("allows implementation task after design-doc exists", async () => {
-		// Create the required design-doc artifact
+	test("allows implementation task after required artifacts exist", async () => {
+		// Both design-doc AND test-plan are required before implementation tasks
 		await apiFetch(`/api/goals/${goalId}/artifacts`, {
 			method: "POST",
 			body: JSON.stringify({
 				name: "design-doc",
 				type: "design-doc",
 				content: "# Design\nThe plan.",
+				producedBy: "test-session",
+			}),
+		});
+		await apiFetch(`/api/goals/${goalId}/artifacts`, {
+			method: "POST",
+			body: JSON.stringify({
+				name: "test-plan",
+				type: "test-plan",
+				content: "# Test Plan\nThe tests.",
 				producedBy: "test-session",
 			}),
 		});

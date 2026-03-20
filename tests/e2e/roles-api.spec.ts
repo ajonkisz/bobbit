@@ -5,13 +5,16 @@
  * They verify CRUD operations for /api/roles and the /api/tools endpoint.
  */
 import { test, expect } from "@playwright/test";
-import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, existsSync, writeFileSync, unlinkSync, readdirSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
+import { join, resolve, dirname } from "node:path";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 const BASE = "http://127.0.0.1:3099";
 const TOKEN = readFileSync(join(homedir(), ".pi", "gateway-token"), "utf-8").trim();
-const ROLES_FILE = join(homedir(), ".pi", "gateway-roles.json");
+// Roles are now YAML files in the roles/ directory at the repo root
+const ROLES_DIR = resolve(process.cwd(), "roles");
+const ROLES_BACKUP_DIR = resolve(process.cwd(), "roles-backup-e2e");
 
 /** Helper: authenticated fetch */
 function apiFetch(path: string, opts: RequestInit = {}): Promise<Response> {
@@ -25,21 +28,31 @@ function apiFetch(path: string, opts: RequestInit = {}): Promise<Response> {
 	});
 }
 
-// Back up and restore roles file around the test suite so we don't corrupt real data
-let rolesBackup: string | null = null;
-
+// Back up and restore YAML role files around the test suite so we don't corrupt real data
 test.beforeAll(() => {
-	if (existsSync(ROLES_FILE)) {
-		rolesBackup = readFileSync(ROLES_FILE, "utf-8");
+	// Copy all YAML files from roles/ to a backup directory
+	mkdirSync(ROLES_BACKUP_DIR, { recursive: true });
+	if (existsSync(ROLES_DIR)) {
+		for (const f of readdirSync(ROLES_DIR).filter(f => f.endsWith(".yaml"))) {
+			copyFileSync(join(ROLES_DIR, f), join(ROLES_BACKUP_DIR, f));
+		}
 	}
 });
 
 test.afterAll(() => {
-	// Restore original roles file (or remove if it didn't exist)
-	if (rolesBackup !== null) {
-		writeFileSync(ROLES_FILE, rolesBackup, "utf-8");
-	} else {
-		try { unlinkSync(ROLES_FILE); } catch { /* ignore */ }
+	// Restore: remove any new files, copy back originals
+	if (existsSync(ROLES_BACKUP_DIR)) {
+		// Remove all current YAML files
+		if (existsSync(ROLES_DIR)) {
+			for (const f of readdirSync(ROLES_DIR).filter(f => f.endsWith(".yaml"))) {
+				unlinkSync(join(ROLES_DIR, f));
+			}
+		}
+		// Copy back from backup
+		for (const f of readdirSync(ROLES_BACKUP_DIR).filter(f => f.endsWith(".yaml"))) {
+			copyFileSync(join(ROLES_BACKUP_DIR, f), join(ROLES_DIR, f));
+		}
+		rmSync(ROLES_BACKUP_DIR, { recursive: true, force: true });
 	}
 });
 
@@ -74,7 +87,7 @@ test.describe("GET /api/roles — default roles", () => {
 		expect(byName["team-lead"].accessory).toBe("crown");
 		expect(byName["coder"].accessory).toBe("bandana");
 		expect(byName["reviewer"].accessory).toBe("magnifier");
-		expect(byName["tester"].accessory).toBe("goggles");
+		expect(byName["tester"].accessory).toBe("flask");
 	});
 
 	test("default roles have labels and prompt templates", async () => {
@@ -308,7 +321,12 @@ test.describe("DELETE /api/roles/:name", () => {
 		expect(resp.status).toBe(404);
 	});
 
-	test("can delete a default role", async () => {
+	test("can delete and re-create a default role", async () => {
+		// Save the role data before deleting so we can restore it
+		const getBeforeResp = await apiFetch("/api/roles/tester");
+		expect(getBeforeResp.status).toBe(200);
+		const originalRole = await getBeforeResp.json();
+
 		// Default roles should be deletable (per spec: "no special status")
 		const resp = await apiFetch("/api/roles/tester", { method: "DELETE" });
 		expect(resp.status).toBe(200);
@@ -316,8 +334,18 @@ test.describe("DELETE /api/roles/:name", () => {
 		const getResp = await apiFetch("/api/roles/tester");
 		expect(getResp.status).toBe(404);
 
-		// Re-create it so other tests aren't affected
-		// (The afterAll will restore the roles file anyway)
+		// Re-create the role so other tests and the server aren't affected
+		const restoreResp = await apiFetch("/api/roles", {
+			method: "POST",
+			body: JSON.stringify({
+				name: originalRole.name,
+				label: originalRole.label,
+				promptTemplate: originalRole.promptTemplate,
+				allowedTools: originalRole.allowedTools,
+				accessory: originalRole.accessory,
+			}),
+		});
+		expect(restoreResp.status).toBe(201);
 	});
 });
 
@@ -334,14 +362,15 @@ test.describe("GET /api/tools", () => {
 	test("includes expected tool names", async () => {
 		const resp = await apiFetch("/api/tools");
 		const { tools } = await resp.json();
-		expect(tools).toContain("Read");
-		expect(tools).toContain("Write");
-		expect(tools).toContain("Edit");
-		expect(tools).toContain("Bash");
-		expect(tools).toContain("web_search");
-		expect(tools).toContain("web_fetch");
-		expect(tools).toContain("delegate");
-		// "workflow" tool was removed and replaced by the skills system
+		// Tools API returns ToolInfo objects with { name, description, group }
+		const names = tools.map((t: any) => typeof t === "string" ? t.toLowerCase() : t.name.toLowerCase());
+		expect(names).toContain("read");
+		expect(names).toContain("write");
+		expect(names).toContain("edit");
+		expect(names).toContain("bash");
+		expect(names).toContain("web_search");
+		expect(names).toContain("web_fetch");
+		expect(names).toContain("delegate");
 	});
 });
 
