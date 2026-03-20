@@ -906,8 +906,8 @@ async function handleApiRoute(
 		}
 
 		if (typeof body.colorIndex === "number") {
-			if (body.colorIndex < 0 || body.colorIndex > 19) {
-				json({ error: "colorIndex must be 0-19" }, 400);
+			if (body.colorIndex < 0 || body.colorIndex > 17) {
+				json({ error: "colorIndex must be 0-17" }, 400);
 				return;
 			}
 			colorStore.set(id, body.colorIndex);

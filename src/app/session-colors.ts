@@ -159,12 +159,12 @@ export function getAccessory(id: string | undefined): AccessoryDefinition {
 // ============================================================================
 
 /**
- * 20 curated hue-rotate offsets from canonical green (90°).
+ * 18 curated hue-rotate offsets from canonical green (90°).
  * Flows from greens → teals → blues → purples → pinks and back.
  */
 export const BOBBIT_HUE_ROTATIONS = [
-	0, 25, 50, 75, 100, 125, 150, 175, 200, 225,
-	-135, -110, -85, -60, -35, -10, 15, 40, 65, 250,
+	0, 25, 50, 75, 100, 125, 150, 175, 225,
+	-135, -110, -85, -60, -35, -10, 15, 40, 65,
 ];
 
 /** Map of session ID → assigned palette index, loaded from server */
