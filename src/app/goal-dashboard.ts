@@ -720,6 +720,13 @@ function renderMetaRows(goal: Goal): TemplateResult {
 						.statusFiles=${[]}
 						.loading=${!gs && !!branch}
 					></git-status-widget>
+					${goal.worktreePath ? html`
+						<span class="meta-sep">\u00B7</span>
+						<div class="meta-item">
+							${svgFolder}
+							<span class="meta-value mono">${goal.worktreePath}</span>
+						</div>
+					` : nothing}
 				</div>
 			` : nothing}
 		</div>
