@@ -1032,7 +1032,6 @@ html {
 	transform: scale(3.5);
 	margin: 8px 18px 28px 18px;
 	image-rendering: pixelated;
-	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
 		/* Cork */
 		8px 2px 0 #000, 9px 2px 0 #8b4513, 10px 2px 0 #000,
@@ -1046,7 +1045,9 @@ html {
 		6px 6px 0 #000, 7px 6px 0 #1e3a5f, 8px 6px 0 #0284c7, 9px 6px 0 #0c4a6e, 10px 6px 0 #082f49, 11px 6px 0 #1e3a5f, 12px 6px 0 #000,
 		/* Bottom */
 		6px 7px 0 #000, 7px 7px 0 #000, 8px 7px 0 #000, 9px 7px 0 #000, 10px 7px 0 #000, 11px 7px 0 #000, 12px 7px 0 #000;
-	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+	animation:
+		blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite,
+		magnifier-depth-busy 10s steps(1) infinite;
 }
 
 /* Bubble animation overlay — uses ::before/::after pseudo-elements */
@@ -1085,7 +1086,7 @@ html {
 }
 
 .bobbit-blob--idle .bobbit-blob__flask {
-	animation: none;
+	animation: magnifier-depth-idle 10s steps(1) infinite;
 	transform: scale(3.5) translateX(-7px);
 }
 .bobbit-blob--exit .bobbit-blob__flask {
