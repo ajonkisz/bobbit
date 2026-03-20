@@ -314,7 +314,7 @@ async function handleApiRoute(
 			}
 			createOpts = {
 				rolePrompt: role.promptTemplate,
-				allowedTools: role.allowedTools.length > 0 ? role.allowedTools : undefined,
+				allowedTools: role.allowedTools,
 			};
 			roleForMeta = { name: role.name, accessory: role.accessory };
 		}

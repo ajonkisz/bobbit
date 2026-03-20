@@ -305,7 +305,7 @@ function renderNavBar(): TemplateResult {
 					variant: "default",
 					size: "sm",
 					onClick: createToolAssistantSession,
-					children: html`<span class="inline-flex items-center gap-1.5 font-semibold">${icon(Wrench, "sm")} + Create Tool</span>`,
+					children: html`<span class="inline-flex items-center gap-1.5 font-semibold">${icon(Plus, "sm")} New Tool</span>`,
 				})}
 			</div>
 		</div>
@@ -402,7 +402,7 @@ function renderEditView(): TemplateResult {
 
 	// Determine role access for this tool
 	const roleAccess = roles.map((role) => {
-		const allowed = role.allowedTools.length === 0 || role.allowedTools.includes(selectedTool!.name);
+		const allowed = role.allowedTools.includes(selectedTool!.name);
 		return { role, allowed };
 	});
 

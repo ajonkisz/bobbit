@@ -311,38 +311,6 @@
 }
 
 /* Tool access mode toggle */
-.roles-tools-mode {
-	display: flex;
-	gap: 0;
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	overflow: hidden;
-	width: fit-content;
-}
-
-.roles-tools-mode-btn {
-	padding: 5px 14px;
-	font-size: 12px;
-	font-weight: 500;
-	border: none;
-	background: transparent;
-	color: var(--muted-foreground);
-	cursor: pointer;
-	transition: all 150ms;
-}
-
-.roles-tools-mode-btn:not(:last-child) {
-	border-right: 1px solid var(--border);
-}
-
-.roles-tools-mode-btn--active {
-	background: var(--secondary);
-	color: var(--foreground);
-}
-
-.roles-tools-mode-btn:hover:not(.roles-tools-mode-btn--active) {
-	background: color-mix(in oklch, var(--secondary) 50%, transparent);
-}
 
 .roles-tools-note {
 	font-size: 11px;

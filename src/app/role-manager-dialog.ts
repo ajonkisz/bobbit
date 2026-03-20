@@ -176,7 +176,7 @@ function renderListView() {
 		<div class="flex flex-col gap-1">
 			${roles.map((role) => {
 				const acc = getAccessory(role.accessory);
-				const toolText = role.allowedTools.length === 0 ? "All tools" : `${role.allowedTools.length} tool${role.allowedTools.length !== 1 ? "s" : ""}`;
+				const toolText = `${role.allowedTools.length} tool${role.allowedTools.length !== 1 ? "s" : ""}`;
 				return html`
 					<button
 						class="flex items-center gap-3 w-full px-3 py-2.5 rounded-md hover:bg-secondary/70 transition-colors text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"

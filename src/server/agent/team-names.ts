@@ -1,25 +1,24 @@
 /**
  * Fun name generator for team agents.
  *
- * Picks a random name from a pre-generated pool of ~1700 short,
- * funny names stored in data/team-names.json. No API calls needed.
+ * Each role has its own name pool in data/team-names/<role>.json.
+ * Falls back to the generic pool in data/team-names.json for roles
+ * without a dedicated file.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = join(__dirname, "..", "..", "..", "data");
 
-// Load the name pool once at module init.
-// Resolve from repo root: dist/server/agent/ -> ../../../data/team-names.json
-let NAME_POOL: string[];
+// Generic fallback pool (loaded once)
+let GENERIC_POOL: string[];
 try {
-	const poolPath = join(__dirname, "..", "..", "..", "data", "team-names.json");
-	NAME_POOL = JSON.parse(readFileSync(poolPath, "utf-8"));
+	GENERIC_POOL = JSON.parse(readFileSync(join(DATA_DIR, "team-names.json"), "utf-8"));
 } catch {
-	// Absolute fallback if the file is missing
-	NAME_POOL = [
+	GENERIC_POOL = [
 		"Ctrl+Z", "The Intern", "Bug Lebowski", "Darth Linter", "Null Pointer",
 		"Greg from QA", "El Debuggador", "Syntax Sinatra", "404 Not Found",
 		"Oops McFixit", "Fizzbuzz", "Glitch", "Spaghetti", "Wombat", "Biscuit",
@@ -27,34 +26,71 @@ try {
 	];
 }
 
-// Track recently used names to avoid repeats within a server lifetime
-const recentlyUsed = new Set<string>();
-const MAX_RECENT = Math.min(Math.floor(NAME_POOL.length / 2), 500);
+// Per-role pools (loaded on demand, cached)
+const rolePools = new Map<string, string[]>();
+
+function getPoolForRole(role: string): string[] {
+	if (rolePools.has(role)) return rolePools.get(role)!;
+
+	const filePath = join(DATA_DIR, "team-names", `${role}.json`);
+	if (existsSync(filePath)) {
+		try {
+			const pool = JSON.parse(readFileSync(filePath, "utf-8"));
+			if (Array.isArray(pool) && pool.length > 0) {
+				rolePools.set(role, pool);
+				return pool;
+			}
+		} catch {
+			// Fall through to generic
+		}
+	}
+
+	// Cache the miss so we don't re-check the filesystem
+	rolePools.set(role, GENERIC_POOL);
+	return GENERIC_POOL;
+}
+
+// Track recently used names per role to avoid repeats
+const recentlyUsedPerRole = new Map<string, Set<string>>();
 
 /**
  * Pick a random fun name for a team agent.
- * Role parameter is accepted for API compatibility but ignored —
- * all names are role-agnostic.
+ * Uses the role-specific name pool if available, otherwise falls back to generic.
  */
-export async function generateTeamName(_role?: string): Promise<string> {
-	return pickName();
+export async function generateTeamName(role?: string): Promise<string> {
+	const effectiveRole = role ?? "__generic__";
+	const pool = role ? getPoolForRole(role) : GENERIC_POOL;
+	return pickName(pool, effectiveRole);
 }
 
-function pickName(): string {
-	// If we've exhausted our recent buffer, clear it
-	if (recentlyUsed.size >= MAX_RECENT) {
-		recentlyUsed.clear();
+/**
+ * Invalidate the cached pool for a role so it's reloaded from disk next time.
+ * Called after generating a new names file for a newly-created role.
+ */
+export function invalidateRoleNameCache(role: string): void {
+	rolePools.delete(role);
+}
+
+function pickName(pool: string[], cacheKey: string): string {
+	let recent = recentlyUsedPerRole.get(cacheKey);
+	if (!recent) {
+		recent = new Set();
+		recentlyUsedPerRole.set(cacheKey, recent);
+	}
+
+	const maxRecent = Math.min(Math.floor(pool.length / 2), 30);
+	if (recent.size >= maxRecent) {
+		recent.clear();
 	}
 
 	// Try to find a name not recently used
 	for (let i = 0; i < 20; i++) {
-		const name = NAME_POOL[Math.floor(Math.random() * NAME_POOL.length)];
-		if (!recentlyUsed.has(name)) {
-			recentlyUsed.add(name);
+		const name = pool[Math.floor(Math.random() * pool.length)];
+		if (!recent.has(name)) {
+			recent.add(name);
 			return name;
 		}
 	}
 
-	// Fallback: just pick any random name
-	return NAME_POOL[Math.floor(Math.random() * NAME_POOL.length)];
+	return pool[Math.floor(Math.random() * pool.length)];
 }

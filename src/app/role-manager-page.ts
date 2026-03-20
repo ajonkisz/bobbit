@@ -69,7 +69,7 @@ let editPrompt = "";
 let editTools: string[] = [];
 let editAccessory = "none";
 let editName = "";
-let editRestrictTools = false;
+
 let saving = false;
 let deleting = false;
 
@@ -117,7 +117,6 @@ function showEdit(role: RoleData): void {
 	editTools = [...role.allowedTools];
 	editAccessory = role.accessory;
 	editName = role.name;
-	editRestrictTools = role.allowedTools.length > 0;
 	saving = false;
 	deleting = false;
 	setHashRoute("role-edit", role.name);
@@ -134,7 +133,6 @@ export function navigateToRoleEdit(roleName: string): void {
 		editTools = [...role.allowedTools];
 		editAccessory = role.accessory;
 		editName = role.name;
-		editRestrictTools = role.allowedTools.length > 0;
 		saving = false;
 		deleting = false;
 	} else {
@@ -179,7 +177,7 @@ async function handleSave(): Promise<void> {
 		const ok = await updateRole(selectedRole.name, {
 			label: editLabel,
 			promptTemplate: editPrompt,
-			allowedTools: editRestrictTools ? editTools : [],
+			allowedTools: editTools,
 			accessory: editAccessory,
 		});
 		if (ok) {
@@ -241,25 +239,16 @@ function toggleToolGroup(group: string): void {
 	renderApp();
 }
 
-function setRestricted(restricted: boolean): void {
-	editRestrictTools = restricted;
-	if (restricted && editTools.length === 0) {
-		editTools = availableTools.map(t => t.name);
-	}
-	renderApp();
-}
-
 // ============================================================================
 // RENDER: NAV BAR
 // ============================================================================
 
 function renderNavBar(): TemplateResult {
 	if (currentView !== "list" && selectedRole) {
-		const effectiveTools = editRestrictTools ? editTools : [];
 		const hasChanges = selectedRole && (
 			editLabel !== selectedRole.label ||
 			editPrompt !== selectedRole.promptTemplate ||
-			JSON.stringify([...effectiveTools].sort()) !== JSON.stringify([...selectedRole.allowedTools].sort()) ||
+			JSON.stringify([...editTools].sort()) !== JSON.stringify([...selectedRole.allowedTools].sort()) ||
 			editAccessory !== selectedRole.accessory
 		);
 		// Edit view: back goes to roles list, breadcrumb shows hierarchy, actions on right
@@ -507,23 +496,9 @@ function renderEditView(): TemplateResult {
 				<div class="roles-edit-section">
 					<div class="roles-tools-top">
 						<h2 class="roles-section-title">Tool Access</h2>
-						<div class="roles-tools-mode">
-							<button
-								class="roles-tools-mode-btn ${!editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
-								@click=${() => setRestricted(false)}
-							>All tools</button>
-							<button
-								class="roles-tools-mode-btn ${editRestrictTools ? "roles-tools-mode-btn--active" : ""}"
-								@click=${() => setRestricted(true)}
-							>Restricted</button>
-						</div>
 					</div>
-					${!editRestrictTools
-						? html`<p class="roles-tools-note">This role can use every available tool.</p>`
-						: html`
-							<p class="roles-tools-note">${editTools.length} of ${availableTools.length} tools enabled</p>
-							${renderToolGroups()}
-						`}
+					<p class="roles-tools-note">${editTools.length} of ${availableTools.length} tools enabled</p>
+					${renderToolGroups()}
 				</div>
 
 

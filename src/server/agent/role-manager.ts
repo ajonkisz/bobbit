@@ -1,5 +1,6 @@
 import { RoleStore, type Role } from "./role-store.js";
 import type { ToolStore } from "./tool-store.js";
+import { generateRoleNames } from "./name-generator.js";
 
 /** Valid role name pattern: lowercase alphanumeric + hyphens */
 const NAME_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
@@ -135,6 +136,12 @@ export class RoleManager {
 			updatedAt: now,
 		};
 		this.store.put(role);
+
+		// Fire-and-forget: generate role-themed names via LLM
+		generateRoleNames(name, label).catch((err) => {
+			console.error(`[role-manager] Failed to generate names for role "${name}":`, err);
+		});
+
 		return role;
 	}
 
