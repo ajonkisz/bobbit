@@ -94,9 +94,8 @@ npm run dev:harness    # Gateway via restart harness + vite (use this for develo
 npm run restart-server # Signal the harness to rebuild & restart the server
 npm start              # Run built gateway (serves embedded UI)
 npm run check          # Type-check both server and web without emitting
-npm test               # Mobile header Playwright tests
+npm test               # Unit tests (Playwright file:// fixtures)
 npm run test:e2e       # E2E tests (auto-starts sandboxed gateway via Playwright webServer)
-npm run test:summary   # Run check + unit + E2E with compact output (preferred for agents)
 ```
 
 ### Dev server harness
@@ -384,15 +383,25 @@ See [docs/dev-workflow.md](docs/dev-workflow.md) for the full guide on running m
 
 ## Testing
 
-**Run tests before committing.** After any code change, run `node scripts/test-summary.mjs --all` (or `npm run test:summary`). This runs type-check + unit tests + E2E tests and outputs a compact summary — just pass/fail counts and failure details. Use this instead of raw `npm test` / `npm run test:e2e` to keep context lean.
+**Run tests before committing.** After any code change, run type-check and relevant tests. Pipe Playwright output through the test filter to keep context lean — it outputs just pass/fail counts and failure details:
 
 ```bash
-node scripts/test-summary.mjs --all    # Type check + unit + E2E (preferred)
-node scripts/test-summary.mjs --e2e    # E2E only
-node scripts/test-summary.mjs --unit   # Unit only
+# Type check first
+npm run check
+
+# Unit tests (fast, no server needed)
+npx playwright test tests/mobile-header.spec.ts --config tests/playwright.config.ts --reporter=json 2>/dev/null | node scripts/test-filter.mjs
+
+# E2E tests (starts sandboxed gateway on port 3099 automatically)
+npm run build:server && npx playwright test --config playwright-e2e.config.ts --reporter=json 2>/dev/null | node scripts/test-filter.mjs
 ```
 
-If you change server code (`src/server/`), E2E tests will rebuild the server automatically. If you only change UI code, `--unit` is sufficient.
+The test filter accepts verbosity flags you can use when debugging failures:
+- `--failures` — summary + failure details only (default)
+- `--verbose` — lists every test with OK/FAIL/SKIP status
+- `--full` — raw JSON pass-through
+
+If you only changed UI code (`src/ui/`, `src/app/`), unit tests are sufficient. Server changes (`src/server/`) need E2E tests too. The E2E `npm run build:server` step recompiles automatically.
 
 **Test structure:**
 
