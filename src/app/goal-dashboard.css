@@ -713,6 +713,63 @@
 	white-space: pre-wrap;
 	word-break: break-word;
 }
+/* ── ARTIFACT FULLSCREEN OVERLAY ── */
+.artifact-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	background: rgba(0, 0, 0, 0.6);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+	backdrop-filter: blur(2px);
+}
+.artifact-overlay-panel {
+	width: 100%;
+	max-width: 1000px;
+	height: 90vh;
+	background: var(--background, #fff);
+	border-radius: 12px;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+}
+.artifact-overlay-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	background: var(--secondary, #f8f9fb);
+	border-bottom: 1px solid var(--border, #e5e7eb);
+	flex-shrink: 0;
+}
+.artifact-overlay-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--foreground);
+}
+.artifact-overlay-close {
+	background: none;
+	border: none;
+	font-size: 24px;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--muted-foreground);
+	padding: 0 4px;
+	border-radius: 4px;
+}
+.artifact-overlay-close:hover {
+	color: var(--foreground);
+	background: var(--accent, rgba(0,0,0,0.05));
+}
+.artifact-overlay-iframe {
+	flex: 1;
+	width: 100%;
+	border: none;
+	background: #fff;
+}
 
 /* ── EMPTY STATES ── */
 .tab-empty {

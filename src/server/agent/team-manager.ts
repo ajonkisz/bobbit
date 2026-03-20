@@ -52,6 +52,8 @@ interface TeamEntry {
 	teamLeadSessionId: string | null;
 	agents: TeamAgent[];
 	maxConcurrent: number;
+	/** Unsubscribe from team lead RPC events (runtime-only, not persisted). */
+	unsubscribeTeamLeadEvents?: () => void;
 }
 
 
@@ -78,9 +80,9 @@ export class TeamManager {
 	private teams = new Map<string, TeamEntry>();
 	private store: TeamStore;
 	/** Timers for the idle-nudge mechanism (goalId → timer). */
-	private idleNudgeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	private idleNudgeTimers = new Map<string, ReturnType<typeof setInterval>>();
 	/** Delay before nudging the idle team lead (ms). */
-	private static readonly IDLE_NUDGE_DELAY_MS = 30_000;
+	private static readonly IDLE_NUDGE_DELAY_MS = 120_000;
 
 	/** Reverse lookup: sessionId → goalId for quick dismissal. */
 	private sessionToGoal = new Map<string, string>();
@@ -173,7 +175,119 @@ export class TeamManager {
 			console.log(
 				`[team-manager] Restored team for goal ${p.goalId} — team lead: ${p.teamLeadSessionId}, agents: ${entry.agents.length}`,
 			);
+
+			// Re-subscribe to team lead events and restart idle timer if needed
+			if (p.teamLeadSessionId) {
+				const tlSession = this.sessionManager.getSession(p.teamLeadSessionId);
+				if (tlSession && tlSession.status !== "terminated") {
+					this.subscribeTeamLeadEvents(p.goalId);
+					if (tlSession.status === "idle" && entry.agents.length > 0) {
+						this.startIdleNudgeTimer(p.goalId);
+					}
+				}
+			}
 		}
+	}
+
+	/**
+	 * Clear and remove the idle-nudge timer for a goal.
+	 */
+	private clearIdleNudgeTimer(goalId: string): void {
+		const timer = this.idleNudgeTimers.get(goalId);
+		if (timer) {
+			clearInterval(timer);
+			this.idleNudgeTimers.delete(goalId);
+		}
+	}
+
+	/**
+	 * Format elapsed time since a timestamp.
+	 */
+	private formatElapsed(sinceMs: number): string {
+		const mins = Math.floor((Date.now() - sinceMs) / 60_000);
+		if (mins < 60) return `${mins}m`;
+		const h = Math.floor(mins / 60);
+		const m = mins % 60;
+		return `${h}h ${m}m`;
+	}
+
+	/**
+	 * Start a repeating idle-nudge timer that checks in on team progress.
+	 * Fires every IDLE_NUDGE_DELAY_MS while the team lead is idle and workers are active.
+	 */
+	private startIdleNudgeTimer(goalId: string): void {
+		// Prevent duplicate timers
+		this.clearIdleNudgeTimer(goalId);
+
+		const timer = setInterval(() => {
+			const entry = this.teams.get(goalId);
+			if (!entry?.teamLeadSessionId) return;
+
+			const teamLeadSession = this.sessionManager.getSession(entry.teamLeadSessionId);
+			if (!teamLeadSession || teamLeadSession.status !== "idle") {
+				return; // Skip this tick — team lead busy or gone
+			}
+
+			// Collect active workers
+			const activeWorkers = entry.agents.filter((a) => {
+				const s = this.sessionManager.getSession(a.sessionId);
+				return s && s.status !== "terminated";
+			});
+
+			if (activeWorkers.length === 0) {
+				this.clearIdleNudgeTimer(goalId);
+				return;
+			}
+
+			// Build status lines
+			const lines = activeWorkers.map((agent) => {
+				const s = this.sessionManager.getSession(agent.sessionId);
+				const status = s?.status ?? "unknown";
+				const tasks = this.taskManager.getTasksForSession(agent.sessionId);
+				const taskInfo = tasks.length > 0
+					? `task "${tasks[0].title}" (${tasks[0].state})`
+					: "no assigned task";
+				const elapsed = this.formatElapsed(agent.createdAt);
+				const shortId = agent.sessionId.slice(0, 4);
+				return `- Agent ${agent.role}-${shortId} (${agent.role}): ${status}, ${taskInfo}, running ${elapsed}`;
+			});
+
+			const message =
+				`[AUTO-NUDGE] Team check-in — your agents' current status:\n${lines.join("\n")}\n\n` +
+				`Review their progress. If an agent appears stuck or going in the wrong direction, steer them back on track. ` +
+				`If an agent is idle and their work looks complete, mark their task as done and dismiss them. ` +
+				`If idle agents have more to do, prompt them to continue.`;
+
+			this.sessionManager.enqueuePrompt(entry.teamLeadSessionId, message, { isSteered: true });
+			console.log(`[team-manager] Sent idle nudge to team lead for goal ${goalId}`);
+		}, TeamManager.IDLE_NUDGE_DELAY_MS);
+
+		this.idleNudgeTimers.set(goalId, timer);
+	}
+
+	/**
+	 * Subscribe to the team lead session's RPC events to manage the idle-nudge timer.
+	 * On agent_end (idle): start the timer. On agent_start (streaming): clear it.
+	 */
+	private subscribeTeamLeadEvents(goalId: string): void {
+		const entry = this.teams.get(goalId);
+		if (!entry?.teamLeadSessionId) return;
+
+		const session = this.sessionManager.getSession(entry.teamLeadSessionId);
+		if (!session) return;
+
+		// Clean up any previous subscription
+		entry.unsubscribeTeamLeadEvents?.();
+
+		const unsubscribe = session.rpcClient.onEvent((event: any) => {
+			if (event.type === "agent_end") {
+				this.startIdleNudgeTimer(goalId);
+			} else if (event.type === "agent_start") {
+				this.clearIdleNudgeTimer(goalId);
+			}
+		});
+
+		entry.unsubscribeTeamLeadEvents = unsubscribe;
 	}
 
 	private get goalManager(): GoalManager {
@@ -247,6 +361,9 @@ export class TeamManager {
 		this.teams.set(goalId, entry);
 		this.sessionToGoal.set(session.id, goalId);
 		this.persistEntry(goalId);
+
+		// Subscribe to team lead lifecycle events for idle-nudge timer
+		this.subscribeTeamLeadEvents(goalId);
 
 		// Transition goal to in-progress if needed
 		if (goal.state === "todo") {
@@ -501,6 +618,11 @@ export class TeamManager {
 		this.sessionToGoal.delete(sessionId);
 		this.persistEntry(goalId);
 
+		// If no workers remain, clear the idle-nudge timer
+		if (entry.agents.length === 0) {
+			this.clearIdleNudgeTimer(goalId);
+		}
+
 		console.log(`[team-manager] Dismissed ${agent.role} agent (${sessionId}) for goal ${goalId}`);
 		return true;
 	}
@@ -550,9 +672,9 @@ export class TeamManager {
 			}
 		}
 
-		// Cancel idle-nudge timer
-		const nudgeTimer = this.idleNudgeTimers.get(goalId);
-		if (nudgeTimer) { clearTimeout(nudgeTimer); this.idleNudgeTimers.delete(goalId); }
+		// Cancel idle-nudge timer and unsubscribe from team lead events
+		this.clearIdleNudgeTimer(goalId);
+		entry.unsubscribeTeamLeadEvents?.();
 
 		// Dismiss all role agents
 		const agentSessionIds = entry.agents.map((a) => a.sessionId);
@@ -587,9 +709,9 @@ export class TeamManager {
 			throw new Error(`No active team for goal: ${goalId}`);
 		}
 
-		// Cancel idle-nudge timer
-		const nudgeTimer = this.idleNudgeTimers.get(goalId);
-		if (nudgeTimer) { clearTimeout(nudgeTimer); this.idleNudgeTimers.delete(goalId); }
+		// Cancel idle-nudge timer and unsubscribe from team lead events
+		this.clearIdleNudgeTimer(goalId);
+		entry.unsubscribeTeamLeadEvents?.();
 
 		// Dismiss all role agents
 		const agentSessionIds = entry.agents.map((a) => a.sessionId);
