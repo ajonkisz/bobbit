@@ -342,9 +342,21 @@ export class SessionManager {
 		// message_update events contain usage data with cost
 		if (event.type !== "message_update") return;
 		const usage = event.message?.usage ?? event.usage;
-		if (!usage || typeof usage.cost !== "number") return;
+		if (!usage) return;
 
-		const cumulativeCost = this.costTracker.recordUsage(session.id, usage);
+		// Usage cost can be either a number (usage.cost) or an object (usage.cost.total)
+		const costValue = typeof usage.cost === "number" ? usage.cost
+			: typeof usage.cost?.total === "number" ? usage.cost.total
+			: undefined;
+		if (costValue === undefined) return;
+
+		const cumulativeCost = this.costTracker.recordUsage(session.id, {
+			inputTokens: usage.inputTokens ?? usage.input,
+			outputTokens: usage.outputTokens ?? usage.output,
+			cacheReadTokens: usage.cacheReadTokens ?? usage.cacheRead,
+			cacheWriteTokens: usage.cacheWriteTokens ?? usage.cacheWrite,
+			cost: costValue,
+		});
 
 		// Look up taskId from assigned tasks for this session
 		const assignedTasks = this.taskManager.getTasksForSession(session.id);
