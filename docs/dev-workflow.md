@@ -141,27 +141,90 @@ Two independent build pipelines:
 
 ---
 
-## Port and host binding
+## Networking architecture
 
-Both the gateway and Vite auto-detect the NordLynx (NordVPN mesh) interface IP. If NordVPN is not running:
+Bobbit is designed for **remote access over a NordVPN mesh network**. The user runs the server on a dev machine and connects from other devices (laptop, tablet) via a mesh IP or a custom domain.
 
-- **Gateway**: exits with an error unless you pass `--host <addr>`
+### Port topology (dev mode)
+
+```
+Browser (ProArt / phone / etc.)
+  │
+  │  https://bobbit.dedyn.io:5173   ← user-facing URL
+  │
+  ▼
+Vite dev server (:5173)             ← serves UI with HMR, HTTPS using gateway cert
+  │  proxy /api/* ──────────────►  Gateway (:3001)  ← REST API + agent management
+  │  proxy /ws/*  ──────────────►  Gateway (:3001)  ← WebSocket (session streaming)
+  │
+  └─ HMR websocket (:5173)         ← Vite's own hot-reload channel (same port)
+```
+
+In **production mode** (`npm start`), there is no Vite — the gateway serves the bundled UI directly on port 3001.
+
+### Host binding
+
+Both the gateway and Vite auto-detect the **NordLynx** (NordVPN mesh) interface IP and bind to it.
+
+- **Gateway**: exits with an error if NordLynx isn't found, unless you pass `--host <addr>`
 - **Vite**: falls back to `localhost` with a warning, or uses `VITE_HOST` env var
 
-For local-only development without NordVPN:
+The detected mesh IP (e.g. `100.123.227.233`) is what other mesh devices use to reach the server.
+
+### deSEC dynamic DNS
+
+On startup, the gateway updates a **deSEC** (dedyn.io) DNS A record so that `bobbit.dedyn.io` points to the current mesh IP. Config lives at `~/.pi/desec.json`:
+
+```json
+{ "domain": "bobbit.dedyn.io", "token": "<deSEC API token>" }
+```
+
+This means the user can always access `https://bobbit.dedyn.io:5173` (dev) or `https://bobbit.dedyn.io:3001` (prod) without memorizing mesh IPs, even when the IP changes across NordVPN reconnects.
+
+**Important**: The deSEC update is skipped for loopback addresses (`127.0.0.1`, `::1`, `localhost`) to prevent E2E tests or local-only runs from clobbering the DNS record. If DNS points to `127.0.0.1`, a prior server start with `--host 127.0.0.1` likely caused it — restart the server normally (without `--host`) to push the correct mesh IP.
+
+### TLS certificates
+
+TLS is **on by default**. The server generates certificates on first run and stores them at:
+
+| File | Purpose |
+|---|---|
+| `~/.pi/gateway-cert.pem` | Server certificate (covers the host IP + `localhost`) |
+| `~/.pi/gateway-key.pem` | Server private key |
+| `~/.pi/gateway-tls/ca.crt` | Local CA certificate (install on other devices to trust) |
+| `~/.pi/gateway-tls/ca.key` | Local CA private key |
+
+The cert is generated via **mkcert** (npm package) signed by the local CA, with fallback to openssl self-signed. Vite reuses the same cert/key for its HTTPS server (`vite.config.ts` reads them from disk).
+
+To trust the cert on a remote device, install `~/.pi/gateway-tls/ca.crt` as a trusted CA.
+
+If the cert doesn't cover the current host (e.g. the mesh IP changed), it is regenerated automatically on next startup.
+
+### Troubleshooting connectivity
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `ERR_CONNECTION_REFUSED` on `:5173` | Vite not running, or not bound to mesh IP | Check `npm run dev:harness` output; verify NordVPN is connected |
+| `ERR_CONNECTION_REFUSED` on `:3001` | Gateway not running | Same as above |
+| WebSocket connects but session fails | Browser has wrong gateway URL in `localStorage` | Open DevTools console: `localStorage.getItem("gw-url")` — should match the gateway's actual address. Fix with `localStorage.setItem("gw-url", "<correct URL>")` and reload |
+| DNS resolves to `127.0.0.1` | A prior `--host 127.0.0.1` run (e.g. E2E tests) pushed loopback to deSEC | Restart the server normally — it will push the mesh IP to deSEC. Flush DNS on the client device if cached |
+| Vite HMR WebSocket error in console | Normal when accessing via domain/mesh IP — Vite's HMR can't always connect back | Harmless. Vite falls back to polling. The "Direct websocket connection fallback" message confirms this |
+| `ERR_CERT_AUTHORITY_INVALID` | Remote device doesn't trust the local CA | Install `~/.pi/gateway-tls/ca.crt` on the device, or click through the browser warning |
+
+### Local-only development (no NordVPN)
 
 ```bash
 # Terminal 1: gateway on localhost
-node dist/server/cli.js --host localhost --port 3001 --cwd . --no-ui
+node dist/server/cli.js --host localhost --port 3001 --cwd . --no-ui --no-tls
 
 # Terminal 2: vite on localhost
-VITE_HOST=localhost npx vite
+GATEWAY_NO_TLS=1 VITE_HOST=localhost npx vite
 ```
 
-Or use the e2e test config which does this automatically:
+Or use the E2E test config which does this automatically:
 
 ```bash
-npx playwright test --config tests/playwright-e2e.config.ts
+npx playwright test --config playwright-e2e.config.ts
 ```
 
 ---

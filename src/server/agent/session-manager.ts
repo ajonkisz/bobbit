@@ -15,6 +15,7 @@ import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 import { CostTracker } from "./cost-tracker.js";
+import type { ColorStore } from "./color-store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +84,8 @@ export interface SessionManagerOptions {
 	agentCliPath?: string;
 	/** Path to a custom system prompt file */
 	systemPromptPath?: string;
+	/** Color store for session color cleanup on terminate */
+	colorStore?: ColorStore;
 }
 
 export class SessionManager {
@@ -91,12 +94,14 @@ export class SessionManager {
 	private systemPromptPath?: string;
 	private store = new SessionStore();
 	private costTracker = new CostTracker();
+	private colorStore?: ColorStore;
 	goalManager: GoalManager;
 	taskManager: TaskManager;
 
 	constructor(options?: SessionManagerOptions) {
 		this.agentCliPath = options?.agentCliPath;
 		this.systemPromptPath = options?.systemPromptPath;
+		this.colorStore = options?.colorStore;
 		this.goalManager = new GoalManager();
 		this.taskManager = new TaskManager();
 	}
@@ -1124,6 +1129,7 @@ export class SessionManager {
 
 		this.sessions.delete(id);
 		this.store.remove(id);
+		this.colorStore?.remove(id);
 		cleanupSessionPrompt(id);
 		return true;
 	}

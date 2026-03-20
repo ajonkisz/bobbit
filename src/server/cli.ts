@@ -138,8 +138,11 @@ async function main() {
 	const tls = args.tls ? await ensureTlsCert(args.host) : undefined;
 
 	// Update deSEC dynDNS if configured (keeps domain pointing to current mesh IP)
+	// Skip for loopback addresses (e.g. E2E tests with --host 127.0.0.1) to avoid
+	// clobbering the DNS record with an unreachable IP.
 	const desecConfig = loadDesecConfig();
-	if (desecConfig) {
+	const isLoopback = args.host === "127.0.0.1" || args.host === "::1" || args.host === "localhost";
+	if (desecConfig && !isLoopback) {
 		updateDesecIp(desecConfig, args.host); // fire and forget
 	}
 

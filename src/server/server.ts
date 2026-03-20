@@ -42,9 +42,11 @@ export function createGateway(config: GatewayConfig) {
 	// Export skill definitions so agent-side extensions can discover them
 	exportSkillDefinitions();
 
+	const colorStore = new ColorStore();
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
+		colorStore,
 	});
 	const protocol = config.tls ? "https" : "http";
 	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
@@ -53,8 +55,6 @@ export function createGateway(config: GatewayConfig) {
 	const piDir = path.join(os.homedir(), ".pi");
 	fs.mkdirSync(piDir, { recursive: true });
 	fs.writeFileSync(path.join(piDir, "gateway-url"), gatewayUrl, "utf-8");
-
-	const colorStore = new ColorStore();
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
 	const goalArtifactStore = new GoalArtifactStore();
