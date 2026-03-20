@@ -165,6 +165,7 @@ async function initApp() {
 				state.goalDashboardId = route.goalId;
 				loadDashboardData(route.goalId);
 				renderApp();
+				await refreshSessions();
 			} else if (route.view === "roles") {
 				const { loadRolePageData } = await import("./role-manager-page.js");
 				loadRolePageData();

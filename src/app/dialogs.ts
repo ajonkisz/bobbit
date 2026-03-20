@@ -467,10 +467,12 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 	let generating = false;
 	let titleChangeUnsub: (() => void) | null = null;
 	let roleDropdownOpen = false;
-	// Track pending role change — null means "no change", empty string means "clear role"
+	// Track pending changes — null means "no change from current"
 	const session0 = state.gatewaySessions.find((s) => s.id === sessionId);
 	const initialRole: string = session0?.role || "";
-	let pendingRole: string | null = null; // null = no change yet
+	const initialColorIndex: number = sessionColorMap.get(sessionId) ?? -1;
+	let pendingRole: string | null = null;
+	let pendingColorIndex: number | null = null;
 
 	// Load roles for the picker
 	import("./api.js").then(({ fetchRoles }) => {
@@ -499,7 +501,12 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 			}
 		}
 
-		// Apply role change if pending
+		// Apply colour change if pending
+		if (pendingColorIndex !== null) {
+			setSessionColor(sessionId, pendingColorIndex);
+		}
+
+		// Apply role change if pending (this restarts the agent — do last)
 		if (pendingRole !== null) {
 			saving = true;
 			renderDialog();
@@ -572,8 +579,11 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 
 		const roleLabel = session?.goalAssistant ? "Goal Assistant" : displayRoleObj?.label || displayRole || "None";
 		const hasRoleChange = pendingRole !== null;
+		const hasColorChange = pendingColorIndex !== null;
 		const hasTitleChange = titleValue.trim() !== "" && titleValue.trim() !== currentTitle;
+		const hasAnyChange = hasTitleChange || hasColorChange || hasRoleChange;
 		const saveLabel = saving ? "Saving…" : hasRoleChange ? "Save & Assign Role" : "Save";
+		const displayColorIndex = pendingColorIndex !== null ? pendingColorIndex : initialColorIndex;
 
 		render(
 			Dialog({
@@ -628,7 +638,7 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 											<div class="flex gap-2 justify-center">
 												${BOBBIT_HUE_ROTATIONS.slice(start, start + ROW_SIZE).map((rot, j) => {
 													const i = start + j;
-													const isSelected = (sessionColorMap.get(sessionId) ?? -1) === i;
+													const isSelected = displayColorIndex === i;
 													const accShadow = hasAccessory ? acc.shadow : "";
 													// Counter-rotate accessory to cancel parent's hue-rotate (except flask which intentionally shifts)
 													const accCounterFilter = acc.id !== "flask" ? `filter:hue-rotate(${-rot}deg);` : "";
@@ -640,7 +650,7 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 																	: "hover:bg-secondary/50"}"
 															style="width:${hasAccessory ? 34 : 28}px;height:24px;"
 															title="Colour ${i + 1}"
-															@click=${() => { setSessionColor(sessionId, i); renderDialog(); }}
+															@click=${() => { pendingColorIndex = i === initialColorIndex ? null : i; renderDialog(); }}
 														>
 															<!-- Wrapper applies hue-rotate to both bobbit + accessory; accessory counter-rotates inside -->
 															<span style="position:absolute;left:${hasAccessory ? 3 : 4}px;top:3px;filter:hue-rotate(${rot}deg);">
@@ -703,7 +713,7 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 								${Button({ variant: "ghost", onClick: cleanup, children: "Cancel" })}
 								${Button({
 									onClick: doSave,
-									disabled: saving || (!hasTitleChange && !hasRoleChange),
+									disabled: saving || !hasAnyChange,
 									children: saveLabel,
 								})}
 							</div>

@@ -1,4 +1,5 @@
 import { getModel } from "@mariozechner/pi-ai";
+import { state } from "./state.js";
 
 /**
  * A remote agent adapter that connects to the Pi Gateway via WebSocket.
@@ -169,10 +170,6 @@ export class RemoteAgent {
 		}).catch(() => {});
 	}
 
-	// Title-flash state for long-task notifications
-	private _titleFlashTimer: ReturnType<typeof setInterval> | null = null;
-	private _originalTitle: string | null = null;
-
 	/**
 	 * Notify the user that a long-running task finished while the tab is
 	 * hidden. Uses two mechanisms that work over plain HTTP:
@@ -181,56 +178,31 @@ export class RemoteAgent {
 	 * Falls back to the Notification API when available (secure contexts).
 	 */
 	private _notifyTaskComplete(elapsedMs: number): void {
-		// TODO: restore visibility check after testing
-		// if (document.visibilityState === "visible") return;
+		// Skip notifications for delegate agents and non-lead team role agents
+		const sessionInfo = state.gatewaySessions.find((s) => s.id === this._sessionId);
+		if (sessionInfo) {
+			const isSubAgent = !!sessionInfo.delegateOf || (!!sessionInfo.role && sessionInfo.role !== "lead");
+			if (isSubAgent) return;
+		}
+
+		// Always beep so the user hears completion even on the active tab
+		RemoteAgent.playNotificationBeep();
+
+		// Browser toast only when the tab is hidden
+		if (document.visibilityState === "visible") return;
 
 		const mins = Math.round(elapsedMs / 60_000);
 
-		// ── Notification API (works on HTTPS / localhost) ────────────
 		if (typeof Notification !== "undefined" && Notification.permission === "granted") {
 			const title = this._title || "Bobbit";
 			const body = `Task completed after ${mins} minute${mins === 1 ? "" : "s"}. Awaiting your input.`;
 			const n = new Notification(title, { body, tag: `bobbit-done-${this._sessionId}` });
 			n.onclick = () => { window.focus(); n.close(); };
 		}
-
-		// ── Title flash (works everywhere) ───────────────────────────
-		this._startTitleFlash(`✅ Done (${mins}m) — ${this._title || "Bobbit"}`);
-
-		// ── Audio beep via Web Audio API ─────────────────────────────
-		RemoteAgent._playNotificationBeep();
-	}
-
-	private _startTitleFlash(alertText: string): void {
-		// Don't stack multiple flashes
-		if (this._titleFlashTimer) return;
-		this._originalTitle = document.title;
-		let showAlert = true;
-		this._titleFlashTimer = setInterval(() => {
-			document.title = showAlert ? alertText : (this._originalTitle || "Bobbit");
-			showAlert = !showAlert;
-		}, 1000);
-
-		// Stop flashing when the user returns to the tab
-		const stop = () => {
-			if (this._titleFlashTimer) {
-				clearInterval(this._titleFlashTimer);
-				this._titleFlashTimer = null;
-			}
-			if (this._originalTitle !== null) {
-				document.title = this._originalTitle;
-				this._originalTitle = null;
-			}
-			document.removeEventListener("visibilitychange", onVisible);
-		};
-		const onVisible = () => {
-			if (document.visibilityState === "visible") stop();
-		};
-		document.addEventListener("visibilitychange", onVisible);
 	}
 
 	/** Play a short two-tone beep using the Web Audio API (no file needed). */
-	private static _playNotificationBeep(): void {
+	static playNotificationBeep(): void {
 		try {
 			const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
 			const now = ctx.currentTime;

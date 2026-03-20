@@ -108,7 +108,14 @@ export class RoleStore {
 		try { fs.unlinkSync(filePath); } catch { /* ignore */ }
 	}
 
+	/** Re-read all YAML files from disk, picking up external changes */
+	reload(): void {
+		this.roles.clear();
+		this.loadAll();
+	}
+
 	getAll(): Role[] {
+		this.reload();
 		return Array.from(this.roles.values());
 	}
 

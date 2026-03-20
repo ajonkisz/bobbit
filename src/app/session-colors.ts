@@ -285,7 +285,8 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 			: `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 ${isCompacting ? "9px" : "0"};`)
 		: baseTransform;
 
-	const eyeTop = addsHeight ? "4px" : "0";
+	const compactTopOffset = compactSquish ? 5.4 : 0;
+	const eyeTop = addsHeight ? `${4 + compactTopOffset}px` : `${compactTopOffset}px`;
 	const eyeLayer = isSelected
 		? html`<span style="position:absolute;left:0;top:${eyeTop};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
 		: "";
@@ -303,13 +304,13 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 			? `transform-origin:0 9px;animation:${isCrown ? "bobbit-squish-crown" : "bobbit-squish"} 3s ease-in-out infinite;`
 			: `transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(${isBandanaStyle ? "4px" : "4.5px"})${isCrown ? " translateX(-0.5px)" : ""};transform-origin:0 9px;`)
 		: `transform:scale(1.6)${isBandanaStyle ? " translateY(-0.5px)" : ""}${isCrown ? " translateX(-0.5px)" : ""};transform-origin:0 0;`;
-	const accTop = addsHeight ? `${acc.yOffset}px` : "0";
+	const accTop = addsHeight ? `${acc.yOffset + compactTopOffset}px` : `${compactTopOffset}px`;
 	const accessoryLayer = hasAccessory
 		? html`<span style="position:absolute;left:0;top:${accTop};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${acc.shadow};${accTransform}${accFilter}"></span>`
 		: "";
 
 	// Shift inner content down when accessory adds height so tips aren't clipped
-	const innerTop = addsHeight ? "4px" : "0";
+	const innerTop = addsHeight ? `${4 + compactTopOffset}px` : `${compactTopOffset}px`;
 	const containerHeight = addsHeight ? "19px" : "15px";
 
 	const containerWidth = hasAccessory ? "20px" : "16px";

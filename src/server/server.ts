@@ -758,13 +758,14 @@ async function handleApiRoute(
 		const goalId = commitsMatch[1];
 		const goal = sessionManager.goalManager.getGoal(goalId);
 		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+		if (!fs.existsSync(goal.cwd)) { json({ commits: [] }); return; }
 		const branch = goal.branch || "HEAD";
 		// Validate branch name to prevent injection
 		if (!/^[a-zA-Z0-9/_.\-]+$/.test(branch)) { json({ error: "Invalid branch name" }, 400); return; }
 		const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "20", 10) || 20, 1), 100);
 		try {
 			const out = execSync(`git log --format="%H|%h|%s|%an|%aI" -${limit} ${branch}`, {
-				cwd: goal.cwd, encoding: "utf-8",
+				cwd: goal.cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] as ["pipe", "pipe", "pipe"],
 			});
 			const commits = out.trim().split("\n").filter(Boolean).map((line: string) => {
 				const [sha, shortSha, message, author, timestamp] = line.split("|");
@@ -784,7 +785,8 @@ async function handleApiRoute(
 		const goal = sessionManager.goalManager.getGoal(goalId);
 		if (!goal) { json({ error: "Goal not found" }, 404); return; }
 		const cwd = goal.cwd;
-		const execOpts = { cwd, encoding: "utf-8" as const, timeout: 5000 };
+		if (!fs.existsSync(cwd)) { json({ error: "Working directory not found" }, 404); return; }
+		const execOpts = { cwd, encoding: "utf-8" as const, timeout: 5000, stdio: ["pipe", "pipe", "pipe"] as ["pipe", "pipe", "pipe"] };
 		try {
 			let branch = "";
 			try {

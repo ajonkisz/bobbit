@@ -47,6 +47,11 @@ const DEFAULT_REQUIREMENTS: ArtifactRequirement[] = [
 		blocksTaskTypes: ["goal-completion"],
 		description: "Code review findings must exist before the goal can be completed",
 	},
+	{
+		artifactType: "summary-report",
+		blocksTaskTypes: ["goal-completion"],
+		description: "A summary report must exist before the goal can be completed",
+	},
 ];
 
 export function getDefaultRequirements(): ArtifactRequirement[] {
