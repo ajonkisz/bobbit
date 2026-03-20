@@ -74,16 +74,16 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		yOffset: 0,
 		addsHeight: false,
 	},
-	"set-square": {
-		id: "set-square",
-		label: "Set Square",
+	palette: {
+		id: "palette",
+		label: "Paint Palette",
 		shadow: `
-			11px 2px 0 #000,
-			10px 3px 0 #000,11px 3px 0 #93c5fd,12px 3px 0 #000,
-			9px 4px 0 #000,10px 4px 0 #bfdbfe,11px 4px 0 #93c5fd,12px 4px 0 #000,
-			8px 5px 0 #000,9px 5px 0 #bfdbfe,10px 5px 0 #bfdbfe,11px 5px 0 #93c5fd,12px 5px 0 #000,
-			7px 6px 0 #000,8px 6px 0 #bfdbfe,9px 6px 0 #bfdbfe,10px 6px 0 #bfdbfe,11px 6px 0 #93c5fd,12px 6px 0 #000,
-			6px 7px 0 #000,7px 7px 0 #000,8px 7px 0 #000,9px 7px 0 #000,10px 7px 0 #000,11px 7px 0 #000,12px 7px 0 #000
+			8px 2px 0 #000,9px 2px 0 #000,10px 2px 0 #000,
+			7px 3px 0 #000,8px 3px 0 #f5e6d3,9px 3px 0 #ef4444,10px 3px 0 #f5e6d3,11px 3px 0 #000,
+			6px 4px 0 #000,7px 4px 0 #f5e6d3,8px 4px 0 #f5e6d3,9px 4px 0 #f5e6d3,10px 4px 0 #3b82f6,11px 4px 0 #f5e6d3,12px 4px 0 #000,
+			6px 5px 0 #000,7px 5px 0 #eab308,8px 5px 0 #f5e6d3,9px 5px 0 #f5e6d3,10px 5px 0 #f5e6d3,11px 5px 0 #f5e6d3,12px 5px 0 #000,
+			6px 6px 0 #000,7px 6px 0 #f5e6d3,8px 6px 0 #f5e6d3,9px 6px 0 #22c55e,10px 6px 0 #f5e6d3,11px 6px 0 #000,
+			7px 7px 0 #000,8px 7px 0 #000,9px 7px 0 #000,10px 7px 0 #000
 		`,
 		yOffset: 0,
 		addsHeight: false,

@@ -198,7 +198,7 @@ export class StreamingMessageContainer extends LitElement {
 						<div class="bobbit-blob__crown"></div>
 						<div class="bobbit-blob__bandana"></div>
 						<div class="bobbit-blob__magnifier"></div>
-						<div class="bobbit-blob__set-square"></div>
+						<div class="bobbit-blob__palette"></div>
 						<div class="bobbit-blob__headphones"></div>
 						<div class="bobbit-blob__pencil"></div>
 						<div class="bobbit-blob__book"></div>
@@ -237,7 +237,7 @@ export class StreamingMessageContainer extends LitElement {
 						<div class="bobbit-blob__crown"></div>
 						<div class="bobbit-blob__bandana"></div>
 						<div class="bobbit-blob__magnifier"></div>
-						<div class="bobbit-blob__set-square"></div>
+						<div class="bobbit-blob__palette"></div>
 						<div class="bobbit-blob__headphones"></div>
 						<div class="bobbit-blob__pencil"></div>
 						<div class="bobbit-blob__book"></div>

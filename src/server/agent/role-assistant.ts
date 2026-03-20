@@ -47,13 +47,13 @@ Include git conventions and idle behavior.
 - **label**: Short human-readable display name.
 - **prompt**: The full system prompt template. Make it detailed and actionable.
 - **tools**: Comma-separated list of allowed tools. Leave empty for "all tools allowed". Available tools: Read, Write, Edit, Bash, web_search, web_fetch, delegate.
-- **accessory**: Pixel-art accessory for the agent's avatar. Options: crown, bandana, magnifier, set-square, headphones, pencil, book, glasses, shield, none.
+- **accessory**: Pixel-art accessory for the agent's avatar. Options: crown, bandana, magnifier, palette, headphones, pencil, book, glasses, shield, none.
 
 ### Accessory guide
 - crown — leadership/orchestration roles
 - bandana — coding/implementation roles
 - magnifier — review/analysis roles
-- set-square — testing/QA roles
+- palette — testing/QA roles
 - headphones — communication/support roles
 - pencil — writing/documentation roles
 - book — research/learning roles
