@@ -670,17 +670,17 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 													<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-muted-foreground transition-transform ${roleDropdownOpen ? "rotate-180" : ""}"><path d="m6 9 6 6 6-6"/></svg>
 												</button>
 												${roleDropdownOpen ? html`
-													<div class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg py-1 max-h-[240px] overflow-y-auto">
+													<div class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground shadow-lg py-1 max-h-[240px] overflow-y-auto">
 														<button
-															class="w-full text-left px-3 py-2 text-sm hover:bg-secondary/50 transition-colors flex items-center gap-2.5 ${!displayRole ? "bg-secondary/30" : ""}"
+															class="w-full text-left px-3 py-2 text-sm text-popover-foreground/60 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2.5 ${!displayRole ? "bg-accent/50" : ""}"
 															@click=${(e: Event) => { e.stopPropagation(); selectRole(""); }}
 														>
 															<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, "none", true)}</span>
-															<span class="text-muted-foreground">None</span>
+															<span>None</span>
 														</button>
 														${state.roles.map((role) => html`
 															<button
-																class="w-full text-left px-3 py-2 text-sm hover:bg-secondary/50 transition-colors flex items-center gap-2.5 ${displayRole === role.name ? "bg-secondary/30" : ""}"
+																class="w-full text-left px-3 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2.5 ${displayRole === role.name ? "bg-accent/50" : ""}"
 																@click=${(e: Event) => { e.stopPropagation(); selectRole(role.name); }}
 															>
 																<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>
