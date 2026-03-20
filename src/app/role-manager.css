@@ -327,44 +327,39 @@
 .roles-tool-groups {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
-}
-
-.roles-tool-group {
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	overflow: hidden;
+	gap: 6px;
 }
 
 .roles-tool-group-header {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 6px;
 	width: 100%;
-	padding: 6px 10px;
+	padding: 0;
+	margin-bottom: 4px;
 	font-size: 11px;
 	font-weight: 600;
-	color: var(--foreground);
-	background: color-mix(in oklch, var(--secondary) 50%, transparent);
+	color: var(--muted-foreground);
+	background: none;
 	border: none;
 	cursor: pointer;
 	text-align: left;
-	transition: background 150ms;
+	transition: color 150ms;
 }
 
 .roles-tool-group-header:hover {
-	background: var(--secondary);
+	color: var(--foreground);
 }
 
 .roles-tool-group-check {
-	width: 16px;
-	height: 16px;
+	width: 14px;
+	height: 14px;
 	border-radius: 3px;
 	border: 1.5px solid var(--border);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 10px;
+	font-size: 9px;
 	flex-shrink: 0;
 	color: transparent;
 	transition: all 150ms;
@@ -395,66 +390,33 @@
 
 .roles-tool-group-items {
 	display: flex;
-	flex-direction: column;
+	flex-wrap: wrap;
+	gap: 4px;
 }
 
-.roles-tool-item {
-	display: flex;
-	align-items: baseline;
-	gap: 8px;
-	width: 100%;
-	padding: 4px 10px 4px 12px;
-	font-size: 12px;
-	border: none;
+.roles-tool-chip {
+	padding: 3px 8px;
+	border-radius: 5px;
+	font-size: 11px;
+	font-weight: 500;
+	font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+	border: 1px solid var(--border);
 	background: transparent;
-	cursor: pointer;
-	text-align: left;
-	transition: background 150ms;
 	color: var(--muted-foreground);
+	cursor: pointer;
+	transition: all 150ms;
+	white-space: nowrap;
 }
 
-.roles-tool-item:hover {
+.roles-tool-chip:hover {
+	border-color: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
 	background: color-mix(in oklch, var(--secondary) 50%, transparent);
 }
 
-.roles-tool-item--active {
-	color: var(--foreground);
-}
-
-.roles-tool-item-check {
-	width: 14px;
-	height: 14px;
-	border-radius: 3px;
-	border: 1.5px solid var(--border);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 9px;
-	flex-shrink: 0;
-	color: transparent;
-	transition: all 150ms;
-}
-
-.roles-tool-item--active .roles-tool-item-check {
-	background: #22c55e;
-	border-color: #22c55e;
-	color: white;
-}
-
-.roles-tool-item-name {
-	font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-	font-size: 11px;
-	font-weight: 500;
-	white-space: nowrap;
-	min-width: 120px;
-}
-
-.roles-tool-item-desc {
-	font-size: 11px;
-	color: var(--muted-foreground);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+.roles-tool-chip--active {
+	background: color-mix(in oklch, #22c55e 12%, transparent);
+	color: #22c55e;
+	border-color: color-mix(in oklch, #22c55e 35%, transparent);
 }
 
 /* Accessory selector */

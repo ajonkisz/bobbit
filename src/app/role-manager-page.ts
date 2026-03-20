@@ -397,13 +397,10 @@ function renderToolGroups(): TemplateResult {
 								const active = editTools.includes(tool.name);
 								return html`
 									<button
-										class="roles-tool-item ${active ? "roles-tool-item--active" : ""}"
+										class="roles-tool-chip ${active ? "roles-tool-chip--active" : ""}"
+										title="${tool.description}"
 										@click=${() => toggleTool(tool.name)}
-									>
-										<span class="roles-tool-item-check">${active ? "\u2713" : ""}</span>
-										<span class="roles-tool-item-name">${tool.name}</span>
-										<span class="roles-tool-item-desc">${tool.description}</span>
-									</button>
+									>${tool.name}</button>
 								`;
 							})}
 						</div>
