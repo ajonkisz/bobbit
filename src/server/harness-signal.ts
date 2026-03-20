@@ -9,10 +9,10 @@
  */
 
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { piDir } from "./pi-dir.js";
 
-const SENTINEL = path.join(os.homedir(), ".pi", "gateway-restart");
+const SENTINEL = path.join(piDir(), "gateway-restart");
 
 const dir = path.dirname(SENTINEL);
 if (!fs.existsSync(dir)) {

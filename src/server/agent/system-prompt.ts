@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { piDir } from "../pi-dir.js";
 
-const PROMPTS_DIR = path.join(os.homedir(), ".pi", "session-prompts");
+const PROMPTS_DIR = path.join(piDir(), "session-prompts");
 
 // Ensure prompts directory exists
 if (!fs.existsSync(PROMPTS_DIR)) {
@@ -160,7 +160,7 @@ export function cleanupSessionPrompt(sessionId: string): void {
 		if (fs.existsSync(promptPath)) fs.unlinkSync(promptPath);
 	} catch { /* ignore */ }
 	// Also clean up per-session preview file
-	const previewPath = path.join(os.homedir(), ".pi", `preview-${sessionId}.html`);
+	const previewPath = path.join(piDir(), `preview-${sessionId}.html`);
 	try {
 		if (fs.existsSync(previewPath)) fs.unlinkSync(previewPath);
 	} catch { /* ignore */ }

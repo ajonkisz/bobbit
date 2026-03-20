@@ -10,10 +10,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { piDir } from "../pi-dir.js";
 import { listSkills } from "./registry.js";
 
-export const SKILL_DEFINITIONS_PATH = path.join(os.homedir(), ".pi", "skill-definitions.json");
+export const SKILL_DEFINITIONS_PATH = path.join(piDir(), "skill-definitions.json");
 
 /**
  * Write all registered skill definitions to disk.

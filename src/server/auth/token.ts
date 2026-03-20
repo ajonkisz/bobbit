@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { piDir } from "../pi-dir.js";
 
-const TOKEN_DIR = path.join(os.homedir(), ".pi");
+const TOKEN_DIR = piDir();
 const TOKEN_FILE = path.join(TOKEN_DIR, "gateway-token");
 
 export function generateToken(): string {

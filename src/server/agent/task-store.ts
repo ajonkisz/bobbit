@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { piDir } from "../pi-dir.js";
 
 export type TaskType =
 	| "architecture"
@@ -35,7 +35,7 @@ export interface PersistedTask {
 	resultSummary?: string;
 }
 
-const STORE_DIR = path.join(os.homedir(), ".pi");
+const STORE_DIR = piDir();
 const STORE_FILE = path.join(STORE_DIR, "gateway-tasks.json");
 
 /**

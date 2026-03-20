@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { stringify, parse } from "yaml";
+import { piDir } from "../pi-dir.js";
 
 export interface Role {
 	/** Unique identifier — lowercase alphanumeric + hyphens, immutable after creation */
@@ -35,7 +35,7 @@ export class RoleStore {
 		fs.mkdirSync(ROLES_DIR, { recursive: true });
 		this.loadAll();
 		// Migrate: remove legacy JSON blob if YAML files now exist
-		const legacyPath = path.join(os.homedir(), ".pi", "gateway-roles.json");
+		const legacyPath = path.join(piDir(), "gateway-roles.json");
 		if (fs.existsSync(legacyPath) && this.roles.size > 0) {
 			try { fs.unlinkSync(legacyPath); } catch { /* ignore */ }
 		}

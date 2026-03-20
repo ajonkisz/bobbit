@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readE2EToken } from "./e2e-setup.js";
 
 const BASE = "http://127.0.0.1:3099";
 let token: string;
@@ -15,10 +16,7 @@ async function apiFetch(path: string, opts?: RequestInit): Promise<Response> {
 }
 
 test.beforeAll(async () => {
-	const fs = await import("node:fs");
-	const os = await import("node:os");
-	const path = await import("node:path");
-	token = fs.readFileSync(path.join(os.homedir(), ".pi", "gateway-token"), "utf-8").trim();
+	token = readE2EToken();
 });
 
 let goalId: string;

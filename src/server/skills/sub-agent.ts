@@ -15,7 +15,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { piDir } from "../pi-dir.js";
 import { RpcBridge, type RpcBridgeOptions } from "../agent/rpc-bridge.js";
 import { assembleSystemPrompt } from "../agent/system-prompt.js";
 import type { Skill } from "./types.js";
@@ -165,7 +165,7 @@ export async function runSkillAgent(request: SkillInvocationRequest): Promise<Sk
 		await rpc.stop().catch(() => {});
 		// Clean up temporary system prompt
 		try {
-			const promptDir = path.join(os.homedir(), ".pi", "session-prompts");
+			const promptDir = path.join(piDir(), "session-prompts");
 			const promptFile = path.join(promptDir, `${subSessionId}.md`);
 			if (fs.existsSync(promptFile)) fs.unlinkSync(promptFile);
 		} catch { /* ignore */ }

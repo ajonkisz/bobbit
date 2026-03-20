@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { piDir } from "../pi-dir.js";
 
 export interface SessionCost {
 	inputTokens: number;
@@ -18,7 +18,7 @@ export interface UsageData {
 	cost?: number;
 }
 
-const STORE_DIR = path.join(os.homedir(), ".pi");
+const STORE_DIR = piDir();
 const STORE_FILE = path.join(STORE_DIR, "gateway-session-costs.json");
 
 function emptyCost(): SessionCost {

@@ -1,9 +1,9 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { piDir } from "../pi-dir.js";
 
-const PI_DIR = path.join(os.homedir(), ".pi");
+const PI_DIR = piDir();
 const TLS_DIR = path.join(PI_DIR, "gateway-tls");
 const CERT_PATH = path.join(PI_DIR, "gateway-cert.pem");
 const KEY_PATH = path.join(PI_DIR, "gateway-key.pem");

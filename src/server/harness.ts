@@ -20,9 +20,9 @@
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { piDir } from "./pi-dir.js";
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -38,7 +38,7 @@ const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const CLI_PATH = path.join(__dirname, "cli.js");
 
 /** Sentinel file — any write triggers a restart */
-const SENTINEL = path.join(os.homedir(), ".pi", "gateway-restart");
+const SENTINEL = path.join(piDir(), "gateway-restart");
 
 // Ensure the sentinel directory exists
 const sentinelDir = path.dirname(SENTINEL);

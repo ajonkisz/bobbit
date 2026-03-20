@@ -7,11 +7,11 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync, existsSync, writeFileSync, unlinkSync, readdirSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
-import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { readE2EToken } from "./e2e-setup.js";
 
 const BASE = "http://127.0.0.1:3099";
-const TOKEN = readFileSync(join(homedir(), ".pi", "gateway-token"), "utf-8").trim();
+const TOKEN = readE2EToken();
 // Roles are now YAML files in the roles/ directory at the repo root
 const ROLES_DIR = resolve(process.cwd(), "roles");
 const ROLES_BACKUP_DIR = resolve(process.cwd(), "roles-backup-e2e");

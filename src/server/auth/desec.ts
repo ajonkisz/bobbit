@@ -5,10 +5,10 @@
  */
 
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { piDir } from "../pi-dir.js";
 
-const PI_DIR = path.join(os.homedir(), ".pi");
+const PI_DIR = piDir();
 const CONFIG_PATH = path.join(PI_DIR, "desec.json");
 
 export interface DesecConfig {

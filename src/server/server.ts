@@ -4,6 +4,7 @@ import http from "node:http";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
+import { piDir } from "./pi-dir.js";
 import { WebSocketServer } from "ws";
 import { ColorStore } from "./agent/color-store.js";
 import { SessionManager } from "./agent/session-manager.js";
@@ -52,9 +53,8 @@ export function createGateway(config: GatewayConfig) {
 	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
 
 	// Write gateway URL to disk so agents can discover it without env vars
-	const piDir = path.join(os.homedir(), ".pi");
-	fs.mkdirSync(piDir, { recursive: true });
-	fs.writeFileSync(path.join(piDir, "gateway-url"), gatewayUrl, "utf-8");
+	fs.mkdirSync(piDir(), { recursive: true });
+	fs.writeFileSync(path.join(piDir(), "gateway-url"), gatewayUrl, "utf-8");
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
 	const goalArtifactStore = new GoalArtifactStore();
@@ -1298,8 +1298,8 @@ async function handleApiRoute(
 	if (url.pathname === "/api/preview" && req.method === "GET") {
 		const sessionId = url.searchParams.get("sessionId");
 		const previewPath = sessionId
-			? path.join(os.homedir(), ".pi", `preview-${sessionId}.html`)
-			: path.join(os.homedir(), ".pi", "preview.html");
+			? path.join(piDir(), `preview-${sessionId}.html`)
+			: path.join(piDir(), "preview.html");
 		try {
 			const content = fs.readFileSync(previewPath, "utf-8");
 			const stat = fs.statSync(previewPath);
@@ -1315,8 +1315,8 @@ async function handleApiRoute(
 		const body = await readBody(req);
 		const sessionId = url.searchParams.get("sessionId");
 		const previewPath = sessionId
-			? path.join(os.homedir(), ".pi", `preview-${sessionId}.html`)
-			: path.join(os.homedir(), ".pi", "preview.html");
+			? path.join(piDir(), `preview-${sessionId}.html`)
+			: path.join(piDir(), "preview.html");
 		fs.writeFileSync(previewPath, body?.html || "", "utf-8");
 		json({ ok: true });
 		return;

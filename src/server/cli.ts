@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { piDir } from "./pi-dir.js";
 import { loadOrCreateToken, readToken } from "./auth/token.js";
 import { ensureTlsCert } from "./auth/tls.js";
 import { loadDesecConfig, updateDesecIp } from "./auth/desec.js";
@@ -176,7 +177,7 @@ async function main() {
 	const fullUrl = `${baseUrl}/?token=${encodeURIComponent(authToken)}`;
 
 	// Write gateway URL to a discoverable file so extensions can call the API
-	const gatewayUrlPath = path.join(os.homedir(), ".pi", "gateway-url");
+	const gatewayUrlPath = path.join(piDir(), "gateway-url");
 	fs.writeFileSync(gatewayUrlPath, baseUrl, "utf-8");
 
 	console.log(`\nPi Gateway v0.1.0`);

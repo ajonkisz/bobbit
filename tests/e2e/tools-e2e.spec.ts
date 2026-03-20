@@ -12,8 +12,9 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import WebSocket from "ws";
+import { readE2EToken } from "./e2e-setup.js";
 
 // ---------------------------------------------------------------------------
 // Config — agent tool tests need much longer timeouts
@@ -26,7 +27,7 @@ test.setTimeout(120_000);
 
 const BASE = "http://127.0.0.1:3099";
 const WS_BASE = "ws://127.0.0.1:3099";
-const TOKEN = readFileSync(join(homedir(), ".pi", "gateway-token"), "utf-8").trim();
+const TOKEN = readE2EToken();
 
 /** Authenticated REST helper */
 function apiFetch(path: string, opts: RequestInit = {}): Promise<Response> {

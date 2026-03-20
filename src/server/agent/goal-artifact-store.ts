@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import { randomUUID } from "node:crypto";
+import { piDir } from "../pi-dir.js";
 
 export type ArtifactType =
 	| "design-doc"
@@ -58,7 +58,7 @@ export function getDefaultRequirements(): ArtifactRequirement[] {
 	return DEFAULT_REQUIREMENTS.map((r) => ({ ...r }));
 }
 
-const STORE_DIR = path.join(os.homedir(), ".pi");
+const STORE_DIR = piDir();
 const STORE_FILE = path.join(STORE_DIR, "gateway-goal-artifacts.json");
 
 export class GoalArtifactStore {

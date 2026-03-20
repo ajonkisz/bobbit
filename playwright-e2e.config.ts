@@ -1,4 +1,10 @@
 import { defineConfig } from '@playwright/test';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Isolated state directory so E2E tests don't pollute ~/.pi
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const E2E_PI_DIR = path.join(__dirname, '.e2e-pi');
 
 export default defineConfig({
 	testDir: './tests/e2e',
@@ -11,6 +17,10 @@ export default defineConfig({
 		timeout: 30_000,
 		stdout: 'ignore',
 		stderr: 'pipe',
+		env: {
+			...process.env,
+			BOBBIT_PI_DIR: E2E_PI_DIR,
+		},
 	},
 	use: { baseURL: 'http://127.0.0.1:3099' },
 });

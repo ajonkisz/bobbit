@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
+import { piDir } from "../pi-dir.js";
 
-const STORE_DIR = path.join(os.homedir(), ".pi");
+const STORE_DIR = piDir();
 const STORE_FILE = path.join(STORE_DIR, "gateway-session-colors.json");
 
 /**

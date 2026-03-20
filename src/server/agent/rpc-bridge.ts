@@ -1,8 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync } from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { piDir } from "../pi-dir.js";
 
 export interface RpcBridgeOptions {
 	/** Path to pi-coding-agent cli.js. Auto-resolved if omitted. */
@@ -174,7 +174,7 @@ export class RpcBridge {
 
 			// Debug: log events to file
 			try {
-				const debugPath = path.join(homedir(), ".pi", "rpc-debug.log");
+				const debugPath = path.join(piDir(), "rpc-debug.log");
 				appendFileSync(debugPath, `EVENT: type=${parsed.type}, id=${parsed.id}, msg_role=${parsed.message?.role}, success=${parsed.success}\n`);
 				if (parsed.type === "message_end" && parsed.message?.role === "user") {
 					const content = parsed.message.content;
