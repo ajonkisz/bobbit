@@ -43,6 +43,7 @@ function idleBlob(accId: string, size = 40, hueIndex = 0): TemplateResult {
 					<div class="bobbit-blob__book"></div>
 					<div class="bobbit-blob__glasses"></div>
 					<div class="bobbit-blob__shield"></div>
+					<div class="bobbit-blob__blueprint"></div>
 					<div class="bobbit-blob__flask"></div>
 				</div>
 			</div>

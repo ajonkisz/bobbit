@@ -158,6 +158,20 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		yOffset: 0,
 		addsHeight: false,
 	},
+	blueprint: {
+		id: "blueprint",
+		label: "Blueprint",
+		shadow: `
+			9px 4px 0 #000,10px 4px 0 #000,
+			8px 5px 0 #000,9px 5px 0 #bfdbfe,10px 5px 0 #93c5fd,11px 5px 0 #000,
+			8px 6px 0 #000,9px 6px 0 #3b82f6,10px 6px 0 #60a5fa,11px 6px 0 #000,
+			8px 7px 0 #000,9px 7px 0 #2563eb,10px 7px 0 #3b82f6,11px 7px 0 #000,
+			8px 8px 0 #000,9px 8px 0 #bfdbfe,10px 8px 0 #93c5fd,11px 8px 0 #000,
+			9px 9px 0 #000,10px 9px 0 #000
+		`,
+		yOffset: 0,
+		addsHeight: false,
+	},
 	flask: {
 		id: "flask",
 		label: "Flask",
