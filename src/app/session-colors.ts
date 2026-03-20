@@ -318,7 +318,8 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 		: "";
 
 	// Accessory overlay layer — counter-hue-rotated to keep fixed colours
-	const accFilter = hueRotate && status !== "starting" && status !== "terminated"
+	// Flask intentionally rotates with the bobbit for contrast
+	const accFilter = hueRotate && status !== "starting" && status !== "terminated" && acc.id !== "flask"
 		? `filter:hue-rotate(${-hueRotate}deg);`
 		: "";
 	// Bandana needs a slight translateY adjustment; crown uses yOffset for top positioning
