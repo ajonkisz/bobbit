@@ -78,10 +78,10 @@ src/
 │   └── system-prompt.md  # Custom system prompt for agent sessions
 └── docs/
     ├── dev-workflow.md          # Development workflow guide
-    └── bobbit-iconography.md    # Bobbit pixel art, animation & accessory system reference
+    └── bobbit-sprites.md       # Bobbit pixel art, animation & accessory system reference
 ```
 
-@docs/bobbit-iconography.md
+The bobbit is a pixel-art blob mascot rendered with CSS box-shadow, with animations, accessories, and color identity. See `docs/bobbit-sprites.md` for the full reference.
 
 ## Commands
 
@@ -96,6 +96,7 @@ npm start              # Run built gateway (serves embedded UI)
 npm run check          # Type-check both server and web without emitting
 npm test               # Mobile header Playwright tests
 npm run test:e2e       # E2E tests (auto-starts sandboxed gateway via Playwright webServer)
+npm run test:summary   # Run check + unit + E2E with compact output (preferred for agents)
 ```
 
 ### Dev server harness
@@ -309,14 +310,38 @@ Notification permission is requested on first user prompt (has user gesture cont
 
 If you need to change UI components or server behavior, edit the forked code directly. If you need changes to the agent itself (tool definitions, LLM interaction, etc.), those live in the npm packages upstream.
 
+## Networking
+
+Bobbit is accessed remotely over a **NordVPN mesh network**. The user runs the server on a dev machine and connects from other devices via a custom domain.
+
+**Port topology in dev mode:**
+- **Vite** (`:5173`) — user-facing HTTPS server, serves UI with HMR, proxies `/api/*` and `/ws/*` to the gateway
+- **Gateway** (`:3001`) — HTTPS server, REST API, WebSocket sessions, agent subprocess management
+
+In production (`npm start`), the gateway serves the bundled UI directly on `:3001`. No Vite.
+
+**deSEC dynamic DNS**: On startup, the gateway updates a deSEC A record (`~/.pi/desec.json`) so `bobbit.dedyn.io` resolves to the current mesh IP. Config:
+```json
+{ "domain": "bobbit.dedyn.io", "token": "<deSEC API token>" }
+```
+
+**Pitfall — E2E tests and DNS**: The deSEC update is skipped for loopback addresses (`127.0.0.1`, `localhost`). If the DNS record points to `127.0.0.1` and remote clients can't connect, a prior server start with `--host 127.0.0.1` likely clobbered it. Restart the server normally (without `--host`) to push the correct mesh IP. Clients may need a DNS cache flush.
+
+**TLS** is on by default. Certs are generated via mkcert (local CA) or openssl fallback:
+- `~/.pi/gateway-cert.pem` / `~/.pi/gateway-key.pem` — server cert and key
+- `~/.pi/gateway-tls/ca.crt` — CA cert (install on remote devices to trust)
+
+Vite reuses the same cert for its HTTPS server. The cert covers the current host IP + localhost; it regenerates automatically if the IP changes.
+
+See [docs/dev-workflow.md](docs/dev-workflow.md) for the full networking reference, troubleshooting table, and local-only setup.
+
 ## Security notes
 
 - Auth token at `~/.pi/gateway-token` (256-bit, mode 0600)
 - All API + WS require token. Constant-time comparison. Rate limiting on failures.
 - **The token grants full shell access.** Treat it like an SSH private key.
 - Static file serving has traversal guard (resolved path must start with static dir).
-- **TLS is on by default.** Self-signed certificates are auto-generated and stored at `~/.pi/gateway-tls/`. Use `--no-tls` to disable. The protocol in startup logs and QR codes is `https` by default.
-- **Gateway and Vite auto-detect the NordLynx mesh IP** and bind to it. If NordVPN isn't running, the gateway exits with an error. Pass `--host <addr>` to override. Never bind to `0.0.0.0` — restrict access to the mesh network only.
+- Never bind to `0.0.0.0` — restrict access to the mesh network only.
 - OAuth flow (`/api/oauth/start`, `/api/oauth/complete`, `/api/oauth/status`) for obtaining API credentials.
 
 ## QR code / multi-device access
@@ -339,6 +364,10 @@ All persistent state lives under `~/.pi/`:
 | `gateway-team-state.json` | `TeamStore` | Team state (agents, roles, goal associations) |
 | `gateway-tasks.json` | `TaskStore` | Task definitions, state, assignments |
 | `skill-definitions.json` | `definitions-sync.ts` | Exported skill definitions for agent discovery |
+| `gateway-url` | `cli.ts` | Last-started gateway base URL (e.g. `https://100.x.x.x:3001`) |
+| `desec.json` | `desec.ts` | deSEC dynDNS config (domain + API token) |
+| `gateway-cert.pem` | `tls.ts` | TLS server certificate |
+| `gateway-key.pem` | `tls.ts` | TLS server private key |
 
 | `agent/auth.json` | (external) | API auth credentials (read by title-generator) |
 | `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
@@ -355,34 +384,24 @@ See [docs/dev-workflow.md](docs/dev-workflow.md) for the full guide on running m
 
 ## Testing
 
-**Unit-style tests** (`npm test`): Use Playwright with `file://` fixtures — plain HTML/JS files that test logic without a build step or dev server. See `tests/mobile-header.spec.ts` and `tests/mobile-header.html` for the pattern.
+**Run tests before committing.** After any code change, run `node scripts/test-summary.mjs --all` (or `npm run test:summary`). This runs type-check + unit tests + E2E tests and outputs a compact summary — just pass/fail counts and failure details. Use this instead of raw `npm test` / `npm run test:e2e` to keep context lean.
 
-**E2E tests with Playwright `webServer`** (`npm run test:e2e`): Agents **can and should** run E2E tests that need a live gateway. Use Playwright's `webServer` config to start a sandboxed server automatically — Playwright manages the server lifecycle internally, so the bash tool returns normally when tests finish. See `playwright-e2e.config.ts` for the pattern:
-
-```typescript
-// playwright-e2e.config.ts
-import { defineConfig } from '@playwright/test';
-export default defineConfig({
-  testDir: './tests/e2e',
-  webServer: {
-    command: 'node dist/server/cli.js --host 127.0.0.1 --port 3099 --no-tls --no-ui',
-    url: 'http://127.0.0.1:3099/api/sessions',
-    reuseExistingServer: false,
-    timeout: 30_000,
-    stdout: 'ignore',
-    stderr: 'pipe',
-  },
-  use: { baseURL: 'http://127.0.0.1:3099' },
-});
+```bash
+node scripts/test-summary.mjs --all    # Type check + unit + E2E (preferred)
+node scripts/test-summary.mjs --e2e    # E2E only
+node scripts/test-summary.mjs --unit   # Unit only
 ```
 
-Run with: `npm run build:server && npx playwright test --config playwright-e2e.config.ts`
+If you change server code (`src/server/`), E2E tests will rebuild the server automatically. If you only change UI code, `--unit` is sufficient.
 
-The server starts on port 3099 (not 3001) to avoid conflicting with the running dev server. Build the server first since the E2E config runs the compiled JS directly.
+**Test structure:**
 
-**Do NOT start background servers manually** from bash (`node server.js &`, `nohup`, etc.) — the bash tool waits for all stdout/stderr pipes to close, so backgrounded processes that inherit those FDs cause the bash tool to hang forever and crash the agent session. Always use Playwright's `webServer` config instead, which manages server FDs internally.
+- **Unit tests** (`tests/*.spec.ts`): Playwright with `file://` fixtures — plain HTML/JS files that test logic without a build step. See `tests/mobile-header.spec.ts` for the pattern.
+- **E2E tests** (`tests/e2e/*.spec.ts`): Run against a real sandboxed gateway on port 3099, auto-started by Playwright's `webServer` config. Covers REST API, WebSocket protocol, session lifecycle, and agent tool invocations.
 
-**Writing new tests**: Prefer `file://` fixtures with plain HTML/JS that simulate the logic under test. Extract state machine logic into testable functions where possible. Only involve real Lit components when the bug is specifically about rendering behavior. For tests that need a real server (WebSocket flows, API integration), use the `webServer` pattern above.
+**Writing new tests**: Prefer `file://` fixtures with plain HTML/JS that simulate the logic under test. Extract state machine logic into testable functions where possible. For tests that need a real server (WebSocket, API integration), add to `tests/e2e/` — they use the `webServer` pattern in `playwright-e2e.config.ts`.
+
+**Do NOT start background servers manually** from bash (`node server.js &`, `nohup`, etc.) — the bash tool waits for all stdout/stderr pipes to close, so backgrounded processes that inherit those FDs cause the bash tool to hang forever and crash the agent session. Always use Playwright's `webServer` config instead.
 
 ## Common tasks
 

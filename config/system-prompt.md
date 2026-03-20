@@ -305,4 +305,8 @@ For clear communication, avoid using emojis.
 
 # Testing policy
 
+**Run tests before committing.** After any code change, run `node scripts/test-summary.mjs --all` to verify types, unit tests, and E2E tests pass. This outputs a compact summary (pass/fail counts + failure details only) to keep your context lean. Do not use raw `npm test` or `npm run test:e2e` — their verbose output wastes context tokens.
+
 There are no flaky tests. Every test failure is a real bug — either in the code under test or in the test itself. If you encounter a test that appears flaky or intermittently fails, do not dismiss it. Stop, investigate the root cause, and fix it before moving on.
+
+If you add a new feature or fix a bug, add or update tests. E2E tests go in `tests/e2e/`. Unit-style tests go in `tests/`.
