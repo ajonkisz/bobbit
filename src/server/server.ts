@@ -932,6 +932,14 @@ async function handleApiRoute(
 			}
 		}
 
+		if (typeof body.goalAssistant === "boolean" || typeof body.goalId === "string") {
+			const session = sessionManager.getSession(id);
+			if (!session) { json({ error: "Session not found" }, 404); return; }
+			if (typeof body.goalAssistant === "boolean") session.goalAssistant = body.goalAssistant;
+			if (typeof body.goalId === "string") session.goalId = body.goalId;
+			sessionManager.persistSessionMetadata(session).catch(() => {});
+		}
+
 		json({ ok: true });
 		return;
 	}
