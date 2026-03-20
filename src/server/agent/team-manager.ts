@@ -294,7 +294,11 @@ export class TeamManager {
 		}
 
 		if (!goal.repoPath) {
-			throw new Error(`Goal "${goal.title}" has no repoPath — cannot create worktree for role agent`);
+			throw new Error(
+				`Goal "${goal.title}" has no repoPath — cannot create worktree for role agent. ` +
+				`This usually means the goal was created without team mode enabled, or the cwd is not a git repo. ` +
+				`Update the goal with repoPath set to the git repository root.`
+			);
 		}
 
 		// Create a worktree for this role agent

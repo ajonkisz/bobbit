@@ -87,6 +87,29 @@ export class GoalManager {
 	}
 
 	updateGoal(id: string, updates: { title?: string; cwd?: string; state?: GoalState; spec?: string; team?: boolean; repoPath?: string; branch?: string }): boolean {
+		const existing = this.store.get(id);
+		if (!existing) return false;
+
+		// If toggling team mode ON for a non-team goal, auto-create worktree
+		if (updates.team === true && !existing.team && !existing.worktreePath) {
+			const cwd = updates.cwd ?? existing.cwd;
+			if (isGitRepo(cwd)) {
+				const repoRoot = getRepoRoot(cwd);
+				const title = updates.title ?? existing.title;
+				const branch = `goal/${toBranchName(title)}-${id.slice(0, 8)}`;
+				try {
+					const result = createWorktree(repoRoot, branch);
+					updates.repoPath = repoRoot;
+					updates.branch = branch;
+					// Also update cwd to the worktree
+					updates.cwd = result.worktreePath;
+					console.log(`[goal-manager] Created worktree for upgraded team goal "${title}": ${result.worktreePath} (branch: ${branch})`);
+				} catch (err) {
+					console.error(`[goal-manager] Failed to create worktree when upgrading to team goal:`, err);
+				}
+			}
+		}
+
 		return this.store.update(id, updates);
 	}
 

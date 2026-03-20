@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 
 export interface WorktreeResult {
@@ -11,6 +12,12 @@ export interface WorktreeResult {
  * The worktree is placed as a sibling directory to the repo.
  */
 export function createWorktree(repoPath: string, branchName: string): WorktreeResult {
+	// Validate repoPath exists — execFileSync with a bad cwd throws a misleading
+	// "spawnSync git ENOENT" that looks like git isn't installed
+	if (!fs.existsSync(repoPath)) {
+		throw new Error(`Cannot create worktree: repoPath does not exist: ${repoPath}`);
+	}
+
 	const worktreePath = path.resolve(repoPath, "..", `${path.basename(repoPath)}-wt-${branchName}`);
 
 	// Create branch and worktree in one step — uses execFileSync (no shell) to prevent injection
@@ -31,6 +38,11 @@ export function cleanupWorktree(
 	branchName?: string,
 	deleteBranch = false,
 ): void {
+	if (!fs.existsSync(repoPath)) {
+		console.warn(`[git] Cannot clean up worktree: repoPath does not exist: ${repoPath}`);
+		return;
+	}
+
 	try {
 		execFileSync("git", ["worktree", "remove", worktreePath, "--force"], {
 			cwd: repoPath,
