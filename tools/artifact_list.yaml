@@ -1,0 +1,4 @@
+name: artifact_list
+description: "List all goal artifacts"
+group: Artifacts
+renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts

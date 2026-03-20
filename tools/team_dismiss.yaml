@@ -1,0 +1,4 @@
+name: team_dismiss
+description: "Terminate an agent and clean up"
+group: Team
+renderer: src/ui/tools/renderers/TeamToolRenderers.ts

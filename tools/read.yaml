@@ -1,0 +1,4 @@
+name: read
+description: "Read file contents (text or images)"
+group: File System
+renderer: src/ui/tools/renderers/ReadRenderer.ts

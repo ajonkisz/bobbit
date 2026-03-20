@@ -128,5 +128,37 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	console.log(`[team-lead-tools] Registered 4 team tools for session ${sessionId}, goal ${goalId}`);
+	pi.registerTool({
+		name: "team_steer",
+		label: "Steer Team Agent",
+		description: "Send an urgent mid-turn redirect to a running agent. Only works when the agent is actively streaming (between tool calls). Use this for course corrections, clarifications, or priority changes that can't wait until the agent finishes. Fails if the agent is idle — use team_prompt instead.",
+		promptSnippet: "Steer a running team agent with an urgent message (mid-turn only).",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "Session ID of the agent to steer" }),
+			message: Type.String({ description: "Steering message — the agent sees this between tool calls" }),
+		}),
+		async execute(_id, params) {
+			try {
+				return ok(await api("POST", `/api/goals/${goalId}/team/steer`, { sessionId: params.session_id, message: params.message }));
+			} catch (e: any) { return err(e.message); }
+		},
+	});
+
+	pi.registerTool({
+		name: "team_prompt",
+		label: "Prompt Team Agent",
+		description: "Send a prompt to a team agent. If the agent is idle, it starts working immediately. If the agent is busy, the message is queued and dispatched when the current turn ends. Use this to assign follow-up work, nudge idle agents, or queue instructions.",
+		promptSnippet: "Send a prompt to a team agent (immediate if idle, queued if busy).",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "Session ID of the agent to prompt" }),
+			message: Type.String({ description: "Prompt message for the agent" }),
+		}),
+		async execute(_id, params) {
+			try {
+				return ok(await api("POST", `/api/goals/${goalId}/team/prompt`, { sessionId: params.session_id, message: params.message }));
+			} catch (e: any) { return err(e.message); }
+		},
+	});
+
+	console.log(`[team-lead-tools] Registered 6 team tools for session ${sessionId}, goal ${goalId}`);
 }

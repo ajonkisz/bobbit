@@ -1,0 +1,4 @@
+name: bash
+description: "Execute shell commands"
+group: Shell
+renderer: src/ui/tools/renderers/BashRenderer.ts

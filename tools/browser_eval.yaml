@@ -1,0 +1,4 @@
+name: browser_eval
+description: "Execute JavaScript in the page"
+group: Browser
+renderer: src/ui/tools/renderers/BrowserEvalRenderer.ts

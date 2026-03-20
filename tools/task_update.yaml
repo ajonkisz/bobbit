@@ -1,0 +1,4 @@
+name: task_update
+description: "Update task fields, assignment, or state"
+group: Tasks
+renderer: src/ui/tools/renderers/TaskToolRenderers.ts

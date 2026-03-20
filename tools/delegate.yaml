@@ -1,0 +1,4 @@
+name: delegate
+description: "Run a task in a separate agent process"
+group: Agent
+renderer: src/ui/tools/renderers/DelegateRenderer.ts

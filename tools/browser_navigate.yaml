@@ -1,0 +1,4 @@
+name: browser_navigate
+description: "Navigate to a URL in headless browser"
+group: Browser
+renderer: src/ui/tools/renderers/BrowserNavigateRenderer.ts

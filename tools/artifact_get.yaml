@@ -1,0 +1,4 @@
+name: artifact_get
+description: "Get an artifact's full content"
+group: Artifacts
+renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts

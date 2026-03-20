@@ -1,0 +1,4 @@
+name: team_complete
+description: "Dismiss all agents and complete goal"
+group: Team
+renderer: src/ui/tools/renderers/TeamToolRenderers.ts

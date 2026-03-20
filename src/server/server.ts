@@ -16,6 +16,7 @@ import { TeamManager } from "./agent/team-manager.js";
 import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
 import { ToolStore } from "./agent/tool-store.js";
+import { ToolManager } from "./agent/tool-manager.js";
 import { TOOL_ASSISTANT_PROMPT } from "./agent/tool-assistant.js";
 import type { TaskType, TaskState } from "./agent/task-store.js";
 import { GoalArtifactStore, getDefaultRequirements, type ArtifactType } from "./agent/goal-artifact-store.js";
@@ -56,7 +57,8 @@ export function createGateway(config: GatewayConfig) {
 	fs.mkdirSync(piDir(), { recursive: true });
 	const roleStore = new RoleStore();
 	const toolStore = new ToolStore();
-	const roleManager = new RoleManager(roleStore, toolStore);
+	const roleManager = new RoleManager(roleStore);
+	const toolManager = new ToolManager(toolStore);
 	const goalArtifactStore = new GoalArtifactStore();
 	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
@@ -103,7 +105,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, goalArtifactStore);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore);
 			return;
 		}
 
@@ -178,6 +180,7 @@ async function handleApiRoute(
 	colorStore: ColorStore,
 	teamManager: TeamManager,
 	roleManager: RoleManager,
+	toolManager: ToolManager,
 	goalArtifactStore: GoalArtifactStore,
 ) {
 	const json = (data: unknown, status = 200) => {
@@ -412,7 +415,7 @@ async function handleApiRoute(
 
 	// GET /api/tools — list available agent tools
 	if (url.pathname === "/api/tools" && req.method === "GET") {
-		json({ tools: roleManager.getAvailableTools() });
+		json({ tools: toolManager.getAvailableTools() });
 		return;
 	}
 
@@ -422,7 +425,7 @@ async function handleApiRoute(
 		const name = decodeURIComponent(toolMatch[1]);
 
 		if (req.method === "GET") {
-			const tool = roleManager.getToolByName(name);
+			const tool = toolManager.getToolByName(name);
 			if (!tool) { json({ error: "Tool not found" }, 404); return; }
 			json(tool);
 			return;
@@ -431,7 +434,7 @@ async function handleApiRoute(
 		if (req.method === "PUT") {
 			const body = await readBody(req);
 			if (!body) { json({ error: "Missing body" }, 400); return; }
-			const ok = roleManager.updateToolMetadata(name, {
+			const ok = toolManager.updateToolMetadata(name, {
 				description: body.description,
 				group: body.group,
 				docs: body.docs,
@@ -892,6 +895,68 @@ async function handleApiRoute(
 			return;
 		}
 		json(state);
+		return;
+	}
+
+	// POST /api/goals/:id/team/steer — steer a team agent mid-turn
+	const teamSteerMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/steer$/);
+	if (teamSteerMatch && req.method === "POST") {
+		const goalId = teamSteerMatch[1];
+		const body = await readBody(req);
+		if (!body?.sessionId || !body?.message) {
+			json({ error: "Missing sessionId or message" }, 400);
+			return;
+		}
+		// Validate target is a team agent
+		const agents = teamManager.listAgents(goalId);
+		if (!agents.find(a => a.sessionId === body.sessionId)) {
+			json({ error: "Session is not a member of this team" }, 403);
+			return;
+		}
+		const session = sessionManager.getSession(body.sessionId);
+		if (!session) {
+			json({ error: "Session not found" }, 404);
+			return;
+		}
+		if (session.status !== "streaming") {
+			json({ error: "Agent is not currently streaming — use team/prompt instead" }, 409);
+			return;
+		}
+		try {
+			await session.rpcClient.steer(body.message);
+			json({ ok: true, dispatched: true });
+		} catch (err) {
+			json({ error: String(err) }, 500);
+		}
+		return;
+	}
+
+	// POST /api/goals/:id/team/prompt — send a prompt to a team agent (queued or immediate)
+	const teamPromptMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/prompt$/);
+	if (teamPromptMatch && req.method === "POST") {
+		const goalId = teamPromptMatch[1];
+		const body = await readBody(req);
+		if (!body?.sessionId || !body?.message) {
+			json({ error: "Missing sessionId or message" }, 400);
+			return;
+		}
+		// Validate target is a team agent
+		const agents = teamManager.listAgents(goalId);
+		if (!agents.find(a => a.sessionId === body.sessionId)) {
+			json({ error: "Session is not a member of this team" }, 403);
+			return;
+		}
+		const session = sessionManager.getSession(body.sessionId);
+		if (!session) {
+			json({ error: "Session not found" }, 404);
+			return;
+		}
+		try {
+			await sessionManager.enqueuePrompt(body.sessionId, body.message);
+			json({ ok: true, status: session.status === "idle" ? "dispatched" : "queued" });
+		} catch (err) {
+			json({ error: String(err) }, 500);
+		}
 		return;
 	}
 

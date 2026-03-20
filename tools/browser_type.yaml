@@ -1,0 +1,4 @@
+name: browser_type
+description: "Type text into an input element"
+group: Browser
+renderer: src/ui/tools/renderers/BrowserTypeRenderer.ts

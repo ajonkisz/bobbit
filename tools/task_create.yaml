@@ -1,0 +1,4 @@
+name: task_create
+description: "Create a new task with type and dependencies"
+group: Tasks
+renderer: src/ui/tools/renderers/TaskToolRenderers.ts

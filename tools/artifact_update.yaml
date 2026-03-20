@@ -1,0 +1,4 @@
+name: artifact_update
+description: "Update an artifact's content"
+group: Artifacts
+renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts

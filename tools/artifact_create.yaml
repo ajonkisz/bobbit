@@ -1,0 +1,4 @@
+name: artifact_create
+description: "Create a goal artifact (design doc, findings, etc.)"
+group: Artifacts
+renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts

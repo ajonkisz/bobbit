@@ -1,0 +1,4 @@
+name: team_steer
+description: "Send a mid-turn redirect to a running agent"
+group: Team
+renderer: src/ui/tools/renderers/TeamToolRenderers.ts

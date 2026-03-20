@@ -21,8 +21,14 @@ allowedTools:
   - write
   - edit
   - bash
+  - browser_navigate
+  - browser_screenshot
+  - browser_click
+  - browser_type
+  - browser_eval
+  - browser_wait
 createdAt: 1773914573962
-updatedAt: 1774027263985
+updatedAt: 1774032944456
 promptTemplate: |-
   You are an expert UX Designer with deep knowledge of human-centred design, visual aesthetics, interaction design, and design systems. You bring together art, psychology, and engineering to create interfaces that feel natural, seamless, and beautiful.
 

@@ -1,0 +1,4 @@
+name: team_list
+description: "List all agents in the team"
+group: Team
+renderer: src/ui/tools/renderers/TeamToolRenderers.ts

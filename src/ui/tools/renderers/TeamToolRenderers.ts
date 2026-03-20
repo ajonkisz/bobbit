@@ -5,7 +5,7 @@
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import { html, type TemplateResult } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
-import { Users, UserPlus, UserMinus, Trophy } from "lucide";
+import { Users, UserPlus, UserMinus, Trophy, Zap, MessageSquare } from "lucide";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
 import { renderSessionLink } from "./delegate-cards.js";
@@ -184,6 +184,74 @@ export class TeamCompleteRenderer implements ToolRenderer {
 
 		return {
 			content: html`<div>${renderHeader(state, Trophy, html`Team completed — all agents dismissed`)}</div>`,
+			isCustom: false,
+		};
+	}
+}
+
+// ── team_steer ───────────────────────────────────────────────────────
+
+export class TeamSteerRenderer implements ToolRenderer {
+	render(params: any, result: ToolResultMessage | undefined, isStreaming?: boolean): ToolRenderResult {
+		const state = result ? (result.isError ? "error" : "complete") : isStreaming ? "inprogress" : "complete";
+		const sid = params?.session_id;
+		const msg = params?.message ? truncate(params.message, 80) : "";
+
+		if (!result) {
+			return {
+				content: html`<div>${renderHeader(state, Zap, html`Steering ${sid ? renderSessionLink(sid) : "agent"} ${msg ? html`— <span class="text-xs text-muted-foreground">${msg}</span>` : ""}`)}</div>`,
+				isCustom: false,
+			};
+		}
+
+		if (result.isError) {
+			const { text } = getResult(result);
+			return {
+				content: html`<div>
+					${renderHeader(state, Zap, html`Steer failed ${sid ? renderSessionLink(sid) : ""}`)}
+					<div class="mt-1 text-xs text-destructive">${text}</div>
+				</div>`,
+				isCustom: false,
+			};
+		}
+
+		return {
+			content: html`<div>${renderHeader(state, Zap, html`Steered ${sid ? renderSessionLink(sid) : "agent"} ${msg ? html`— <span class="text-xs text-muted-foreground">${msg}</span>` : ""}`)}</div>`,
+			isCustom: false,
+		};
+	}
+}
+
+// ── team_prompt ──────────────────────────────────────────────────────
+
+export class TeamPromptRenderer implements ToolRenderer {
+	render(params: any, result: ToolResultMessage | undefined, isStreaming?: boolean): ToolRenderResult {
+		const state = result ? (result.isError ? "error" : "complete") : isStreaming ? "inprogress" : "complete";
+		const sid = params?.session_id;
+		const msg = params?.message ? truncate(params.message, 80) : "";
+
+		if (!result) {
+			return {
+				content: html`<div>${renderHeader(state, MessageSquare, html`Prompting ${sid ? renderSessionLink(sid) : "agent"} ${msg ? html`— <span class="text-xs text-muted-foreground">${msg}</span>` : ""}`)}</div>`,
+				isCustom: false,
+			};
+		}
+
+		const { data, text } = getResult(result);
+		if (result.isError) {
+			return {
+				content: html`<div>
+					${renderHeader(state, MessageSquare, html`Prompt failed ${sid ? renderSessionLink(sid) : ""}`)}
+					<div class="mt-1 text-xs text-destructive">${text}</div>
+				</div>`,
+				isCustom: false,
+			};
+		}
+
+		const status = data?.status || "sent";
+		const statusLabel = status === "queued" ? "queued" : "dispatched";
+		return {
+			content: html`<div>${renderHeader(state, MessageSquare, html`Prompted ${sid ? renderSessionLink(sid) : "agent"} <span class="text-xs text-muted-foreground">(${statusLabel})</span> ${msg ? html`— <span class="text-xs text-muted-foreground">${msg}</span>` : ""}`)}</div>`,
 			isCustom: false,
 		};
 	}

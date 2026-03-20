@@ -1,0 +1,4 @@
+name: edit
+description: "Replace exact text in a file"
+group: File System
+renderer: src/ui/tools/renderers/EditRenderer.ts

@@ -1,0 +1,4 @@
+name: task_list
+description: "List all tasks for the goal"
+group: Tasks
+renderer: src/ui/tools/renderers/TaskToolRenderers.ts

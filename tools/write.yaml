@@ -1,0 +1,4 @@
+name: write
+description: "Create or overwrite a file"
+group: File System
+renderer: src/ui/tools/renderers/WriteRenderer.ts

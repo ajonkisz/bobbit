@@ -1,0 +1,4 @@
+name: browser_wait
+description: "Wait for an element to appear"
+group: Browser
+renderer: src/ui/tools/renderers/BrowserWaitRenderer.ts

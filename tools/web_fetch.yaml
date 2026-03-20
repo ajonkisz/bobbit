@@ -1,0 +1,4 @@
+name: web_fetch
+description: "Fetch a URL and extract text"
+group: Web
+renderer: src/ui/tools/renderers/WebFetchRenderer.ts

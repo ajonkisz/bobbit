@@ -1,0 +1,4 @@
+name: team_spawn
+description: "Spawn a role agent with its own worktree"
+group: Team
+renderer: src/ui/tools/renderers/TeamToolRenderers.ts
