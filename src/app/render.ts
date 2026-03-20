@@ -488,6 +488,45 @@ function rolePreviewPanel() {
 }
 
 // ============================================================================
+// PREVIEW SWIPE (mobile)
+// ============================================================================
+
+let _swipeAttached = false;
+
+/** Attach swipe-left/right gesture to toggle between chat and preview tabs on mobile */
+function setupPreviewSwipe(): void {
+	if (_swipeAttached) return;
+	const el = document.getElementById("app-main");
+	if (!el) return;
+	_swipeAttached = true;
+
+	let startX = 0;
+	let startY = 0;
+
+	el.addEventListener("touchstart", (e: TouchEvent) => {
+		startX = e.touches[0].clientX;
+		startY = e.touches[0].clientY;
+	}, { passive: true });
+
+	el.addEventListener("touchend", (e: TouchEvent) => {
+		if (!state.isPreviewSession) return;
+		const dx = e.changedTouches[0].clientX - startX;
+		const dy = e.changedTouches[0].clientY - startY;
+		// Require horizontal swipe > 60px and more horizontal than vertical
+		if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+		if (dx < 0 && state.previewPanelTab === "chat") {
+			// Swipe left → show preview
+			state.previewPanelTab = "preview";
+			renderApp();
+		} else if (dx > 0 && state.previewPanelTab === "preview") {
+			// Swipe right → show chat
+			state.previewPanelTab = "chat";
+			renderApp();
+		}
+	}, { passive: true });
+}
+
+// ============================================================================
 // RENDER APP
 // ============================================================================
 
@@ -867,6 +906,7 @@ export function doRenderApp(): void {
 			</div>
 		`, app);
 		ensureMobileScrollTracking();
+		setupPreviewSwipe();
 		requestAnimationFrame(() => {
 			const headerEl = document.getElementById("app-header");
 			if (headerEl) {
