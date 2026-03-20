@@ -18,10 +18,10 @@ import { RoleManager } from "./agent/role-manager.js";
 import { ToolStore } from "./agent/tool-store.js";
 import { ToolManager } from "./agent/tool-manager.js";
 import { TOOL_ASSISTANT_PROMPT } from "./agent/tool-assistant.js";
-import type { TaskType, TaskState } from "./agent/task-store.js";
-import { GoalArtifactStore, getDefaultRequirements, type ArtifactType } from "./agent/goal-artifact-store.js";
+import type { TaskState } from "./agent/task-store.js";
+import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
+import { ArtifactSpecStore } from "./agent/artifact-spec-store.js";
 
-const VALID_TASK_TYPES = new Set<string>(["architecture", "design-review", "mock-generation", "tdd-tests", "implementation", "code-review", "security-review", "documentation", "testing", "bug-fix", "refactor", "custom"]);
 const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
 
 export interface TlsConfig {
@@ -60,6 +60,7 @@ export function createGateway(config: GatewayConfig) {
 	const roleManager = new RoleManager(roleStore);
 	const toolManager = new ToolManager(toolStore);
 	const goalArtifactStore = new GoalArtifactStore();
+	const artifactSpecStore = new ArtifactSpecStore();
 	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
@@ -105,7 +106,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecStore);
 			return;
 		}
 
@@ -182,6 +183,7 @@ async function handleApiRoute(
 	roleManager: RoleManager,
 	toolManager: ToolManager,
 	goalArtifactStore: GoalArtifactStore,
+	artifactSpecStore: ArtifactSpecStore,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -530,30 +532,8 @@ async function handleApiRoute(
 			json({ error: "Missing type" }, 400);
 			return;
 		}
-		if (!VALID_TASK_TYPES.has(type)) {
-			json({ error: `Invalid task type: ${type}` }, 400);
-			return;
-		}
-
-		// Enforce artifact requirements
-		const requirements = getDefaultRequirements();
-		const skipTypes = goal.skipArtifactRequirements ?? [];
-		const existingArtifacts = goalArtifactStore.getByGoalId(goalId);
-		const existingTypes = new Set(existingArtifacts.map((a) => a.type));
-		const missingArtifacts: { type: string; description: string }[] = [];
-		for (const req2 of requirements) {
-			if (skipTypes.includes(req2.artifactType)) continue;
-			if (req2.blocksTaskTypes.includes(type) && !existingTypes.has(req2.artifactType)) {
-				missingArtifacts.push({ type: req2.artifactType, description: req2.description });
-			}
-		}
-		if (missingArtifacts.length > 0) {
-			json({ error: "Missing required artifacts", missingArtifacts }, 409);
-			return;
-		}
-
 		try {
-			const task = sessionManager.taskManager.createTask(goalId, title, type as TaskType, {
+			const task = sessionManager.taskManager.createTask(goalId, title, type, {
 				parentTaskId: body.parentTaskId,
 				spec: body.spec,
 				dependsOn: body.dependsOn,
@@ -592,13 +572,35 @@ async function handleApiRoute(
 		if (!body?.producedBy || typeof body.producedBy !== "string") {
 			json({ error: "Missing producedBy" }, 400); return;
 		}
+
+		// Enforce artifact spec requirements if specId is provided
+		if (body.specId && typeof body.specId === "string") {
+			const spec = artifactSpecStore.get(body.specId);
+			if (spec && spec.requires && spec.requires.length > 0) {
+				const existingArtifacts = goalArtifactStore.getByGoalId(goalId);
+				const existingSpecIds = new Set(existingArtifacts.map(a => a.specId || a.type));
+				const missingSpecs: string[] = [];
+				for (const reqId of spec.requires) {
+					if (!existingSpecIds.has(reqId)) {
+						missingSpecs.push(reqId);
+					}
+				}
+				if (missingSpecs.length > 0) {
+					json({ error: "Missing required artifacts", missingSpecs }, 409);
+					return;
+				}
+			}
+		}
+
 		const artifact = goalArtifactStore.create({
 			goalId,
 			name: body.name,
-			type: body.type as ArtifactType,
+			type: body.type,
 			content: body.content,
 			producedBy: body.producedBy,
 			skillId: body.skillId,
+			specId: body.specId,
+			status: body.status,
 		});
 		json(artifact, 201);
 		return;
@@ -1338,6 +1340,82 @@ async function handleApiRoute(
 	// GET /api/skills — list available skill definitions
 	if (url.pathname === "/api/skills" && req.method === "GET") {
 		json({ skills: listSkills().map((s) => ({ id: s.id, name: s.name, description: s.description })) });
+		return;
+	}
+
+	// ── Artifact Spec endpoints ────────────────────────────────────
+
+	// GET /api/artifact-specs
+	const artifactSpecsMatch = url.pathname === "/api/artifact-specs";
+	if (artifactSpecsMatch && req.method === "GET") {
+		json({ specs: artifactSpecStore.getAll() });
+		return;
+	}
+
+	// POST /api/artifact-specs
+	if (artifactSpecsMatch && req.method === "POST") {
+		const body = await readBody(req);
+		if (!body?.id || typeof body.id !== "string") { json({ error: "Missing id" }, 400); return; }
+		if (!body?.name || typeof body.name !== "string") { json({ error: "Missing name" }, 400); return; }
+		if (!body?.kind || typeof body.kind !== "string") { json({ error: "Missing kind" }, 400); return; }
+		if (!body?.format || typeof body.format !== "string") { json({ error: "Missing format" }, 400); return; }
+		try {
+			const spec = artifactSpecStore.create({
+				id: body.id,
+				name: body.name,
+				description: body.description || "",
+				kind: body.kind,
+				format: body.format,
+				mustHave: body.mustHave || [],
+				shouldHave: body.shouldHave || [],
+				mustNotHave: body.mustNotHave || [],
+				requires: body.requires,
+				suggestedRole: body.suggestedRole,
+			});
+			json(spec, 201);
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
+	}
+
+	// GET /api/artifact-specs/:id
+	const artifactSpecMatch = url.pathname.match(/^\/api\/artifact-specs\/([^/]+)$/);
+	if (artifactSpecMatch && req.method === "GET") {
+		const spec = artifactSpecStore.get(decodeURIComponent(artifactSpecMatch[1]));
+		if (!spec) { json({ error: "Artifact spec not found" }, 404); return; }
+		json(spec);
+		return;
+	}
+
+	// PUT /api/artifact-specs/:id
+	if (artifactSpecMatch && req.method === "PUT") {
+		const specId = decodeURIComponent(artifactSpecMatch[1]);
+		const body = await readBody(req);
+		if (!body) { json({ error: "Missing body" }, 400); return; }
+		const updated = artifactSpecStore.update(specId, body);
+		if (!updated) { json({ error: "Artifact spec not found" }, 404); return; }
+		json(updated);
+		return;
+	}
+
+	// DELETE /api/artifact-specs/:id
+	if (artifactSpecMatch && req.method === "DELETE") {
+		const specId = decodeURIComponent(artifactSpecMatch[1]);
+		const spec = artifactSpecStore.get(specId);
+		if (!spec) { json({ error: "Artifact spec not found" }, 404); return; }
+		// Check if any goal artifacts reference this spec
+		const allGoals = sessionManager.goalManager.listGoals();
+		for (const goal of allGoals) {
+			const artifacts = goalArtifactStore.getByGoalId(goal.id);
+			if (artifacts.some(a => a.specId === specId)) {
+				json({ error: "Cannot delete: artifact spec is referenced by existing goal artifacts" }, 409);
+				return;
+			}
+		}
+		artifactSpecStore.delete(specId);
+		res.writeHead(204);
+		res.end();
 		return;
 	}
 
