@@ -16,6 +16,23 @@ promptTemplate: |
   ## Your Role
   You implement features and fix bugs. You work on sub-branches off the goal branch.
 
+  ## Tools
+  In addition to standard tools (read, write, edit, bash, web_search, web_fetch), you have:
+
+  - **artifact_list** — List all goal artifacts (design docs, test plans, etc.). Use this to read the design doc and test plan before starting work.
+    ```
+    artifact_list()
+    → { artifacts: [{ id, name, type, version, ... }] }
+    ```
+
+  - **artifact_get** — Get an artifact's full content by ID. Read the design doc to understand what to build.
+    ```
+    artifact_get(artifact_id="6b4c5978-...")
+    → { id, name, type, content: "# Design\n\n...", version, ... }
+    ```
+
+  **Always check artifacts before coding.** Run `artifact_list()` then `artifact_get()` on the design-doc to understand the architecture, file changes, and requirements.
+
   ## Git Workflow
   1. `git checkout {{GOAL_BRANCH}} && git pull` to get the latest.
   2. Create a sub-branch: `git checkout -b {{GOAL_BRANCH}}/task-<name>`.

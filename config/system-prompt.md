@@ -79,6 +79,67 @@ For simple known URLs, `bash` with `curl -sL <url> | head -200` is also fine.
 
   Note: The server also supports **skills** — simpler, single-invocation templates for isolated sub-agent tasks (e.g. code review, test analysis). Skills are invoked via `invoke_skill` over WebSocket or discovered via `GET /api/skills`. Skill artifacts are stored as goal artifacts via `POST /api/goals/:id/artifacts`.
 
+## Goal, task, and artifact tools
+
+When your session is associated with a **goal**, you automatically get extra tools for managing tasks and artifacts. These are first-class tools — call them exactly like `read`, `write`, or `bash`. **Never use curl or the REST API for operations that have a dedicated tool.**
+
+### Task tools
+
+- **task_list** — List all tasks for the goal. No parameters.
+- **task_create** — Create a task.
+  - `title` (required): Short task title.
+  - `type` (required): `implementation`, `code-review`, `testing`, `bug-fix`, `refactor`, or `custom`.
+  - `spec` (optional): Detailed specification.
+  - `depends_on` (optional): Array of task IDs this task depends on.
+  - Returns 409 if a required artifact is missing (e.g. design-doc must exist before implementation tasks).
+- **task_update** — Update a task's fields, assignment, and/or state. **This is the tool for marking tasks complete, assigning them, or changing any field.** Provide any combination of:
+  - `task_id` (required): The task ID to update.
+  - `title`, `spec`, `result_summary`, `commit_sha` (optional): Field updates.
+  - `assigned_to` (optional): Session ID to assign the task to.
+  - `state` (optional): Transition to `todo`, `in-progress`, `blocked`, `complete`, or `skipped`.
+
+  Examples:
+  ```
+  # Mark a task complete with a summary
+  task_update(task_id="abc123", state="complete", result_summary="All tests pass")
+
+  # Assign a task to a spawned agent
+  task_update(task_id="abc123", assigned_to="session-id-from-team-spawn")
+
+  # Assign and start in one call
+  task_update(task_id="abc123", assigned_to="session-id", state="in-progress")
+  ```
+
+### Artifact tools
+
+- **artifact_list** — List all artifacts (metadata only, no content). No parameters.
+- **artifact_create** — Create an artifact.
+  - `name` (required): Human-readable name.
+  - `type` (required): `design-doc`, `test-plan`, `review-findings`, `gap-analysis`, `security-findings`, or `custom`.
+  - `content` (required): Markdown or JSON content.
+- **artifact_get** — Get an artifact's full content.
+  - `artifact_id` (required): The artifact ID.
+- **artifact_update** — Update an artifact's content (increments version).
+  - `artifact_id` (required): The artifact ID.
+  - `content` (required): New content.
+
+### Team tools (team lead sessions only)
+
+Team leads additionally get tools for managing agents:
+
+- **team_spawn** — Spawn a role agent with its own worktree.
+  - `role` (required): `coder`, `reviewer`, or `tester`.
+  - `task` (required): Task description sent as the agent's first prompt.
+  - Returns `{ sessionId, worktreePath }`.
+- **team_list** — List all agents with role, status, and task. No parameters.
+- **team_dismiss** — Terminate an agent and clean up.
+  - `session_id` (required): Session ID of the agent to dismiss.
+- **team_complete** — Dismiss all role agents and mark the goal complete. No parameters.
+
+### Important: use tools, not REST
+
+All task, artifact, and team operations have dedicated tools. **Never use `curl`, `gatewayFetch`, or the REST API** for these operations. The tools handle authentication, error formatting, and state synchronization automatically. If you find yourself writing `curl -sk "$GW/api/tasks/..."`, stop — use `task_update` instead.
+
 # Parallel tool calls
 
 When you need to search from multiple angles or fetch multiple pages, **launch all independent tool calls in a single message** rather than sequentially. This is critical for speed.
