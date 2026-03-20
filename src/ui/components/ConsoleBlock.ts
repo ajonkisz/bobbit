@@ -2,8 +2,10 @@ import { icon } from "@mariozechner/mini-lit";
 import { LitElement } from "lit";
 import { property, state } from "lit/decorators.js";
 import { html } from "lit/html.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { Check, Copy } from "lucide";
 import { i18n } from "../utils/i18n.js";
+import { ansiToHtml, hasAnsi } from "../utils/ansi.js";
 
 export class ConsoleBlock extends LitElement {
 	@property() content: string = "";
@@ -57,9 +59,11 @@ export class ConsoleBlock extends LitElement {
 					</button>
 				</div>
 				<div class="console-scroll overflow-auto max-h-64">
-					<pre class="!bg-background !border-0 !rounded-none m-0 p-3 text-xs ${textClass} font-mono whitespace-pre">
+					${hasAnsi(this.content || "")
+						? html`<pre class="!bg-background !border-0 !rounded-none m-0 p-3 text-xs ${textClass} font-mono whitespace-pre">${unsafeHTML(ansiToHtml(this.content || ""))}</pre>`
+						: html`<pre class="!bg-background !border-0 !rounded-none m-0 p-3 text-xs ${textClass} font-mono whitespace-pre">
 ${this.content || ""}</pre
-					>
+					>`}
 				</div>
 			</div>
 		`;
