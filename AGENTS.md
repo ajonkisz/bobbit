@@ -33,6 +33,8 @@ src/
 │   │   ├── role-manager.ts     # Role definitions and management
 │   │   ├── role-store.ts       # Role persistence
 │   │   ├── role-assistant.ts   # System prompt for role assistant
+│   │   ├── tool-store.ts       # Tool metadata persistence (~/.pi/gateway-tools.json)
+│   │   ├── tool-assistant.ts   # System prompt for tool management assistant
 │   │   └── color-store.ts      # Per-session color index persistence (~/.pi/gateway-session-colors.json)
 │   ├── auth/        # Token auth, rate limiting, TLS, OAuth
 │   │   ├── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
@@ -73,6 +75,8 @@ src/
 │   ├── main.ts      # Bootstrap, routing, session sidebar, QR code, OAuth
 │   ├── remote-agent.ts  # WebSocket ↔ Agent interface adapter (critical file)
 │   ├── custom-messages.ts  # Custom message type definitions
+│   ├── tool-manager-page.ts  # Tool management UI (list + detail views)
+│   ├── tool-manager.css       # Tool management page styles
 │   └── oauth.ts     # Browser-side OAuth flow
 ├── config/
 │   └── system-prompt.md  # Custom system prompt for agent sessions
@@ -254,6 +258,23 @@ When an agent tries to create a task via `POST /api/goals/:id/tasks`, the server
 - `GET /api/goals/:id/artifacts/:artifactId` — get a specific artifact
 - `PUT /api/goals/:id/artifacts/:artifactId` — revise an artifact (increments version)
 
+## Tool Management
+
+Tools can be browsed and documented via the tool management UI at `#/tools`. Each tool has editable metadata (description, group, docs) stored in `ToolStore`, layered on top of the built-in tool definitions from `AVAILABLE_TOOLS` in `role-manager.ts`.
+
+**Storage**: `ToolStore` persists to `~/.pi/gateway-tools.json` (same load-on-construct, write-on-mutate pattern as other stores). Stores custom overrides only — built-in tool names and defaults come from `role-manager.ts`.
+
+**REST API**:
+- `GET /api/tools` — list all tools (extended with `docs`, `hasRenderer`, `rendererFile` fields)
+- `GET /api/tools/:name` — get a single tool's full detail; 404 if unknown
+- `PUT /api/tools/:name` — update tool metadata (`{ description?, group?, docs? }`); 404 if unknown
+
+**UI pages**:
+- `#/tools` — grouped tool list with renderer status indicators (green = custom renderer, gray = default)
+- `#/tools/:toolName` — detail/edit view with description, group, documentation fields, renderer info, role access summary, and a renderer preview
+
+**Tool assistant**: Sessions created with `toolAssistant: true` get `TOOL_ASSISTANT_PROMPT` from `tool-assistant.ts`. The assistant helps write tool documentation, improve renderers, configure role access, and design new tools. It outputs structured `<tool_proposal>` blocks with `<tool>`, `<action>`, and `<content>` tags.
+
 ## Compaction
 
 Context compaction reduces token usage by summarizing the conversation. Two modes exist:
@@ -362,6 +383,7 @@ All persistent state lives under `~/.pi/`:
 | `gateway-goal-artifacts.json` | `GoalArtifactStore` | Goal artifact content and metadata |
 | `gateway-team-state.json` | `TeamStore` | Team state (agents, roles, goal associations) |
 | `gateway-tasks.json` | `TaskStore` | Task definitions, state, assignments |
+| `gateway-tools.json` | `ToolStore` | Tool metadata overrides (description, group, docs) |
 | `skill-definitions.json` | `definitions-sync.ts` | Exported skill definitions for agent discovery |
 | `gateway-url` | `cli.ts` | Last-started gateway base URL (e.g. `https://100.x.x.x:3001`) |
 | `desec.json` | `desec.ts` | deSEC dynDNS config (domain + API token) |
@@ -427,6 +449,8 @@ If you only changed UI code (`src/ui/`, `src/app/`), unit tests are sufficient. 
 **Add a new skill definition**: Create in `src/server/skills/definitions/`, import and register in `src/server/skills/index.ts`. Define a `Skill` object with id, instructions, isolation level, and expected output. Run `exportDefinitions()` to sync to disk.
 
 **Add a goal-related feature**: Goal CRUD is in `goal-manager.ts`/`goal-store.ts`. REST endpoints in `server.ts`. Goal assistant prompt in `goal-assistant.ts`. Client-side proposal parsing in `remote-agent.ts` `_checkForGoalProposal()`.
+
+**Add/edit tool documentation**: Navigate to `#/tools`, click a tool, edit the Description/Group/Docs fields, and Save. Or launch a Tool Assistant session for AI-guided documentation. Server-side: tool metadata is in `tool-store.ts`, API routes in `server.ts`, assistant prompt in `tool-assistant.ts`.
 
 **Change how messages render**: `src/ui/components/Messages.ts` for standard roles, `src/ui/components/message-renderer-registry.ts` for custom types.
 
