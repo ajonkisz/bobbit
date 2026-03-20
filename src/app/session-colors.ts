@@ -263,7 +263,7 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 	const eyeShadow = `3px 4px 0 ${p.eye},6px 4px 0 ${p.eye},3px 5px 0 ${p.eye},6px 5px 0 ${p.eye}`;
 
 	const shimmerDelay = -(Date.now() % 8000);
-	const shimmer = isBusy ? `animation:blob-shimmer 8s ease-in-out infinite;animation-delay:${shimmerDelay}ms;` : "";
+	const shimmer = isBusy && !isCompacting ? `animation:blob-shimmer 8s ease-in-out infinite;animation-delay:${shimmerDelay}ms;` : "";
 	const isIdle = status === "idle" && !isCompacting && !isSelected && !noDesaturate;
 	const isCancelling = isAborting && (status === "streaming" || isBusy);
 	const filters: string[] = [];
