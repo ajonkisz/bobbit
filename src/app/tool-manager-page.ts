@@ -14,47 +14,52 @@ import { renderTool } from "../ui/tools/index.js";
 
 const TOOL_GROUPS = ["File System", "Shell", "Web", "Browser", "Agent", "Team", "Tasks", "Artifacts", "Other"];
 
+/** Build a mock ToolResultMessage with the correct content array format. */
+function mockResult(text: string): any {
+	return { type: "tool_result", content: [{ type: "text", text }], tool_use_id: "mock" };
+}
+
 /** Sample params and results for renderer preview. */
 const TOOL_MOCK_DATA: Record<string, { params: any; result: any }> = {
 	bash: {
 		params: { command: "npm run check" },
-		result: { type: "tool_result", content: "No errors found.\n", tool_use_id: "mock" },
+		result: mockResult("No errors found.\n"),
 	},
 	read: {
 		params: { path: "src/app/main.ts", limit: 20 },
-		result: { type: "tool_result", content: "import { html } from 'lit';\nimport { state } from './state.js';\n// ...(18 more lines)", tool_use_id: "mock" },
+		result: mockResult("import { html } from 'lit';\nimport { state } from './state.js';\n// ...(18 more lines)"),
 	},
 	write: {
 		params: { path: "src/app/example.ts", content: "export const hello = 'world';\n" },
-		result: { type: "tool_result", content: "File written: src/app/example.ts (1 line)", tool_use_id: "mock" },
+		result: mockResult("File written: src/app/example.ts (1 line)"),
 	},
 	edit: {
 		params: { path: "src/app/main.ts", oldText: "const x = 1;", newText: "const x = 2;" },
-		result: { type: "tool_result", content: "Successfully replaced text in src/app/main.ts.", tool_use_id: "mock" },
+		result: mockResult("Successfully replaced text in src/app/main.ts."),
 	},
 	web_search: {
 		params: { query: "lit html template best practices" },
-		result: { type: "tool_result", content: "1. Lit — Best Practices (lit.dev)\n2. Web Components Guide (MDN)\n3. Template Rendering Patterns", tool_use_id: "mock" },
+		result: mockResult("1. Lit — Best Practices (lit.dev)\n2. Web Components Guide (MDN)\n3. Template Rendering Patterns"),
 	},
 	web_fetch: {
 		params: { url: "https://lit.dev/docs/" },
-		result: { type: "tool_result", content: "Lit is a simple library for building fast, lightweight web components...", tool_use_id: "mock" },
+		result: mockResult("Lit is a simple library for building fast, lightweight web components..."),
 	},
 	delegate: {
 		params: { instructions: "Review the auth module for security issues" },
-		result: { type: "tool_result", content: "No critical issues found. 2 minor suggestions.", tool_use_id: "mock" },
+		result: mockResult("No critical issues found. 2 minor suggestions."),
 	},
 	ls: {
 		params: { path: "src/app" },
-		result: { type: "tool_result", content: "main.ts\nrender.ts\nrouting.ts\nstate.ts\napi.ts\nsidebar.ts", tool_use_id: "mock" },
+		result: mockResult("main.ts\nrender.ts\nrouting.ts\nstate.ts\napi.ts\nsidebar.ts"),
 	},
 	grep: {
 		params: { pattern: "renderTool", path: "src/" },
-		result: { type: "tool_result", content: "src/ui/tools/index.ts:74: export function renderTool(\nsrc/app/tool-manager-page.ts:10: import { renderTool } from '../ui/tools/index.js';", tool_use_id: "mock" },
+		result: mockResult("src/ui/tools/index.ts:74: export function renderTool(\nsrc/app/tool-manager-page.ts:10: import { renderTool } from '../ui/tools/index.js';"),
 	},
 	find: {
 		params: { glob: "src/**/*.css" },
-		result: { type: "tool_result", content: "src/app/app.css\nsrc/app/role-manager.css\nsrc/app/tool-manager.css", tool_use_id: "mock" },
+		result: mockResult("src/app/app.css\nsrc/app/role-manager.css\nsrc/app/tool-manager.css"),
 	},
 };
 
