@@ -761,8 +761,34 @@ async function handleApiRoute(
 		// Validate branch name to prevent injection
 		if (!/^[a-zA-Z0-9/_.\-]+$/.test(branch)) { json({ error: "Invalid branch name" }, 400); return; }
 		const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "20", 10) || 20, 1), 100);
+		const execOpts = { cwd: goal.cwd, encoding: "utf-8" as const, stdio: ["pipe", "pipe", "pipe"] as ["pipe", "pipe", "pipe"], timeout: 5000 };
 		try {
-			const out = execSync(`git log --format="%H|%h|%s|%an|%aI" -${limit} ${branch}`, {
+			// Determine primary branch to exclude inherited commits
+			let primaryBranch = "master";
+			try {
+				const remoteHead = execSync("git symbolic-ref refs/remotes/origin/HEAD", execOpts).trim();
+				primaryBranch = remoteHead.replace("refs/remotes/origin/", "");
+			} catch {
+				try { execSync("git rev-parse --verify refs/heads/master", execOpts); primaryBranch = "master"; }
+				catch { try { execSync("git rev-parse --verify refs/heads/main", execOpts); primaryBranch = "main"; } catch { /* keep default */ } }
+			}
+
+			// Use range notation to show only commits unique to goal branch
+			// Fall back to plain log if the branch IS the primary branch or range fails
+			let rangeSpec = `-${limit} ${branch}`;
+			if (branch !== primaryBranch && branch !== "HEAD") {
+				const primaryRef = (() => {
+					try { execSync(`git rev-parse --verify origin/${primaryBranch}`, execOpts); return `origin/${primaryBranch}`; }
+					catch { return primaryBranch; }
+				})();
+				try {
+					// Test that the range is valid
+					execSync(`git rev-parse ${primaryRef}`, execOpts);
+					rangeSpec = `-${limit} ${primaryRef}..${branch}`;
+				} catch { /* fall back to plain log */ }
+			}
+
+			const out = execSync(`git log --format="%H|%h|%s|%an|%aI" ${rangeSpec}`, {
 				cwd: goal.cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] as ["pipe", "pipe", "pipe"],
 			});
 			const commits = out.trim().split("\n").filter(Boolean).map((line: string) => {

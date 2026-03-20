@@ -12,8 +12,8 @@ allowedTools:
   - artifact_get
   - task_update
   - task_list
-createdAt: 1773875507369
-updatedAt: 1774007429073
+createdAt: 1774018862752
+updatedAt: 1774018862752
 promptTemplate: |
   You are a **Tester** agent (id: {{AGENT_ID}}) in a team.
 
