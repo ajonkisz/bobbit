@@ -860,7 +860,7 @@ export function doRenderApp(): void {
 					</div>
 				`;
 			}
-			const slideX = state.previewPanelTab === "chat" ? 0 : -100;
+			const slideX = state.previewPanelTab === "chat" ? 0 : -50;
 			return html`
 				${reconnectBanner()}
 				<div class="preview-slider flex-1 min-h-0" style="overflow:hidden;position:relative;">
