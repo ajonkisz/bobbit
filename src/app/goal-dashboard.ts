@@ -684,25 +684,8 @@ function formatTokens(n: number): string {
 
 function renderMetaRows(goal: Goal): TemplateResult {
 	const isTeamGoal = !!goal.team;
-	const worktreePath = goal.worktreePath || "";
 	const branch = goal.branch || "";
-
-	// Derive git status display
 	const gs = gitStatus;
-	let gitMergeTag: TemplateResult | typeof nothing = nothing;
-	if (gs) {
-		if (gs.mergedIntoPrimary) {
-			gitMergeTag = html`<span class="meta-tag merge-merged">Merged into ${gs.primaryBranch}</span>`;
-		} else if (gs.aheadOfPrimary > 0 && gs.behindPrimary > 0) {
-			gitMergeTag = html`<span class="meta-tag merge-diverged">\u2191${gs.aheadOfPrimary} \u2193${gs.behindPrimary} vs ${gs.primaryBranch}</span>`;
-		} else if (gs.aheadOfPrimary > 0) {
-			gitMergeTag = html`<span class="meta-tag merge-ahead">\u2191${gs.aheadOfPrimary} ahead of ${gs.primaryBranch}</span>`;
-		} else if (gs.behindPrimary > 0) {
-			gitMergeTag = html`<span class="meta-tag merge-behind">\u2193${gs.behindPrimary} behind ${gs.primaryBranch}</span>`;
-		} else {
-			gitMergeTag = html`<span class="meta-tag merge-clean">Up to date with ${gs.primaryBranch}</span>`;
-		}
-	}
 
 	return html`
 		<div class="meta-rows">
@@ -720,30 +703,23 @@ function renderMetaRows(goal: Goal): TemplateResult {
 					</div>
 				` : nothing}
 			</div>
-			${branch || worktreePath || gs ? html`
-				<div class="meta-row">
-					${branch ? html`
-						<div class="meta-item">
-							${svgGitBranch}
-							<span class="meta-label">branch</span>
-							<span class="meta-value mono">${branch}</span>
-						</div>
-					` : nothing}
-					${gitMergeTag !== nothing ? html`
-						${branch ? html`<span class="meta-sep">\u00B7</span>` : nothing}
-						<div class="meta-item">
-							${svgMerge}
-							${gitMergeTag}
-						</div>
-					` : nothing}
-					${worktreePath ? html`
-						${branch || gitMergeTag !== nothing ? html`<span class="meta-sep">\u00B7</span>` : nothing}
-						<div class="meta-item">
-							${svgFolder}
-							<span class="meta-label">worktree</span>
-							<span class="meta-value mono">${worktreePath}</span>
-						</div>
-					` : nothing}
+			${branch || gs ? html`
+				<div class="meta-row dashboard-git-row">
+					<git-status-widget
+						.branch=${gs?.branch ?? branch}
+						.primaryBranch=${gs?.primaryBranch ?? "master"}
+						.isOnPrimary=${gs?.isOnPrimary ?? false}
+						.clean=${gs?.clean ?? true}
+						.hasUpstream=${true}
+						.ahead=${0}
+						.behind=${0}
+						.aheadOfPrimary=${gs?.aheadOfPrimary ?? 0}
+						.behindPrimary=${gs?.behindPrimary ?? 0}
+						.mergedIntoPrimary=${gs?.mergedIntoPrimary ?? false}
+						.unpushed=${false}
+						.statusFiles=${[]}
+						.loading=${!gs && !!branch}
+					></git-status-widget>
 				</div>
 			` : nothing}
 		</div>
