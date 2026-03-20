@@ -51,10 +51,8 @@ export function createGateway(config: GatewayConfig) {
 	const protocol = config.tls ? "https" : "http";
 	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
 
-	// Write gateway URL to disk so agents can discover it without env vars
 	const piDir = path.join(os.homedir(), ".pi");
 	fs.mkdirSync(piDir, { recursive: true });
-	fs.writeFileSync(path.join(piDir, "gateway-url"), gatewayUrl, "utf-8");
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
 	const goalArtifactStore = new GoalArtifactStore();
