@@ -568,6 +568,7 @@ export function backToSessions(): void {
 	state.isGoalAssistantSession = false;
 	state.activeRoleProposal = null;
 	state.isRoleAssistantSession = false;
+	state.isToolAssistantSession = false;
 	state.isPreviewSession = false;
 	stopPreviewPolling();
 	state.cwdDropdownOpen = false;
@@ -585,6 +586,7 @@ export function disconnectGateway(): void {
 	state.connectionStatus = "disconnected";
 	state.isGoalAssistantSession = false;
 	state.isRoleAssistantSession = false;
+	state.isToolAssistantSession = false;
 	state.isPreviewSession = false;
 	stopPreviewPolling();
 	state.appView = "disconnected";

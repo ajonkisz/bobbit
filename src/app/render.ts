@@ -503,17 +503,17 @@ function toolPreviewPanel() {
 		const toolName = state.toolPreviewName.trim();
 		if (!toolName) return;
 
-		try {
-			await gatewayFetch(`/api/tools/${encodeURIComponent(toolName)}`, {
-				method: "PUT",
-				body: JSON.stringify({
-					description: state.toolPreviewDescription.trim() || undefined,
-					group: state.toolPreviewGroup.trim() || undefined,
-					docs: state.toolPreviewDocs.trim() || undefined,
-				}),
-			});
-		} catch {
-			// Ignore save errors — tool may not exist yet
+		const res = await gatewayFetch(`/api/tools/${encodeURIComponent(toolName)}`, {
+			method: "PUT",
+			body: JSON.stringify({
+				description: state.toolPreviewDescription.trim() || undefined,
+				group: state.toolPreviewGroup.trim() || undefined,
+				docs: state.toolPreviewDocs.trim() || undefined,
+			}),
+		});
+		if (!res.ok && res.status !== 404) {
+			// 404 is expected if tool doesn't exist yet; other errors are real
+			console.error(`Failed to save tool metadata: ${res.status}`);
 		}
 
 		const sessionId = activeSessionId();
