@@ -708,11 +708,11 @@ html {
 	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 
-/* ===== Goggles overlay (head-worn, on face) ===== */
-.bobbit-blob__goggles {
+/* ===== Protractor overlay (hand-held, right side) ===== */
+.bobbit-blob__protractor {
 	display: none;
 }
-.bobbit-goggles .bobbit-blob__goggles {
+.bobbit-protractor .bobbit-blob__protractor {
 	display: block;
 	position: absolute;
 	width: 1px;
@@ -724,36 +724,38 @@ html {
 	image-rendering: pixelated;
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
-		1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000,
-		1px 3px 0 #000, 2px 3px 0 #60a5fa, 3px 3px 0 #93c5fd, 4px 3px 0 #000, 5px 3px 0 #6b7280, 6px 3px 0 #000, 7px 3px 0 #60a5fa, 8px 3px 0 #93c5fd, 9px 3px 0 #000,
-		1px 4px 0 #000, 2px 4px 0 #3b82f6, 3px 4px 0 #60a5fa, 4px 4px 0 #000, 5px 4px 0 #000, 6px 4px 0 #000, 7px 4px 0 #3b82f6, 8px 4px 0 #60a5fa, 9px 4px 0 #000,
-		2px 5px 0 #000, 3px 5px 0 #000, 4px 5px 0 #000, 7px 5px 0 #000, 8px 5px 0 #000, 9px 5px 0 #000,
-		0 3px 0 #000, 0 4px 0 #6b7280, 10px 3px 0 #000, 10px 4px 0 #6b7280, 11px 3px 0 #000, 11px 4px 0 #000;
-	animation: blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite;
+		8px 2px 0 #000, 9px 2px 0 #000, 10px 2px 0 #000,
+		7px 3px 0 #000, 8px 3px 0 #bfdbfe, 9px 3px 0 #bfdbfe, 10px 3px 0 #bfdbfe, 11px 3px 0 #000,
+		6px 4px 0 #000, 7px 4px 0 #ef4444, 8px 4px 0 #93c5fd, 9px 4px 0 #bfdbfe, 10px 4px 0 #93c5fd, 11px 4px 0 #ef4444, 12px 4px 0 #000,
+		6px 5px 0 #000, 7px 5px 0 #93c5fd, 8px 5px 0 #bfdbfe, 9px 5px 0 #ef4444, 10px 5px 0 #bfdbfe, 11px 5px 0 #93c5fd, 12px 5px 0 #000,
+		7px 6px 0 #000, 8px 6px 0 #000, 9px 6px 0 #000, 10px 6px 0 #000, 11px 6px 0 #000;
+	animation:
+		blob-busy-move-rigid 10s cubic-bezier(0.34, 1, 0.64, 1) infinite,
+		magnifier-depth-busy 10s steps(1) infinite;
 }
-.bobbit-blob--idle .bobbit-blob__goggles {
-	animation: none;
+.bobbit-blob--idle .bobbit-blob__protractor {
+	animation: magnifier-depth-idle 10s steps(1) infinite;
 	transform: scale(3.5) translateX(-7px);
 }
-.bobbit-blob--exit .bobbit-blob__goggles {
+.bobbit-blob--exit .bobbit-blob__protractor {
 	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
-.bobbit-blob--exit-roll .bobbit-blob__goggles {
+.bobbit-blob--exit-roll .bobbit-blob__protractor {
 	animation: blob-exit-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
-.bobbit-blob--enter .bobbit-blob__goggles {
+.bobbit-blob--enter .bobbit-blob__protractor {
 	animation: blob-enter-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
-.bobbit-blob--enter-roll .bobbit-blob__goggles {
+.bobbit-blob--enter-roll .bobbit-blob__protractor {
 	animation: blob-enter-roll-rigid 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
-.bobbit-blob--compact-shake .bobbit-blob__goggles {
+.bobbit-blob--compact-shake .bobbit-blob__protractor {
 	animation: blob-compact-shake-rigid 0.8s ease-in-out forwards !important;
 }
-.bobbit-blob--compacting .bobbit-blob__goggles {
+.bobbit-blob--compacting .bobbit-blob__protractor {
 	animation: blob-compact-squash-rigid 3s ease-in-out infinite !important;
 }
-.bobbit-blob--compact-pop .bobbit-blob__goggles {
+.bobbit-blob--compact-pop .bobbit-blob__protractor {
 	animation: blob-compact-pop-rigid 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
 }
 

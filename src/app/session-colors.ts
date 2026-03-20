@@ -74,15 +74,15 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		yOffset: 0,
 		addsHeight: false,
 	},
-	goggles: {
-		id: "goggles",
-		label: "Goggles",
+	protractor: {
+		id: "protractor",
+		label: "Protractor",
 		shadow: `
-			1px 1px 0 #000,2px 1px 0 #000,3px 1px 0 #000,4px 1px 0 #000,5px 1px 0 #000,6px 1px 0 #000,7px 1px 0 #000,8px 1px 0 #000,9px 1px 0 #000,
-			1px 2px 0 #000,2px 2px 0 #60a5fa,3px 2px 0 #93c5fd,4px 2px 0 #000,5px 2px 0 #6b7280,6px 2px 0 #000,7px 2px 0 #60a5fa,8px 2px 0 #93c5fd,9px 2px 0 #000,
-			1px 3px 0 #000,2px 3px 0 #3b82f6,3px 3px 0 #60a5fa,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #3b82f6,8px 3px 0 #60a5fa,9px 3px 0 #000,
-			2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,
-			0 2px 0 #000,0 3px 0 #6b7280,10px 2px 0 #000,10px 3px 0 #6b7280,11px 2px 0 #000,11px 3px 0 #000
+			8px 2px 0 #000,9px 2px 0 #000,10px 2px 0 #000,
+			7px 3px 0 #000,8px 3px 0 #bfdbfe,9px 3px 0 #bfdbfe,10px 3px 0 #bfdbfe,11px 3px 0 #000,
+			6px 4px 0 #000,7px 4px 0 #ef4444,8px 4px 0 #93c5fd,9px 4px 0 #bfdbfe,10px 4px 0 #93c5fd,11px 4px 0 #ef4444,12px 4px 0 #000,
+			6px 5px 0 #000,7px 5px 0 #93c5fd,8px 5px 0 #bfdbfe,9px 5px 0 #ef4444,10px 5px 0 #bfdbfe,11px 5px 0 #93c5fd,12px 5px 0 #000,
+			7px 6px 0 #000,8px 6px 0 #000,9px 6px 0 #000,10px 6px 0 #000,11px 6px 0 #000
 		`,
 		yOffset: 0,
 		addsHeight: false,

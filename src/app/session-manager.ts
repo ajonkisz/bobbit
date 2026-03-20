@@ -307,7 +307,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		await refreshSessions();
 		const sessionForRole = state.gatewaySessions.find((s) => s.id === sessionId);
 		// Remove all accessory classes, then add the active one
-		const accClasses = ["bobbit-crowned", "bobbit-bandana", "bobbit-magnifier", "bobbit-goggles", "bobbit-headphones", "bobbit-pencil", "bobbit-book", "bobbit-glasses", "bobbit-shield", "bobbit-flask"];
+		const accClasses = ["bobbit-crowned", "bobbit-bandana", "bobbit-magnifier", "bobbit-protractor", "bobbit-headphones", "bobbit-pencil", "bobbit-book", "bobbit-glasses", "bobbit-shield", "bobbit-flask"];
 		accClasses.forEach((c) => document.documentElement.classList.remove(c));
 		const accId = sessionForRole?.accessory
 			?? (sessionForRole?.role === "team-lead" ? "crown" : sessionForRole?.role === "coder" ? "bandana" : undefined);
