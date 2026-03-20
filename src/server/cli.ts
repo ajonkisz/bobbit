@@ -176,8 +176,11 @@ async function main() {
 	const fullUrl = `${baseUrl}/?token=${encodeURIComponent(authToken)}`;
 
 	// Write gateway URL to a discoverable file so extensions can call the API
-	const gatewayUrlPath = path.join(os.homedir(), ".pi", "gateway-url");
-	fs.writeFileSync(gatewayUrlPath, baseUrl, "utf-8");
+	// Skip for loopback addresses to avoid E2E tests clobbering the real URL
+	if (!isLoopback) {
+		const gatewayUrlPath = path.join(os.homedir(), ".pi", "gateway-url");
+		fs.writeFileSync(gatewayUrlPath, baseUrl, "utf-8");
+	}
 
 	console.log(`\nPi Gateway v0.1.0`);
 	console.log(`  Listening:  ${baseUrl}`);
