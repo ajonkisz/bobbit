@@ -74,9 +74,14 @@ src/
 │   ├── remote-agent.ts  # WebSocket ↔ Agent interface adapter (critical file)
 │   ├── custom-messages.ts  # Custom message type definitions
 │   └── oauth.ts     # Browser-side OAuth flow
-└── config/
-    └── system-prompt.md  # Custom system prompt for agent sessions
+├── config/
+│   └── system-prompt.md  # Custom system prompt for agent sessions
+└── docs/
+    ├── dev-workflow.md          # Development workflow guide
+    └── bobbit-iconography.md    # Bobbit pixel art, animation & accessory system reference
 ```
+
+@docs/bobbit-iconography.md
 
 ## Commands
 
