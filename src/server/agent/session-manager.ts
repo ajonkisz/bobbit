@@ -339,8 +339,11 @@ export class SessionManager {
 	 * Broadcasts a cost_update to connected clients if cost data is found.
 	 */
 	private trackCostFromEvent(session: SessionInfo, event: any): void {
-		// message_update events contain usage data with cost
-		if (event.type !== "message_update") return;
+		// Only track cost on message_end (fires once per completed message).
+		// message_update fires on every streaming chunk with the same usage
+		// object, which would multiply costs by ~30-40x.
+		if (event.type !== "message_end") return;
+		if (event.message?.role !== "assistant") return;
 		const usage = event.message?.usage ?? event.usage;
 		if (!usage) return;
 
