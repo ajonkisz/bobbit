@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { TaskStore, type TaskType, type TaskState, type PersistedTask } from "./task-store.js";
+import { TaskStore, type TaskState, type PersistedTask } from "./task-store.js";
 
 /** Valid state transitions. Terminal states (complete, skipped) have no outgoing transitions. */
 const VALID_TRANSITIONS: Record<TaskState, TaskState[]> = {
@@ -20,7 +20,7 @@ export class TaskManager {
 	createTask(
 		goalId: string,
 		title: string,
-		type: TaskType,
+		type: string,
 		opts?: { parentTaskId?: string; spec?: string; dependsOn?: string[] },
 	): PersistedTask {
 		const { parentTaskId, spec } = opts ?? {};

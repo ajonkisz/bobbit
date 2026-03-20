@@ -3,59 +3,19 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { piDir } from "../pi-dir.js";
 
-export type ArtifactType =
-	| "design-doc"
-	| "test-plan"
-	| "review-findings"
-	| "gap-analysis"
-	| "security-findings"
-	| "summary-report"
-	| "custom";
-
 export interface GoalArtifact {
 	id: string;
 	goalId: string;
 	name: string;
-	type: ArtifactType;
+	type: string;
 	content: string;
 	producedBy: string;
 	skillId?: string;
+	specId?: string;
+	status?: "submitted" | "accepted" | "rejected";
 	version: number;
 	createdAt: number;
 	updatedAt: number;
-}
-
-export interface ArtifactRequirement {
-	artifactType: ArtifactType;
-	blocksTaskTypes: string[];
-	description: string;
-}
-
-const DEFAULT_REQUIREMENTS: ArtifactRequirement[] = [
-	{
-		artifactType: "design-doc",
-		blocksTaskTypes: ["implementation"],
-		description: "A design document must exist before implementation tasks can be created",
-	},
-	{
-		artifactType: "test-plan",
-		blocksTaskTypes: ["implementation"],
-		description: "A test plan must exist before implementation tasks can be created",
-	},
-	{
-		artifactType: "review-findings",
-		blocksTaskTypes: ["goal-completion"],
-		description: "Code review findings must exist before the goal can be completed",
-	},
-	{
-		artifactType: "summary-report",
-		blocksTaskTypes: ["goal-completion"],
-		description: "A summary report must exist before the goal can be completed",
-	},
-];
-
-export function getDefaultRequirements(): ArtifactRequirement[] {
-	return DEFAULT_REQUIREMENTS.map((r) => ({ ...r }));
 }
 
 const STORE_DIR = piDir();
@@ -75,6 +35,10 @@ export class GoalArtifactStore {
 				if (Array.isArray(data)) {
 					for (const a of data) {
 						if (a.id) {
+							// Migration: existing artifacts without status are accepted
+							if (a.status === undefined) {
+								a.status = "accepted";
+							}
 							this.artifacts.set(a.id, a);
 						}
 					}
@@ -101,6 +65,7 @@ export class GoalArtifactStore {
 		const now = Date.now();
 		const full: GoalArtifact = {
 			...artifact,
+			status: artifact.status ?? "submitted",
 			id: randomUUID(),
 			version: 1,
 			createdAt: now,
