@@ -491,114 +491,64 @@ function rolePreviewPanel() {
 // PREVIEW SWIPE (mobile)
 // ============================================================================
 
-/** Core swipe logic shared between #app handler (chat side) and overlay (iframe side). */
-let _swipeStartX = 0;
-let _swipeStartY = 0;
-let _swipeTracking = false;
-let _swipeLocked = false;
+/** Edge-swipe: narrow strips on screen edges for sliding between chat ↔ preview.
+ *  No direction-locking needed — edge strips don't conflict with content scrolling. */
 
-function swipeStart(x: number, y: number): void {
-	_swipeStartX = x;
-	_swipeStartY = y;
-	_swipeTracking = false;
-	_swipeLocked = false;
-	const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-	if (track) track.style.transition = "none";
+const EDGE_WIDTH = 30; // px from screen edge that triggers swipe
+
+function makeEdgeStrip(side: "left" | "right"): HTMLDivElement {
+	const strip = document.createElement("div");
+	strip.className = `preview-edge-${side}`;
+	strip.style.cssText = `position:absolute;top:0;bottom:0;${side}:0;width:${EDGE_WIDTH}px;z-index:10;touch-action:none;`;
+
+	let startX = 0;
+
+	strip.addEventListener("touchstart", (e: TouchEvent) => {
+		startX = e.touches[0].clientX;
+		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+		if (track) track.style.transition = "none";
+	});
+
+	strip.addEventListener("touchmove", (e: TouchEvent) => {
+		e.preventDefault(); // prevent scroll — this is an intentional swipe on the edge strip
+		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+		if (!track) return;
+		const dx = e.touches[0].clientX - startX;
+		const basePercent = state.previewPanelTab === "chat" ? 0 : -50;
+		const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
+		track.style.transform = `translateX(${Math.max(-50, Math.min(0, basePercent + dragPercent))}%)`;
+	});
+
+	strip.addEventListener("touchend", (e: TouchEvent) => {
+		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+		if (!track) return;
+		track.style.transition = "transform 0.3s ease-out";
+		const dx = e.changedTouches[0].clientX - startX;
+		const threshold = track.parentElement!.clientWidth * 0.2;
+		if (dx < -threshold && state.previewPanelTab === "chat") state.previewPanelTab = "preview";
+		else if (dx > threshold && state.previewPanelTab === "preview") state.previewPanelTab = "chat";
+		track.style.transform = `translateX(${state.previewPanelTab === "chat" ? 0 : -50}%)`;
+		renderApp();
+	});
+
+	return strip;
 }
 
-function swipeMove(x: number, y: number): void {
-	const dx = x - _swipeStartX;
-	const dy = y - _swipeStartY;
-	if (!_swipeLocked && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-		_swipeLocked = true;
-		_swipeTracking = Math.abs(dx) > Math.abs(dy);
-	}
-	if (!_swipeTracking) return;
-	const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-	if (!track) return;
-	const basePercent = state.previewPanelTab === "chat" ? 0 : -50;
-	const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
-	track.style.transform = `translateX(${Math.max(-50, Math.min(0, basePercent + dragPercent))}%)`;
-}
+function setupPreviewSwipe(): void { /* no-op, replaced by ensurePreviewOverlay */ }
 
-function swipeEnd(x: number): void {
-	const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-	if (!track) return;
-	track.style.transition = "transform 0.3s ease-out";
-	if (!_swipeTracking) return;
-	const dx = x - _swipeStartX;
-	const threshold = track.parentElement!.clientWidth * 0.2;
-	if (dx < -threshold && state.previewPanelTab === "chat") state.previewPanelTab = "preview";
-	else if (dx > threshold && state.previewPanelTab === "preview") state.previewPanelTab = "chat";
-	track.style.transform = `translateX(${state.previewPanelTab === "chat" ? 0 : -50}%)`;
-	renderApp();
-}
-
-/** Attach swipe handlers: #app for chat-side swipes, programmatic overlay for iframe-side. */
-function setupPreviewSwipe(): void {
-	const el = document.getElementById("app");
-	if (!el || (el as any).__swipeAttached) return;
-	(el as any).__swipeAttached = true;
-
-	// Chat-side swipes bubble to #app naturally
-	el.addEventListener("touchstart", (e: TouchEvent) => {
-		if (!state.isPreviewSession) return;
-		swipeStart(e.touches[0].clientX, e.touches[0].clientY);
-	}, { passive: true });
-	el.addEventListener("touchmove", (e: TouchEvent) => {
-		if (!state.isPreviewSession) return;
-		swipeMove(e.touches[0].clientX, e.touches[0].clientY);
-	}, { passive: true });
-	el.addEventListener("touchend", (e: TouchEvent) => {
-		if (!state.isPreviewSession || !_swipeLocked) return;
-		swipeEnd(e.changedTouches[0].clientX);
-	}, { passive: true });
-}
-
-/** Ensure a transparent overlay exists on top of the preview iframe to capture touches.
- *  Called after each render. */
+/** Ensure edge strips exist on the slider for swipe navigation. Called after each render. */
 function ensurePreviewOverlay(): void {
 	if (!state.isPreviewSession || isDesktop()) return;
+	const slider = document.querySelector(".preview-slider") as HTMLElement | null;
+	if (!slider || slider.querySelector(".preview-edge-right")) return;
+
+	// Right edge of chat panel → swipe left to preview
+	slider.appendChild(makeEdgeStrip("right"));
+	// Left edge of preview panel: position it at viewport-width offset inside the track
 	const wrap = document.querySelector(".preview-iframe-wrap") as HTMLElement | null;
-	if (!wrap) return;
-	if (wrap.querySelector(".preview-touch-overlay")) return;
-
-	const overlay = document.createElement("div");
-	overlay.className = "preview-touch-overlay";
-	overlay.style.cssText = "position:absolute;inset:0;z-index:1;";
-
-	let locked = "";
-
-	overlay.addEventListener("touchstart", (e: TouchEvent) => {
-		locked = "";
-		overlay.style.pointerEvents = "auto";
-		swipeStart(e.touches[0].clientX, e.touches[0].clientY);
-	}, { passive: true });
-
-	overlay.addEventListener("touchmove", (e: TouchEvent) => {
-		const dx = e.touches[0].clientX - _swipeStartX;
-		const dy = e.touches[0].clientY - _swipeStartY;
-		if (locked === "" && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-			locked = Math.abs(dy) > Math.abs(dx) ? "vertical" : "horizontal";
-			if (locked === "vertical") {
-				overlay.style.pointerEvents = "none";
-				return;
-			}
-		}
-		if (locked === "horizontal") {
-			swipeMove(e.touches[0].clientX, e.touches[0].clientY);
-		}
-	}, { passive: true });
-
-	overlay.addEventListener("touchend", (e: TouchEvent) => {
-		overlay.style.pointerEvents = "auto";
-		if (locked === "horizontal") {
-			swipeEnd(e.changedTouches[0].clientX);
-		}
-		locked = "";
-	}, { passive: true });
-
-	wrap.appendChild(overlay);
+	if (wrap && !wrap.querySelector(".preview-edge-left")) {
+		wrap.appendChild(makeEdgeStrip("left"));
+	}
 }
 
 // ============================================================================
