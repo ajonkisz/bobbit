@@ -446,17 +446,19 @@ function renderEditView(): TemplateResult {
 				<!-- Identity section -->
 				<div class="roles-edit-section">
 					<h2 class="roles-section-title">Identity</h2>
-					<div class="roles-edit-field">
-						<label class="roles-field-label">Name</label>
-						<div class="roles-field-readonly">${editName}</div>
-					</div>
-					<div class="roles-edit-field">
-						<label class="roles-field-label">Display Label</label>
-						${Input({
-							value: editLabel,
-							placeholder: "e.g. Documentation Writer",
-							onInput: (e: Event) => { editLabel = (e.target as HTMLInputElement).value; renderApp(); },
-						})}
+					<div class="roles-identity-row">
+						<div class="roles-edit-field">
+							<label class="roles-field-label">Id</label>
+							<div class="roles-field-readonly">${editName}</div>
+						</div>
+						<div class="roles-edit-field" style="flex:1;min-width:0;">
+							<label class="roles-field-label">Label</label>
+							${Input({
+								value: editLabel,
+								placeholder: "e.g. Documentation Writer",
+								onInput: (e: Event) => { editLabel = (e.target as HTMLInputElement).value; renderApp(); },
+							})}
+						</div>
 					</div>
 				</div>
 
