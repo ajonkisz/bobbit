@@ -9,6 +9,7 @@ import { TeamStore } from "./team-store.js";
 import type { PersistedTeamEntry } from "./team-store.js";
 import { generateTeamName } from "./team-names.js";
 import type { ColorStore } from "./color-store.js";
+import type { GoalArtifactStore } from "./goal-artifact-store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -66,6 +67,8 @@ export interface TeamManagerConfig {
 	taskManager: TaskManager;
 	/** Role store for looking up role definitions (prompts, accessories, tools) */
 	roleStore?: RoleStore;
+	/** Goal artifact store for checking artifact requirements on completion */
+	goalArtifactStore?: GoalArtifactStore;
 }
 
 export class TeamManager {
@@ -74,6 +77,10 @@ export class TeamManager {
 	private taskManager: TaskManager;
 	private teams = new Map<string, TeamEntry>();
 	private store: TeamStore;
+	/** Timers for the idle-nudge mechanism (goalId → timer). */
+	private idleNudgeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	/** Delay before nudging the idle team lead (ms). */
+	private static readonly IDLE_NUDGE_DELAY_MS = 30_000;
 
 	/** Reverse lookup: sessionId → goalId for quick dismissal. */
 	private sessionToGoal = new Map<string, string>();
@@ -531,6 +538,22 @@ export class TeamManager {
 			throw new Error(`No active team for goal: ${goalId}`);
 		}
 
+		// Enforce required artifacts before allowing completion
+		if (this.config.goalArtifactStore) {
+			const artifacts = this.config.goalArtifactStore.getByGoalId(goalId);
+			const types = new Set(artifacts.map(a => a.type));
+			const missing: string[] = [];
+			if (!types.has("review-findings")) missing.push("review-findings");
+			if (!types.has("summary-report")) missing.push("summary-report");
+			if (missing.length > 0) {
+				throw new Error(`Cannot complete goal � missing required artifacts: ${missing.join(", ")}. Create them with artifact_create before calling team_complete.`);
+			}
+		}
+
+		// Cancel idle-nudge timer
+		const nudgeTimer = this.idleNudgeTimers.get(goalId);
+		if (nudgeTimer) { clearTimeout(nudgeTimer); this.idleNudgeTimers.delete(goalId); }
+
 		// Dismiss all role agents
 		const agentSessionIds = entry.agents.map((a) => a.sessionId);
 		for (const sessionId of agentSessionIds) {
@@ -563,6 +586,10 @@ export class TeamManager {
 		if (!entry) {
 			throw new Error(`No active team for goal: ${goalId}`);
 		}
+
+		// Cancel idle-nudge timer
+		const nudgeTimer = this.idleNudgeTimers.get(goalId);
+		if (nudgeTimer) { clearTimeout(nudgeTimer); this.idleNudgeTimers.delete(goalId); }
 
 		// Dismiss all role agents
 		const agentSessionIds = entry.agents.map((a) => a.sessionId);

@@ -9,6 +9,7 @@ export type ArtifactType =
 	| "review-findings"
 	| "gap-analysis"
 	| "security-findings"
+	| "summary-report"
 	| "custom";
 
 export interface GoalArtifact {
@@ -45,6 +46,11 @@ const DEFAULT_REQUIREMENTS: ArtifactRequirement[] = [
 		artifactType: "review-findings",
 		blocksTaskTypes: ["goal-completion"],
 		description: "Code review findings must exist before the goal can be completed",
+	},
+	{
+		artifactType: "summary-report",
+		blocksTaskTypes: ["goal-completion"],
+		description: "A summary report must exist before the goal can be completed",
 	},
 ];
 

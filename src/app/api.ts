@@ -10,6 +10,10 @@ import {
 } from "./state.js";
 import { setHashRoute } from "./routing.js";
 import { sessionHueRotation, sessionColorMap } from "./session-colors.js";
+import { RemoteAgent } from "./remote-agent.js";
+
+/** Track previous session statuses to detect streaming→idle transitions. */
+const _prevSessionStatus = new Map<string, string>();
 
 // dialogs.ts imports from api.ts, so we use dynamic import to break the cycle
 async function showConnectionError(title: string, message: string): Promise<void> {
@@ -85,7 +89,31 @@ export async function refreshSessions(): Promise<void> {
 		]);
 		if (!sessionsRes.ok) throw new Error(`Failed to fetch sessions: ${sessionsRes.status}`);
 		const sessionsData = await sessionsRes.json();
-		state.gatewaySessions = sessionsData.sessions || [];
+		const newSessions: GatewaySession[] = sessionsData.sessions || [];
+
+		// Detect non-active sessions that transitioned from streaming→idle
+		// and notify the user (beep + browser notification).
+		const activeId = state.remoteAgent?.gatewaySessionId;
+		for (const s of newSessions) {
+			const prev = _prevSessionStatus.get(s.id);
+			const isSubAgent = !!s.delegateOf || (!!s.role && s.role !== "lead");
+			if (prev === "streaming" && s.status === "idle" && s.id !== activeId && !isSubAgent) {
+				RemoteAgent.playNotificationBeep();
+				if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+					const title = s.title || "Bobbit";
+					const n = new Notification(title, {
+						body: "Task completed. Awaiting your input.",
+						tag: `bobbit-done-${s.id}`,
+					});
+					n.onclick = () => { window.focus(); n.close(); };
+				}
+			}
+		}
+		for (const s of newSessions) {
+			_prevSessionStatus.set(s.id, s.status);
+		}
+
+		state.gatewaySessions = newSessions;
 
 		for (const s of state.gatewaySessions) {
 			if (s.colorIndex !== undefined && !sessionColorMap.has(s.id)) {
@@ -292,7 +320,7 @@ export async function teardownTeam(goalId: string): Promise<boolean> {
 // GOAL ARTIFACT API
 // ============================================================================
 
-export type ArtifactType = "design-doc" | "test-plan" | "review-findings" | "gap-analysis" | "security-findings" | "custom";
+export type ArtifactType = "design-doc" | "test-plan" | "review-findings" | "gap-analysis" | "security-findings" | "summary-report" | "custom";
 
 export interface GoalArtifact {
 	id: string;
