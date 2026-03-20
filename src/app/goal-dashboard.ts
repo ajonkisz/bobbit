@@ -1092,7 +1092,9 @@ function renderArtifactsTab(): TemplateResult {
 									<span>${artifact.name}</span>
 									${artifact.skillId ? html`<span class="artifact-skill-badge">Skill: ${artifact.skillId}</span>` : nothing}
 								</div>
-								<pre class="artifact-content-body">${artifact.content}</pre>
+								${artifact.content.trimStart().startsWith("<!") || artifact.content.trimStart().startsWith("<html")
+									? html`<iframe class="artifact-content-iframe" sandbox="allow-scripts" .srcdoc=${artifact.content}></iframe>`
+									: html`<pre class="artifact-content-body">${artifact.content}</pre>`}
 							</div>
 						` : nothing}
 					`;

@@ -713,6 +713,13 @@
 	white-space: pre-wrap;
 	word-break: break-word;
 }
+.artifact-content-iframe {
+	width: 100%;
+	min-height: 200px;
+	max-height: 600px;
+	border: none;
+	background: #fff;
+}
 
 /* ── EMPTY STATES ── */
 .tab-empty {
