@@ -405,7 +405,7 @@ html {
 	overflow: visible;
 	transform-origin: 5px 8px; /* same as sprite */
 	transform: scale(3.5);
-	margin: 8px 18px 28px 15.375px;
+	margin: 8px 18px 28px 16.5px;
 	image-rendering: pixelated;
 	/* Counter hue-rotate so crown stays gold */
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
