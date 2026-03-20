@@ -297,6 +297,22 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			renderApp();
 		};
 
+		remote.onToolProposal = (proposal) => {
+			if (!state.toolPreviewNameEdited) state.toolPreviewName = proposal.tool;
+			if (!state.toolPreviewDocsEdited && proposal.action === "docs") state.toolPreviewDocs = proposal.content;
+			if (!state.toolPreviewDescriptionEdited && proposal.action === "docs") {
+				// Extract first line as description
+				const firstLine = proposal.content.split("\n")[0]?.trim();
+				if (firstLine) state.toolPreviewDescription = firstLine;
+			}
+			state.toolPreviewAction = proposal.action;
+			state.hasReceivedToolProposal = true;
+			if (state.toolAssistantTab === "chat" && !isDesktop()) {
+				state.toolAssistantTab = "preview";
+			}
+			renderApp();
+		};
+
 		state.connectionStatus = "connected";
 		state.remoteAgent = remote;
 		state.appView = "authenticated";
@@ -424,6 +440,26 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		if (options?.isRoleAssistant && !isExisting) {
 			remote.prompt("Start the role creation session.");
+		}
+
+		// Clear tool proposal when connecting to a non-tool-assistant session
+		if (!state.isToolAssistantSession) {
+			state.hasReceivedToolProposal = false;
+		}
+
+		if (state.isToolAssistantSession) {
+			state.toolAssistantTab = "chat";
+			state.toolPreviewName = "";
+			state.toolPreviewDescription = "";
+			state.toolPreviewGroup = "";
+			state.toolPreviewDocs = "";
+			state.toolPreviewAction = "";
+			state.toolPreviewNameEdited = false;
+			state.toolPreviewDescriptionEdited = false;
+			state.toolPreviewGroupEdited = false;
+			state.toolPreviewDocsEdited = false;
+			state.hasReceivedToolProposal = false;
+			state.toolPreviewDocsEditMode = false;
 		}
 
 		if (options?.isToolAssistant && !isExisting) {

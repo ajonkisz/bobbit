@@ -495,6 +495,145 @@ function rolePreviewPanel() {
 }
 
 // ============================================================================
+// TOOL PREVIEW PANEL (tool assistant split-screen)
+// ============================================================================
+
+function toolPreviewPanel() {
+	const handleSaveTool = async () => {
+		const toolName = state.toolPreviewName.trim();
+		if (!toolName) return;
+
+		try {
+			await gatewayFetch(`/api/tools/${encodeURIComponent(toolName)}`, {
+				method: "PUT",
+				body: JSON.stringify({
+					description: state.toolPreviewDescription.trim() || undefined,
+					group: state.toolPreviewGroup.trim() || undefined,
+					docs: state.toolPreviewDocs.trim() || undefined,
+				}),
+			});
+		} catch {
+			// Ignore save errors — tool may not exist yet
+		}
+
+		const sessionId = activeSessionId();
+		if (state.remoteAgent) {
+			state.remoteAgent.disconnect();
+			state.remoteAgent = null;
+			state.connectionStatus = "disconnected";
+		}
+		state.isToolAssistantSession = false;
+		state.hasReceivedToolProposal = false;
+		localStorage.removeItem("gateway.sessionId");
+
+		if (sessionId) {
+			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+		}
+
+		// Navigate to the tools page
+		const { loadToolPageData } = await import("./tool-manager-page.js");
+		await loadToolPageData();
+		setHashRoute("tools");
+		renderApp();
+	};
+
+	const handleCancel = () => {
+		backToSessions();
+	};
+
+	const TOOL_GROUPS = ["File System", "Shell", "Web", "Browser", "Agent", "Team", "Tasks", "Artifacts", "Other"];
+
+	return html`
+		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
+			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Tool Name</label>
+					${Input({
+						type: "text",
+						value: state.toolPreviewName,
+						placeholder: "tool-name",
+						onInput: (e: Event) => {
+							state.toolPreviewName = (e.target as HTMLInputElement).value;
+							state.toolPreviewNameEdited = true;
+						},
+					})}
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Description</label>
+					${Input({
+						type: "text",
+						value: state.toolPreviewDescription,
+						placeholder: "Short description of what the tool does",
+						onInput: (e: Event) => {
+							state.toolPreviewDescription = (e.target as HTMLInputElement).value;
+							state.toolPreviewDescriptionEdited = true;
+						},
+					})}
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Group</label>
+					<div class="flex flex-wrap gap-1">
+						${TOOL_GROUPS.map((g) => {
+							const isSelected = state.toolPreviewGroup === g;
+							return html`
+								<button
+									class="text-xs px-2 py-1 rounded border transition-colors ${isSelected ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}"
+									@click=${() => {
+										state.toolPreviewGroup = g;
+										state.toolPreviewGroupEdited = true;
+										renderApp();
+									}}
+								>${g}</button>
+							`;
+						})}
+					</div>
+				</div>
+				${state.toolPreviewAction ? html`
+					<div>
+						<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-secondary text-secondary-foreground">
+							Action: ${state.toolPreviewAction}
+						</span>
+					</div>
+				` : ""}
+				<div class="flex-1 flex flex-col min-h-0">
+					<div class="flex items-center justify-between mb-1.5">
+						<label class="text-xs text-muted-foreground font-medium">Documentation</label>
+						<button
+							class="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+							@click=${() => { state.toolPreviewDocsEditMode = !state.toolPreviewDocsEditMode; renderApp(); }}
+						>
+							${state.toolPreviewDocsEditMode ? "Preview" : "Edit"}
+						</button>
+					</div>
+					${state.toolPreviewDocsEditMode
+						? html`<textarea
+								class="flex-1 min-h-[200px] p-3 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+								.value=${state.toolPreviewDocs}
+								@input=${(e: Event) => {
+									state.toolPreviewDocs = (e.target as HTMLTextAreaElement).value;
+									state.toolPreviewDocsEdited = true;
+								}}
+							></textarea>`
+						: html`<div class="flex-1 min-h-[200px] p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm">
+								<markdown-block .content=${state.toolPreviewDocs || "_No documentation yet — the assistant will populate this_"}></markdown-block>
+							</div>`
+					}
+				</div>
+			</div>
+			<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+				${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
+				${Button({
+					variant: "default",
+					onClick: handleSaveTool,
+					disabled: !state.toolPreviewName.trim(),
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(Wrench, "sm")} Save Tool</span>`,
+				})}
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
 // PREVIEW SWIPE (mobile)
 // ============================================================================
 
@@ -831,6 +970,23 @@ export function doRenderApp(): void {
 		`;
 	};
 
+	const toolAssistantTabBar = () => {
+		return html`
+			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
+				<button
+					class="goal-tab-pill ${state.toolAssistantTab === "chat" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.toolAssistantTab = "chat"; renderApp(); }}
+				>Chat</button>
+				<button
+					class="goal-tab-pill ${state.toolAssistantTab === "preview" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.toolAssistantTab = "preview"; renderApp(); }}
+				>
+					Preview${state.hasReceivedToolProposal ? html` <span class="goal-tab-dot"></span>` : ""}
+				</button>
+			</div>
+		`;
+	};
+
 	const previewTabBar = () => {
 		return html`
 			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
@@ -931,6 +1087,24 @@ export function doRenderApp(): void {
 				}
 			`;
 		}
+		if (connected && state.isToolAssistantSession) {
+			if (desktop) {
+				return html`
+					${reconnectBanner()}
+					<div class="flex-1 flex min-h-0 overflow-hidden">
+						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
+						${toolPreviewPanel()}
+					</div>
+				`;
+			}
+			return html`
+				${reconnectBanner()}
+				${state.toolAssistantTab === "chat"
+					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
+					: html`<div class="flex-1 min-h-0 flex flex-col">${toolPreviewPanel()}</div>`
+				}
+			`;
+		}
 		if (connected && state.isPreviewSession) {
 			if (desktop) {
 				const collapsed = isPreviewCollapsed();
@@ -1018,7 +1192,8 @@ export function doRenderApp(): void {
 					</div>
 					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
 					${state.isRoleAssistantSession ? roleAssistantTabBar() : ""}
-					${state.isPreviewSession && !state.isGoalAssistantSession && !state.isRoleAssistantSession ? previewTabBar() : ""}
+					${state.isToolAssistantSession ? toolAssistantTabBar() : ""}
+					${state.isPreviewSession && !state.isGoalAssistantSession && !state.isRoleAssistantSession && !state.isToolAssistantSession ? previewTabBar() : ""}
 				</div>
 				<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>
