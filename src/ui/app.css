@@ -1029,7 +1029,7 @@ html {
 	height: 1px;
 	overflow: visible;
 	transform-origin: 5px 8px;
-	transform: scale(3.5);
+	transform: scale(3.5) translateY(1px);
 	margin: 8px 18px 28px 18px;
 	image-rendering: pixelated;
 	box-shadow:
@@ -1087,7 +1087,7 @@ html {
 
 .bobbit-blob--idle .bobbit-blob__flask {
 	animation: magnifier-depth-idle 10s steps(1) infinite;
-	transform: scale(3.5) translateX(-7px);
+	transform: scale(3.5) translate(-7px, 1px);
 }
 .bobbit-blob--exit .bobbit-blob__flask {
 	animation: blob-exit-rigid 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
