@@ -125,7 +125,7 @@ When mocking up UI changes, animations, or visual design options, write a self-c
    ```
    The user may need to refresh the page once to pick up the flag. After that, the split-pane appears.
 
-2. **Write your preview HTML to `~/.pi/preview.html`**. The panel polls this file every second and auto-updates the iframe.
+2. **Write your preview HTML to `~/.pi/preview.html`**. The panel polls this file every second and auto-updates the iframe. **Note:** This is currently a single shared file — all preview sessions see the same content. There is no per-session isolation yet. If multiple sessions have preview enabled, the last write wins.
 
 3. **Reference real app CSS and components** — do NOT duplicate styles. Since the preview iframe is same-origin with the Vite dev server, you can `<link rel="stylesheet" href="/src/ui/app.css">` to use the actual production CSS. Use the same DOM structure and class names as the real components. This guarantees the preview is pixel-identical to the app.
 
