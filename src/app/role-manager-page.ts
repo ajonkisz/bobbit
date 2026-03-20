@@ -4,7 +4,7 @@ import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
 import { fetchRoles, fetchTools, createRole, updateRole, deleteRole, gatewayFetch, type RoleData } from "./api.js";
-import { ACCESSORY_IDS, getAccessory } from "./session-colors.js";
+import { ACCESSORY_IDS, BOBBIT_HUE_ROTATIONS, getAccessory } from "./session-colors.js";
 import { state, renderApp } from "./state.js";
 import { setHashRoute } from "./routing.js";
 
@@ -19,7 +19,7 @@ import { setHashRoute } from "./routing.js";
  *  outside chat we use a CSS class (.bobbit-blob--inline) that resets these
  *  properties, added via role-manager.css.
  */
-function idleBlob(accId: string, size = 40): TemplateResult {
+function idleBlob(accId: string, size = 40, hueIndex = 0): TemplateResult {
 	const accClass = accId && accId !== "none"
 		? `bobbit-${accId === "crown" ? "crowned" : accId}`
 		: "";
@@ -28,10 +28,11 @@ function idleBlob(accId: string, size = 40): TemplateResult {
 	// Use a larger viewport to capture everything, then scale down.
 	const naturalSize = 60;
 	const s = size / naturalSize;
+	const hue = BOBBIT_HUE_ROTATIONS[hueIndex % BOBBIT_HUE_ROTATIONS.length];
 	return html`
 		<div style="width:${size}px;height:${size}px;flex-shrink:0;">
 			<div style="width:${naturalSize}px;height:${naturalSize}px;position:relative;overflow:hidden;transform:scale(${s.toFixed(3)});transform-origin:top left;">
-				<div class="${cls}">
+				<div class="${cls}" style="--bobbit-hue-rotate:${hue}deg;">
 					<div class="bobbit-blob__sprite"></div>
 					<div class="bobbit-blob__crown"></div>
 					<div class="bobbit-blob__bandana"></div>
@@ -300,10 +301,10 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 	}
 }
 
-function renderRoleRow(role: RoleData): TemplateResult {
+function renderRoleRow(role: RoleData, index: number): TemplateResult {
 	return html`
 		<div class="role-row" tabindex="0" role="button" @click=${() => showEdit(role)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showEdit(role); } }}>
-			${idleBlob(role.accessory ?? "none", 32)}
+			${idleBlob(role.accessory ?? "none", 32, index)}
 			<div class="role-row-info">
 				<span class="role-row-label">${role.label}</span>
 				<span class="role-row-slug">${role.name}</span>
@@ -349,7 +350,7 @@ function renderListView(): TemplateResult {
 
 	return html`
 		<div class="roles-list">
-			${roles.map(renderRoleRow)}
+			${roles.map((role, i) => renderRoleRow(role, i))}
 		</div>
 	`;
 }
@@ -426,7 +427,7 @@ function renderEditView(): TemplateResult {
 				<div class="roles-edit-section">
 					<h2 class="roles-section-title">Accessory</h2>
 					<div class="roles-accessory-grid">
-						${ACCESSORY_IDS.map((accId) => {
+						${ACCESSORY_IDS.map((accId, i) => {
 							const acc = getAccessory(accId);
 							const selected = editAccessory === accId;
 							return html`
@@ -437,7 +438,7 @@ function renderEditView(): TemplateResult {
 									<span class="roles-accessory-preview">
 										${accId === "none"
 											? html`<span class="text-xs text-muted-foreground">\u2014</span>`
-											: idleBlob(accId, 32)}
+											: idleBlob(accId, 32, i)}
 									</span>
 									<span class="roles-accessory-label">${acc.label}</span>
 								</button>
