@@ -76,7 +76,7 @@ test.describe("GET /api/roles — default roles", () => {
 		expect(names).toContain("team-lead");
 		expect(names).toContain("coder");
 		expect(names).toContain("reviewer");
-		expect(names).toContain("tester");
+		expect(names).toContain("test-engineer");
 	});
 
 	test("default roles have expected accessories", async () => {
@@ -87,7 +87,7 @@ test.describe("GET /api/roles — default roles", () => {
 		expect(byName["team-lead"].accessory).toBe("crown");
 		expect(byName["coder"].accessory).toBe("bandana");
 		expect(byName["reviewer"].accessory).toBe("magnifier");
-		expect(byName["tester"].accessory).toBe("flask");
+		expect(byName["test-engineer"].accessory).toBe("flask");
 	});
 
 	test("default roles have labels and prompt templates", async () => {
@@ -323,15 +323,15 @@ test.describe("DELETE /api/roles/:name", () => {
 
 	test("can delete and re-create a default role", async () => {
 		// Save the role data before deleting so we can restore it
-		const getBeforeResp = await apiFetch("/api/roles/tester");
+		const getBeforeResp = await apiFetch("/api/roles/test-engineer");
 		expect(getBeforeResp.status).toBe(200);
 		const originalRole = await getBeforeResp.json();
 
 		// Default roles should be deletable (per spec: "no special status")
-		const resp = await apiFetch("/api/roles/tester", { method: "DELETE" });
+		const resp = await apiFetch("/api/roles/test-engineer", { method: "DELETE" });
 		expect(resp.status).toBe(200);
 
-		const getResp = await apiFetch("/api/roles/tester");
+		const getResp = await apiFetch("/api/roles/test-engineer");
 		expect(getResp.status).toBe(404);
 
 		// Re-create the role so other tests and the server aren't affected
