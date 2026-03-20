@@ -102,6 +102,8 @@
 	min-height: 0;
 	overflow-y: auto;
 	padding: 20px;
+	display: flex;
+	flex-direction: column;
 }
 
 .roles-list {
@@ -201,27 +203,47 @@
 
 .roles-edit-container {
 	display: flex;
-	gap: 0;
+	flex-direction: column;
+	gap: 20px;
 	min-height: 0;
 }
 
-.roles-edit-main {
+/* Top row: identity fields + accessory grid side by side */
+.roles-edit-top-row {
+	display: flex;
+	gap: 24px;
+	align-items: flex-start;
+}
+
+/* Bottom row: prompt editor + tool access side by side, fills remaining height */
+.roles-edit-bottom-row {
+	display: flex;
+	gap: 24px;
+	align-items: stretch;
+	flex: 1;
+	min-height: 0;
+}
+
+/* Prompt section stretches to fill available height */
+.roles-edit-prompt-section {
 	flex: 1;
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
-	padding-right: 24px;
 }
 
-.roles-edit-sidebar {
+.roles-edit-prompt-section .roles-prompt-editor {
+	flex: 1;
+	min-height: 200px;
+	resize: none;
+}
+
+/* Tool access section — fixed width on the right */
+.roles-edit-tools-section {
 	width: 340px;
 	flex-shrink: 0;
 	border-left: 1px solid var(--border);
 	padding-left: 24px;
-	display: flex;
-	flex-direction: column;
-	gap: 16px;
 }
 
 .roles-edit-section {
@@ -263,7 +285,7 @@
 /* System prompt editor */
 .roles-prompt-editor {
 	width: 100%;
-	min-height: 300px;
+	min-height: 200px;
 	padding: 12px;
 	border-radius: 6px;
 	border: 1px solid var(--border);
@@ -273,7 +295,7 @@
 	font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
 	line-height: 1.6;
 	outline: none;
-	resize: vertical;
+	resize: none;
 	transition: border-color 150ms;
 }
 .roles-prompt-editor:focus {
@@ -483,18 +505,7 @@
 	color: var(--foreground);
 }
 
-/* Actions in sidebar */
-.roles-edit-actions {
-	margin-top: auto;
-	padding-top: 16px;
-	border-top: 1px solid var(--border);
-}
 
-.roles-danger-zone {
-	margin-top: 12px;
-	padding-top: 12px;
-	border-top: 1px solid var(--border);
-}
 
 /* ============================================================================
  * EMPTY / LOADING STATES
@@ -566,18 +577,21 @@
 		left: 16px;
 		bottom: 3px;
 	}
-	.roles-edit-container {
+	.roles-edit-top-row {
 		flex-direction: column;
 	}
-	.roles-edit-main {
-		padding-right: 0;
+	.roles-edit-bottom-row {
+		flex-direction: column;
 	}
-	.roles-edit-sidebar {
+	.roles-edit-tools-section {
 		width: auto;
 		border-left: none;
 		border-top: 1px solid var(--border);
 		padding-left: 0;
-		padding-top: 24px;
+		padding-top: 16px;
+	}
+	.roles-edit-prompt-section .roles-prompt-editor {
+		min-height: 300px;
 	}
 }
 
