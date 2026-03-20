@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { ChevronDown, Crosshair, PanelLeftClose, PanelLeftOpen, Plus, Users, Wrench } from "lucide";
+import { ChevronDown, Layers, PanelLeftClose, PanelLeftOpen, Plus, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -116,7 +116,7 @@ export function renderSidebar() {
 					@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); import("./routing.js").then((m) => m.setHashRoute("artifact-specs")); }}
 					title="Manage artifact specs"
 				>
-					${icon(Crosshair, "sm")}
+					${icon(Layers, "sm")}
 					<span>Specs</span>
 				</button>
 				<button
