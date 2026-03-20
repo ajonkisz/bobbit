@@ -12,6 +12,7 @@ import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
 import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
+import { TOOL_ASSISTANT_PROMPT } from "./tool-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 import { CostTracker } from "./cost-tracker.js";
@@ -42,6 +43,8 @@ export interface SessionInfo {
 	goalAssistant?: boolean;
 	/** True if this is a role-creation assistant session */
 	roleAssistant?: boolean;
+	/** True if this is a tool-management assistant session */
+	toolAssistant?: boolean;
 	/** Whether this session has a live HTML preview panel */
 	preview?: boolean;
 	/** If this is a delegate session, the parent session ID */
@@ -486,6 +489,7 @@ export class SessionManager {
 			goalId: ps.goalId,
 			goalAssistant: ps.goalAssistant,
 			roleAssistant: ps.roleAssistant,
+			toolAssistant: ps.toolAssistant,
 			role: ps.role,
 			teamGoalId: ps.teamGoalId,
 			worktreePath: ps.worktreePath,
@@ -495,6 +499,10 @@ export class SessionManager {
 			promptQueue: new PromptQueue(ps.messageQueue),
 		};
 
+		// Skip cost tracking during session restore (switch_session replays
+		// all historical message_update events which would double-count costs)
+		let restoring = true;
+
 		const unsub = rpcClient.onEvent((event: any) => {
 			session.lastActivity = Date.now();
 			this.store.update(ps.id, { lastActivity: session.lastActivity });
@@ -503,7 +511,7 @@ export class SessionManager {
 
 			eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
-			this.trackCostFromEvent(session, event);
+			if (!restoring) this.trackCostFromEvent(session, event);
 		});
 
 		session.unsubscribe = unsub;
@@ -515,6 +523,7 @@ export class SessionManager {
 			{ type: "switch_session", sessionPath: ps.agentSessionFile },
 			15_000,
 		);
+		restoring = false;
 		if (!switchResp.success) {
 			await rpcClient.stop();
 			throw new Error(`switch_session failed: ${switchResp.error}`);
@@ -537,7 +546,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; allowedTools?: string[] }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; toolAssistant?: boolean; allowedTools?: string[] }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -552,7 +561,7 @@ export class SessionManager {
 		// Auto-load goal tools extension for any goal-associated session
 		// (unless it's a goal/role assistant, or already has an extension —
 		// team-lead-tools.ts imports goal-tools internally, so no double-load)
-		if (goalId && !goalAssistant && !opts?.roleAssistant) {
+		if (goalId && !goalAssistant && !opts?.roleAssistant && !opts?.toolAssistant) {
 			const alreadyHasExtension = bridgeOptions.args?.includes("--extension");
 			if (!alreadyHasExtension) {
 				bridgeOptions.args = bridgeOptions.args || [];
@@ -579,6 +588,16 @@ export class SessionManager {
 				cwd,
 				goalSpec: ROLE_ASSISTANT_PROMPT,
 				goalTitle: "Role Creation Assistant",
+				goalState: "active",
+			});
+			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		} else if (opts?.toolAssistant) {
+			// Tool assistant sessions get a special system prompt
+			const promptPath = assembleSystemPrompt(id, {
+				baseSystemPromptPath: undefined,
+				cwd,
+				goalSpec: TOOL_ASSISTANT_PROMPT,
+				goalTitle: "Tool Management Assistant",
 				goalState: "active",
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
@@ -637,7 +656,7 @@ export class SessionManager {
 		const now = Date.now();
 		const session: SessionInfo = {
 			id,
-			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : "New session",
+			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : opts?.toolAssistant ? "Tool Assistant" : "New session",
 			cwd,
 			status: "starting",
 			createdAt: now,
@@ -647,10 +666,11 @@ export class SessionManager {
 			eventBuffer,
 			unsubscribe: () => {},
 			isCompacting: false,
-			titleGenerated: (goalAssistant || opts?.roleAssistant) ? true : false,
+			titleGenerated: (goalAssistant || opts?.roleAssistant || opts?.toolAssistant) ? true : false,
 			goalId,
 			goalAssistant,
 			roleAssistant: opts?.roleAssistant,
+			toolAssistant: opts?.toolAssistant,
 			taskId: opts?.taskId,
 			allowedTools: opts?.allowedTools,
 			promptQueue: new PromptQueue(),
@@ -886,6 +906,7 @@ export class SessionManager {
 			goalId: session.goalId,
 			goalAssistant: session.goalAssistant,
 			roleAssistant: session.roleAssistant,
+			toolAssistant: session.toolAssistant,
 			role: session.role,
 			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
@@ -930,6 +951,7 @@ export class SessionManager {
 			goalId: s.goalId,
 			goalAssistant: s.goalAssistant,
 			roleAssistant: s.roleAssistant,
+			toolAssistant: s.toolAssistant,
 			delegateOf: s.delegateOf,
 			role: s.role,
 			teamGoalId: s.teamGoalId,
@@ -1025,13 +1047,14 @@ export class SessionManager {
 		bridgeOptions.env = { BOBBIT_SESSION_ID: id };
 
 		const rpcClient = new RpcBridge(bridgeOptions);
+		let switchingSession = true;
 		const unsub = rpcClient.onEvent((event: any) => {
 			session.lastActivity = Date.now();
 			this.store.update(id, { lastActivity: session.lastActivity });
 			this.handleAgentLifecycle(session, event);
 			session.eventBuffer.push(event);
 			broadcast(session.clients, { type: "event", data: event });
-			this.trackCostFromEvent(session, event);
+			if (!switchingSession) this.trackCostFromEvent(session, event);
 		});
 
 		await rpcClient.start();
@@ -1046,6 +1069,7 @@ export class SessionManager {
 				console.error(`[session-manager] switch_session failed after role assignment: ${switchResp.error}`);
 			}
 		}
+		switchingSession = false;
 
 		// Swap in the new bridge and update metadata
 		session.rpcClient = rpcClient;
@@ -1261,6 +1285,7 @@ export class SessionManager {
 			if (this.systemPromptPath) bridgeOptions.systemPromptPath = this.systemPromptPath;
 
 			const rpcClient = new RpcBridge(bridgeOptions);
+			let switchingSession = true;
 			const unsub = rpcClient.onEvent((event: any) => {
 				session.lastActivity = Date.now();
 				this.store.update(id, { lastActivity: session.lastActivity });
@@ -1269,7 +1294,7 @@ export class SessionManager {
 
 				session.eventBuffer.push(event);
 				broadcast(session.clients, { type: "event", data: event });
-				this.trackCostFromEvent(session, event);
+				if (!switchingSession) this.trackCostFromEvent(session, event);
 			});
 
 			await rpcClient.start();
@@ -1284,6 +1309,7 @@ export class SessionManager {
 					console.error(`[session-manager] switch_session failed after force abort: ${switchResp.error}`);
 				}
 			}
+			switchingSession = false;
 
 			// Swap in the new bridge
 			session.rpcClient = rpcClient;
