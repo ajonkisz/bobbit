@@ -87,21 +87,6 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		yOffset: 0,
 		addsHeight: false,
 	},
-	headphones: {
-		id: "headphones",
-		label: "Headphones",
-		shadow: `
-			3px -1px 0 #000,4px -1px 0 #000,5px -1px 0 #000,6px -1px 0 #000,7px -1px 0 #000,
-			2px 0 0 #000,3px 0 0 #6b7280,4px 0 0 #9ca3af,5px 0 0 #9ca3af,6px 0 0 #9ca3af,7px 0 0 #6b7280,8px 0 0 #000,
-			1px 1px 0 #000,2px 1px 0 #000,8px 1px 0 #000,9px 1px 0 #000,
-			0 2px 0 #000,1px 2px 0 #4b5563,2px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #4b5563,10px 2px 0 #000,
-			0 3px 0 #000,1px 3px 0 #ef4444,2px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #ef4444,10px 3px 0 #000,
-			0 4px 0 #000,1px 4px 0 #dc2626,2px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #dc2626,10px 4px 0 #000,
-			1px 5px 0 #000,2px 5px 0 #000,8px 5px 0 #000,9px 5px 0 #000
-		`,
-		yOffset: 0,
-		addsHeight: false,
-	},
 	pencil: {
 		id: "pencil",
 		label: "Pencil",
@@ -113,32 +98,6 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 			6px 7px 0 #000,7px 7px 0 #fde047,8px 7px 0 #fbbf24,9px 7px 0 #000,
 			5px 8px 0 #000,6px 8px 0 #f4a460,7px 8px 0 #cd853f,8px 8px 0 #000,
 			4px 9px 0 #000,5px 9px 0 #4b5563,6px 9px 0 #000
-		`,
-		yOffset: 0,
-		addsHeight: false,
-	},
-	book: {
-		id: "book",
-		label: "Book",
-		shadow: `
-			2px 0 0 #000,3px 0 0 #000,4px 0 0 #000,5px 0 0 #000,6px 0 0 #000,7px 0 0 #000,
-			1px 1px 0 #000,2px 1px 0 #3b82f6,3px 1px 0 #60a5fa,4px 1px 0 #60a5fa,5px 1px 0 #60a5fa,6px 1px 0 #60a5fa,7px 1px 0 #3b82f6,8px 1px 0 #000,
-			1px 2px 0 #000,2px 2px 0 #2563eb,3px 2px 0 #f5f5f5,4px 2px 0 #d4d4d4,5px 2px 0 #f5f5f5,6px 2px 0 #d4d4d4,7px 2px 0 #2563eb,8px 2px 0 #000,
-			1px 3px 0 #000,2px 3px 0 #3b82f6,3px 3px 0 #60a5fa,4px 3px 0 #60a5fa,5px 3px 0 #60a5fa,6px 3px 0 #60a5fa,7px 3px 0 #3b82f6,8px 3px 0 #000,
-			2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000
-		`,
-		yOffset: 0,
-		addsHeight: false,
-	},
-	glasses: {
-		id: "glasses",
-		label: "Glasses",
-		shadow: `
-			2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,
-			1px 3px 0 #000,2px 3px 0 #e0e7ff,3px 3px 0 #c7d2fe,4px 3px 0 #000,5px 3px 0 #4b5563,6px 3px 0 #000,7px 3px 0 #e0e7ff,8px 3px 0 #c7d2fe,9px 3px 0 #000,
-			1px 4px 0 #000,2px 4px 0 #c7d2fe,3px 4px 0 #e0e7ff,4px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #c7d2fe,8px 4px 0 #e0e7ff,9px 4px 0 #000,
-			2px 5px 0 #000,3px 5px 0 #000,4px 5px 0 #000,7px 5px 0 #000,8px 5px 0 #000,9px 5px 0 #000,
-			0 3px 0 #000,10px 3px 0 #000,0 4px 0 #4b5563,10px 4px 0 #4b5563,11px 4px 0 #000
 		`,
 		yOffset: 0,
 		addsHeight: false,
