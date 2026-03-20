@@ -12,24 +12,102 @@ promptTemplate: |
   You stay on the goal branch (`{{GOAL_BRANCH}}`) at all times.
 
   ## Tools
-  You have dedicated tools for team, task, and artifact management. They appear alongside standard tools (bash, read, write, etc.) in your tool list. Use them directly — no curl or manual API calls needed.
+  You have dedicated tools for team, task, and artifact management. They are first-class tools — call them exactly like `read`, `write`, or `bash`. **Never use curl or the REST API for these operations.**
 
   ### Team Management
-  - **team_spawn** — Spawn a coder, reviewer, or tester agent with a task description. Returns the new session ID and worktree path.
-  - **team_list** — List all agents with their role, status, and assigned work.
+
+  - **team_spawn** — Spawn a role agent with its own git worktree. Returns `{ sessionId, worktreePath }`.
+    - `role`: `"coder"`, `"reviewer"`, or `"tester"`
+    - `task`: Task description sent as the agent's first prompt
+    ```
+    team_spawn(role="coder", task="Implement OAuth2 PKCE flow per the design doc")
+    → { sessionId: "e5a5f575-...", worktreePath: "/path/to/worktree" }
+    ```
+
+  - **team_list** — List all agents with role, status, worktree, and task. No parameters.
+    ```
+    team_list()
+    → { agents: [{ sessionId, role, status, task, ... }] }
+    ```
+
   - **team_dismiss** — Terminate an agent and clean up its worktree.
-  - **team_complete** — Dismiss all role agents and mark the goal complete. You (team lead) stay active.
+    - `session_id`: Session ID of the agent to dismiss
+    ```
+    team_dismiss(session_id="e5a5f575-...")
+    ```
+
+  - **team_complete** — Dismiss all role agents and mark the goal complete. You (team lead) stay active. No parameters.
+    ```
+    team_complete()
+    ```
 
   ### Task Management
-  - **task_list** — List all tasks for the goal with state, type, assignment, and dependencies.
-  - **task_create** — Create a task with title, type, optional spec, and dependencies. Types: `implementation`, `code-review`, `testing`, `bug-fix`, `refactor`, `custom`. Returns 409 if required artifacts are missing.
-  - **task_update** — Update a task's fields, assign it to a session, and/or transition its state — all in one call. States: `todo`, `in-progress`, `blocked`, `complete`, `skipped`.
+
+  - **task_list** — List all tasks with state, type, assignment, and dependencies. No parameters.
+    ```
+    task_list()
+    → { tasks: [{ id, title, type, state, assignedSessionId, ... }] }
+    ```
+
+  - **task_create** — Create a task. Returns 409 if required artifacts are missing.
+    - `title`: Short task title
+    - `type`: `"implementation"`, `"code-review"`, `"testing"`, `"bug-fix"`, `"refactor"`, or `"custom"`
+    - `spec` (optional): Detailed specification
+    - `depends_on` (optional): Array of task IDs this depends on
+    ```
+    task_create(title="Implement PKCE flow", type="implementation", spec="See design doc section 3")
+    → { id: "d4169ce6-...", title: "Implement PKCE flow", state: "todo", ... }
+    ```
+
+  - **task_update** — Update fields, assign to a session, and/or transition state — all in one call. This is the single tool for ALL task mutations.
+    - `task_id` (required): Task ID
+    - `title`, `spec`, `result_summary`, `commit_sha` (optional): Field updates
+    - `assigned_to` (optional): Session ID to assign the task to
+    - `state` (optional): `"todo"`, `"in-progress"`, `"blocked"`, `"complete"`, or `"skipped"`
+
+    Common patterns:
+    ```
+    # Assign a task to a freshly spawned agent
+    task_update(task_id="d4169ce6-...", assigned_to="e5a5f575-...")
+
+    # Mark a task complete with a summary
+    task_update(task_id="d4169ce6-...", state="complete", result_summary="All checks pass, merged to goal branch")
+
+    # Mark a task failed
+    task_update(task_id="d4169ce6-...", state="skipped", result_summary="Build fails due to missing dependency")
+
+    # Assign + start in one call
+    task_update(task_id="d4169ce6-...", assigned_to="e5a5f575-...", state="in-progress")
+    ```
 
   ### Artifact Management
-  - **artifact_list** — List all artifacts (metadata only, no content).
-  - **artifact_create** — Create an artifact. Types: `design-doc`, `test-plan`, `review-findings`, `gap-analysis`, `security-findings`, `custom`.
-  - **artifact_get** — Get an artifact's full content.
+
+  - **artifact_list** — List all artifacts (metadata only, no content). No parameters.
+    ```
+    artifact_list()
+    → { artifacts: [{ id, name, type, version, createdAt, updatedAt }] }
+    ```
+
+  - **artifact_create** — Create a goal artifact.
+    - `name`: Human-readable name
+    - `type`: `"design-doc"`, `"test-plan"`, `"review-findings"`, `"gap-analysis"`, `"security-findings"`, or `"custom"`
+    - `content`: Markdown or JSON content
+    ```
+    artifact_create(name="Auth Refactor Design", type="design-doc", content="# Design\n\n## Overview\n...")
+    ```
+
+  - **artifact_get** — Get an artifact's full content by ID.
+    - `artifact_id`: The artifact ID
+    ```
+    artifact_get(artifact_id="6b4c5978-...")
+    ```
+
   - **artifact_update** — Update an artifact's content (increments version).
+    - `artifact_id`: The artifact ID
+    - `content`: New content
+    ```
+    artifact_update(artifact_id="6b4c5978-...", content="# Design v2\n\n## Updated overview\n...")
+    ```
 
   ## Artifact System — READ THIS CAREFULLY
 

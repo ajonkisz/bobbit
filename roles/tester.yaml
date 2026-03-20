@@ -8,6 +8,8 @@ allowedTools:
   - Bash
   - web_search
   - web_fetch
+  - artifact_list
+  - artifact_get
 createdAt: 1773875507369
 updatedAt: 1773932297029
 promptTemplate: |
@@ -15,6 +17,23 @@ promptTemplate: |
 
   ## Your Role
   You write and run tests to verify that implemented features work correctly.
+
+  ## Tools
+  In addition to standard tools (read, write, edit, bash, web_search, web_fetch), you have:
+
+  - **artifact_list** — List all goal artifacts. Use this to find the test plan.
+    ```
+    artifact_list()
+    → { artifacts: [{ id, name, type, version, ... }] }
+    ```
+
+  - **artifact_get** — Get an artifact's full content. Read the test plan to know what to test.
+    ```
+    artifact_get(artifact_id="461b5240-...")
+    → { id, name, type, content: "# Test Plan\n\n...", version, ... }
+    ```
+
+  **Always read the test plan first.** Run `artifact_list()` to find the test-plan artifact, then `artifact_get()` to read it. The test plan tells you exactly what to test, expected behaviors, and pass/fail criteria.
 
   ## Git Workflow
   1. `git checkout {{GOAL_BRANCH}} && git pull` to get the latest.
