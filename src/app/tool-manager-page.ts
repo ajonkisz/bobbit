@@ -6,12 +6,78 @@ import { ArrowLeft, ChevronDown, Pencil, Plus, Wrench } from "lucide";
 import { fetchTools, fetchToolDetail, updateTool, fetchRoles, gatewayFetch, type ToolInfo, type RoleData } from "./api.js";
 import { state, renderApp } from "./state.js";
 import { setHashRoute } from "./routing.js";
+import { renderTool } from "../ui/tools/index.js";
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
 const TOOL_GROUPS = ["File System", "Shell", "Web", "Browser", "Agent", "Team", "Tasks", "Artifacts", "Other"];
+
+/** Sample params and results for renderer preview. */
+const TOOL_MOCK_DATA: Record<string, { params: any; result: any }> = {
+	bash: {
+		params: { command: "npm run check" },
+		result: { type: "tool_result", content: "No errors found.\n", tool_use_id: "mock" },
+	},
+	read: {
+		params: { path: "src/app/main.ts", limit: 20 },
+		result: { type: "tool_result", content: "import { html } from 'lit';\nimport { state } from './state.js';\n// ...(18 more lines)", tool_use_id: "mock" },
+	},
+	write: {
+		params: { path: "src/app/example.ts", content: "export const hello = 'world';\n" },
+		result: { type: "tool_result", content: "File written: src/app/example.ts (1 line)", tool_use_id: "mock" },
+	},
+	edit: {
+		params: { path: "src/app/main.ts", oldText: "const x = 1;", newText: "const x = 2;" },
+		result: { type: "tool_result", content: "Successfully replaced text in src/app/main.ts.", tool_use_id: "mock" },
+	},
+	web_search: {
+		params: { query: "lit html template best practices" },
+		result: { type: "tool_result", content: "1. Lit — Best Practices (lit.dev)\n2. Web Components Guide (MDN)\n3. Template Rendering Patterns", tool_use_id: "mock" },
+	},
+	web_fetch: {
+		params: { url: "https://lit.dev/docs/" },
+		result: { type: "tool_result", content: "Lit is a simple library for building fast, lightweight web components...", tool_use_id: "mock" },
+	},
+	delegate: {
+		params: { instructions: "Review the auth module for security issues" },
+		result: { type: "tool_result", content: "No critical issues found. 2 minor suggestions.", tool_use_id: "mock" },
+	},
+	ls: {
+		params: { path: "src/app" },
+		result: { type: "tool_result", content: "main.ts\nrender.ts\nrouting.ts\nstate.ts\napi.ts\nsidebar.ts", tool_use_id: "mock" },
+	},
+	grep: {
+		params: { pattern: "renderTool", path: "src/" },
+		result: { type: "tool_result", content: "src/ui/tools/index.ts:74: export function renderTool(\nsrc/app/tool-manager-page.ts:10: import { renderTool } from '../ui/tools/index.js';", tool_use_id: "mock" },
+	},
+	find: {
+		params: { glob: "src/**/*.css" },
+		result: { type: "tool_result", content: "src/app/app.css\nsrc/app/role-manager.css\nsrc/app/tool-manager.css", tool_use_id: "mock" },
+	},
+};
+
+function getMockData(toolName: string): { params: any; result: any } {
+	return TOOL_MOCK_DATA[toolName] || {
+		params: { example: "value" },
+		result: { type: "tool_result", content: "OK", tool_use_id: "mock" },
+	};
+}
+
+function renderRendererPreview(toolName: string): TemplateResult {
+	const mock = getMockData(toolName);
+	const inProgress = renderTool(toolName, mock.params, undefined, true);
+	const complete = renderTool(toolName, mock.params, mock.result, false);
+	return html`
+		<div class="tools-renderer-preview">
+			<div class="tools-renderer-preview-label">In progress</div>
+			<div class="tools-renderer-preview-box">${inProgress.content}</div>
+			<div class="tools-renderer-preview-label">Complete</div>
+			<div class="tools-renderer-preview-box">${complete.content}</div>
+		</div>
+	`;
+}
 
 // ============================================================================
 // STATE
@@ -390,6 +456,7 @@ function renderEditView(): TemplateResult {
 							? html`<span class="tools-renderer-path">${selectedTool.rendererFile}</span>`
 							: nothing}
 					</div>
+					${renderRendererPreview(selectedTool.name)}
 				</div>
 
 				<!-- Role access -->

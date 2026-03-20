@@ -544,3 +544,31 @@
 		padding-top: 24px;
 	}
 }
+
+/* ============================================================================
+ * RENDERER PREVIEW
+ * ============================================================================ */
+
+.tools-renderer-preview {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.tools-renderer-preview-label {
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--muted-foreground);
+}
+
+.tools-renderer-preview-box {
+	padding: 10px;
+	background: var(--background);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	font-size: 13px;
+	overflow: hidden;
+}
