@@ -37,11 +37,11 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		id: "crown",
 		label: "Crown",
 		shadow: `
-			3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,
-			2px 0 0 #000,3px 0 0 #fef08a,4px 0 0 #000,5px 0 0 #fef08a,6px 0 0 #000,7px 0 0 #fef08a,8px 0 0 #000,
-			1px 1px 0 #000,2px 1px 0 #fde047,3px 1px 0 #fef08a,4px 1px 0 #fde047,5px 1px 0 #ef4444,6px 1px 0 #fde047,7px 1px 0 #fef08a,8px 1px 0 #fde047,9px 1px 0 #000,
-			1px 2px 0 #000,2px 2px 0 #ca8a04,3px 2px 0 #eab308,4px 2px 0 #eab308,5px 2px 0 #eab308,6px 2px 0 #eab308,7px 2px 0 #eab308,8px 2px 0 #ca8a04,9px 2px 0 #000,
-			1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000
+			2px -1px 0 #000,4px -1px 0 #000,6px -1px 0 #000,
+			1px 0 0 #000,2px 0 0 #fef08a,3px 0 0 #000,4px 0 0 #fef08a,5px 0 0 #000,6px 0 0 #fef08a,7px 0 0 #000,
+			0 1px 0 #000,1px 1px 0 #fde047,2px 1px 0 #fef08a,3px 1px 0 #fde047,4px 1px 0 #ef4444,5px 1px 0 #fde047,6px 1px 0 #fef08a,7px 1px 0 #fde047,8px 1px 0 #000,
+			0 2px 0 #000,1px 2px 0 #ca8a04,2px 2px 0 #eab308,3px 2px 0 #eab308,4px 2px 0 #eab308,5px 2px 0 #eab308,6px 2px 0 #eab308,7px 2px 0 #ca8a04,8px 2px 0 #000,
+			0 3px 0 #000,1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000
 		`,
 		yOffset: 2,
 		addsHeight: true,
