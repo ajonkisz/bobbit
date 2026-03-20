@@ -7,6 +7,7 @@ import {
 	renderApp,
 	GW_URL_KEY,
 	GW_TOKEN_KEY,
+	activeSessionId,
 } from "./state.js";
 import { gatewayFetch, refreshSessions } from "./api.js";
 import { getRouteFromHash, setHashRoute } from "./routing.js";
@@ -206,6 +207,17 @@ async function initApp() {
 			state.sidebarCollapsed = !state.sidebarCollapsed;
 			localStorage.setItem("bobbit-sidebar-collapsed", String(state.sidebarCollapsed));
 			renderApp();
+		}
+
+		// Ctrl+] / Cmd+] — Toggle preview panel
+		if (mod && e.key === "]") {
+			if (state.isPreviewSession) {
+				e.preventDefault();
+				const key = `bobbit-preview-collapsed-${activeSessionId()}`;
+				const collapsed = localStorage.getItem(key) === "true";
+				localStorage.setItem(key, String(!collapsed));
+				renderApp();
+			}
 		}
 	});
 }
