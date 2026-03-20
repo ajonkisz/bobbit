@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>HTML Artifact Detection Test</title></head>
+<body>
+<script>
+/**
+ * isHtmlContent — extracted from goal-dashboard.ts for testing.
+ */
+function isHtmlContent(content) {
+	const trimmed = content.trimStart();
+	return trimmed.startsWith("<!") || trimmed.startsWith("<html");
+}
+
+// Expose test results on window for Playwright to read
+window.__testResults = {};
+
+// Test cases
+const cases = [
+	// Should detect as HTML
+	{ input: '<!DOCTYPE html><html><body>Hi</body></html>', expected: true, name: 'doctype html' },
+	{ input: '<html><body>Hi</body></html>', expected: true, name: 'html tag' },
+	{ input: '  <!DOCTYPE html>\n<html>', expected: true, name: 'leading whitespace doctype' },
+	{ input: '\n\n<html lang="en">', expected: true, name: 'leading newlines html' },
+	{ input: '<!DOCTYPE html>\n<html>\n<head>', expected: true, name: 'full html start' },
+
+	// Should NOT detect as HTML
+	{ input: '# Markdown heading\nSome text', expected: false, name: 'markdown' },
+	{ input: '{"key": "value"}', expected: false, name: 'json' },
+	{ input: 'Plain text content', expected: false, name: 'plain text' },
+	{ input: '<div>Not a full HTML doc</div>', expected: false, name: 'html fragment div' },
+	{ input: '<p>Paragraph</p>', expected: false, name: 'html fragment p' },
+	{ input: '', expected: false, name: 'empty string' },
+	{ input: '   \n  # Heading', expected: false, name: 'whitespace then markdown' },
+];
+
+let allPassed = true;
+const results = [];
+for (const c of cases) {
+	const actual = isHtmlContent(c.input);
+	const passed = actual === c.expected;
+	if (!passed) allPassed = false;
+	results.push({ name: c.name, passed, expected: c.expected, actual });
+}
+
+window.__testResults = { allPassed, results };
+</script>
+</body>
+</html>

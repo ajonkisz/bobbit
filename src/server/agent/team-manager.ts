@@ -13,6 +13,18 @@ import type { GoalArtifactStore } from "./goal-artifact-store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Format elapsed time since a timestamp as a human-readable string.
+ * Exported for testing.
+ */
+export function formatElapsed(sinceMs: number): string {
+	const mins = Math.floor((Date.now() - sinceMs) / 60_000);
+	if (mins < 60) return `${mins}m`;
+	const h = Math.floor(mins / 60);
+	const m = mins % 60;
+	return `${h}h ${m}m`;
+}
+
 /** Resolve the absolute path to the team-lead-tools extension (raw .ts, loaded by jiti). */
 const TEAM_LEAD_EXTENSION_PATH = path.resolve(__dirname, "../../../extensions/team-lead-tools.ts");
 import type { TaskManager } from "./task-manager.js";
@@ -204,11 +216,7 @@ export class TeamManager {
 	 * Format elapsed time since a timestamp.
 	 */
 	private formatElapsed(sinceMs: number): string {
-		const mins = Math.floor((Date.now() - sinceMs) / 60_000);
-		if (mins < 60) return `${mins}m`;
-		const h = Math.floor(mins / 60);
-		const m = mins % 60;
-		return `${h}h ${m}m`;
+		return formatElapsed(sinceMs);
 	}
 
 	/**
