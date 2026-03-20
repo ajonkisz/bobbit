@@ -94,9 +94,9 @@ export function renderSidebar() {
 
 	return html`
 		<div class="w-[240px] shrink-0 h-full flex flex-col sidebar-edge" style="background: var(--sidebar);">
-			<div class="flex items-center border-b border-border/50 px-1 py-1">
+			<div class="flex items-center border-b border-border/50 px-0.5 py-1">
 				<button
-					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 					@click=${() => { import("./role-manager-page.js").then((m) => m.loadRolePageData()); import("./routing.js").then((m) => m.setHashRoute("roles")); }}
 					title="Manage roles"
 				>
@@ -104,7 +104,7 @@ export function renderSidebar() {
 					<span>Roles</span>
 				</button>
 				<button
-					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 					@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); import("./routing.js").then((m) => m.setHashRoute("tools")); }}
 					title="Manage tools"
 				>
@@ -112,7 +112,7 @@ export function renderSidebar() {
 					<span>Tools</span>
 				</button>
 				<button
-					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 					@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); import("./routing.js").then((m) => m.setHashRoute("artifact-specs")); }}
 					title="Manage artifact specs"
 				>
@@ -120,7 +120,7 @@ export function renderSidebar() {
 					<span>Specs</span>
 				</button>
 				<button
-					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 					@click=${() => showGoalDialog()}
 					title="New goal"
 				>
