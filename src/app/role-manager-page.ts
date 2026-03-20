@@ -252,7 +252,14 @@ function setRestricted(restricted: boolean): void {
 
 function renderNavBar(): TemplateResult {
 	if (currentView !== "list" && selectedRole) {
-		// Edit view: back goes to roles list, breadcrumb shows hierarchy
+		const effectiveTools = editRestrictTools ? editTools : [];
+		const hasChanges = selectedRole && (
+			editLabel !== selectedRole.label ||
+			editPrompt !== selectedRole.promptTemplate ||
+			JSON.stringify([...effectiveTools].sort()) !== JSON.stringify([...selectedRole.allowedTools].sort()) ||
+			editAccessory !== selectedRole.accessory
+		);
+		// Edit view: back goes to roles list, breadcrumb shows hierarchy, actions on right
 		return html`
 			<div class="roles-nav">
 				<div class="roles-nav-left">
@@ -264,6 +271,23 @@ function renderNavBar(): TemplateResult {
 						<span class="roles-breadcrumb-sep">/</span>
 						<h1 class="roles-title">${selectedRole.label}</h1>
 					</div>
+				</div>
+				<div class="roles-nav-right">
+					${Button({
+						variant: "ghost" as any,
+						size: "sm",
+						onClick: handleDelete,
+						disabled: deleting,
+						className: "text-destructive hover:text-destructive hover:bg-destructive/10",
+						children: html`<span class="inline-flex items-center gap-1">${icon(Trash2, "sm")} ${deleting ? "Deleting\u2026" : "Delete"}</span>`,
+					})}
+					${Button({
+						variant: "default",
+						size: "sm",
+						onClick: handleSave,
+						disabled: saving || !hasChanges,
+						children: saving ? "Saving\u2026" : "Save",
+					})}
 				</div>
 			</div>
 		`;
@@ -416,14 +440,6 @@ function renderToolGroups(): TemplateResult {
 // ============================================================================
 
 function renderEditView(): TemplateResult {
-	const effectiveTools = editRestrictTools ? editTools : [];
-	const hasChanges = selectedRole && (
-		editLabel !== selectedRole.label ||
-		editPrompt !== selectedRole.promptTemplate ||
-		JSON.stringify([...effectiveTools].sort()) !== JSON.stringify([...selectedRole.allowedTools].sort()) ||
-		editAccessory !== selectedRole.accessory
-	);
-
 	return html`
 		<div class="roles-edit-container">
 			<div class="roles-edit-main">
@@ -505,24 +521,7 @@ function renderEditView(): TemplateResult {
 						`}
 				</div>
 
-				<!-- Actions -->
-				<div class="roles-edit-section roles-edit-actions">
-					${Button({
-						variant: "default",
-						onClick: handleSave,
-						disabled: saving || !hasChanges,
-						children: saving ? "Saving\u2026" : "Save Changes",
-					})}
-					<div class="roles-danger-zone">
-						${Button({
-							variant: "ghost" as any,
-							onClick: handleDelete,
-							disabled: deleting,
-							className: "text-destructive hover:text-destructive hover:bg-destructive/10",
-							children: html`${icon(Trash2, "sm")} ${deleting ? "Deleting\u2026" : "Delete Role"}`,
-						})}
-					</div>
-				</div>
+
 			</div>
 		</div>
 	`;
