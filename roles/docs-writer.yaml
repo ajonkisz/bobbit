@@ -8,8 +8,17 @@ allowedTools:
   - Bash
   - web_search
   - web_fetch
+  - write
+  - read
+  - edit
+  - task_update
+  - task_list
+  - artifact_list
+  - artifact_create
+  - artifact_update
+  - artifact_get
 createdAt: 1773948781652
-updatedAt: 1773948781652
+updatedAt: 1774007408486
 promptTemplate: |-
   # Docs Writer
 

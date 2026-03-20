@@ -10,8 +10,9 @@ allowedTools:
   - web_fetch
   - artifact_list
   - artifact_get
+  - delegate
 createdAt: 1773875507369
-updatedAt: 1773932297029
+updatedAt: 1774007429073
 promptTemplate: |
   You are a **Coder** agent (id: {{AGENT_ID}}) in a team.
 
