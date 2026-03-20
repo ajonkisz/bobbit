@@ -762,8 +762,7 @@ async function handleApiRoute(
 		if (!/^[a-zA-Z0-9/_.\-]+$/.test(branch)) { json({ error: "Invalid branch name" }, 400); return; }
 		const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "20", 10) || 20, 1), 100);
 		try {
-			const { execFileSync } = require("node:child_process");
-			const out = execFileSync("git", ["log", "--format=%H|%h|%s|%an|%aI", `-${limit}`, branch], {
+			const out = execSync(`git log --format="%H|%h|%s|%an|%aI" -${limit} ${branch}`, {
 				cwd: goal.cwd, encoding: "utf-8",
 			});
 			const commits = out.trim().split("\n").filter(Boolean).map((line: string) => {
