@@ -411,9 +411,9 @@ html {
 	filter: hue-rotate(calc(-1 * var(--bobbit-hue-rotate, 0deg)));
 	box-shadow:
 		3px -2px 0 #000, 5px -2px 0 #000, 7px -2px 0 #000,
-		2px -1px 0 #000, 3px -1px 0 #fde047, 4px -1px 0 #000, 5px -1px 0 #fde047, 6px -1px 0 #000, 7px -1px 0 #fde047, 8px -1px 0 #000,
-		1px 0px 0 #000, 2px 0px 0 #fbbf24, 3px 0px 0 #fde047, 4px 0px 0 #fbbf24, 5px 0px 0 #fde047, 6px 0px 0 #fbbf24, 7px 0px 0 #fde047, 8px 0px 0 #fbbf24, 9px 0px 0 #000,
-		1px 1px 0 #000, 2px 1px 0 #b45309, 3px 1px 0 #d97706, 4px 1px 0 #d97706, 5px 1px 0 #d97706, 6px 1px 0 #d97706, 7px 1px 0 #d97706, 8px 1px 0 #b45309, 9px 1px 0 #000,
+		2px -1px 0 #000, 3px -1px 0 #fef08a, 4px -1px 0 #000, 5px -1px 0 #fef08a, 6px -1px 0 #000, 7px -1px 0 #fef08a, 8px -1px 0 #000,
+		1px 0px 0 #000, 2px 0px 0 #fde047, 3px 0px 0 #fef08a, 4px 0px 0 #fde047, 5px 0px 0 #ef4444, 6px 0px 0 #fde047, 7px 0px 0 #fef08a, 8px 0px 0 #fde047, 9px 0px 0 #000,
+		1px 1px 0 #000, 2px 1px 0 #ca8a04, 3px 1px 0 #eab308, 4px 1px 0 #eab308, 5px 1px 0 #eab308, 6px 1px 0 #eab308, 7px 1px 0 #eab308, 8px 1px 0 #ca8a04, 9px 1px 0 #000,
 		1px 2px 0 #000, 2px 2px 0 #000, 3px 2px 0 #000, 4px 2px 0 #000, 5px 2px 0 #000, 6px 2px 0 #000, 7px 2px 0 #000, 8px 2px 0 #000, 9px 2px 0 #000;
 	/* Match sprite's busy animation so crown moves in sync */
 	animation:
