@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users, Wrench } from "lucide";
+import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, Layers, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -64,7 +64,7 @@ function renderMobileLanding() {
 					</button>
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); setHashRoute("artifact-specs"); }}>
-						${icon(Crosshair, "xs")} Specs
+						${icon(Layers, "xs")} Specs
 					</button>
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => showGoalDialog()}>
