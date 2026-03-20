@@ -1,8 +1,9 @@
 /**
  * Team Lead tool extensions for Bobbit.
  *
- * Registers first-class agent tools for team management, task coordination,
- * and artifact management. Loaded via --extension flag for team lead sessions only.
+ * Registers team management tools (spawn, dismiss, list, complete) for team lead
+ * sessions only. Task and artifact tools are in goal-tools.ts, which is loaded
+ * automatically for ALL goal sessions.
  *
  * Calls the gateway REST API directly — no CLI wrapper needed.
  */
@@ -12,7 +13,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
 
+// Also register goal-tools (task + artifact management)
+import goalTools from "./goal-tools.js";
+
 export default function (pi: ExtensionAPI) {
+	// Register goal tools first (task_list, task_create, artifact_create, etc.)
+	goalTools(pi);
+
 	// Self-signed TLS
 	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
@@ -62,7 +69,7 @@ export default function (pi: ExtensionAPI) {
 		return { content: [{ type: "text" as const, text: msg }], details: undefined, isError: true };
 	}
 
-	// ── Team tools ────────────────────────────────────────────────────
+	// ── Team tools (team lead only) ───────────────────────────────────
 
 	pi.registerTool({
 		name: "team_spawn",
@@ -121,163 +128,5 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	// ── Task tools ────────────────────────────────────────────────────
-
-	pi.registerTool({
-		name: "task_list",
-		label: "List Tasks",
-		description: "List all tasks for the current goal with their state, type, assignment, and dependencies.",
-		promptSnippet: "List all tasks for the goal.",
-		parameters: Type.Object({}),
-		async execute() {
-			try {
-				return ok(await api("GET", `/api/goals/${goalId}/tasks`));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	pi.registerTool({
-		name: "task_create",
-		label: "Create Task",
-		description: [
-			"Create a new task for the goal.",
-			"Types: implementation, code-review, testing, bug-fix, refactor, custom.",
-			"The server enforces artifact requirements — if a required artifact is missing, this returns a 409 error listing what's needed.",
-		].join(" "),
-		promptSnippet: "Create a task with title, type, optional spec, and dependencies.",
-		parameters: Type.Object({
-			title: Type.String({ description: "Short task title" }),
-			type: Type.String({ description: "Task type: implementation, code-review, testing, bug-fix, refactor, or custom" }),
-			spec: Type.Optional(Type.String({ description: "Detailed specification for the task" })),
-			depends_on: Type.Optional(Type.Array(Type.String(), { description: "Task IDs this task depends on" })),
-		}),
-		async execute(_id, params) {
-			try {
-				const body: Record<string, unknown> = { title: params.title, type: params.type };
-				if (params.spec) body.spec = params.spec;
-				if (params.depends_on?.length) body.dependsOn = params.depends_on;
-				return ok(await api("POST", `/api/goals/${goalId}/tasks`, body));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	pi.registerTool({
-		name: "task_update",
-		label: "Update Task",
-		description: [
-			"Update a task's fields, assignment, and/or state in a single call.",
-			"Provide any combination: field updates (title, spec, result_summary, commit_sha),",
-			"assignment (assigned_to session ID), and/or state transition (state).",
-			"States: todo, in-progress, blocked, complete, skipped.",
-		].join(" "),
-		promptSnippet: "Update task fields, assign to a session, and/or transition state.",
-		parameters: Type.Object({
-			task_id: Type.String({ description: "Task ID" }),
-			title: Type.Optional(Type.String({ description: "New title" })),
-			spec: Type.Optional(Type.String({ description: "New spec" })),
-			result_summary: Type.Optional(Type.String({ description: "Summary of results" })),
-			commit_sha: Type.Optional(Type.String({ description: "Commit SHA" })),
-			assigned_to: Type.Optional(Type.String({ description: "Session ID to assign task to" })),
-			state: Type.Optional(Type.String({ description: "Transition to: todo, in-progress, blocked, complete, skipped" })),
-		}),
-		async execute(_id, params) {
-			try {
-				const { task_id, assigned_to, state, ...fields } = params;
-				// Update fields
-				const updateBody: Record<string, unknown> = {};
-				if (fields.title !== undefined) updateBody.title = fields.title;
-				if (fields.spec !== undefined) updateBody.spec = fields.spec;
-				if (fields.result_summary !== undefined) updateBody.resultSummary = fields.result_summary;
-				if (fields.commit_sha !== undefined) updateBody.commitSha = fields.commit_sha;
-				if (Object.keys(updateBody).length > 0) {
-					await api("PUT", `/api/tasks/${task_id}`, updateBody);
-				}
-				// Assign
-				if (assigned_to) {
-					await api("POST", `/api/tasks/${task_id}/assign`, { sessionId: assigned_to });
-				}
-				// Transition
-				if (state) {
-					await api("POST", `/api/tasks/${task_id}/transition`, { state });
-				}
-				// Return current task state
-				return ok(await api("GET", `/api/tasks/${task_id}`));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	// ── Artifact tools ────────────────────────────────────────────────
-
-	pi.registerTool({
-		name: "artifact_list",
-		label: "List Artifacts",
-		description: "List all artifacts for the goal (name, type, version, timestamps). Does not include content — use artifact_get for that.",
-		promptSnippet: "List all goal artifacts (metadata only, no content).",
-		parameters: Type.Object({}),
-		async execute() {
-			try {
-				return ok(await api("GET", `/api/goals/${goalId}/artifacts`));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	pi.registerTool({
-		name: "artifact_create",
-		label: "Create Artifact",
-		description: [
-			"Create a goal artifact. Types: design-doc (blocks implementation tasks),",
-			"test-plan, review-findings (blocks goal completion), gap-analysis, security-findings, custom.",
-		].join(" "),
-		promptSnippet: "Create a goal artifact (design-doc, review-findings, test-plan, etc.).",
-		parameters: Type.Object({
-			name: Type.String({ description: "Human-readable artifact name" }),
-			type: Type.String({ description: "Artifact type: design-doc, test-plan, review-findings, gap-analysis, security-findings, or custom" }),
-			content: Type.String({ description: "Artifact content (markdown or JSON)" }),
-		}),
-		async execute(_id, params) {
-			try {
-				return ok(await api("POST", `/api/goals/${goalId}/artifacts`, {
-					name: params.name,
-					type: params.type,
-					content: params.content,
-					producedBy: sessionId,
-				}));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	pi.registerTool({
-		name: "artifact_get",
-		label: "Get Artifact",
-		description: "Get a specific artifact including its full content.",
-		promptSnippet: "Get an artifact's full content by ID.",
-		parameters: Type.Object({
-			artifact_id: Type.String({ description: "Artifact ID" }),
-		}),
-		async execute(_id, params) {
-			try {
-				return ok(await api("GET", `/api/goals/${goalId}/artifacts/${params.artifact_id}`));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	pi.registerTool({
-		name: "artifact_update",
-		label: "Update Artifact",
-		description: "Update an artifact's content. Increments the version number.",
-		promptSnippet: "Update an artifact's content (increments version).",
-		parameters: Type.Object({
-			artifact_id: Type.String({ description: "Artifact ID" }),
-			content: Type.String({ description: "New content (markdown or JSON)" }),
-		}),
-		async execute(_id, params) {
-			try {
-				return ok(await api("PUT", `/api/goals/${goalId}/artifacts/${params.artifact_id}`, {
-					content: params.content,
-				}));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	console.log(`[team-lead-tools] Registered 11 tools for session ${sessionId}, goal ${goalId}`);
+	console.log(`[team-lead-tools] Registered 4 team tools for session ${sessionId}, goal ${goalId}`);
 }

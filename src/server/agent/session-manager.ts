@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { WebSocket } from "ws";
 import type { ServerMessage, QueuedMessage } from "../ws/protocol.js";
 import { EventBuffer } from "./event-buffer.js";
@@ -13,6 +15,11 @@ import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 import { CostTracker } from "./cost-tracker.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** Goal tools extension — task + artifact management for any goal session. */
+const GOAL_TOOLS_EXTENSION_PATH = path.resolve(__dirname, "../../../extensions/goal-tools.ts");
 
 export type SessionStatus = "starting" | "idle" | "streaming" | "terminated";
 
@@ -514,11 +521,24 @@ export class SessionManager {
 
 		const bridgeOptions: RpcBridgeOptions = {
 			cwd,
-			args: agentArgs,
+			args: agentArgs ? [...agentArgs] : [],
 			env: { BOBBIT_SESSION_ID: id, ...opts?.env },
 		};
 		if (this.agentCliPath) {
 			bridgeOptions.cliPath = this.agentCliPath;
+		}
+
+		// Auto-load goal tools extension for any goal-associated session
+		// (unless it's a goal/role assistant, or already has an extension —
+		// team-lead-tools.ts imports goal-tools internally, so no double-load)
+		if (goalId && !goalAssistant && !opts?.roleAssistant) {
+			const alreadyHasExtension = bridgeOptions.args?.includes("--extension");
+			if (!alreadyHasExtension) {
+				bridgeOptions.args = bridgeOptions.args || [];
+				bridgeOptions.args.push("--extension", GOAL_TOOLS_EXTENSION_PATH);
+			}
+			// Ensure BOBBIT_GOAL_ID is set for the extension to read
+			bridgeOptions.env = { ...bridgeOptions.env, BOBBIT_GOAL_ID: goalId };
 		}
 
 		if (goalAssistant) {
