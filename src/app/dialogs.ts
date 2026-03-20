@@ -19,7 +19,7 @@ import {
 import { gatewayFetch, createGoal, updateGoal } from "./api.js";
 import { updateLocalSessionTitle } from "./api.js";
 import { refreshSessions } from "./api.js";
-import { BOBBIT_HUE_ROTATIONS, sessionColorMap, setSessionColor, statusBobbit } from "./session-colors.js";
+import { BOBBIT_HUE_ROTATIONS, sessionColorMap, setSessionColor, statusBobbit, getAccessory } from "./session-colors.js";
 import { clearSessionModel } from "./routing.js";
 // NOTE: session-manager imports from dialogs, so we use dynamic imports to break the cycle
 
@@ -466,6 +466,12 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 	let titleValue = currentTitle;
 	let generating = false;
 	let titleChangeUnsub: (() => void) | null = null;
+	let roleDropdownOpen = false;
+
+	// Load roles for the picker
+	import("./api.js").then(({ fetchRoles }) => {
+		if (state.roles.length === 0) fetchRoles().then(() => renderDialog());
+	});
 
 	const cleanup = () => {
 		titleChangeUnsub?.();
@@ -524,7 +530,35 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 		state.remoteAgent.generateTitle();
 	};
 
+	const doAssignRole = async (roleName: string | null) => {
+		roleDropdownOpen = false;
+		renderDialog();
+		try {
+			await gatewayFetch(`/api/sessions/${sessionId}`, {
+				method: "PATCH",
+				body: JSON.stringify({ roleId: roleName || "" }),
+			});
+			await refreshSessions();
+			renderDialog();
+		} catch (err) {
+			console.error("[assign-role] Failed:", err);
+		}
+	};
+
 	const renderDialog = () => {
+		const session = state.gatewaySessions.find((s) => s.id === sessionId);
+		const currentAccessory = session?.accessory
+			?? (session?.role === "team-lead" ? "crown" : session?.role === "coder" ? "bandana" : "none");
+		const acc = getAccessory(currentAccessory);
+		const hasAccessory = acc.id !== "none" && acc.shadow !== "";
+
+		// Split 14 colours into 2 equal rows of 7
+		const ROW_SIZE = Math.ceil(BOBBIT_HUE_ROTATIONS.length / 2);
+
+		const currentRole = session?.role || "";
+		const currentRoleObj = state.roles.find((r) => r.name === currentRole);
+		const roleLabel = session?.goalAssistant ? "Goal Assistant" : currentRoleObj?.label || currentRole || "None";
+
 		render(
 			Dialog({
 				isOpen: true,
@@ -535,67 +569,112 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 				children: html`
 					${DialogContent({
 						children: html`
-							${DialogHeader({ title: "Rename Session" })}
-							<div class="mt-4 flex flex-col gap-3">
-								<div class="flex items-center gap-2">
-									<div class="flex-1">
-										${Input({
-											value: titleValue,
-											placeholder: "Session title…",
-											onInput: (e: Event) => {
-												titleValue = (e.target as HTMLInputElement).value;
-											},
-											onKeyDown: (e: KeyboardEvent) => {
-												if (e.key === "Enter") doRename();
-												if (e.key === "Escape") cleanup();
-											},
-										})}
-									</div>
-									${activeSessionId() === sessionId && state.remoteAgent
-										? html`<button
-												class="shrink-0 p-2 rounded-md border border-border hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-												@click=${doGenerate}
-												?disabled=${generating}
-												title="Auto-generate title from chat history"
-											>
-												${generating
-													? html`<svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-															<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-														</svg>`
-													: icon(WandSparkles, "sm")}
-											</button>`
-										: ""}
-								</div>
-								<!-- Bobbit color picker -->
+							${DialogHeader({ title: "Edit Session" })}
+							<div class="mt-4 flex flex-col gap-4">
+								<!-- Title -->
 								<div>
-									<div class="text-xs text-muted-foreground mb-1.5">Colour</div>
-									<div class="flex flex-wrap gap-1.5">
-										${BOBBIT_HUE_ROTATIONS.map((rot, i) => {
-											const isSelected = (sessionColorMap.get(sessionId) ?? -1) === i;
-											return html`
-												<button
-													class="w-6 h-6 rounded-md border-2 transition-all flex items-center justify-center ${isSelected ? "border-foreground scale-110" : "border-transparent hover:border-muted-foreground/50"}"
-													style="position:relative;overflow:hidden;"
-													title="Colour ${i + 1}"
-													@click=${() => { setSessionColor(sessionId, i); renderDialog(); }}
+									<div class="text-xs text-muted-foreground mb-1.5">Title</div>
+									<div class="flex items-center gap-2">
+										<div class="flex-1">
+											${Input({
+												value: titleValue,
+												placeholder: "Session title…",
+												onInput: (e: Event) => {
+													titleValue = (e.target as HTMLInputElement).value;
+												},
+												onKeyDown: (e: KeyboardEvent) => {
+													if (e.key === "Enter") doRename();
+													if (e.key === "Escape") cleanup();
+												},
+											})}
+										</div>
+										${activeSessionId() === sessionId && state.remoteAgent
+											? html`<button
+													class="shrink-0 p-2 rounded-md border border-border hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+													@click=${doGenerate}
+													?disabled=${generating}
+													title="Auto-generate title from chat history"
 												>
-													<span style="position:absolute;left:1px;top:1px;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(2.2);transform-origin:0 0;filter:hue-rotate(${rot}deg);box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
-												</button>
-											`;
-										})}
+													${generating
+														? html`<svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+																<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+															</svg>`
+														: icon(WandSparkles, "sm")}
+												</button>`
+											: ""}
 									</div>
 								</div>
-								<!-- Role info -->
-								${(() => {
-									const session = state.gatewaySessions.find((s) => s.id === sessionId);
-									const roleLabel = session?.goalAssistant ? "Goal Assistant" : session?.role || "";
-									return roleLabel
-										? html`<div>
-												<div class="text-xs text-muted-foreground mb-1">Role</div>
-												<div class="text-sm text-foreground/80 font-mono px-2 py-1 rounded bg-secondary/50">${roleLabel}</div>
-											</div>`
-										: "";
-								})()}
+								<!-- Colour picker -->
+								<div>
+									<div class="text-xs text-muted-foreground mb-2">Colour</div>
+									<div class="flex flex-col gap-2">
+										${[0, ROW_SIZE].map((start) => html`
+											<div class="flex gap-2 justify-center">
+												${BOBBIT_HUE_ROTATIONS.slice(start, start + ROW_SIZE).map((rot, j) => {
+													const i = start + j;
+													const isSelected = (sessionColorMap.get(sessionId) ?? -1) === i;
+													const accShadow = hasAccessory ? acc.shadow : "";
+													const accFilter = acc.id !== "flask" ? `filter:hue-rotate(${-rot}deg);` : "";
+													// Bobbit sprite is 10 wide, accessory can extend to ~12. Centre within cell.
+													// Cell: 28×24px, sprite scale 2.0, sprite is ~10×9 native = 20×18 scaled.
+													// Centre offset: (28-20)/2=4 left, (24-18)/2=3 top
+													return html`
+														<button
+															class="relative transition-all rounded-lg flex items-center justify-center
+																${isSelected
+																	? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+																	: "hover:bg-secondary/50"}"
+															style="width:${hasAccessory ? 34 : 28}px;height:24px;"
+															title="Colour ${i + 1}"
+															@click=${() => { setSessionColor(sessionId, i); renderDialog(); }}
+														>
+															<span style="position:absolute;left:${hasAccessory ? 3 : 4}px;top:3px;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(2);transform-origin:0 0;filter:hue-rotate(${rot}deg);box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
+															${hasAccessory ? html`<span style="position:absolute;left:${hasAccessory ? 3 : 4}px;top:3px;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(2);transform-origin:0 0;box-shadow:${accShadow};${accFilter}"></span>` : ""}
+														</button>
+													`;
+												})}
+											</div>
+										`)}
+									</div>
+								</div>
+								<!-- Role picker -->
+								<div>
+									<div class="text-xs text-muted-foreground mb-1.5">Role</div>
+									${session?.goalAssistant
+										? html`<div class="text-sm text-foreground/80 px-3 py-1.5 rounded-md bg-secondary/50">Goal Assistant</div>`
+										: html`
+											<div class="relative">
+												<button
+													class="w-full text-left px-3 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-secondary/50 transition-colors flex items-center gap-2"
+													@click=${() => { roleDropdownOpen = !roleDropdownOpen; renderDialog(); }}
+												>
+													<span class="shrink-0">${statusBobbit("idle", false, sessionId, false, false, false, false, currentAccessory, true)}</span>
+													<span class="flex-1 ${currentRole ? "text-foreground" : "text-muted-foreground"}">${roleLabel}</span>
+													<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-muted-foreground"><path d="m6 9 6 6 6-6"/></svg>
+												</button>
+												${roleDropdownOpen ? html`
+													<div class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg py-1 max-h-[200px] overflow-y-auto">
+														<button
+															class="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary/50 transition-colors flex items-center gap-2 ${!currentRole ? "bg-secondary/30" : ""}"
+															@click=${() => doAssignRole(null)}
+														>
+															<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, "none", true)}</span>
+															<span class="text-muted-foreground">None</span>
+														</button>
+														${state.roles.map((role) => html`
+															<button
+																class="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary/50 transition-colors flex items-center gap-2 ${currentRole === role.name ? "bg-secondary/30" : ""}"
+																@click=${() => doAssignRole(role.name)}
+															>
+																<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>
+																<span>${role.label}</span>
+															</button>
+														`)}
+													</div>
+												` : ""}
+											</div>
+										`}
+								</div>
 							</div>
 						`,
 					})}
@@ -604,7 +683,7 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 						children: html`
 							<div class="flex gap-2 justify-end">
 								${Button({ variant: "ghost", onClick: cleanup, children: "Cancel" })}
-								${Button({ onClick: doRename, children: "Rename" })}
+								${Button({ onClick: doRename, children: "Save" })}
 							</div>
 						`,
 					})}

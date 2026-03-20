@@ -920,7 +920,7 @@ async function handleApiRoute(
 			sessionManager.persistSessionMetadata(session).catch(() => {});
 		}
 
-		if (typeof body.roleId === "string") {
+		if (typeof body.roleId === "string" && body.roleId !== "") {
 			const role = roleManager.getRole(body.roleId);
 			if (!role) { json({ error: `Role "${body.roleId}" not found` }, 404); return; }
 			try {
@@ -929,6 +929,14 @@ async function handleApiRoute(
 			} catch (err) {
 				json({ error: String(err) }, 400);
 				return;
+			}
+		} else if (typeof body.roleId === "string" && body.roleId === "") {
+			// Clear role assignment
+			const session = sessionManager.getSession(id);
+			if (session) {
+				session.role = undefined;
+				session.accessory = undefined;
+				sessionManager.persistSessionMetadata(session).catch(() => {});
 			}
 		}
 
