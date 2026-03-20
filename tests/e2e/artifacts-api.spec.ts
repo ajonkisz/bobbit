@@ -85,6 +85,30 @@ test.describe("Goal Artifacts API", () => {
 		expect(updated.content).toContain("Revised content");
 	});
 
+	test("stores and retrieves HTML artifact content", async () => {
+		const htmlContent = '<!DOCTYPE html><html><head><title>Report</title></head><body><h1>Summary</h1><p>All tests pass.</p></body></html>';
+		const createResp = await apiFetch(`/api/goals/${goalId}/artifacts`, {
+			method: "POST",
+			body: JSON.stringify({
+				name: "summary-report",
+				type: "summary-report",
+				content: htmlContent,
+				producedBy: "test-session-456",
+			}),
+		});
+		expect(createResp.status).toBe(201);
+		const artifact = await createResp.json();
+		expect(artifact.content).toBe(htmlContent);
+
+		// Retrieve and verify HTML is preserved exactly
+		const getResp = await apiFetch(`/api/goals/${goalId}/artifacts/${artifact.id}`);
+		expect(getResp.status).toBe(200);
+		const fetched = await getResp.json();
+		expect(fetched.content).toBe(htmlContent);
+		expect(fetched.content).toContain("<!DOCTYPE html>");
+		expect(fetched.content).toContain("<h1>Summary</h1>");
+	});
+
 	test("returns 404 for non-existent artifact", async () => {
 		const resp = await apiFetch(`/api/goals/${goalId}/artifacts/nonexistent-id`);
 		expect(resp.status).toBe(404);

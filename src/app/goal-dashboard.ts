@@ -476,7 +476,7 @@ function getArtifactStatuses(artifactList: GoalArtifact[]): ArtifactRequirementS
 	return statuses;
 }
 
-function isHtmlContent(content: string): boolean {
+export function isHtmlContent(content: string): boolean {
 	const trimmed = content.trimStart();
 	return trimmed.startsWith("<!") || trimmed.startsWith("<html");
 }
