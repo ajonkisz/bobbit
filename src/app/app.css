@@ -91,6 +91,10 @@
 	0%, 100% { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px); }
 	50% { transform: scale(1.6) scaleX(1.08) scaleY(0.65) translateY(5.5px); }
 }
+@keyframes bobbit-squish-crown {
+	0%, 100% { transform: scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px) translateX(-0.5px); }
+	50% { transform: scale(1.6) scaleX(1.08) scaleY(0.65) translateY(5.5px) translateX(-0.5px); }
+}
 
 /* ============================================================================
  * BOBBIT — eye animation (blink + look around)
