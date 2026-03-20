@@ -851,8 +851,9 @@ export function doRenderApp(): void {
 		return html`
 			<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
 				<div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-					<span class="text-xs font-medium text-muted-foreground">Live Preview</span>
-					<button @click=${togglePreviewCollapse} class="text-muted-foreground hover:text-foreground" style="background:none;border:none;cursor:pointer;padding:2px;" title="Collapse preview (Ctrl+])">
+					<span class="text-xs font-medium text-muted-foreground" style="flex-shrink:0;">Live Preview</span>
+					<span class="text-xs text-muted-foreground" style="flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:0.7;padding:0 8px;" title=${`~/.pi/preview-${activeSessionId() || ""}.html`}>~/.pi/preview-${activeSessionId() || ""}.html</span>
+					<button @click=${togglePreviewCollapse} class="text-muted-foreground hover:text-foreground" style="background:none;border:none;cursor:pointer;padding:2px;flex-shrink:0;" title="Collapse preview (Ctrl+])">
 						${icon(PanelRightClose, "sm")}
 					</button>
 				</div>
