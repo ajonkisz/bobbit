@@ -616,8 +616,8 @@
  * With accessories the visual area is ~55×45px (overflow:visible extends it).
  * We scale the whole thing with the outer container's transform. */
 .bobbit-blob--inline .bobbit-blob__sprite {
-	/* Keep original margins and scale — just remove the idle translateX
-	   since we center via the container */
+	/* Offset eye animation phase so multiple inline blobs don't blink in sync */
+	animation-delay: var(--bobbit-eye-delay, 0s) !important;
 }
 
 /* Shadow not needed inline */
