@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Goal Dashboard — Mock B5</title>
+<!-- Pull in the REAL Bobbit CSS (Vite dev server, same origin) -->
+<link rel="stylesheet" href="/src/ui/app.css">
+<link rel="stylesheet" href="/src/app/goal-dashboard.css">
+<style>
+/* ── Dashboard-specific local variables (semantic aliases) ── */
+.dashboard-mock {
+  --text-tertiary: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
+  --border-subtle: color-mix(in oklch, var(--border) 60%, transparent);
+  --type-code: oklch(0.62 0.15 250);
+  --type-test: oklch(0.65 0.15 145);
+  --type-review: oklch(0.70 0.14 75);
+  --radius: 8px;
+  --radius-sm: 5px;
+
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  background: var(--background);
+  color: var(--foreground);
+  line-height: 1.5; -webkit-font-smoothing: antialiased;
+  overflow: hidden; height: 100vh; display: flex; flex-direction: column;
+}
+
+/* ── BOBBIT PIXEL SPRITE ── */
+.bobbit {
+  display: inline-flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; flex-shrink: 0; image-rendering: pixelated;
+}
+.bobbit-body {
+  position: absolute; left: 0; top: 0; display: block; width: 1px; height: 1px;
+  image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0;
+  box-shadow:
+    3px 0 0 #000,4px 0 0 #000,5px 0 0 #000,6px 0 0 #000,7px 0 0 #000,
+    2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,
+    1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,
+    0 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,
+    0 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,
+    0 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,
+    0 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,
+    1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,
+    2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;
+}
+.bobbit-accessory {
+  position: absolute; left: 0; display: block; width: 1px; height: 1px;
+  image-rendering: pixelated; transform: scale(1.6); transform-origin: 0 0;
+}
+.bobbit-accessory.crown {
+  top: 2px;
+  box-shadow:
+    3px -1px 0 #000,5px -1px 0 #000,7px -1px 0 #000,
+    2px 0 0 #000,3px 0 0 #fde047,4px 0 0 #000,5px 0 0 #fde047,6px 0 0 #000,7px 0 0 #fde047,8px 0 0 #000,
+    1px 1px 0 #000,2px 1px 0 #fbbf24,3px 1px 0 #fde047,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #fde047,8px 1px 0 #fbbf24,9px 1px 0 #000,
+    1px 2px 0 #000,2px 2px 0 #b45309,3px 2px 0 #d97706,4px 2px 0 #d97706,5px 2px 0 #d97706,6px 2px 0 #d97706,7px 2px 0 #d97706,8px 2px 0 #b45309,9px 2px 0 #000,
+    1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000;
+}
+.bobbit-accessory.bandana {
+  top: 0; transform: scale(1.6) translateY(-0.5px);
+  box-shadow:
+    1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,
+    0 3px 0 #000,1px 3px 0 #b91c1c,2px 3px 0 #dc2626,3px 3px 0 #ef4444,4px 3px 0 #ef4444,5px 3px 0 #ef4444,6px 3px 0 #ef4444,7px 3px 0 #ef4444,8px 3px 0 #f87171,9px 3px 0 #000,
+    0 4px 0 #000,1px 4px 0 #000,2px 4px 0 #000,3px 4px 0 #000,4px 4px 0 #000,5px 4px 0 #000,6px 4px 0 #000,7px 4px 0 #000,8px 4px 0 #000,9px 4px 0 #000,
+    10px 3px 0 #000,10px 4px 0 #b91c1c,11px 4px 0 #000,10px 5px 0 #991b1b,11px 5px 0 #000,10px 6px 0 #000;
+}
+.bobbit-accessory.flask {
+  top: 0;
+  box-shadow:
+    8px 4px 0 #000,9px 4px 0 #8b4513,10px 4px 0 #000,
+    8px 5px 0 #000,9px 5px 0 #7dd3fc,10px 5px 0 #000,
+    7px 6px 0 #000,8px 6px 0 #1e3a5f,9px 6px 0 #38bdf8,10px 6px 0 #0ea5e9,11px 6px 0 #000,
+    6px 7px 0 #000,7px 7px 0 #1e3a5f,8px 7px 0 #0ea5e9,9px 7px 0 #0284c7,10px 7px 0 #0369a1,11px 7px 0 #1e3a5f,12px 7px 0 #000,
+    6px 8px 0 #000,7px 8px 0 #1e3a5f,8px 8px 0 #0284c7,9px 8px 0 #0c4a6e,10px 8px 0 #082f49,11px 8px 0 #1e3a5f,12px 8px 0 #000,
+    6px 9px 0 #000,7px 9px 0 #000,8px 9px 0 #000,9px 9px 0 #000,10px 9px 0 #000,11px 9px 0 #000,12px 9px 0 #000;
+}
+.hue-purple  { filter: hue-rotate(200deg); }
+.hue-blue    { filter: hue-rotate(125deg); }
+.hue-teal    { filter: hue-rotate(75deg); }
+.hue-default { filter: hue-rotate(0deg); }
+@keyframes bobbit-bob {
+  0%   { transform: translateY(0) scaleY(1); }
+  12%  { transform: translateY(0) scaleY(0.96); }
+  38%  { transform: translateY(-1px) scaleY(1.03); }
+  58%  { transform: translateY(-0.3px) scaleY(1); }
+  78%  { transform: translateY(0) scaleY(0.98); }
+  100% { transform: translateY(0) scaleY(1); }
+}
+.bobbit.working { animation: bobbit-bob 1.8s cubic-bezier(0.34,1.2,0.64,1) infinite; }
+.bobbit.idle .bobbit-body { filter: saturate(0.4); }
+
+/* ── SPLIT BUTTON (primary action + dropdown) ── */
+.btn-split {
+  display: inline-flex; align-items: stretch; border-radius: var(--radius-sm); overflow: hidden;
+  position: relative;
+}
+.btn-split-main {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--primary); border-right: none;
+  background: var(--primary); color: var(--primary-foreground);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  transition: background 150ms;
+}
+.btn-split-main:hover { opacity: 0.9; }
+.btn-split-main.danger {
+  background: var(--destructive); border-color: var(--destructive);
+}
+.btn-split-main.danger:hover { opacity: 0.9; }
+.btn-split-chevron {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; cursor: pointer;
+  border: 1px solid var(--primary); border-left: 1px solid rgba(255,255,255,0.2);
+  background: var(--primary); color: var(--primary-foreground);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: background 150ms;
+}
+.btn-split-chevron:hover { opacity: 0.9; }
+/* Role dropdown */
+.role-dropdown {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0;
+  min-width: 180px; z-index: 50;
+  background: var(--popover); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  padding: 4px 0;
+}
+.role-dropdown.open { display: block; }
+.role-dropdown-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; font-size: 12px; color: var(--foreground);
+  cursor: pointer; transition: background 150ms; border: none; background: none; width: 100%; text-align: left;
+}
+.role-dropdown-item:hover { background: var(--accent); }
+.role-dropdown-item .role-label { font-weight: 500; }
+
+/* ── NAV BAR ── */
+.nav {
+  display: flex; align-items: center;
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+  background: var(--background); flex-shrink: 0; gap: 10px;
+}
+.nav-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.nav-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.back-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted-foreground); cursor: pointer; transition: all 150ms;
+}
+.back-btn:hover { background: var(--accent); color: var(--foreground); }
+.nav-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted-foreground); transition: all 150ms; white-space: nowrap;
+}
+.btn:hover { background: var(--accent); color: var(--foreground); }
+.btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted-foreground); cursor: pointer; transition: all 150ms;
+}
+.btn-icon:hover { background: var(--accent); color: var(--foreground); }
+.btn-icon.danger:hover { color: var(--destructive); border-color: color-mix(in oklch, var(--destructive) 40%, transparent); }
+
+/* ── METADATA ROWS ── */
+.meta-rows {
+  display: flex; flex-direction: column; gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--secondary); flex-shrink: 0;
+}
+.meta-row {
+  display: flex; align-items: center; gap: 6px 12px;
+  padding: 5px 20px;
+  flex-wrap: wrap;
+}
+.meta-row + .meta-row { border-top: 1px solid var(--border-subtle); }
+.meta-item {
+  display: flex; align-items: center; gap: 5px;
+  padding: 2px 0; font-size: 11px; color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.meta-sep { color: var(--border); font-size: 10px; user-select: none; }
+.meta-item svg { flex-shrink: 0; color: var(--text-tertiary); }
+.meta-label { color: var(--text-tertiary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 2px; }
+.meta-value { font-weight: 500; }
+.meta-value.mono { font-family: var(--font-mono, monospace); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.meta-tag {
+  font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 10px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.meta-tag.team-on { background: oklch(0.55 0.15 290 / 0.15); color: oklch(0.72 0.15 290); }
+.meta-tag.merge-clean { background: oklch(0.65 0.15 145 / 0.12); color: oklch(0.72 0.15 145); }
+
+/* ── COMPACT SUMMARY ROW ── */
+.summary-row {
+  display: flex; align-items: center;
+  padding: 8px 20px; gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--background); flex-shrink: 0;
+}
+.summary-ring {
+  display: flex; align-items: center; gap: 10px;
+  padding-right: 16px; border-right: 1px solid var(--border);
+}
+.ring-container { position: relative; width: 36px; height: 36px; flex-shrink: 0; }
+.ring-bg, .ring-fg {
+  position: absolute; top: 0; left: 0; width: 36px; height: 36px;
+  fill: none; stroke-width: 3.5; stroke-linecap: round;
+}
+.ring-bg { stroke: var(--border); }
+.ring-fg { stroke: var(--primary); transform: rotate(-90deg); transform-origin: center; }
+.ring-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 10px; font-weight: 700; }
+.ring-text { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ring-sub { font-size: 10px; color: var(--text-tertiary); }
+.summary-stats { display: flex; gap: 0; }
+.mini-stat {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-right: 1px solid var(--border-subtle); white-space: nowrap;
+}
+.mini-stat:last-child { border-right: none; }
+.mini-stat-value { font-size: 15px; font-weight: 700; line-height: 1; }
+.mini-stat-label { font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+.summary-agents {
+  display: flex; align-items: center; gap: 6px;
+  margin-left: auto; padding-left: 16px; border-left: 1px solid var(--border);
+}
+.bobbit-row { display: flex; gap: 4px; align-items: center; }
+.bobbit-mini-label { font-size: 10px; color: var(--text-tertiary); margin-left: 4px; white-space: nowrap; }
+
+/* ── PHASE PIPELINE ── */
+.phase-pipeline {
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px 20px; gap: 0;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.phase-node {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  color: var(--text-tertiary); background: transparent;
+  border: 1px solid var(--border-subtle); transition: all 200ms; position: relative; white-space: nowrap;
+}
+.phase-node.done {
+  color: oklch(0.72 0.15 145); border-color: oklch(0.65 0.15 145 / 0.25); background: oklch(0.65 0.15 145 / 0.06);
+}
+.phase-node.done .phase-check { display: inline; }
+.phase-node.active {
+  color: oklch(0.72 0.15 250); border-color: oklch(0.62 0.15 250 / 0.4);
+  background: oklch(0.62 0.15 250 / 0.1);
+  box-shadow: 0 0 0 1px oklch(0.62 0.15 250 / 0.15);
+  font-weight: 600; animation: phase-glow 2.5s ease-in-out infinite; padding-left: 20px;
+}
+@keyframes phase-glow {
+  0%, 100% { box-shadow: 0 0 0 1px oklch(0.62 0.15 250 / 0.15), 0 0 8px oklch(0.62 0.15 250 / 0.08); }
+  50% { box-shadow: 0 0 0 3px oklch(0.62 0.15 250 / 0.2), 0 0 16px oklch(0.62 0.15 250 / 0.15); }
+}
+.phase-node.active::before {
+  content: ''; position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+  width: 5px; height: 5px; border-radius: 50%; background: oklch(0.62 0.15 250);
+  animation: phase-dot-pulse 2.5s ease-in-out infinite;
+}
+@keyframes phase-dot-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 oklch(0.62 0.15 250 / 0.6); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 4px transparent; }
+}
+.phase-check { display: none; font-size: 10px; }
+.phase-arrow {
+  display: flex; align-items: center; width: 24px; flex-shrink: 0; justify-content: center; color: var(--border);
+}
+.phase-arrow svg { width: 18px; height: 10px; }
+.phase-arrow.done svg { color: oklch(0.65 0.15 145 / 0.4); }
+.phase-arrow.active svg { color: oklch(0.62 0.15 250 / 0.4); }
+
+/* ── TAB BAR ── */
+.tab-bar {
+  display: flex; align-items: center;
+  padding: 0 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--background);
+}
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 16px; font-size: 13px; font-weight: 500;
+  color: var(--text-tertiary); cursor: pointer;
+  border-bottom: 2px solid transparent; transition: color 150ms, border-color 150ms;
+  user-select: none; white-space: nowrap;
+}
+.tab:hover { color: var(--muted-foreground); }
+.tab.active { color: var(--foreground); border-bottom-color: var(--primary); }
+.tab-count {
+  font-size: 10px; font-weight: 600; background: var(--secondary);
+  color: var(--text-tertiary); padding: 1px 7px; border-radius: 10px;
+}
+.tab.active .tab-count { background: color-mix(in oklch, var(--primary) 15%, transparent); color: var(--primary); }
+
+/* ── TAB CONTENT ── */
+.tab-content { flex: 1; overflow: hidden; position: relative; }
+.tab-panel { display: none; height: 100%; overflow-y: auto; }
+.tab-panel.active { display: block; }
+.tab-panel-inner { padding: 20px; }
+
+/* ── TASK TABLE ── */
+.task-table { width: 100%; border-collapse: collapse; }
+.task-table th {
+  text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-tertiary); padding: 8px 12px;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--background); z-index: 1;
+}
+.task-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; vertical-align: middle; }
+.task-table tr { transition: background 150ms; }
+.task-table tbody tr:hover { background: var(--secondary); }
+.task-title-cell { font-weight: 500; }
+.status-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+}
+.status-chip .dot { width: 6px; height: 6px; border-radius: 50%; }
+.chip-todo { background: color-mix(in oklch, var(--muted-foreground) 15%, transparent); color: var(--muted-foreground); }
+.chip-todo .dot { background: var(--text-tertiary); }
+.chip-progress { background: oklch(0.62 0.15 250 / 0.12); color: oklch(0.72 0.15 250); }
+.chip-progress .dot { background: oklch(0.62 0.15 250); }
+.chip-done { background: oklch(0.65 0.15 145 / 0.12); color: oklch(0.72 0.15 145); }
+.chip-done .dot { background: oklch(0.65 0.15 145); }
+.chip-failed { background: color-mix(in oklch, var(--destructive) 12%, transparent); color: var(--destructive); }
+.chip-failed .dot { background: var(--destructive); }
+.type-tag { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+.assignee-cell { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); }
+.elapsed-cell { font-size: 12px; color: var(--text-tertiary); font-family: var(--font-mono, monospace); }
+
+/* ── AGENT GRID ── */
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.agent-card {
+  background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px 18px; display: flex; align-items: flex-start; gap: 14px;
+  cursor: pointer; transition: border-color 200ms, background 200ms;
+}
+.agent-card:hover { border-color: var(--muted-foreground); background: var(--accent); }
+.agent-card-bobbit { flex-shrink: 0; margin-top: 2px; }
+.agent-card-info { flex: 1; min-width: 0; }
+.agent-card-name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.agent-card-name { font-size: 14px; font-weight: 600; }
+.role-tag { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 3px; }
+.agent-card-task { font-size: 12px; color: var(--muted-foreground); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-card-meta { display: flex; gap: 12px; font-size: 11px; color: var(--text-tertiary); }
+.agent-card-meta-item { display: flex; align-items: center; gap: 4px; }
+.status-indicator { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-indicator.working { background: oklch(0.65 0.15 145); animation: pulse 2s ease-in-out infinite; }
+.status-indicator.idle { background: var(--text-tertiary); }
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 oklch(0.65 0.15 145 / 0.4); }
+  50% { box-shadow: 0 0 0 4px oklch(0.65 0.15 145 / 0); }
+}
+
+/* ── COMMIT ROWS ── */
+.commit-list { display: flex; flex-direction: column; }
+.commit-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); transition: background 150ms;
+}
+.commit-row:hover { background: var(--secondary); }
+.commit-row:last-child { border-bottom: none; }
+.commit-dot-col { width: 20px; display: flex; justify-content: center; position: relative; }
+.commit-dot-col::before {
+  content: ''; position: absolute; top: -10px; bottom: -10px; left: 50%;
+  width: 2px; background: var(--border-subtle); transform: translateX(-50%);
+}
+.commit-row:first-child .commit-dot-col::before { top: 50%; }
+.commit-row:last-child .commit-dot-col::before { bottom: 50%; }
+.cdot { width: 10px; height: 10px; border-radius: 50%; background: var(--popover); border: 2px solid var(--border); z-index: 1; position: relative; }
+.cdot.head { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 20%, transparent); }
+.commit-sha2 { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--primary); background: color-mix(in oklch, var(--primary) 8%, transparent); padding: 2px 8px; border-radius: 4px; flex-shrink: 0; width: 70px; text-align: center; }
+.commit-msg2 { flex: 1; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.commit-badges2 { display: flex; gap: 4px; flex-shrink: 0; }
+.cbadge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+.cbadge-pass { background: oklch(0.65 0.15 145 / 0.12); color: oklch(0.72 0.15 145); }
+.cbadge-fail { background: color-mix(in oklch, var(--destructive) 12%, transparent); color: var(--destructive); }
+.cbadge-pending { background: color-mix(in oklch, var(--muted-foreground) 12%, transparent); color: var(--muted-foreground); }
+.commit-author2 { font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; width: 70px; text-align: right; }
+.commit-time2 { font-size: 11px; color: var(--text-tertiary); flex-shrink: 0; width: 50px; text-align: right; }
+
+/* ── ARTIFACT LIST ── */
+.artifact-list { display: flex; flex-direction: column; gap: 0; }
+.artifact-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-bottom: 1px solid var(--border-subtle);
+  transition: background 150ms; cursor: pointer;
+}
+.artifact-item:last-child { border-bottom: none; }
+.artifact-item:hover { background: var(--secondary); }
+.artifact-item.missing { opacity: 0.5; cursor: default; }
+.artifact-item.missing:hover { background: transparent; }
+.artifact-status-icon {
+  width: 32px; height: 32px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.artifact-status-icon.exists { background: oklch(0.65 0.15 145 / 0.1); }
+.artifact-status-icon.missing-icon { background: color-mix(in oklch, var(--destructive) 8%, transparent); }
+.artifact-main { flex: 1; min-width: 0; }
+.artifact-name-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.artifact-name { font-size: 13px; font-weight: 500; }
+.artifact-badge {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 1px 6px; border-radius: 3px;
+}
+.badge-required { background: oklch(0.70 0.14 75 / 0.12); color: oklch(0.78 0.14 75); }
+.badge-version { background: oklch(0.65 0.15 145 / 0.12); color: oklch(0.72 0.15 145); }
+.badge-missing-label { background: color-mix(in oklch, var(--destructive) 10%, transparent); color: var(--destructive); }
+.artifact-detail {
+  display: flex; align-items: center; gap: 8px; margin-top: 3px;
+  font-size: 11px; color: var(--text-tertiary);
+}
+.artifact-detail-sep { color: var(--border); }
+.artifact-blocks {
+  font-size: 10px; font-weight: 600; color: oklch(0.78 0.14 75);
+  background: oklch(0.70 0.14 75 / 0.08); padding: 1px 7px; border-radius: 3px;
+}
+.artifact-right {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.artifact-view-btn {
+  font-size: 11px; font-weight: 500; color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--primary) 20%, transparent);
+  padding: 3px 10px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: all 150ms;
+}
+.artifact-view-btn:hover { background: color-mix(in oklch, var(--primary) 15%, transparent); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .summary-row { flex-wrap: wrap; gap: 8px; }
+  .summary-agents { margin-left: 0; border-left: none; padding-left: 0; }
+  .phase-pipeline { flex-wrap: wrap; gap: 4px; justify-content: flex-start; }
+  .agent-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .nav { padding: 8px 12px; flex-wrap: wrap; }
+  .tab-panel-inner { padding: 14px; }
+  .task-table th:nth-child(5), .task-table td:nth-child(5) { display: none; }
+  .task-table th:nth-child(2), .task-table td:nth-child(2) { display: none; }
+  .tab { padding: 9px 12px; font-size: 12px; }
+  .phase-arrow { width: 16px; }
+  .phase-node { padding: 3px 8px; font-size: 10px; }
+  .phase-node.active { padding-left: 16px; }
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body class="dark bg-background">
+
+<div class="dashboard-mock">
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nav-left">
+    <button class="back-btn" title="Back to sessions">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    </button>
+    <span class="nav-title">Refactor authentication module</span>
+  </div>
+  <div class="nav-right">
+    <button class="btn-icon" title="Edit goal"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button>
+    <button class="btn-icon danger" title="Delete goal"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+
+    <!-- TEAM MODE: Start/Stop team -->
+    <div class="btn-split" id="team-btn" style="display:inline-flex;">
+      <button class="btn-split-main" id="team-btn-main">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span id="team-btn-label">Start Team</span>
+      </button>
+    </div>
+
+    <!-- NON-TEAM MODE: New session with role picker -->
+    <div class="btn-split" id="session-btn" style="display:none;">
+      <button class="btn-split-main" onclick="alert('Create session')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        New Session
+      </button>
+      <button class="btn-split-chevron" id="role-chevron" title="Choose role">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="role-dropdown" id="role-dropdown">
+        <button class="role-dropdown-item">
+          <span class="bobbit idle hue-default" style="width:16px;height:14px;"><span class="bobbit-body" style="transform:scale(1.3);"></span></span>
+          <span class="role-label">Default</span>
+        </button>
+        <button class="role-dropdown-item">
+          <span class="bobbit idle hue-blue" style="width:16px;height:14px;"><span class="bobbit-body" style="transform:scale(1.3);"></span><span class="bobbit-accessory bandana" style="transform:scale(1.3);"></span></span>
+          <span class="role-label">Coder</span>
+        </button>
+        <button class="role-dropdown-item">
+          <span class="bobbit idle hue-teal" style="width:16px;height:14px;"><span class="bobbit-body" style="transform:scale(1.3);"></span><span class="bobbit-accessory flask" style="transform:scale(1.3);"></span></span>
+          <span class="role-label">Tester</span>
+        </button>
+        <button class="role-dropdown-item">
+          <span class="bobbit idle hue-purple" style="width:16px;height:14px;"><span class="bobbit-body" style="transform:scale(1.3);"></span><span class="bobbit-accessory crown" style="transform:scale(1.3);top:1px;"></span></span>
+          <span class="role-label">UX Designer</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- METADATA ROWS -->
+<div class="meta-rows">
+  <div class="meta-row">
+    <div class="meta-item">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="meta-tag team-on">Team Mode</span>
+    </div>
+    <span class="meta-sep">&middot;</span>
+    <div class="meta-item">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M6 9v12"/></svg>
+      <span class="meta-tag merge-clean">Clean &mdash; 0 behind master</span>
+    </div>
+    <span class="meta-sep">&middot;</span>
+    <div class="meta-item">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span class="meta-value">$1.47</span>
+      <span class="meta-label">cost</span>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+      <span class="meta-label">branch</span>
+      <span class="meta-value mono">feat/auth-refactor</span>
+    </div>
+    <span class="meta-sep">&middot;</span>
+    <div class="meta-item">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span class="meta-label">worktree</span>
+      <span class="meta-value mono">bobbit-wt-goal/auth-refactor-e7d6</span>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY ROW -->
+<div class="summary-row">
+  <div class="summary-ring">
+    <div class="ring-container">
+      <svg class="ring-bg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="14"/></svg>
+      <svg class="ring-fg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" stroke-dasharray="88" stroke-dashoffset="33"/></svg>
+      <div class="ring-label">63%</div>
+    </div>
+    <div>
+      <div class="ring-text">5/8 tasks</div>
+      <div class="ring-sub">complete</div>
+    </div>
+  </div>
+  <div class="summary-stats">
+    <div class="mini-stat"><span class="mini-stat-value" style="color:oklch(0.72 0.15 250)">2</span><span class="mini-stat-label">Active</span></div>
+    <div class="mini-stat"><span class="mini-stat-value" style="color:var(--destructive)">1</span><span class="mini-stat-label">Failed</span></div>
+    <div class="mini-stat"><span class="mini-stat-value" style="color:oklch(0.72 0.15 145)">3</span><span class="mini-stat-label">Agents</span></div>
+  </div>
+  <div class="summary-agents">
+    <div class="bobbit-row">
+      <span class="bobbit idle hue-purple" style="width:18px;height:17px;"><span class="bobbit-body" style="top:3px;"></span><span class="bobbit-accessory crown"></span></span>
+      <span class="bobbit working hue-blue" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory bandana"></span></span>
+      <span class="bobbit working hue-teal" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory flask"></span></span>
+    </div>
+    <span class="bobbit-mini-label">2 working, 1 idle</span>
+  </div>
+</div>
+
+<!-- PHASE PIPELINE -->
+<div class="phase-pipeline">
+  <div class="phase-node done"><span class="phase-check">&#10003;</span> Planning</div>
+  <div class="phase-arrow done"><svg viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M0 6h16M13 2l4 4-4 4"/></svg></div>
+  <div class="phase-node done"><span class="phase-check">&#10003;</span> Design</div>
+  <div class="phase-arrow active"><svg viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M0 6h16M13 2l4 4-4 4"/></svg></div>
+  <div class="phase-node active">Implementation</div>
+  <div class="phase-arrow"><svg viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M0 6h16M13 2l4 4-4 4"/></svg></div>
+  <div class="phase-node">Review</div>
+  <div class="phase-arrow"><svg viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M0 6h16M13 2l4 4-4 4"/></svg></div>
+  <div class="phase-node">Complete</div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <div class="tab active" data-tab="tasks">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+    Tasks <span class="tab-count">8</span>
+  </div>
+  <div class="tab" data-tab="agents">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Agents <span class="tab-count">3</span>
+  </div>
+  <div class="tab" data-tab="commits">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+    Commits <span class="tab-count">5</span>
+  </div>
+  <div class="tab" data-tab="artifacts">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+    Artifacts <span class="tab-count">4</span>
+  </div>
+</div>
+
+<!-- TAB CONTENT -->
+<div class="tab-content">
+
+  <!-- TASKS -->
+  <div class="tab-panel active" id="tab-tasks">
+    <div class="tab-panel-inner" style="padding-top:0;">
+      <table class="task-table">
+        <thead><tr>
+          <th style="width:35%">Task</th><th style="width:10%">Type</th><th style="width:14%">Status</th><th style="width:20%">Assignee</th><th style="width:8%">Time</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td class="task-title-cell">Implement OAuth2 PKCE flow</td>
+            <td><span class="type-tag" style="background:oklch(0.62 0.15 250/0.12);color:oklch(0.72 0.15 250)">Code</span></td>
+            <td><span class="status-chip chip-progress"><span class="dot"></span>In Progress</span></td>
+            <td><div class="assignee-cell"><span class="bobbit working hue-blue" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory bandana"></span></span> Coder-1</div></td>
+            <td class="elapsed-cell">45m</td>
+          </tr>
+          <tr>
+            <td class="task-title-cell">Integration tests for token refresh</td>
+            <td><span class="type-tag" style="background:oklch(0.65 0.15 145/0.12);color:oklch(0.72 0.15 145)">Test</span></td>
+            <td><span class="status-chip chip-progress"><span class="dot"></span>In Progress</span></td>
+            <td><div class="assignee-cell"><span class="bobbit working hue-teal" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory flask"></span></span> Tester</div></td>
+            <td class="elapsed-cell">12m</td>
+          </tr>
+          <tr>
+            <td class="task-title-cell">Write migration guide for API consumers</td>
+            <td><span class="type-tag" style="background:oklch(0.70 0.14 75/0.12);color:oklch(0.78 0.14 75)">Review</span></td>
+            <td><span class="status-chip chip-todo"><span class="dot"></span>Backlog</span></td>
+            <td><span style="font-size:12px;color:var(--text-tertiary)">Unassigned</span></td>
+            <td class="elapsed-cell">2d</td>
+          </tr>
+          <tr style="opacity:0.55">
+            <td class="task-title-cell">Extract session store interface</td>
+            <td><span class="type-tag" style="background:oklch(0.62 0.15 250/0.12);color:oklch(0.72 0.15 250)">Code</span></td>
+            <td><span class="status-chip chip-done"><span class="dot"></span>Done</span></td>
+            <td><div class="assignee-cell"><span class="bobbit idle hue-blue" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory bandana"></span></span> Coder-1</div></td>
+            <td class="elapsed-cell">1h23m</td>
+          </tr>
+          <tr style="opacity:0.55">
+            <td class="task-title-cell">Replace bcrypt with argon2id</td>
+            <td><span class="type-tag" style="background:oklch(0.62 0.15 250/0.12);color:oklch(0.72 0.15 250)">Code</span></td>
+            <td><span class="status-chip chip-done"><span class="dot"></span>Done</span></td>
+            <td><div class="assignee-cell"><span class="bobbit idle hue-default" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory bandana"></span></span> Coder-2</div></td>
+            <td class="elapsed-cell">38m</td>
+          </tr>
+          <tr style="opacity:0.55">
+            <td class="task-title-cell">Unit tests for token validation</td>
+            <td><span class="type-tag" style="background:oklch(0.65 0.15 145/0.12);color:oklch(0.72 0.15 145)">Test</span></td>
+            <td><span class="status-chip chip-done"><span class="dot"></span>Done</span></td>
+            <td><div class="assignee-cell"><span class="bobbit idle hue-teal" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory flask"></span></span> Tester</div></td>
+            <td class="elapsed-cell">15m</td>
+          </tr>
+          <tr style="opacity:0.55">
+            <td class="task-title-cell">Add CORS configuration tests</td>
+            <td><span class="type-tag" style="background:oklch(0.65 0.15 145/0.12);color:oklch(0.72 0.15 145)">Test</span></td>
+            <td><span class="status-chip chip-done"><span class="dot"></span>Done</span></td>
+            <td><div class="assignee-cell"><span class="bobbit idle hue-teal" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory flask"></span></span> Tester</div></td>
+            <td class="elapsed-cell">22m</td>
+          </tr>
+          <tr>
+            <td class="task-title-cell">Rate limiter stress test<div style="font-size:11px;color:var(--destructive);margin-top:3px;">Timeout: Redis connection pool exhausted</div></td>
+            <td><span class="type-tag" style="background:oklch(0.65 0.15 145/0.12);color:oklch(0.72 0.15 145)">Test</span></td>
+            <td><span class="status-chip chip-failed"><span class="dot"></span>Failed</span></td>
+            <td><div class="assignee-cell"><span class="bobbit idle hue-teal" style="width:18px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory flask"></span></span> Tester</div></td>
+            <td class="elapsed-cell">8m</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- AGENTS -->
+  <div class="tab-panel" id="tab-agents">
+    <div class="tab-panel-inner">
+      <div class="agent-grid">
+        <div class="agent-card">
+          <div class="agent-card-bobbit"><span class="bobbit idle hue-purple" style="width:20px;height:19px;"><span class="bobbit-body" style="top:4px;"></span><span class="bobbit-accessory crown"></span></span></div>
+          <div class="agent-card-info">
+            <div class="agent-card-name-row"><span class="agent-card-name">Team Lead</span><span class="role-tag" style="background:oklch(0.55 0.15 290/0.15);color:oklch(0.72 0.15 290)">LEAD</span><span class="status-indicator idle"></span></div>
+            <div class="agent-card-task">Coordinating implementation tasks</div>
+            <div class="agent-card-meta">
+              <div class="agent-card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg> 3 tasks assigned</div>
+              <div class="agent-card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> 2h 15m</div>
+            </div>
+          </div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-bobbit"><span class="bobbit working hue-blue" style="width:20px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory bandana"></span></span></div>
+          <div class="agent-card-info">
+            <div class="agent-card-name-row"><span class="agent-card-name">Coder-1</span><span class="role-tag" style="background:oklch(0.62 0.15 250/0.15);color:oklch(0.72 0.15 250)">CODER</span><span class="status-indicator working"></span></div>
+            <div class="agent-card-task">Implement OAuth2 PKCE flow</div>
+            <div class="agent-card-meta">
+              <div class="agent-card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg> 2 completed</div>
+              <div class="agent-card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg> 3 commits</div>
+              <div class="agent-card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> 45m</div>
+            </div>
+          </div>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-bobbit"><span class="bobbit working hue-teal" style="width:20px;height:15px;"><span class="bobbit-body"></span><span class="bobbit-accessory flask"></span></span></div>
+          <div class="agent-card-info">
+            <div class="agent-card-name-row"><span class="agent-card-name">Tester</span><span class="role-tag" style="background:oklch(0.65 0.15 145/0.15);color:oklch(0.72 0.15 145)">TESTER</span><span class="status-indicator working"></span></div>
+            <div class="agent-card-task">Integration tests for token refresh</div>
+            <div class="agent-card-meta">
+              <div class="agent-card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg> 3 done, 1 failed</div>
+              <div class="agent-card-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> 12m</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMMITS -->
+  <div class="tab-panel" id="tab-commits">
+    <div class="tab-panel-inner" style="padding-top:0;">
+      <div class="commit-list">
+        <div class="commit-row"><div class="commit-dot-col"><div class="cdot head"></div></div><code class="commit-sha2">a3f7c21</code><div class="commit-msg2">feat: implement PKCE challenge generation</div><div class="commit-badges2"><span class="cbadge cbadge-pass">&#10003; Tests</span><span class="cbadge cbadge-pending">&#9203; Review</span></div><div class="commit-author2">Coder-1</div><div class="commit-time2">12m</div></div>
+        <div class="commit-row"><div class="commit-dot-col"><div class="cdot"></div></div><code class="commit-sha2">b8e4d10</code><div class="commit-msg2">refactor: extract session store interface</div><div class="commit-badges2"><span class="cbadge cbadge-pass">&#10003; Tests</span><span class="cbadge cbadge-pass">&#10003; Review</span></div><div class="commit-author2">Coder-1</div><div class="commit-time2">1h</div></div>
+        <div class="commit-row"><div class="commit-dot-col"><div class="cdot"></div></div><code class="commit-sha2">c1d5a92</code><div class="commit-msg2">security: replace bcrypt with argon2id for password hashing</div><div class="commit-badges2"><span class="cbadge cbadge-pass">&#10003; Tests</span><span class="cbadge cbadge-pass">&#10003; Review</span></div><div class="commit-author2">Coder-2</div><div class="commit-time2">2h</div></div>
+        <div class="commit-row"><div class="commit-dot-col"><div class="cdot"></div></div><code class="commit-sha2">d4e8f33</code><div class="commit-msg2">feat: add rate limiter middleware with Redis backend</div><div class="commit-badges2"><span class="cbadge cbadge-fail">&#10007; Tests</span></div><div class="commit-author2">Coder-2</div><div class="commit-time2">3h</div></div>
+        <div class="commit-row"><div class="commit-dot-col"><div class="cdot"></div></div><code class="commit-sha2">e5a9b77</code><div class="commit-msg2">chore: initial auth module scaffold</div><div class="commit-badges2"><span class="cbadge cbadge-pass">&#10003; Tests</span><span class="cbadge cbadge-pass">&#10003; Review</span></div><div class="commit-author2">Coder-1</div><div class="commit-time2">5h</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARTIFACTS -->
+  <div class="tab-panel" id="tab-artifacts">
+    <div class="tab-panel-inner" style="padding-top:0;">
+      <div class="artifact-list">
+        <div class="artifact-item">
+          <div class="artifact-status-icon exists">&#x1F4D0;</div>
+          <div class="artifact-main">
+            <div class="artifact-name-row">
+              <span class="artifact-name">Design Document</span>
+              <span class="artifact-badge badge-required">Required</span>
+              <span class="artifact-badge badge-version">v2</span>
+            </div>
+            <div class="artifact-detail">
+              <span>Updated 3h ago</span>
+              <span class="artifact-detail-sep">&middot;</span>
+              <span class="bobbit idle hue-purple" style="width:14px;height:13px;"><span class="bobbit-body" style="transform:scale(1.2);"></span></span>
+              <span>Team Lead</span>
+              <span class="artifact-detail-sep">&middot;</span>
+              <span>Blocks implementation tasks</span>
+            </div>
+          </div>
+          <div class="artifact-right"><span class="artifact-view-btn">View</span></div>
+        </div>
+        <div class="artifact-item">
+          <div class="artifact-status-icon exists">&#x1F9EA;</div>
+          <div class="artifact-main">
+            <div class="artifact-name-row">
+              <span class="artifact-name">Test Plan</span>
+              <span class="artifact-badge badge-required">Required</span>
+              <span class="artifact-badge badge-version">v1</span>
+            </div>
+            <div class="artifact-detail">
+              <span>Created 2h ago</span>
+              <span class="artifact-detail-sep">&middot;</span>
+              <span class="bobbit idle hue-purple" style="width:14px;height:13px;"><span class="bobbit-body" style="transform:scale(1.2);"></span></span>
+              <span>Team Lead</span>
+              <span class="artifact-detail-sep">&middot;</span>
+              <span>Blocks implementation tasks</span>
+            </div>
+          </div>
+          <div class="artifact-right"><span class="artifact-view-btn">View</span></div>
+        </div>
+        <div class="artifact-item missing">
+          <div class="artifact-status-icon missing-icon">&#x1F50D;</div>
+          <div class="artifact-main">
+            <div class="artifact-name-row">
+              <span class="artifact-name">Review Findings</span>
+              <span class="artifact-badge badge-required">Required</span>
+              <span class="artifact-badge badge-missing-label">Missing</span>
+            </div>
+            <div class="artifact-detail">
+              <span class="artifact-blocks">&#x26A0; Blocks goal completion</span>
+            </div>
+          </div>
+        </div>
+        <div class="artifact-item missing">
+          <div class="artifact-status-icon missing-icon">&#x1F512;</div>
+          <div class="artifact-main">
+            <div class="artifact-name-row">
+              <span class="artifact-name">Security Findings</span>
+              <span class="artifact-badge badge-missing-label">Missing</span>
+            </div>
+            <div class="artifact-detail"><span>Optional</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- .dashboard-mock -->
+
+<script>
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+let teamRunning = false;
+document.getElementById('team-btn-main').addEventListener('click', () => {
+  teamRunning = !teamRunning;
+  const main = document.getElementById('team-btn-main');
+  if (teamRunning) {
+    main.classList.add('danger');
+    main.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1"/></svg> <span>Stop Team</span>';
+  } else {
+    main.classList.remove('danger');
+    main.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> <span>Start Team</span>';
+  }
+});
+
+const chevron = document.getElementById('role-chevron');
+const dropdown = document.getElementById('role-dropdown');
+if (chevron) {
+  chevron.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('open'); });
+}
+document.addEventListener('click', () => dropdown?.classList.remove('open'));
+
+document.querySelectorAll('.meta-tag.team-on').forEach(tag => {
+  tag.style.cursor = 'pointer';
+  tag.title = 'Click to toggle team/non-team mode (demo)';
+  tag.addEventListener('click', () => {
+    const teamBtn = document.getElementById('team-btn');
+    const sessionBtn = document.getElementById('session-btn');
+    const isTeam = teamBtn.style.display !== 'none';
+    teamBtn.style.display = isTeam ? 'none' : 'inline-flex';
+    sessionBtn.style.display = isTeam ? 'inline-flex' : 'none';
+    tag.textContent = isTeam ? 'Solo Mode' : 'Team Mode';
+  });
+});
+</script>
+</body>
+</html>
