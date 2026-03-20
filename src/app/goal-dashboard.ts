@@ -48,6 +48,7 @@ let tasks: Task[] = [];
 let commits: CommitInfo[] = [];
 let artifacts: GoalArtifact[] = [];
 let expandedArtifactIds: Set<string> = new Set();
+let fullscreenArtifact: GoalArtifact | null = null;
 let artifactPollTimer: ReturnType<typeof setInterval> | null = null;
 let teamActive = false;
 let teamStarting = false;
@@ -473,6 +474,26 @@ function getArtifactStatuses(artifactList: GoalArtifact[]): ArtifactRequirementS
 		}
 	}
 	return statuses;
+}
+
+function isHtmlContent(content: string): boolean {
+	const trimmed = content.trimStart();
+	return trimmed.startsWith("<!") || trimmed.startsWith("<html");
+}
+
+function openArtifactView(artifact: GoalArtifact): void {
+	if (isHtmlContent(artifact.content)) {
+		fullscreenArtifact = artifact;
+	} else {
+		toggleArtifactExpand(artifact.id);
+		return;
+	}
+	renderApp();
+}
+
+function closeFullscreenArtifact(): void {
+	fullscreenArtifact = null;
+	renderApp();
 }
 
 function toggleArtifactExpand(artifactId: string): void {
@@ -1056,7 +1077,7 @@ function renderArtifactsTab(): TemplateResult {
 
 					return html`
 						<div class="artifact-item ${isMissing ? "missing" : ""}"
-							@click=${() => artifact && toggleArtifactExpand(artifact.id)}>
+							@click=${() => artifact && openArtifactView(artifact)}>
 							<div class="artifact-status-icon ${exists ? "exists" : "missing-icon"}">${iconStr}</div>
 							<div class="artifact-main">
 								<div class="artifact-name-row">
@@ -1092,9 +1113,7 @@ function renderArtifactsTab(): TemplateResult {
 									<span>${artifact.name}</span>
 									${artifact.skillId ? html`<span class="artifact-skill-badge">Skill: ${artifact.skillId}</span>` : nothing}
 								</div>
-								${artifact.content.trimStart().startsWith("<!") || artifact.content.trimStart().startsWith("<html")
-									? html`<iframe class="artifact-content-iframe" sandbox="allow-scripts" .srcdoc=${artifact.content}></iframe>`
-									: html`<pre class="artifact-content-body">${artifact.content}</pre>`}
+								<pre class="artifact-content-body">${artifact.content}</pre>
 							</div>
 						` : nothing}
 					`;
@@ -1153,6 +1172,17 @@ export function renderGoalDashboard(): TemplateResult {
 				<div class="tab-panel ${activeTab === "commits" ? "active" : ""}">${activeTab === "commits" ? renderCommitsTab() : nothing}</div>
 				<div class="tab-panel ${activeTab === "artifacts" ? "active" : ""}">${activeTab === "artifacts" ? renderArtifactsTab() : nothing}</div>
 			</div>
+			${fullscreenArtifact ? html`
+				<div class="artifact-overlay" @click=${(e: Event) => { if ((e.target as HTMLElement).classList.contains("artifact-overlay")) closeFullscreenArtifact(); }}>
+					<div class="artifact-overlay-panel">
+						<div class="artifact-overlay-header">
+							<span class="artifact-overlay-title">${fullscreenArtifact.name}</span>
+							<button class="artifact-overlay-close" @click=${closeFullscreenArtifact}>&times;</button>
+						</div>
+						<iframe class="artifact-overlay-iframe" sandbox="allow-scripts" .srcdoc=${fullscreenArtifact.content}></iframe>
+					</div>
+				</div>
+			` : nothing}
 		</div>
 	`;
 }
