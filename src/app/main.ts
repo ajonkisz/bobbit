@@ -108,6 +108,32 @@ async function handleHashChange(): Promise<void> {
 			await loadRolePageData();
 			navigateToRoleEdit(route.roleName);
 			await refreshSessions();
+		} else if (route.view === "tools") {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadToolPageData } = await import("./tool-manager-page.js");
+			loadToolPageData();
+			renderApp();
+			await refreshSessions();
+		} else if (route.view === "tool-edit" && route.toolName) {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadToolPageData, navigateToToolEdit } = await import("./tool-manager-page.js");
+			await loadToolPageData();
+			navigateToToolEdit(route.toolName);
+			await refreshSessions();
 		} else {
 			clearDashboardState();
 			if (state.remoteAgent) {
@@ -173,6 +199,13 @@ async function initApp() {
 				const { loadRolePageData, navigateToRoleEdit } = await import("./role-manager-page.js");
 				await loadRolePageData();
 				navigateToRoleEdit(route.roleName);
+			} else if (route.view === "tools") {
+				const { loadToolPageData } = await import("./tool-manager-page.js");
+				loadToolPageData();
+			} else if (route.view === "tool-edit" && route.toolName) {
+				const { loadToolPageData, navigateToToolEdit } = await import("./tool-manager-page.js");
+				await loadToolPageData();
+				navigateToToolEdit(route.toolName);
 			}
 		} catch {
 			renderApp();

@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { ChevronDown, Crosshair, PanelLeftClose, PanelLeftOpen, Plus, Users } from "lucide";
+import { ChevronDown, Crosshair, PanelLeftClose, PanelLeftOpen, Plus, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -102,6 +102,14 @@ export function renderSidebar() {
 				>
 					${icon(Users, "sm")}
 					<span>Roles</span>
+				</button>
+				<button
+					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); import("./routing.js").then((m) => m.setHashRoute("tools")); }}
+					title="Manage tools"
+				>
+					${icon(Wrench, "sm")}
+					<span>Tools</span>
 				</button>
 				<button
 					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"

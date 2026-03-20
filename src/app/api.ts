@@ -393,6 +393,9 @@ export interface ToolInfo {
 	name: string;
 	description: string;
 	group: string;
+	docs?: string;
+	hasRenderer?: boolean;
+	rendererFile?: string;
 }
 
 export async function fetchTools(): Promise<ToolInfo[]> {
@@ -409,6 +412,33 @@ export async function fetchTools(): Promise<ToolInfo[]> {
 	} catch (err) {
 		console.error("[role-api] fetchTools failed:", err);
 		return [];
+	}
+}
+
+export async function fetchToolDetail(name: string): Promise<ToolInfo | null> {
+	try {
+		const res = await gatewayFetch(`/api/tools/${encodeURIComponent(name)}`);
+		if (!res.ok) return null;
+		return await res.json();
+	} catch {
+		return null;
+	}
+}
+
+export async function updateTool(name: string, updates: { description?: string; group?: string; docs?: string }): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/tools/${encodeURIComponent(name)}`, {
+			method: "PUT",
+			body: JSON.stringify(updates),
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || `Failed: ${res.status}`);
+		}
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to update tool", err instanceof Error ? err.message : String(err));
+		return false;
 	}
 }
 
