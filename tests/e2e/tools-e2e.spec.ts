@@ -349,33 +349,19 @@ test.describe("Tasks API", () => {
 		expect(task.state).toBe("todo");
 	});
 
-	test("blocks implementation task when design-doc missing", async () => {
+	test("allows implementation task without artifact requirements", async () => {
+		// Task creation no longer enforces artifact requirements
 		const resp = await apiFetch(`/api/goals/${goalId}/tasks`, {
 			method: "POST",
 			body: JSON.stringify({ title: "Impl Y", type: "implementation" }),
 		});
-		expect(resp.status).toBe(409);
-		const body = await resp.json();
-		expect(body.missingArtifacts).toBeTruthy();
+		expect(resp.status).toBe(201);
 	});
 
-	test("allows implementation task after required artifacts exist", async () => {
-		// Both design-doc AND test-plan are required before implementation tasks
-		const art1 = await apiFetch(`/api/goals/${goalId}/artifacts`, {
-			method: "POST",
-			body: JSON.stringify({ name: "design-doc", type: "design-doc", content: "# Plan", producedBy: "test" }),
-		});
-		expect(art1.status).toBe(201);
-
-		const art2 = await apiFetch(`/api/goals/${goalId}/artifacts`, {
-			method: "POST",
-			body: JSON.stringify({ name: "test-plan", type: "test-plan", content: "# Tests", producedBy: "test" }),
-		});
-		expect(art2.status).toBe(201);
-
+	test("accepts any task type string", async () => {
 		const resp = await apiFetch(`/api/goals/${goalId}/tasks`, {
 			method: "POST",
-			body: JSON.stringify({ title: "Impl Y", type: "implementation" }),
+			body: JSON.stringify({ title: "Custom type", type: "my-custom-type" }),
 		});
 		expect(resp.status).toBe(201);
 	});

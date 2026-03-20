@@ -1,0 +1,14 @@
+id: summary-report
+name: Summary Report
+description: Final completion report for the goal
+kind: deliverable
+format: html
+mustHave:
+  - Goal summary
+  - Task breakdown
+  - Test results
+  - Review findings
+shouldHave: []
+mustNotHave: []
+createdAt: 1774047381110
+updatedAt: 1774047381110

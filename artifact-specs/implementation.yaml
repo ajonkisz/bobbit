@@ -1,0 +1,16 @@
+id: implementation
+name: Implementation
+description: Code changes on a branch
+kind: deliverable
+format: diff
+mustHave:
+  - All changes committed
+  - Type-check passes
+  - No unrelated changes
+shouldHave: []
+mustNotHave: []
+requires:
+  - design-doc
+  - test-plan
+createdAt: 1774047381110
+updatedAt: 1774047381110
