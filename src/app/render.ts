@@ -852,7 +852,7 @@ export function doRenderApp(): void {
 			<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
 				<div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
 					<span class="text-xs font-medium text-muted-foreground">Live Preview</span>
-					<button @click=${togglePreviewCollapse} class="text-muted-foreground hover:text-foreground" style="background:none;border:none;cursor:pointer;padding:2px;" title="Collapse preview">
+					<button @click=${togglePreviewCollapse} class="text-muted-foreground hover:text-foreground" style="background:none;border:none;cursor:pointer;padding:2px;" title="Collapse preview (Ctrl+])">
 						${icon(PanelRightClose, "sm")}
 					</button>
 				</div>
@@ -869,7 +869,7 @@ export function doRenderApp(): void {
 	};
 
 	const previewExpandButton = () => html`
-		<button @click=${togglePreviewCollapse} class="text-muted-foreground hover:text-foreground" style="background:none;border:none;cursor:pointer;padding:6px 4px;border-left:1px solid var(--border);align-self:stretch;display:flex;align-items:center;" title="Expand preview">
+		<button @click=${togglePreviewCollapse} class="text-muted-foreground hover:text-foreground" style="background:none;border:none;cursor:pointer;padding:6px 4px;border-left:1px solid var(--border);align-self:stretch;display:flex;align-items:center;" title="Expand preview (Ctrl+])">
 			${icon(PanelRightOpen, "sm")}
 		</button>
 	`;
