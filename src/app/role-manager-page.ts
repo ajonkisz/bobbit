@@ -442,12 +442,12 @@ function renderToolGroups(): TemplateResult {
 function renderEditView(): TemplateResult {
 	return html`
 		<div class="roles-edit-container">
-			<!-- Top row: identity + accessory side by side -->
-			<div class="roles-edit-top-row">
-				<div class="roles-edit-section" style="flex:1;min-width:0;">
+			<div class="roles-edit-main">
+				<!-- Identity section -->
+				<div class="roles-edit-section">
 					<h2 class="roles-section-title">Identity</h2>
 					<div class="roles-edit-field">
-						<label class="roles-field-label">Id</label>
+						<label class="roles-field-label">Name</label>
 						<div class="roles-field-readonly">${editName}</div>
 					</div>
 					<div class="roles-edit-field">
@@ -459,6 +459,19 @@ function renderEditView(): TemplateResult {
 						})}
 					</div>
 				</div>
+
+				<!-- System prompt section -->
+				<div class="roles-edit-section">
+					<h2 class="roles-section-title">System Prompt</h2>
+					<textarea
+						class="roles-prompt-editor"
+						.value=${editPrompt}
+						placeholder="Markdown system prompt template. Supports {{GOAL_BRANCH}} and {{AGENT_ID}} placeholders."
+						@input=${(e: Event) => { editPrompt = (e.target as HTMLTextAreaElement).value; }}
+					></textarea>
+				</div>
+
+				<!-- Accessory selector -->
 				<div class="roles-edit-section">
 					<h2 class="roles-section-title">Accessory</h2>
 					<div class="roles-accessory-grid">
@@ -483,19 +496,10 @@ function renderEditView(): TemplateResult {
 				</div>
 			</div>
 
-			<!-- Bottom row: prompt + tool access side by side -->
-			<div class="roles-edit-bottom-row">
-				<div class="roles-edit-section roles-edit-prompt-section">
-					<h2 class="roles-section-title">System Prompt</h2>
-					<textarea
-						class="roles-prompt-editor"
-						.value=${editPrompt}
-						placeholder="Markdown system prompt template. Supports {{GOAL_BRANCH}} and {{AGENT_ID}} placeholders."
-						@input=${(e: Event) => { editPrompt = (e.target as HTMLTextAreaElement).value; }}
-					></textarea>
-				</div>
-
-				<div class="roles-edit-section roles-edit-tools-section">
+			<!-- Right sidebar -->
+			<div class="roles-edit-sidebar">
+				<!-- Tools section -->
+				<div class="roles-edit-section">
 					<div class="roles-tools-top">
 						<h2 class="roles-section-title">Tool Access</h2>
 						<div class="roles-tools-mode">
@@ -516,6 +520,8 @@ function renderEditView(): TemplateResult {
 							${renderToolGroups()}
 						`}
 				</div>
+
+
 			</div>
 		</div>
 	`;
