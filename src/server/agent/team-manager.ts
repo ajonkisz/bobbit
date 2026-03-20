@@ -80,7 +80,7 @@ export class TeamManager {
 	private teams = new Map<string, TeamEntry>();
 	private store: TeamStore;
 	/** Timers for the idle-nudge mechanism (goalId → timer). */
-	private idleNudgeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	private idleNudgeTimers = new Map<string, ReturnType<typeof setInterval>>();
 	/** Delay before nudging the idle team lead (ms). */
 	private static readonly IDLE_NUDGE_DELAY_MS = 120_000;
 
@@ -224,7 +224,7 @@ export class TeamManager {
 			if (!entry?.teamLeadSessionId) return;
 
 			const teamLeadSession = this.sessionManager.getSession(entry.teamLeadSessionId);
-			if (!teamLeadSession || teamLeadSession.status === "terminated" || teamLeadSession.status === "streaming") {
+			if (!teamLeadSession || teamLeadSession.status !== "idle") {
 				return; // Skip this tick — team lead busy or gone
 			}
 
