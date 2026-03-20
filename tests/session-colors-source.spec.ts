@@ -3,8 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Tests that verify the source file session-colors.ts has the correct
- * palette after removing colours 9 and 20 (1-indexed).
+ * Tests that verify the source file session-colors.ts has the correct palette.
  */
 test.describe("session-colors.ts source verification", () => {
 	const sourceFile = path.resolve("src/app/session-colors.ts");
@@ -14,32 +13,27 @@ test.describe("session-colors.ts source verification", () => {
 		source = fs.readFileSync(sourceFile, "utf-8");
 	});
 
-	test("BOBBIT_HUE_ROTATIONS does not contain value 200", () => {
+	test("BOBBIT_HUE_ROTATIONS does not contain removed values 200, 225, or 250", () => {
 		const match = source.match(/BOBBIT_HUE_ROTATIONS\s*=\s*\[([\s\S]*?)\]/);
 		expect(match).toBeTruthy();
 		const values = match![1].split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
 		expect(values).not.toContain(200);
-	});
-
-	test("BOBBIT_HUE_ROTATIONS does not contain value 250", () => {
-		const match = source.match(/BOBBIT_HUE_ROTATIONS\s*=\s*\[([\s\S]*?)\]/);
-		expect(match).toBeTruthy();
-		const values = match![1].split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+		expect(values).not.toContain(225);
 		expect(values).not.toContain(250);
 	});
 
-	test("BOBBIT_HUE_ROTATIONS has exactly 18 entries", () => {
+	test("BOBBIT_HUE_ROTATIONS has exactly 17 entries", () => {
 		const match = source.match(/BOBBIT_HUE_ROTATIONS\s*=\s*\[([\s\S]*?)\]/);
 		expect(match).toBeTruthy();
 		const values = match![1].split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
-		expect(values.length).toBe(18);
+		expect(values.length).toBe(17);
 	});
 
 	test("BOBBIT_HUE_ROTATIONS contains expected remaining values", () => {
 		const match = source.match(/BOBBIT_HUE_ROTATIONS\s*=\s*\[([\s\S]*?)\]/);
 		expect(match).toBeTruthy();
 		const values = match![1].split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
-		const expected = [0, 25, 50, 75, 100, 125, 150, 175, 225, -135, -110, -85, -60, -35, -10, 15, 40, 65];
+		const expected = [0, 25, 50, 75, 100, 125, 150, 175, -135, -110, -85, -60, -35, -10, 15, 40, 65];
 		expect(values).toEqual(expected);
 	});
 });

@@ -10,10 +10,8 @@
  * Mirrors the BOBBIT_HUE_ROTATIONS palette and color assignment logic.
  */
 
-// The palette AFTER removing colours 9 and 20 (1-indexed), i.e. indices 8 and 19.
-// Original was 20 entries; should now be 18.
 const BOBBIT_HUE_ROTATIONS = [
-	0, 25, 50, 75, 100, 125, 150, 175, 225,
+	0, 25, 50, 75, 100, 125, 150, 175,
 	-135, -110, -85, -60, -35, -10, 15, 40, 65,
 ];
 
@@ -40,7 +38,6 @@ function reset() {
 	sessionColorMap.clear();
 }
 
-// Expose for Playwright
 window.__BOBBIT_HUE_ROTATIONS = BOBBIT_HUE_ROTATIONS;
 window.__sessionColorMap = sessionColorMap;
 window.__nextAvailableColorIndex = nextAvailableColorIndex;

@@ -6,22 +6,41 @@ const STORE_DIR = path.join(os.homedir(), ".pi");
 const STORE_FILE = path.join(STORE_DIR, "gateway-session-colors.json");
 
 /**
- * Mapping from old 20-colour palette indices to new 18-colour palette indices.
- * Old indices 8 (hue 200°) and 19 (hue 250°) were removed.
+ * Mapping from the original 20-colour palette indices to the current
+ * 17-colour palette. Removed hues: 200° (old 8), 225° (old 9), 250° (old 19).
+ *
+ * Old palette: [0,25,50,75,100,125,150,175,200,225,-135,-110,-85,-60,-35,-10,15,40,65,250]
+ * New palette: [0,25,50,75,100,125,150,175,-135,-110,-85,-60,-35,-10,15,40,65]
+ *
  * - 0-7: unchanged
- * - 8 (removed 200°) → 7 (175°, nearest neighbour)
- * - 9-18: shift down by 1
- * - 19 (removed 250°) → 8 (225°, nearest neighbour)
+ * - 8 (removed 200°) → 7 (175°, nearest)
+ * - 9 (removed 225°) → 7 (175°, nearest)
+ * - 10-18: shift down by 2 (10→8, 11→9, ..., 18→16)
+ * - 19 (removed 250°) → 8 (-135°, nearest in new palette)
  */
-const OLD_TO_NEW_INDEX: number[] = [
+const V1_TO_CURRENT: number[] = [
 	0, 1, 2, 3, 4, 5, 6, 7, // 0-7: unchanged
 	7,                        // 8 (200°) → 7 (175°)
-	8, 9, 10, 11, 12, 13, 14, 15, 16, 17, // 9-18 → 8-17
-	8,                        // 19 (250°) → 8 (225°)
+	7,                        // 9 (225°) → 7 (175°)
+	8, 9, 10, 11, 12, 13, 14, 15, 16, // 10-18 → 8-16
+	8,                        // 19 (250°) → 8 (-135°)
+];
+
+/**
+ * Mapping from the intermediate 18-colour palette (v2) to the current
+ * 17-colour palette. Removed hue: 225° (was at index 8 in v2).
+ *
+ * V2 palette: [0,25,50,75,100,125,150,175,225,-135,-110,-85,-60,-35,-10,15,40,65]
+ * New palette: [0,25,50,75,100,125,150,175,-135,-110,-85,-60,-35,-10,15,40,65]
+ */
+const V2_TO_CURRENT: number[] = [
+	0, 1, 2, 3, 4, 5, 6, 7, // 0-7: unchanged
+	7,                        // 8 (225°) → 7 (175°)
+	8, 9, 10, 11, 12, 13, 14, 15, 16, // 9-17 → 8-16
 ];
 
 /** Current palette version. Bump when palette changes require migration. */
-const PALETTE_VERSION = 2;
+const PALETTE_VERSION = 3;
 
 /**
  * Persists session → palette index mapping to disk.
@@ -43,9 +62,10 @@ export class ColorStore {
 						if (id.startsWith("_")) continue; // skip metadata keys
 						if (typeof idx === "number") this.colors.set(id, idx);
 					}
-					// Migrate from old 20-colour palette if needed
-					if (typeof data._paletteVersion !== "number" || data._paletteVersion < PALETTE_VERSION) {
-						this.migrateFromOldPalette();
+					// Migrate from old palette if needed
+					const storedVersion = typeof data._paletteVersion === "number" ? data._paletteVersion : 1;
+					if (storedVersion < PALETTE_VERSION) {
+						this.migrateFromOldPalette(storedVersion);
 					}
 				}
 			}
@@ -54,24 +74,25 @@ export class ColorStore {
 		}
 	}
 
-	/** Remap all indices from the old 20-colour palette to the new 18-colour palette. */
-	private migrateFromOldPalette(): void {
+	/** Remap all indices from an old palette version to the current 17-colour palette. */
+	private migrateFromOldPalette(fromVersion: number): void {
+		const mapping = fromVersion < 2 ? V1_TO_CURRENT : V2_TO_CURRENT;
 		let changed = false;
 		for (const [id, idx] of this.colors) {
-			if (idx >= 0 && idx < OLD_TO_NEW_INDEX.length) {
-				const newIdx = OLD_TO_NEW_INDEX[idx];
+			if (idx >= 0 && idx < mapping.length) {
+				const newIdx = mapping[idx];
 				if (newIdx !== idx) {
 					this.colors.set(id, newIdx);
 					changed = true;
 				}
-			} else if (idx > 17) {
+			} else if (idx > 16) {
 				// Any index out of new range → clamp to max
-				this.colors.set(id, 17);
+				this.colors.set(id, 16);
 				changed = true;
 			}
 		}
 		if (changed) {
-			console.log(`[color-store] Migrated session colors from old 20-colour palette to 18-colour palette`);
+			console.log(`[color-store] Migrated session colors from palette v${fromVersion} to v${PALETTE_VERSION}`);
 		}
 		this.save();
 	}

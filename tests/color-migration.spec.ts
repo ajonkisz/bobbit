@@ -3,108 +3,129 @@ import path from "node:path";
 
 const TEST_PAGE = `file://${path.resolve("tests/color-migration.html")}`;
 
-test.describe("Color palette migration (20 → 18 colours)", () => {
+test.describe("Color palette migration from v1 (20-colour) to current (17-colour)", () => {
 	test("indices 0-7 are unchanged", async ({ page }) => {
 		await page.goto(TEST_PAGE);
 		const results = await page.evaluate(() => {
 			const w = window as any;
-			return Array.from({ length: 8 }, (_, i) => w.__migrateIndex(i));
+			return Array.from({ length: 8 }, (_, i) => w.__migrateIndex(i, w.__V1_TO_CURRENT));
 		});
 		expect(results).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
 	});
 
-	test("removed index 8 (hue 200°) maps to index 7 (hue 175°)", async ({ page }) => {
+	test("removed index 8 (200°) maps to 7 (175°)", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		const result = await page.evaluate(() => (window as any).__migrateIndex(8));
-		expect(result).toBe(7);
+		const r = await page.evaluate(() => (window as any).__migrateIndex(8, (window as any).__V1_TO_CURRENT));
+		expect(r).toBe(7);
 	});
 
-	test("removed index 19 (hue 250°) maps to index 8 (hue 225°)", async ({ page }) => {
+	test("removed index 9 (225°) maps to 7 (175°)", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		const result = await page.evaluate(() => (window as any).__migrateIndex(19));
-		expect(result).toBe(8);
+		const r = await page.evaluate(() => (window as any).__migrateIndex(9, (window as any).__V1_TO_CURRENT));
+		expect(r).toBe(7);
 	});
 
-	test("indices 9-18 shift down by 1", async ({ page }) => {
+	test("removed index 19 (250°) maps to 8 (-135°)", async ({ page }) => {
+		await page.goto(TEST_PAGE);
+		const r = await page.evaluate(() => (window as any).__migrateIndex(19, (window as any).__V1_TO_CURRENT));
+		expect(r).toBe(8);
+	});
+
+	test("indices 10-18 shift down by 2", async ({ page }) => {
 		await page.goto(TEST_PAGE);
 		const results = await page.evaluate(() => {
 			const w = window as any;
-			return Array.from({ length: 10 }, (_, i) => w.__migrateIndex(i + 9));
+			return Array.from({ length: 9 }, (_, i) => w.__migrateIndex(i + 10, w.__V1_TO_CURRENT));
 		});
-		expect(results).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+		expect(results).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16]);
 	});
 
-	test("migration preserves hue continuity for shifted indices", async ({ page }) => {
+	test("v1 migration preserves hue for shifted indices 10-18", async ({ page }) => {
 		await page.goto(TEST_PAGE);
-		// For each old index 9-18, the old hue should equal the new hue at the migrated index
 		const allMatch = await page.evaluate(() => {
 			const w = window as any;
-			for (let oldIdx = 9; oldIdx <= 18; oldIdx++) {
-				const newIdx = w.__migrateIndex(oldIdx);
-				if (w.__OLD_PALETTE[oldIdx] !== w.__NEW_PALETTE[newIdx]) return false;
+			for (let oldIdx = 10; oldIdx <= 18; oldIdx++) {
+				const newIdx = w.__migrateIndex(oldIdx, w.__V1_TO_CURRENT);
+				if (w.__V1_PALETTE[oldIdx] !== w.__NEW_PALETTE[newIdx]) return false;
 			}
 			return true;
 		});
 		expect(allMatch).toBe(true);
 	});
 
-	test("removed index 8 maps to closest available hue", async ({ page }) => {
-		await page.goto(TEST_PAGE);
-		const [oldHue, newHue] = await page.evaluate(() => {
-			const w = window as any;
-			const newIdx = w.__migrateIndex(8);
-			return [w.__OLD_PALETTE[8], w.__NEW_PALETTE[newIdx]];
-		});
-		// Old hue 200°, mapped to 175° (index 7) — 25° difference
-		expect(oldHue).toBe(200);
-		expect(newHue).toBe(175);
-		expect(Math.abs(oldHue - newHue)).toBe(25);
-	});
-
-	test("removed index 19 maps to closest available hue", async ({ page }) => {
-		await page.goto(TEST_PAGE);
-		const [oldHue, newHue] = await page.evaluate(() => {
-			const w = window as any;
-			const newIdx = w.__migrateIndex(19);
-			return [w.__OLD_PALETTE[19], w.__NEW_PALETTE[newIdx]];
-		});
-		// Old hue 250°, mapped to 225° (index 8) — 25° difference
-		expect(oldHue).toBe(250);
-		expect(newHue).toBe(225);
-		expect(Math.abs(oldHue - newHue)).toBe(25);
-	});
-
-	test("all migrated indices are within new palette range (0-17)", async ({ page }) => {
+	test("all v1 migrated indices are within 0-16", async ({ page }) => {
 		await page.goto(TEST_PAGE);
 		const allValid = await page.evaluate(() => {
 			const w = window as any;
 			for (let i = 0; i < 20; i++) {
-				const newIdx = w.__migrateIndex(i);
-				if (newIdx < 0 || newIdx > 17) return false;
+				const newIdx = w.__migrateIndex(i, w.__V1_TO_CURRENT);
+				if (newIdx < 0 || newIdx > 16) return false;
 			}
 			return true;
 		});
 		expect(allValid).toBe(true);
 	});
 
-	test("bulk migration remaps a realistic color map", async ({ page }) => {
+	test("bulk v1 migration", async ({ page }) => {
 		await page.goto(TEST_PAGE);
 		const result = await page.evaluate(() => {
 			const w = window as any;
 			return w.__migrateColorMap({
-				"session-a": 0,   // stays 0
-				"session-b": 8,   // removed → 7
-				"session-c": 12,  // shifts → 11
-				"session-d": 19,  // removed → 8
-				"session-e": 18,  // shifts → 17
-			});
+				"a": 0, "b": 8, "c": 9, "d": 12, "e": 19, "f": 18,
+			}, w.__V1_TO_CURRENT);
 		});
-		expect(result).toEqual({
-			"session-a": 0,
-			"session-b": 7,
-			"session-c": 11,
-			"session-d": 8,
-			"session-e": 17,
+		expect(result).toEqual({ a: 0, b: 7, c: 7, d: 10, e: 8, f: 16 });
+	});
+});
+
+test.describe("Color palette migration from v2 (18-colour) to current (17-colour)", () => {
+	test("indices 0-7 are unchanged", async ({ page }) => {
+		await page.goto(TEST_PAGE);
+		const results = await page.evaluate(() => {
+			const w = window as any;
+			return Array.from({ length: 8 }, (_, i) => w.__migrateIndex(i, w.__V2_TO_CURRENT));
 		});
+		expect(results).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+	});
+
+	test("removed index 8 (225°) maps to 7 (175°)", async ({ page }) => {
+		await page.goto(TEST_PAGE);
+		const r = await page.evaluate(() => (window as any).__migrateIndex(8, (window as any).__V2_TO_CURRENT));
+		expect(r).toBe(7);
+	});
+
+	test("indices 9-17 shift down by 1", async ({ page }) => {
+		await page.goto(TEST_PAGE);
+		const results = await page.evaluate(() => {
+			const w = window as any;
+			return Array.from({ length: 9 }, (_, i) => w.__migrateIndex(i + 9, w.__V2_TO_CURRENT));
+		});
+		expect(results).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16]);
+	});
+
+	test("v2 migration preserves hue for shifted indices 9-17", async ({ page }) => {
+		await page.goto(TEST_PAGE);
+		const allMatch = await page.evaluate(() => {
+			const w = window as any;
+			for (let oldIdx = 9; oldIdx <= 17; oldIdx++) {
+				const newIdx = w.__migrateIndex(oldIdx, w.__V2_TO_CURRENT);
+				if (w.__V2_PALETTE[oldIdx] !== w.__NEW_PALETTE[newIdx]) return false;
+			}
+			return true;
+		});
+		expect(allMatch).toBe(true);
+	});
+
+	test("all v2 migrated indices are within 0-16", async ({ page }) => {
+		await page.goto(TEST_PAGE);
+		const allValid = await page.evaluate(() => {
+			const w = window as any;
+			for (let i = 0; i < 18; i++) {
+				const newIdx = w.__migrateIndex(i, w.__V2_TO_CURRENT);
+				if (newIdx < 0 || newIdx > 16) return false;
+			}
+			return true;
+		});
+		expect(allValid).toBe(true);
 	});
 });
