@@ -760,18 +760,66 @@ async function handleApiRoute(
 		const branch = goal.branch || "HEAD";
 		// Validate branch name to prevent injection
 		if (!/^[a-zA-Z0-9/_.\-]+$/.test(branch)) { json({ error: "Invalid branch name" }, 400); return; }
+		const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "20", 10) || 20, 1), 100);
 		try {
 			const { execFileSync } = require("node:child_process");
-			const out = execFileSync("git", ["log", "--format=%H|%h|%s|%an|%aI", "-20", branch], {
+			const out = execFileSync("git", ["log", "--format=%H|%h|%s|%an|%aI", `-${limit}`, branch], {
 				cwd: goal.cwd, encoding: "utf-8",
 			});
 			const commits = out.trim().split("\n").filter(Boolean).map((line: string) => {
 				const [sha, shortSha, message, author, timestamp] = line.split("|");
 				return { sha, shortSha, message, author, timestamp };
 			});
-			json(commits);
+			json({ commits });
 		} catch (e: any) {
 			json({ error: "Failed to read git log", detail: e.message }, 500);
+		}
+		return;
+	}
+
+	// GET /api/goals/:id/git-status — git status for goal worktree
+	const goalGitMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/git-status$/);
+	if (goalGitMatch && req.method === "GET") {
+		const goalId = goalGitMatch[1];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+		const cwd = goal.cwd;
+		const execOpts = { cwd, encoding: "utf-8" as const, timeout: 5000 };
+		try {
+			let branch = "";
+			try {
+				branch = execSync("git rev-parse --abbrev-ref HEAD", execOpts).trim();
+			} catch {
+				json({ error: "Not a git repository" }, 400);
+				return;
+			}
+			let primaryBranch = "master";
+			try {
+				const remoteHead = execSync("git symbolic-ref refs/remotes/origin/HEAD", execOpts).trim();
+				primaryBranch = remoteHead.replace("refs/remotes/origin/", "");
+			} catch {
+				try { execSync("git rev-parse --verify refs/heads/master", execOpts); primaryBranch = "master"; }
+				catch { try { execSync("git rev-parse --verify refs/heads/main", execOpts); primaryBranch = "main"; } catch { /* keep default */ } }
+			}
+			const isOnPrimary = branch === primaryBranch;
+			let aheadOfPrimary = 0;
+			let behindPrimary = 0;
+			let mergedIntoPrimary = false;
+			if (!isOnPrimary) {
+				const primaryRef = (() => {
+					try { execSync(`git rev-parse --verify origin/${primaryBranch}`, execOpts); return `origin/${primaryBranch}`; }
+					catch { return primaryBranch; }
+				})();
+				try { aheadOfPrimary = parseInt(execSync(`git rev-list --count ${primaryRef}..HEAD`, execOpts).trim(), 10) || 0; } catch { /* ignore */ }
+				try { behindPrimary = parseInt(execSync(`git rev-list --count HEAD..${primaryRef}`, execOpts).trim(), 10) || 0; } catch { /* ignore */ }
+				mergedIntoPrimary = aheadOfPrimary === 0;
+			}
+			let statusRaw = "";
+			try { statusRaw = execSync("git status --porcelain", execOpts).replace(/\s+$/, ""); } catch { /* empty */ }
+			const clean = !statusRaw;
+			json({ branch, primaryBranch, isOnPrimary, clean, aheadOfPrimary, behindPrimary, mergedIntoPrimary });
+		} catch (err) {
+			json({ error: String(err) }, 500);
 		}
 		return;
 	}

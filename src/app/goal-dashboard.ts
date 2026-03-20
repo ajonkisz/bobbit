@@ -55,6 +55,30 @@ let teamStopping = false;
 let loading = true;
 let error = "";
 
+/** Git merge status for goal branch */
+interface GoalGitStatus {
+	branch: string;
+	primaryBranch: string;
+	isOnPrimary: boolean;
+	clean: boolean;
+	aheadOfPrimary: number;
+	behindPrimary: number;
+	mergedIntoPrimary: boolean;
+}
+let gitStatus: GoalGitStatus | null = null;
+
+/** Aggregated cost for goal */
+interface GoalCost {
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	totalCost: number;
+}
+let goalCost: GoalCost | null = null;
+let costPollTimer: ReturnType<typeof setInterval> | null = null;
+let gitStatusPollTimer: ReturnType<typeof setInterval> | null = null;
+
 /** Current dashboard tab */
 let dashboardTab: "tasks" | "agents" | "commits" | "artifacts" = "tasks";
 
@@ -75,11 +99,13 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	startTaskPolling(goalId);
 
 	try {
-		const [goalRes, tasksRes, commitsRes, fetchedArtifacts] = await Promise.all([
+		const [goalRes, tasksRes, commitsRes, fetchedArtifacts, gitStatusRes, costRes] = await Promise.all([
 			gatewayFetch(`/api/goals/${goalId}`),
 			gatewayFetch(`/api/goals/${goalId}/tasks`),
 			gatewayFetch(`/api/goals/${goalId}/commits?limit=20`).catch(() => null),
 			fetchGoalArtifacts(goalId),
+			gatewayFetch(`/api/goals/${goalId}/git-status`).catch(() => null),
+			gatewayFetch(`/api/goals/${goalId}/cost`).catch(() => null),
 		]);
 
 		if (!goalRes.ok) throw new Error(`Goal not found (${goalRes.status})`);
@@ -102,10 +128,20 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 
 		artifacts = fetchedArtifacts;
 
+		if (gitStatusRes && gitStatusRes.ok) {
+			gitStatus = await gitStatusRes.json();
+		}
+
+		if (costRes && costRes.ok) {
+			goalCost = await costRes.json();
+		}
+
 		const teamState = await getTeamState(goalId);
 		teamActive = teamState != null;
 
 		startArtifactPolling(goalId);
+		startCostPolling(goalId);
+		startGitStatusPolling(goalId);
 
 		loading = false;
 	} catch (err) {
@@ -130,9 +166,13 @@ export function clearDashboardState(): void {
 	error = "";
 	dashboardTab = "tasks";
 	roleDropdownOpen = false;
+	gitStatus = null;
+	goalCost = null;
 	stopAgentPolling();
 	stopTaskPolling();
 	stopArtifactPolling();
+	stopCostPolling();
+	stopGitStatusPolling();
 }
 
 // ============================================================================
@@ -218,6 +258,48 @@ function startArtifactPolling(goalId: string): void {
 
 function stopArtifactPolling(): void {
 	if (artifactPollTimer) { clearInterval(artifactPollTimer); artifactPollTimer = null; }
+}
+
+function startCostPolling(goalId: string): void {
+	stopCostPolling();
+	costPollTimer = setInterval(async () => {
+		if (!currentGoalId || currentGoalId !== goalId) return;
+		try {
+			const res = await gatewayFetch(`/api/goals/${goalId}/cost`);
+			if (res.ok) {
+				const newCost: GoalCost = await res.json();
+				if (newCost.totalCost !== goalCost?.totalCost) {
+					goalCost = newCost;
+					renderApp();
+				}
+			}
+		} catch { /* ignore */ }
+	}, 15_000);
+}
+
+function stopCostPolling(): void {
+	if (costPollTimer) { clearInterval(costPollTimer); costPollTimer = null; }
+}
+
+function startGitStatusPolling(goalId: string): void {
+	stopGitStatusPolling();
+	gitStatusPollTimer = setInterval(async () => {
+		if (!currentGoalId || currentGoalId !== goalId) return;
+		try {
+			const res = await gatewayFetch(`/api/goals/${goalId}/git-status`);
+			if (res.ok) {
+				const newStatus: GoalGitStatus = await res.json();
+				if (JSON.stringify(newStatus) !== JSON.stringify(gitStatus)) {
+					gitStatus = newStatus;
+					renderApp();
+				}
+			}
+		} catch { /* ignore */ }
+	}, 30_000);
+}
+
+function stopGitStatusPolling(): void {
+	if (gitStatusPollTimer) { clearInterval(gitStatusPollTimer); gitStatusPollTimer = null; }
 }
 
 // ============================================================================
