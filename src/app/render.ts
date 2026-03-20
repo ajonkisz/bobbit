@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, ChevronDown, Crosshair, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users } from "lucide";
+import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users } from "lucide";
 import {
 	state,
 	renderApp,
@@ -839,11 +839,22 @@ export function doRenderApp(): void {
 		`;
 	};
 
+	const previewCollapseKey = () => `bobbit-preview-collapsed-${activeSessionId()}`;
+	const isPreviewCollapsed = () => localStorage.getItem(previewCollapseKey()) === "true";
+	const togglePreviewCollapse = () => {
+		const next = !isPreviewCollapsed();
+		localStorage.setItem(previewCollapseKey(), String(next));
+		renderApp();
+	};
+
 	const htmlPreviewPanel = () => {
 		return html`
 			<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
 				<div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
 					<span class="text-xs font-medium text-muted-foreground">Live Preview</span>
+					<button @click=${togglePreviewCollapse} class="text-muted-foreground hover:text-foreground" style="background:none;border:none;cursor:pointer;padding:2px;" title="Collapse preview">
+						${icon(PanelRightClose, "sm")}
+					</button>
 				</div>
 				<div style="position:relative;flex:1;min-height:0;">
 					<iframe
@@ -856,6 +867,12 @@ export function doRenderApp(): void {
 			</div>
 		`;
 	};
+
+	const previewExpandButton = () => html`
+		<button @click=${togglePreviewCollapse} class="text-muted-foreground hover:text-foreground" style="background:none;border:none;cursor:pointer;padding:6px 4px;border-left:1px solid var(--border);align-self:stretch;display:flex;align-items:center;" title="Expand preview">
+			${icon(PanelRightOpen, "sm")}
+		</button>
+	`;
 
 	const mainArea = () => {
 		// Goal dashboard route
@@ -905,11 +922,12 @@ export function doRenderApp(): void {
 		}
 		if (connected && state.isPreviewSession) {
 			if (desktop) {
+				const collapsed = isPreviewCollapsed();
 				return html`
 					${reconnectBanner()}
 					<div class="flex-1 flex min-h-0 overflow-hidden">
-						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
-						${htmlPreviewPanel()}
+						<div class="${collapsed ? 'flex-1' : 'goal-chat-panel flex-1'} min-w-0 flex flex-col">${state.chatPanel}</div>
+						${collapsed ? previewExpandButton() : htmlPreviewPanel()}
 					</div>
 				`;
 			}
