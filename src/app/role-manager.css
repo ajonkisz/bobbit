@@ -102,6 +102,10 @@
 	min-height: 0;
 	overflow-y: auto;
 	padding: 20px;
+}
+
+/* When body contains the edit view, flex-column so prompt can stretch */
+.roles-body:has(.roles-edit-container) {
 	display: flex;
 	flex-direction: column;
 }
