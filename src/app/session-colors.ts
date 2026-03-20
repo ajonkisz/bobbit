@@ -106,13 +106,12 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		id: "shield",
 		label: "Shield",
 		shadow: `
-			3px -1px 0 #000,4px -1px 0 #000,5px -1px 0 #000,6px -1px 0 #000,7px -1px 0 #000,
-			2px 0 0 #000,3px 0 0 #6b7280,4px 0 0 #9ca3af,5px 0 0 #d1d5db,6px 0 0 #9ca3af,7px 0 0 #6b7280,8px 0 0 #000,
-			2px 1px 0 #000,3px 1px 0 #9ca3af,4px 1px 0 #d1d5db,5px 1px 0 #f3f4f6,6px 1px 0 #d1d5db,7px 1px 0 #9ca3af,8px 1px 0 #000,
-			2px 2px 0 #000,3px 2px 0 #6b7280,4px 2px 0 #9ca3af,5px 2px 0 #d1d5db,6px 2px 0 #9ca3af,7px 2px 0 #6b7280,8px 2px 0 #000,
-			3px 3px 0 #000,4px 3px 0 #6b7280,5px 3px 0 #9ca3af,6px 3px 0 #6b7280,7px 3px 0 #000,
-			4px 4px 0 #000,5px 4px 0 #6b7280,6px 4px 0 #000,
-			5px 5px 0 #000
+			8px 3px 0 #000,9px 3px 0 #000,10px 3px 0 #000,11px 3px 0 #000,12px 3px 0 #000,
+			7px 4px 0 #000,8px 4px 0 #9ca3af,9px 4px 0 #d1d5db,10px 4px 0 #d1d5db,11px 4px 0 #9ca3af,12px 4px 0 #000,
+			7px 5px 0 #000,8px 5px 0 #d1d5db,9px 5px 0 #f3f4f6,10px 5px 0 #ef4444,11px 5px 0 #d1d5db,12px 5px 0 #000,
+			7px 6px 0 #000,8px 6px 0 #9ca3af,9px 6px 0 #d1d5db,10px 6px 0 #d1d5db,11px 6px 0 #9ca3af,12px 6px 0 #000,
+			8px 7px 0 #000,9px 7px 0 #9ca3af,10px 7px 0 #9ca3af,11px 7px 0 #000,
+			9px 8px 0 #000,10px 8px 0 #000
 		`,
 		yOffset: 0,
 		addsHeight: false,
