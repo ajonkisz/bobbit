@@ -107,7 +107,7 @@
 .roles-list {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 8px;
 	max-width: 600px;
 	margin: 0 auto;
 }
@@ -121,7 +121,7 @@
 	flex-direction: row;
 	align-items: center;
 	gap: 10px;
-	padding: 6px 16px;
+	padding: 8px 16px;
 	background: var(--secondary);
 	border: 1px solid var(--border);
 	border-radius: 8px;
@@ -346,7 +346,7 @@
 	flex-direction: column;
 	align-items: center;
 	gap: 2px;
-	padding: 4px 4px;
+	padding: 6px 4px;
 	border-radius: 6px;
 	border: 1px solid transparent;
 	background: transparent;
@@ -486,10 +486,10 @@
 	margin-bottom: 0 !important;
 	overflow: visible;
 	position: absolute;
-	/* Center the blob in the 60×60 viewport. The sprite margin-box is 37px wide
-	   starting from left:0. Center it: (60-37)/2 = ~11px offset. */
-	left: 11px;
-	bottom: 4px;
+	/* Center the blob in the 66×66 viewport. The sprite margin-box is 37px wide
+	   starting from left:0. Center it: (66-37)/2 = ~14px offset. */
+	left: 14px;
+	bottom: 8px;
 }
 
 /* Keep the original 3.5x scale and sprite margins — the blob layout is

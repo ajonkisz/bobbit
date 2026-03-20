@@ -26,7 +26,7 @@ function idleBlob(accId: string, size = 40, hueIndex = 0): TemplateResult {
 	const cls = `bobbit-blob bobbit-blob--idle bobbit-blob--inline ${accClass}`.trim();
 	// The sprite margin-box is 37×37px but accessories overflow it.
 	// Use a larger viewport to capture everything, then scale down.
-	const naturalSize = 60;
+	const naturalSize = 66;
 	const s = size / naturalSize;
 	const hue = BOBBIT_HUE_ROTATIONS[hueIndex % BOBBIT_HUE_ROTATIONS.length];
 	return html`
