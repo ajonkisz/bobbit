@@ -158,16 +158,16 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		yOffset: 0,
 		addsHeight: false,
 	},
-	compass: {
-		id: "compass",
-		label: "Compass",
+	"set-square": {
+		id: "set-square",
+		label: "Set Square",
 		shadow: `
-			9px 3px 0 #000,10px 3px 0 #000,
-			8px 4px 0 #000,9px 4px 0 #9ca3af,10px 4px 0 #9ca3af,11px 4px 0 #000,
-			8px 5px 0 #000,9px 5px 0 #d1d5db,10px 5px 0 #d1d5db,11px 5px 0 #000,
-			7px 6px 0 #000,8px 6px 0 #9ca3af,10px 6px 0 #9ca3af,11px 6px 0 #000,
-			6px 7px 0 #000,7px 7px 0 #9ca3af,10px 7px 0 #000,11px 7px 0 #fbbf24,12px 7px 0 #000,
-			5px 8px 0 #000,6px 8px 0 #4b5563,12px 8px 0 #000
+			10px 4px 0 #000,
+			9px 5px 0 #000,10px 5px 0 #93c5fd,11px 5px 0 #000,
+			8px 6px 0 #000,9px 6px 0 #bfdbfe,10px 6px 0 #93c5fd,11px 6px 0 #000,
+			7px 7px 0 #000,8px 7px 0 #bfdbfe,9px 7px 0 #000,10px 7px 0 #bfdbfe,11px 7px 0 #000,
+			6px 8px 0 #000,7px 8px 0 #bfdbfe,8px 8px 0 #bfdbfe,9px 8px 0 #bfdbfe,10px 8px 0 #93c5fd,11px 8px 0 #000,
+			5px 9px 0 #000,6px 9px 0 #000,7px 9px 0 #000,8px 9px 0 #000,9px 9px 0 #000,10px 9px 0 #000,11px 9px 0 #000
 		`,
 		yOffset: 0,
 		addsHeight: false,
