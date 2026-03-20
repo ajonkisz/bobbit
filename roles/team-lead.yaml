@@ -1,7 +1,25 @@
 name: team-lead
 label: Team Lead
 accessory: crown
-allowedTools: []
+allowedTools:
+  - read
+  - write
+  - edit
+  - bash
+  - web_search
+  - web_fetch
+  - delegate
+  - team_spawn
+  - team_list
+  - team_dismiss
+  - team_complete
+  - task_list
+  - task_create
+  - task_update
+  - artifact_list
+  - artifact_create
+  - artifact_get
+  - artifact_update
 createdAt: 1773875507369
 updatedAt: 1774025455973
 promptTemplate: |+

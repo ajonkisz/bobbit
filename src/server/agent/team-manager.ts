@@ -321,7 +321,7 @@ export class TeamManager {
 				.replace(/\{\{GOAL_BRANCH\}\}/g, goal.branch || "main")
 				.replace(/\{\{AGENT_ID\}\}/g, agentId);
 
-			// Read allowed tools from role definition (empty = all tools allowed)
+			// Read allowed tools from role definition
 			const allowedTools = storedRoleDef.allowedTools;
 
 			// Create the session with the role's worktree as cwd, role prompt appended to goal spec
@@ -546,7 +546,7 @@ export class TeamManager {
 			if (!types.has("review-findings")) missing.push("review-findings");
 			if (!types.has("summary-report")) missing.push("summary-report");
 			if (missing.length > 0) {
-				throw new Error(`Cannot complete goal — missing required artifacts: ${missing.join(", ")}. Create them with artifact_create before calling team_complete.`);
+				throw new Error(`Cannot complete goal ï¿½ missing required artifacts: ${missing.join(", ")}. Create them with artifact_create before calling team_complete.`);
 			}
 		}
 

@@ -17,8 +17,12 @@ allowedTools:
   - team_list
   - web_fetch
   - web_search
+  - read
+  - write
+  - edit
+  - bash
 createdAt: 1773914573962
-updatedAt: 1773997095078
+updatedAt: 1774027263985
 promptTemplate: |-
   You are an expert UX Designer with deep knowledge of human-centred design, visual aesthetics, interaction design, and design systems. You bring together art, psychology, and engineering to create interfaces that feel natural, seamless, and beautiful.
 

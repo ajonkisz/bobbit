@@ -59,7 +59,7 @@ export interface SessionInfo {
 	taskId?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory?: string;
-	/** Allowed tools for this session (empty array = all tools allowed) */
+	/** Allowed tools for this session */
 	allowedTools?: string[];
 	/** Server-side prompt queue */
 	promptQueue: PromptQueue;
@@ -1077,7 +1077,7 @@ export class SessionManager {
 		session.status = "idle";
 		session.role = role.name;
 		session.accessory = role.accessory;
-		session.allowedTools = role.allowedTools.length > 0 ? role.allowedTools : undefined;
+		session.allowedTools = role.allowedTools;
 
 		this.store.update(id, { role: role.name, accessory: role.accessory });
 

@@ -11,7 +11,7 @@ export interface Role {
 	label: string;
 	/** Markdown system prompt template (supports {{GOAL_BRANCH}} and {{AGENT_ID}} placeholders) */
 	promptTemplate: string;
-	/** Subset of allowed agent tools — empty array means "all tools allowed" */
+	/** Subset of allowed agent tools */
 	allowedTools: string[];
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory: string;

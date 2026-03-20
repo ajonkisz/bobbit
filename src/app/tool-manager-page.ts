@@ -199,7 +199,7 @@ async function createToolAssistantSession(): Promise<void> {
 		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
 		const { id } = await res.json();
 		const { connectToSession } = await import("./session-manager.js");
-		await connectToSession(id, false);
+		await connectToSession(id, false, { isToolAssistant: true });
 	} catch (err) {
 		const { showConnectionError } = await import("./dialogs.js");
 		const msg = err instanceof Error ? err.message : String(err);
@@ -305,7 +305,7 @@ function renderNavBar(): TemplateResult {
 					variant: "default",
 					size: "sm",
 					onClick: createToolAssistantSession,
-					children: html`<span class="inline-flex items-center gap-1.5 font-semibold">${icon(Wrench, "sm")} Tool Assistant</span>`,
+					children: html`<span class="inline-flex items-center gap-1.5 font-semibold">${icon(Wrench, "sm")} + Create Tool</span>`,
 				})}
 			</div>
 		</div>

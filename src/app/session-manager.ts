@@ -186,7 +186,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 // CONNECT TO SESSION
 // ============================================================================
 
-export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isPreview?: boolean }): Promise<void> {
+export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isPreview?: boolean }): Promise<void> {
 	if (state.connectingSessionId) return;
 	state.connectingSessionId = sessionId;
 
@@ -323,6 +323,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
 		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
 		state.isRoleAssistantSession = options?.isRoleAssistant || sessionData?.roleAssistant || false;
+		state.isToolAssistantSession = options?.isToolAssistant || sessionData?.toolAssistant || false;
 		state.isPreviewSession = options?.isPreview || sessionData?.preview || false;
 		state.previewPanelHtml = ""; // Clear stale preview from previous session
 		if (state.isPreviewSession) startPreviewPolling();
@@ -423,6 +424,10 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		if (options?.isRoleAssistant && !isExisting) {
 			remote.prompt("Start the role creation session.");
+		}
+
+		if (options?.isToolAssistant && !isExisting) {
+			remote.prompt("Start the tool assistant session. Help me document, improve, or create tools.");
 		}
 
 		// Restore draft and set up auto-save

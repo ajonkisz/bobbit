@@ -18,6 +18,7 @@ export interface GatewaySession {
 	goalId?: string;
 	goalAssistant?: boolean;
 	roleAssistant?: boolean;
+	toolAssistant?: boolean;
 	colorIndex?: number;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
@@ -98,6 +99,7 @@ export const state = {
 
 	// Role assistant split-screen state
 	isRoleAssistantSession: false,
+	isToolAssistantSession: false,
 	roleAssistantTab: "chat" as "chat" | "preview",
 	rolePreviewName: "",
 	rolePreviewLabel: "",
