@@ -967,7 +967,7 @@ html {
 	width: 1px;
 	height: 1px;
 	box-shadow:
-		9px 1px 0 rgba(125, 211, 252, 0.9);
+		9px 3px 0 rgba(125, 211, 252, 0.9);
 	animation: flask-bubbles 2.5s ease-in-out infinite;
 }
 .bobbit-flask .bobbit-blob__flask::after {
@@ -976,7 +976,7 @@ html {
 	width: 1px;
 	height: 1px;
 	box-shadow:
-		10px 1px 0 rgba(56, 189, 248, 0.8);
+		10px 3px 0 rgba(56, 189, 248, 0.8);
 	animation: flask-bubbles 2.5s ease-in-out 1s infinite;
 }
 
