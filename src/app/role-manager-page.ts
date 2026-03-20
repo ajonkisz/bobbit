@@ -19,7 +19,7 @@ import { setHashRoute } from "./routing.js";
  *  outside chat we use a CSS class (.bobbit-blob--inline) that resets these
  *  properties, added via role-manager.css.
  */
-function idleBlob(accId: string, size = 40, hueIndex = 0): TemplateResult {
+function idleBlob(accId: string, size = 40, hueIndex = 0, phaseIndex = 0): TemplateResult {
 	const accClass = accId && accId !== "none"
 		? `bobbit-${accId === "crown" ? "crowned" : accId}`
 		: "";
@@ -29,10 +29,13 @@ function idleBlob(accId: string, size = 40, hueIndex = 0): TemplateResult {
 	const naturalSize = 66;
 	const s = size / naturalSize;
 	const hue = BOBBIT_HUE_ROTATIONS[hueIndex % BOBBIT_HUE_ROTATIONS.length];
+	// Offset animations so multiple blobs don't blink/shimmer in sync
+	const eyeDelay = -(phaseIndex * 1.3 % 10).toFixed(2);
+	const shimmerDelay = -(phaseIndex * 1.7 % 8).toFixed(2);
 	return html`
 		<div style="width:${size}px;height:${size}px;flex-shrink:0;">
 			<div style="width:${naturalSize}px;height:${naturalSize}px;position:relative;overflow:hidden;transform:scale(${s.toFixed(3)});transform-origin:top left;">
-				<div class="${cls}" style="--bobbit-hue-rotate:${hue}deg;">
+				<div class="${cls}" style="--bobbit-hue-rotate:${hue}deg;--bobbit-eye-delay:${eyeDelay}s;--bobbit-shimmer-delay:${shimmerDelay}s;">
 					<div class="bobbit-blob__sprite"></div>
 					<div class="bobbit-blob__crown"></div>
 					<div class="bobbit-blob__bandana"></div>
@@ -339,7 +342,7 @@ async function handleDeleteFromList(role: RoleData): Promise<void> {
 function renderRoleRow(role: RoleData, index: number): TemplateResult {
 	return html`
 		<div class="role-row" tabindex="0" role="button" @click=${() => showEdit(role)} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showEdit(role); } }}>
-			${idleBlob(role.accessory ?? "none", 42, index)}
+			${idleBlob(role.accessory ?? "none", 42, index, index)}
 			<div class="role-row-info">
 				<span class="role-row-label">${role.label}</span>
 				<span class="role-row-slug">${role.name}</span>
@@ -477,7 +480,7 @@ function renderEditView(): TemplateResult {
 									<span class="roles-accessory-preview">
 										${accId === "none"
 											? html`<span class="text-xs text-muted-foreground">\u2014</span>`
-											: idleBlob(accId, 42, i)}
+											: idleBlob(accId, 42, i, i)}
 									</span>
 									<span class="roles-accessory-label">${acc.label}</span>
 								</button>
