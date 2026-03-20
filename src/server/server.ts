@@ -18,9 +18,11 @@ import { RoleManager } from "./agent/role-manager.js";
 import { ToolStore } from "./agent/tool-store.js";
 import { ToolManager } from "./agent/tool-manager.js";
 import { TOOL_ASSISTANT_PROMPT } from "./agent/tool-assistant.js";
+import { ARTIFACT_SPEC_ASSISTANT_PROMPT } from "./agent/artifact-spec-assistant.js";
 import type { TaskState } from "./agent/task-store.js";
 import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
 import { ArtifactSpecStore } from "./agent/artifact-spec-store.js";
+import { ArtifactSpecManager } from "./agent/artifact-spec-manager.js";
 
 const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
 
@@ -61,6 +63,7 @@ export function createGateway(config: GatewayConfig) {
 	const toolManager = new ToolManager(toolStore);
 	const goalArtifactStore = new GoalArtifactStore();
 	const artifactSpecStore = new ArtifactSpecStore();
+	const artifactSpecManager = new ArtifactSpecManager(artifactSpecStore);
 	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
@@ -106,7 +109,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecStore);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager);
 			return;
 		}
 
@@ -183,7 +186,7 @@ async function handleApiRoute(
 	roleManager: RoleManager,
 	toolManager: ToolManager,
 	goalArtifactStore: GoalArtifactStore,
-	artifactSpecStore: ArtifactSpecStore,
+	artifactSpecManager: ArtifactSpecManager,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -286,6 +289,7 @@ async function handleApiRoute(
 		const goalAssistant = body?.goalAssistant === true;
 		const roleAssistant = body?.roleAssistant === true;
 		const toolAssistant = body?.toolAssistant === true;
+		const artifactSpecAssistant = body?.artifactSpecAssistant === true;
 
 		// If creating under a goal, use the goal's cwd as default
 		let cwd = body?.cwd || config.defaultCwd;
@@ -304,13 +308,15 @@ async function handleApiRoute(
 
 		// If a roleId is provided, look up the role and pass its prompt/tools/accessory
 		const roleId = body?.roleId;
-		let createOpts: { rolePrompt?: string; allowedTools?: string[]; roleAssistant?: boolean; toolAssistant?: boolean } | undefined;
+		let createOpts: { rolePrompt?: string; allowedTools?: string[]; roleAssistant?: boolean; toolAssistant?: boolean; artifactSpecAssistant?: boolean } | undefined;
 		let roleForMeta: { name: string; accessory: string } | undefined;
 
 		if (toolAssistant) {
 			createOpts = { toolAssistant: true };
 		} else if (roleAssistant) {
 			createOpts = { roleAssistant: true };
+		} else if (artifactSpecAssistant) {
+			createOpts = { artifactSpecAssistant: true };
 		} else if (roleId && typeof roleId === "string") {
 			const role = roleManager.getRole(roleId);
 			if (!role) {
@@ -342,6 +348,7 @@ async function handleApiRoute(
 				goalAssistant: session.goalAssistant,
 				roleAssistant: session.roleAssistant,
 				toolAssistant: session.toolAssistant,
+				artifactSpecAssistant: session.artifactSpecAssistant,
 				role: session.role,
 				accessory: session.accessory,
 			}, 201);
@@ -575,7 +582,7 @@ async function handleApiRoute(
 
 		// Enforce artifact spec requirements if specId is provided
 		if (body.specId && typeof body.specId === "string") {
-			const spec = artifactSpecStore.get(body.specId);
+			const spec = artifactSpecManager.getSpec(body.specId);
 			if (spec && spec.requires && spec.requires.length > 0) {
 				const existingArtifacts = goalArtifactStore.getByGoalId(goalId);
 				const existingSpecIds = new Set(existingArtifacts.map(a => a.specId || a.type));
@@ -1348,7 +1355,7 @@ async function handleApiRoute(
 	// GET /api/artifact-specs
 	const artifactSpecsMatch = url.pathname === "/api/artifact-specs";
 	if (artifactSpecsMatch && req.method === "GET") {
-		json({ specs: artifactSpecStore.getAll() });
+		json({ specs: artifactSpecManager.listSpecs() });
 		return;
 	}
 
@@ -1360,15 +1367,15 @@ async function handleApiRoute(
 		if (!body?.kind || typeof body.kind !== "string") { json({ error: "Missing kind" }, 400); return; }
 		if (!body?.format || typeof body.format !== "string") { json({ error: "Missing format" }, 400); return; }
 		try {
-			const spec = artifactSpecStore.create({
+			const spec = artifactSpecManager.createSpec({
 				id: body.id,
 				name: body.name,
 				description: body.description || "",
 				kind: body.kind,
 				format: body.format,
-				mustHave: body.mustHave || [],
-				shouldHave: body.shouldHave || [],
-				mustNotHave: body.mustNotHave || [],
+				mustHave: body.mustHave,
+				shouldHave: body.shouldHave,
+				mustNotHave: body.mustNotHave,
 				requires: body.requires,
 				suggestedRole: body.suggestedRole,
 			});
@@ -1382,7 +1389,7 @@ async function handleApiRoute(
 	// GET /api/artifact-specs/:id
 	const artifactSpecMatch = url.pathname.match(/^\/api\/artifact-specs\/([^/]+)$/);
 	if (artifactSpecMatch && req.method === "GET") {
-		const spec = artifactSpecStore.get(decodeURIComponent(artifactSpecMatch[1]));
+		const spec = artifactSpecManager.getSpec(decodeURIComponent(artifactSpecMatch[1]));
 		if (!spec) { json({ error: "Artifact spec not found" }, 404); return; }
 		json(spec);
 		return;
@@ -1393,16 +1400,21 @@ async function handleApiRoute(
 		const specId = decodeURIComponent(artifactSpecMatch[1]);
 		const body = await readBody(req);
 		if (!body) { json({ error: "Missing body" }, 400); return; }
-		const updated = artifactSpecStore.update(specId, body);
-		if (!updated) { json({ error: "Artifact spec not found" }, 404); return; }
-		json(updated);
+		try {
+			const ok = artifactSpecManager.updateSpec(specId, body);
+			if (!ok) { json({ error: "Artifact spec not found" }, 404); return; }
+			const updated = artifactSpecManager.getSpec(specId);
+			json(updated);
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
 		return;
 	}
 
 	// DELETE /api/artifact-specs/:id
 	if (artifactSpecMatch && req.method === "DELETE") {
 		const specId = decodeURIComponent(artifactSpecMatch[1]);
-		const spec = artifactSpecStore.get(specId);
+		const spec = artifactSpecManager.getSpec(specId);
 		if (!spec) { json({ error: "Artifact spec not found" }, 404); return; }
 		// Check if any goal artifacts reference this spec
 		const allGoals = sessionManager.goalManager.listGoals();
@@ -1413,7 +1425,7 @@ async function handleApiRoute(
 				return;
 			}
 		}
-		artifactSpecStore.delete(specId);
+		artifactSpecManager.deleteSpec(specId);
 		res.writeHead(204);
 		res.end();
 		return;

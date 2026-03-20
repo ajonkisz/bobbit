@@ -1,27 +1,170 @@
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { fileURLToPath } from "node:url";
+import { stringify, parse } from "yaml";
 
 export type ArtifactKind = "analysis" | "deliverable" | "review" | "verification";
 export type ArtifactFormat = "markdown" | "html" | "diff" | "command";
 
 export interface ArtifactSpec {
+	/** Unique identifier — lowercase alphanumeric + hyphens, immutable after creation */
 	id: string;
+	/** Human-readable display label */
 	name: string;
+	/** What this artifact is and why it matters */
 	description: string;
+	/** Nature of the work */
 	kind: ArtifactKind;
+	/** Output format the agent produces */
 	format: ArtifactFormat;
+	/** Non-negotiable requirements */
 	mustHave: string[];
+	/** Strongly recommended */
 	shouldHave: string[];
+	/** Disqualifying traits */
 	mustNotHave: string[];
+	/** Other artifact spec IDs that must have artifacts first */
 	requires?: string[];
+	/** Role best suited to produce this */
 	suggestedRole?: string;
 	createdAt: number;
 	updatedAt: number;
 }
 
-function getBuiltinDefaults(): ArtifactSpec[] {
-	const now = Date.now();
+/** artifact-specs/ directory at the repo root — version controlled */
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SPECS_DIR = path.resolve(__dirname, "../../../artifact-specs");
+
+/**
+ * File-backed artifact spec store. Each spec is a YAML file in
+ * artifact-specs/<id>.yaml at the repo root. Version controlled —
+ * edits via the UI write back to the same files so they can be committed.
+ */
+export class ArtifactSpecStore {
+	private specs: Map<string, ArtifactSpec> = new Map();
+
+	constructor() {
+		fs.mkdirSync(SPECS_DIR, { recursive: true });
+		this.loadAll();
+		// Seed defaults if directory is empty
+		if (this.specs.size === 0) {
+			this.seedDefaults();
+		}
+	}
+
+	private specFilePath(id: string): string {
+		return path.join(SPECS_DIR, `${id}.yaml`);
+	}
+
+	private loadAll(): void {
+		let entries: fs.Dirent[];
+		try {
+			entries = fs.readdirSync(SPECS_DIR, { withFileTypes: true });
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			if (!entry.isFile() || !entry.name.endsWith(".yaml")) continue;
+			const filePath = path.join(SPECS_DIR, entry.name);
+			try {
+				const raw = fs.readFileSync(filePath, "utf-8");
+				const data = parse(raw);
+				if (data && typeof data === "object" && data.id) {
+					this.specs.set(data.id, {
+						id: data.id,
+						name: data.name ?? data.id,
+						description: data.description ?? "",
+						kind: data.kind ?? "analysis",
+						format: data.format ?? "markdown",
+						mustHave: Array.isArray(data.mustHave) ? data.mustHave : [],
+						shouldHave: Array.isArray(data.shouldHave) ? data.shouldHave : [],
+						mustNotHave: Array.isArray(data.mustNotHave) ? data.mustNotHave : [],
+						requires: Array.isArray(data.requires) ? data.requires : undefined,
+						suggestedRole: data.suggestedRole || undefined,
+						createdAt: data.createdAt ?? 0,
+						updatedAt: data.updatedAt ?? 0,
+					});
+				}
+			} catch (err) {
+				console.error(`[artifact-spec-store] Failed to load ${filePath}:`, err);
+			}
+		}
+	}
+
+	private saveOne(spec: ArtifactSpec): void {
+		const filePath = this.specFilePath(spec.id);
+		try {
+			const obj: Record<string, unknown> = {
+				id: spec.id,
+				name: spec.name,
+				description: spec.description,
+				kind: spec.kind,
+				format: spec.format,
+				mustHave: spec.mustHave,
+				shouldHave: spec.shouldHave,
+				mustNotHave: spec.mustNotHave,
+			};
+			if (spec.requires && spec.requires.length > 0) obj.requires = spec.requires;
+			if (spec.suggestedRole) obj.suggestedRole = spec.suggestedRole;
+			obj.createdAt = spec.createdAt;
+			obj.updatedAt = spec.updatedAt;
+
+			const content = stringify(obj, { lineWidth: 0 });
+			fs.writeFileSync(filePath, content, "utf-8");
+		} catch (err) {
+			console.error(`[artifact-spec-store] Failed to save ${filePath}:`, err);
+		}
+	}
+
+	private seedDefaults(): void {
+		const now = Date.now();
+		const defaults = getBuiltinDefaults(now);
+		for (const spec of defaults) {
+			this.specs.set(spec.id, spec);
+			this.saveOne(spec);
+		}
+	}
+
+	put(spec: ArtifactSpec): void {
+		this.specs.set(spec.id, spec);
+		this.saveOne(spec);
+	}
+
+	get(id: string): ArtifactSpec | undefined {
+		return this.specs.get(id);
+	}
+
+	remove(id: string): void {
+		this.specs.delete(id);
+		const filePath = this.specFilePath(id);
+		try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+	}
+
+	/** Re-read all YAML files from disk, picking up external changes */
+	reload(): void {
+		this.specs.clear();
+		this.loadAll();
+	}
+
+	getAll(): ArtifactSpec[] {
+		this.reload();
+		return Array.from(this.specs.values());
+	}
+
+	update(id: string, updates: Partial<Omit<ArtifactSpec, "id" | "createdAt">>): boolean {
+		const existing = this.specs.get(id);
+		if (!existing) return false;
+		const cleaned: Record<string, unknown> = {};
+		for (const [k, v] of Object.entries(updates)) {
+			if (v !== undefined && k !== "id" && k !== "createdAt") cleaned[k] = v;
+		}
+		Object.assign(existing, cleaned, { updatedAt: Date.now() });
+		this.saveOne(existing);
+		return true;
+	}
+}
+
+function getBuiltinDefaults(now: number): ArtifactSpec[] {
 	return [
 		{
 			id: "design-doc",
@@ -112,96 +255,4 @@ function getBuiltinDefaults(): ArtifactSpec[] {
 			updatedAt: now,
 		},
 	];
-}
-
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-artifact-specs.json");
-
-export class ArtifactSpecStore {
-	private specs: Map<string, ArtifactSpec> = new Map();
-
-	constructor() {
-		this.load();
-	}
-
-	private load(): void {
-		try {
-			if (fs.existsSync(STORE_FILE)) {
-				const data = JSON.parse(fs.readFileSync(STORE_FILE, "utf-8"));
-				if (Array.isArray(data)) {
-					for (const s of data) {
-						if (s.id) {
-							this.specs.set(s.id, s);
-						}
-					}
-				}
-			}
-		} catch (err) {
-			console.error("[artifact-spec-store] Failed to load persisted specs:", err);
-		}
-
-		// Seed with built-in defaults if store is empty
-		if (this.specs.size === 0) {
-			for (const spec of getBuiltinDefaults()) {
-				this.specs.set(spec.id, spec);
-			}
-			this.save();
-		}
-	}
-
-	private save(): void {
-		try {
-			if (!fs.existsSync(STORE_DIR)) {
-				fs.mkdirSync(STORE_DIR, { recursive: true });
-			}
-			const data = Array.from(this.specs.values());
-			fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), "utf-8");
-		} catch (err) {
-			console.error("[artifact-spec-store] Failed to save specs:", err);
-		}
-	}
-
-	create(input: Omit<ArtifactSpec, "createdAt" | "updatedAt">): ArtifactSpec {
-		if (this.specs.has(input.id)) {
-			throw new Error(`Artifact spec with id "${input.id}" already exists`);
-		}
-		const now = Date.now();
-		const spec: ArtifactSpec = {
-			...input,
-			createdAt: now,
-			updatedAt: now,
-		};
-		this.specs.set(spec.id, spec);
-		this.save();
-		return spec;
-	}
-
-	get(id: string): ArtifactSpec | undefined {
-		return this.specs.get(id);
-	}
-
-	getAll(): ArtifactSpec[] {
-		return Array.from(this.specs.values());
-	}
-
-	update(id: string, updates: Partial<Omit<ArtifactSpec, "id" | "createdAt">>): ArtifactSpec | undefined {
-		const existing = this.specs.get(id);
-		if (!existing) return undefined;
-		const cleaned: Record<string, unknown> = {};
-		for (const [k, v] of Object.entries(updates)) {
-			if (v !== undefined && k !== "id" && k !== "createdAt") cleaned[k] = v;
-		}
-		Object.assign(existing, cleaned, { updatedAt: Date.now() });
-		this.save();
-		return existing;
-	}
-
-	delete(id: string): boolean {
-		const existed = this.specs.has(id);
-		if (existed) {
-			this.specs.delete(id);
-			this.save();
-		}
-		return existed;
-	}
 }
