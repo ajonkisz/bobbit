@@ -491,14 +491,12 @@ function rolePreviewPanel() {
 // PREVIEW SWIPE (mobile)
 // ============================================================================
 
-let _swipeAttached = false;
-
-/** Attach swipe-left/right gesture to toggle between chat and preview tabs on mobile */
+/** Attach swipe-left/right gesture to #app (stable element, never recreated).
+ *  Toggles between chat and preview tabs on mobile preview sessions. */
 function setupPreviewSwipe(): void {
-	if (_swipeAttached) return;
-	const el = document.getElementById("app-main");
-	if (!el) return;
-	_swipeAttached = true;
+	const el = document.getElementById("app");
+	if (!el || (el as any).__swipeAttached) return;
+	(el as any).__swipeAttached = true;
 
 	let startX = 0;
 	let startY = 0;
