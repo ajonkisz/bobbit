@@ -467,6 +467,10 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 	let generating = false;
 	let titleChangeUnsub: (() => void) | null = null;
 	let roleDropdownOpen = false;
+	// Track pending role change — null means "no change", empty string means "clear role"
+	const session0 = state.gatewaySessions.find((s) => s.id === sessionId);
+	const initialRole: string = session0?.role || "";
+	let pendingRole: string | null = null; // null = no change yet
 
 	// Load roles for the picker
 	import("./api.js").then(({ fetchRoles }) => {
@@ -480,24 +484,40 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 		container.remove();
 	};
 
-	const doRename = () => {
+	const doSave = async () => {
+		// Apply title change
 		const trimmed = titleValue.trim();
-		if (!trimmed || trimmed === currentTitle) {
-			cleanup();
-			return;
+		if (trimmed && trimmed !== currentTitle) {
+			updateLocalSessionTitle(sessionId, trimmed);
+			if (state.remoteAgent && activeSessionId() === sessionId) {
+				state.remoteAgent.setTitle(trimmed);
+			} else {
+				import("./api.js").then(({ patchSession }) => {
+					patchSession(sessionId, { title: trimmed });
+				});
+				refreshSessions();
+			}
 		}
-		updateLocalSessionTitle(sessionId, trimmed);
 
-		if (state.remoteAgent && activeSessionId() === sessionId) {
-			state.remoteAgent.setTitle(trimmed);
-		} else {
-			import("./api.js").then(({ patchSession }) => {
-				patchSession(sessionId, { title: trimmed });
-			});
-			refreshSessions();
+		// Apply role change if pending
+		if (pendingRole !== null) {
+			saving = true;
+			renderDialog();
+			try {
+				await gatewayFetch(`/api/sessions/${sessionId}`, {
+					method: "PATCH",
+					body: JSON.stringify({ roleId: pendingRole }),
+				});
+				await refreshSessions();
+			} catch (err) {
+				console.error("[assign-role] Failed:", err);
+			}
 		}
+
 		cleanup();
 	};
+
+	let saving = false;
 
 	const doGenerate = () => {
 		if (!state.remoteAgent || activeSessionId() !== sessionId) return;
@@ -530,40 +550,30 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 		state.remoteAgent.generateTitle();
 	};
 
-	let assigningRole = false;
-
-	const doAssignRole = async (roleName: string | null) => {
+	const selectRole = (roleName: string) => {
+		pendingRole = roleName === initialRole ? null : roleName;
 		roleDropdownOpen = false;
-		assigningRole = true;
 		renderDialog();
-		try {
-			await gatewayFetch(`/api/sessions/${sessionId}`, {
-				method: "PATCH",
-				body: JSON.stringify({ roleId: roleName || "" }),
-			});
-			await refreshSessions();
-		} catch (err) {
-			console.error("[assign-role] Failed:", err);
-		} finally {
-			assigningRole = false;
-			// Dialog may have been destroyed by agent restart / reconnect — guard
-			if (container.parentNode) renderDialog();
-		}
 	};
 
 	const renderDialog = () => {
 		const session = state.gatewaySessions.find((s) => s.id === sessionId);
-		const currentAccessory = session?.accessory
-			?? (session?.role === "team-lead" ? "crown" : session?.role === "coder" ? "bandana" : "none");
-		const acc = getAccessory(currentAccessory);
+
+		// Use pending role for display if set, otherwise current session role
+		const displayRole = pendingRole !== null ? pendingRole : (session?.role || "");
+		const displayRoleObj = state.roles.find((r) => r.name === displayRole);
+		const displayAccessory = displayRoleObj?.accessory
+			?? (displayRole === "team-lead" ? "crown" : displayRole === "coder" ? "bandana" : "none");
+		const acc = getAccessory(displayAccessory);
 		const hasAccessory = acc.id !== "none" && acc.shadow !== "";
 
 		// Split 14 colours into 2 equal rows of 7
 		const ROW_SIZE = Math.ceil(BOBBIT_HUE_ROTATIONS.length / 2);
 
-		const currentRole = session?.role || "";
-		const currentRoleObj = state.roles.find((r) => r.name === currentRole);
-		const roleLabel = session?.goalAssistant ? "Goal Assistant" : currentRoleObj?.label || currentRole || "None";
+		const roleLabel = session?.goalAssistant ? "Goal Assistant" : displayRoleObj?.label || displayRole || "None";
+		const hasRoleChange = pendingRole !== null;
+		const hasTitleChange = titleValue.trim() !== "" && titleValue.trim() !== currentTitle;
+		const saveLabel = saving ? "Saving…" : hasRoleChange ? "Save & Assign Role" : "Save";
 
 		render(
 			Dialog({
@@ -589,7 +599,7 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 													titleValue = (e.target as HTMLInputElement).value;
 												},
 												onKeyDown: (e: KeyboardEvent) => {
-													if (e.key === "Enter") doRename();
+													if (e.key === "Enter") doSave();
 													if (e.key === "Escape") cleanup();
 												},
 											})}
@@ -648,43 +658,39 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 									<div class="text-xs text-muted-foreground mb-1.5">Role</div>
 									${session?.goalAssistant
 										? html`<div class="text-sm text-foreground/80 px-3 py-1.5 rounded-md bg-secondary/50">Goal Assistant</div>`
-										: assigningRole
-											? html`<div class="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
-												<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
-												Assigning role…
-											</div>`
-											: html`
-												<div class="relative" id="role-picker-container">
-													<button
-														class="w-full text-left px-3 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-secondary/50 transition-colors flex items-center gap-2"
-														@click=${(e: Event) => { e.stopPropagation(); roleDropdownOpen = !roleDropdownOpen; renderDialog(); }}
-													>
-														<span class="shrink-0">${statusBobbit("idle", false, sessionId, false, false, false, false, currentAccessory, true)}</span>
-														<span class="flex-1 ${currentRole ? "text-foreground" : "text-muted-foreground"}">${roleLabel}</span>
-														<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-muted-foreground transition-transform ${roleDropdownOpen ? "rotate-180" : ""}"><path d="m6 9 6 6 6-6"/></svg>
-													</button>
-													${roleDropdownOpen ? html`
-														<div class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg py-1 max-h-[200px] overflow-y-auto">
+										: html`
+											<div class="relative" id="role-picker-container">
+												<button
+													class="w-full text-left px-3 py-2 text-sm rounded-md border border-border bg-background hover:bg-secondary/50 transition-colors flex items-center gap-2.5"
+													@click=${(e: Event) => { e.stopPropagation(); roleDropdownOpen = !roleDropdownOpen; renderDialog(); }}
+												>
+													<span class="shrink-0">${statusBobbit("idle", false, sessionId, false, false, false, false, displayAccessory, true)}</span>
+													<span class="flex-1 ${displayRole ? "text-foreground" : "text-muted-foreground"}">${roleLabel}</span>
+													${hasRoleChange ? html`<span class="text-[10px] text-primary font-medium px-1.5 py-0.5 rounded bg-primary/10">changed</span>` : ""}
+													<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-muted-foreground transition-transform ${roleDropdownOpen ? "rotate-180" : ""}"><path d="m6 9 6 6 6-6"/></svg>
+												</button>
+												${roleDropdownOpen ? html`
+													<div class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-lg py-1 max-h-[240px] overflow-y-auto">
+														<button
+															class="w-full text-left px-3 py-2 text-sm hover:bg-secondary/50 transition-colors flex items-center gap-2.5 ${!displayRole ? "bg-secondary/30" : ""}"
+															@click=${(e: Event) => { e.stopPropagation(); selectRole(""); }}
+														>
+															<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, "none", true)}</span>
+															<span class="text-muted-foreground">None</span>
+														</button>
+														${state.roles.map((role) => html`
 															<button
-																class="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary/50 transition-colors flex items-center gap-2 ${!currentRole ? "bg-secondary/30" : ""}"
-																@click=${(e: Event) => { e.stopPropagation(); doAssignRole(null); }}
+																class="w-full text-left px-3 py-2 text-sm hover:bg-secondary/50 transition-colors flex items-center gap-2.5 ${displayRole === role.name ? "bg-secondary/30" : ""}"
+																@click=${(e: Event) => { e.stopPropagation(); selectRole(role.name); }}
 															>
-																<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, "none", true)}</span>
-																<span class="text-muted-foreground">None</span>
+																<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>
+																<span>${role.label}</span>
 															</button>
-															${state.roles.map((role) => html`
-																<button
-																	class="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary/50 transition-colors flex items-center gap-2 ${currentRole === role.name ? "bg-secondary/30" : ""}"
-																	@click=${(e: Event) => { e.stopPropagation(); doAssignRole(role.name); }}
-																>
-																	<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>
-																	<span>${role.label}</span>
-																</button>
-															`)}
-														</div>
-													` : ""}
-												</div>
-											`}
+														`)}
+													</div>
+												` : ""}
+											</div>
+										`}
 								</div>
 							</div>
 						`,
@@ -694,7 +700,11 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 						children: html`
 							<div class="flex gap-2 justify-end">
 								${Button({ variant: "ghost", onClick: cleanup, children: "Cancel" })}
-								${Button({ onClick: doRename, children: "Save" })}
+								${Button({
+									onClick: doSave,
+									disabled: saving || (!hasTitleChange && !hasRoleChange),
+									children: saveLabel,
+								})}
 							</div>
 						`,
 					})}
