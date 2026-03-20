@@ -454,6 +454,10 @@
 		width: 28px;
 		height: 28px;
 	}
+	.bobbit-blob--inline {
+		left: 14px;
+		bottom: 6px;
+	}
 	.roles-edit-container {
 		flex-direction: column;
 	}
@@ -486,10 +490,8 @@
 	margin-bottom: 0 !important;
 	overflow: visible;
 	position: absolute;
-	/* Center the blob in the 66×66 viewport. The sprite margin-box is 37px wide
-	   starting from left:0. Center it: (66-37)/2 = ~14px offset. */
-	left: 14px;
-	bottom: 8px;
+	left: 16px;
+	bottom: 5px;
 }
 
 /* Keep the original 3.5x scale and sprite margins — the blob layout is
