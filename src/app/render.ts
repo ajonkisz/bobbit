@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users } from "lucide";
+import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -33,6 +33,8 @@ import { renderGoalDashboard } from "./goal-dashboard.js";
 import "./goal-dashboard.css";
 import { renderRoleManagerPage, loadRolePageData } from "./role-manager-page.js";
 import "./role-manager.css";
+import { renderToolManagerPage } from "./tool-manager-page.js";
+import "./tool-manager.css";
 
 // ============================================================================
 // MOBILE LANDING PAGE
@@ -53,6 +55,10 @@ function renderMobileLanding() {
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => { import("./role-manager-page.js").then((m) => m.loadRolePageData()); setHashRoute("roles"); }}>
 						${icon(Users, "xs")} Roles
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); setHashRoute("tools"); }}>
+						${icon(Wrench, "xs")} Tools
 					</button>
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => showGoalDialog()}>
@@ -884,6 +890,9 @@ export function doRenderApp(): void {
 		}
 		if (route.view === "roles" || route.view === "role-edit") {
 			return renderRoleManagerPage();
+		}
+		if (route.view === "tools" || route.view === "tool-edit") {
+			return renderToolManagerPage();
 		}
 
 		if (connected && state.isGoalAssistantSession) {
