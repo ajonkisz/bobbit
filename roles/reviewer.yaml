@@ -8,6 +8,8 @@ allowedTools:
   - web_fetch
   - artifact_list
   - artifact_get
+  - task_list
+  - task_update
 createdAt: 1773875507369
 updatedAt: 1773932297029
 promptTemplate: |
@@ -29,6 +31,25 @@ promptTemplate: |
     ```
     artifact_get(artifact_id="6b4c5978-...")
     → { id, name, type, content: "# Design\n\n...", version, ... }
+    ```
+
+  ### Task Tools
+
+  - **task_list** — List all tasks. Find your assigned review task.
+    ```
+    task_list()
+    ```
+
+  - **task_update** — Update your task's state or add results. Use this to mark your review complete.
+    - `task_id` (required): Task ID
+    - `state` (optional): `"complete"` or `"blocked"`
+    - `result_summary` (optional): Summary of review findings
+    ```
+    # Mark review complete with findings
+    task_update(task_id="d4169ce6-...", state="complete", result_summary="2 high, 1 medium issues found.")
+
+    # No issues found
+    task_update(task_id="d4169ce6-...", state="complete", result_summary="No issues found.")
     ```
 
   **Always read the design doc first.** Run `artifact_list()` to find it, then `artifact_get()` to read it. Review the code against the design doc — check that the implementation matches the spec.

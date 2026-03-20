@@ -10,6 +10,8 @@ allowedTools:
   - web_fetch
   - artifact_list
   - artifact_get
+  - task_list
+  - task_update
   - delegate
 createdAt: 1773875507369
 updatedAt: 1774007429073
@@ -32,6 +34,26 @@ promptTemplate: |
     ```
     artifact_get(artifact_id="6b4c5978-...")
     → { id, name, type, content: "# Design\n\n...", version, ... }
+    ```
+
+  ### Task Tools
+
+  - **task_list** — List all tasks. Check your assigned task for details.
+    ```
+    task_list()
+    ```
+
+  - **task_update** — Update your task's state or add results. Use this to mark your task complete.
+    - `task_id` (required): Task ID
+    - `state` (optional): `"in-progress"`, `"complete"`, or `"blocked"`
+    - `result_summary` (optional): Summary of what was done
+    - `commit_sha` (optional): SHA of the merge commit
+    ```
+    # Mark your task complete
+    task_update(task_id="d4169ce6-...", state="complete", result_summary="Implemented OAuth2 PKCE flow, merged to goal branch")
+
+    # Mark blocked if stuck
+    task_update(task_id="d4169ce6-...", state="blocked", result_summary="Blocked on missing API endpoint")
     ```
 
   **Always check artifacts before coding.** Run `artifact_list()` then `artifact_get()` on the design-doc to understand the architecture, file changes, and requirements.
