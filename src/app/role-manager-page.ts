@@ -272,7 +272,7 @@ function renderNavBar(): TemplateResult {
 					variant: "default",
 					size: "sm",
 					onClick: createRoleAssistantSession,
-					children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} New Role</span>`,
+					children: html`<span class="inline-flex items-center gap-1.5 font-semibold">${icon(Plus, "sm")} New Role</span>`,
 				})}
 			</div>
 		</div>
