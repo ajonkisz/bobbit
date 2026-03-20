@@ -516,7 +516,7 @@
 .bobbit-blob--inline .bobbit-blob__crown,
 .bobbit-blob--inline .bobbit-blob__bandana,
 .bobbit-blob--inline .bobbit-blob__magnifier,
-.bobbit-blob--inline .bobbit-blob__protractor,
+.bobbit-blob--inline .bobbit-blob__set-square,
 .bobbit-blob--inline .bobbit-blob__headphones,
 .bobbit-blob--inline .bobbit-blob__pencil,
 .bobbit-blob--inline .bobbit-blob__book,
@@ -529,7 +529,7 @@
 .bobbit-blob--inline.bobbit-crowned .bobbit-blob__crown { display: block !important; }
 .bobbit-blob--inline.bobbit-bandana .bobbit-blob__bandana { display: block !important; }
 .bobbit-blob--inline.bobbit-magnifier .bobbit-blob__magnifier { display: block !important; }
-.bobbit-blob--inline.bobbit-protractor .bobbit-blob__protractor { display: block !important; }
+.bobbit-blob--inline.bobbit-set-square .bobbit-blob__set-square { display: block !important; }
 .bobbit-blob--inline.bobbit-headphones .bobbit-blob__headphones { display: block !important; }
 .bobbit-blob--inline.bobbit-pencil .bobbit-blob__pencil { display: block !important; }
 .bobbit-blob--inline.bobbit-book .bobbit-blob__book { display: block !important; }
