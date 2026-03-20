@@ -522,7 +522,7 @@
 .bobbit-blob--inline .bobbit-blob__book,
 .bobbit-blob--inline .bobbit-blob__glasses,
 .bobbit-blob--inline .bobbit-blob__shield,
-.bobbit-blob--inline .bobbit-blob__compass,
+.bobbit-blob--inline .bobbit-blob__set-square,
 .bobbit-blob--inline .bobbit-blob__flask {
 	display: none !important;
 }
@@ -536,5 +536,5 @@
 .bobbit-blob--inline.bobbit-book .bobbit-blob__book { display: block !important; }
 .bobbit-blob--inline.bobbit-glasses .bobbit-blob__glasses { display: block !important; }
 .bobbit-blob--inline.bobbit-shield .bobbit-blob__shield { display: block !important; }
-.bobbit-blob--inline.bobbit-compass .bobbit-blob__compass { display: block !important; }
+.bobbit-blob--inline.bobbit-set-square .bobbit-blob__set-square { display: block !important; }
 .bobbit-blob--inline.bobbit-flask .bobbit-blob__flask { display: block !important; }
