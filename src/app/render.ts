@@ -607,7 +607,7 @@ function setupPreviewSwipe(): void {
 	}, { passive: true });
 }
 
-function ensurePreviewOverlay(): void { /* no-op — swipe handled via postMessage */ }
+
 
 // ============================================================================
 // RENDER APP
@@ -845,7 +845,7 @@ export function doRenderApp(): void {
 				<div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
 					<span class="text-xs font-medium text-muted-foreground">Live Preview</span>
 				</div>
-				<div class="preview-iframe-wrap" style="position:relative;flex:1;min-height:0;">
+				<div style="position:relative;flex:1;min-height:0;">
 					<iframe
 						class="w-full border-0"
 						style="position:absolute;inset:0;height:100%;"
@@ -996,7 +996,6 @@ export function doRenderApp(): void {
 		`, app);
 		ensureMobileScrollTracking();
 		setupPreviewSwipe();
-		ensurePreviewOverlay();
 		requestAnimationFrame(() => {
 			const headerEl = document.getElementById("app-header");
 			if (headerEl) {
