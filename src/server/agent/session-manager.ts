@@ -447,6 +447,21 @@ export class SessionManager {
 		const bridgeOptions: RpcBridgeOptions = { cwd: ps.cwd };
 		if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
 
+		// Restore env vars needed by extensions
+		bridgeOptions.env = { BOBBIT_SESSION_ID: ps.id };
+		if (ps.goalId) {
+			bridgeOptions.env.BOBBIT_GOAL_ID = ps.goalId;
+		}
+
+		// Restore extension args for goal/team sessions
+		if (ps.goalId && !ps.goalAssistant && !ps.roleAssistant && !ps.toolAssistant) {
+			const isTeamLead = ps.role === "team-lead";
+			const extensionPath = isTeamLead
+				? path.resolve(__dirname, "../../../extensions/team-lead-tools.ts")
+				: GOAL_TOOLS_EXTENSION_PATH;
+			bridgeOptions.args = ["--extension", extensionPath];
+		}
+
 		// Re-assemble system prompt (global + AGENTS.md + goal spec)
 		if (ps.goalAssistant) {
 			// Goal assistant sessions get the special goal assistant prompt
@@ -1045,6 +1060,13 @@ export class SessionManager {
 		if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
 		if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		bridgeOptions.env = { BOBBIT_SESSION_ID: id };
+		if (session.goalId) {
+			bridgeOptions.env.BOBBIT_GOAL_ID = session.goalId;
+			// Re-attach goal tools extension (unless this is a team lead, which gets it from team-manager)
+			if (!bridgeOptions.args?.includes("--extension")) {
+				bridgeOptions.args = ["--extension", GOAL_TOOLS_EXTENSION_PATH];
+			}
+		}
 
 		const rpcClient = new RpcBridge(bridgeOptions);
 		let switchingSession = true;
