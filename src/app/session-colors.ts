@@ -106,13 +106,13 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		id: "pencil",
 		label: "Pencil",
 		shadow: `
-			10px -2px 0 #000,11px -2px 0 #000,
-			9px -1px 0 #000,10px -1px 0 #f9a8d4,11px -1px 0 #ec4899,12px -1px 0 #000,
-			8px 0 0 #000,9px 0 0 #9ca3af,10px 0 0 #d1d5db,11px 0 0 #000,
-			7px 1px 0 #000,8px 1px 0 #fde047,9px 1px 0 #fbbf24,10px 1px 0 #000,
-			6px 2px 0 #000,7px 2px 0 #fde047,8px 2px 0 #fbbf24,9px 2px 0 #000,
-			5px 3px 0 #000,6px 3px 0 #f4a460,7px 3px 0 #cd853f,8px 3px 0 #000,
-			4px 4px 0 #000,5px 4px 0 #4b5563,6px 4px 0 #000
+			7px -2px 0 #000,8px -2px 0 #000,
+			6px -1px 0 #000,7px -1px 0 #f9a8d4,8px -1px 0 #ec4899,9px -1px 0 #000,
+			5px 0 0 #000,6px 0 0 #9ca3af,7px 0 0 #d1d5db,8px 0 0 #000,
+			4px 1px 0 #000,5px 1px 0 #fde047,6px 1px 0 #fbbf24,7px 1px 0 #000,
+			3px 2px 0 #000,4px 2px 0 #fde047,5px 2px 0 #fbbf24,6px 2px 0 #000,
+			2px 3px 0 #000,3px 3px 0 #f4a460,4px 3px 0 #cd853f,5px 3px 0 #000,
+			1px 4px 0 #000,2px 4px 0 #4b5563,3px 4px 0 #000
 		`,
 		yOffset: 0,
 		addsHeight: false,
