@@ -795,11 +795,67 @@ export function doRenderApp(): void {
 				<div class="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
 					<span class="text-xs font-medium text-muted-foreground">Live Preview</span>
 				</div>
-				<iframe
-					class="flex-1 w-full border-0"
-					sandbox="allow-scripts allow-same-origin"
-					.srcdoc=${state.previewPanelHtml}
-				></iframe>
+				<div style="position:relative;flex:1;min-height:0;">
+					<iframe
+						class="w-full border-0"
+						style="position:absolute;inset:0;height:100%;"
+						sandbox="allow-scripts allow-same-origin"
+						.srcdoc=${state.previewPanelHtml}
+					></iframe>
+					<div class="preview-touch-overlay"
+						style="position:absolute;inset:0;z-index:1;"
+						@touchstart=${(e: TouchEvent) => {
+							const overlay = e.currentTarget as HTMLElement;
+							overlay.dataset.startX = String(e.touches[0].clientX);
+							overlay.dataset.startY = String(e.touches[0].clientY);
+							overlay.dataset.locked = "";
+							overlay.style.pointerEvents = "auto";
+						}}
+						@touchmove=${(e: TouchEvent) => {
+							const overlay = e.currentTarget as HTMLElement;
+							const sx = Number(overlay.dataset.startX);
+							const sy = Number(overlay.dataset.startY);
+							const dx = e.touches[0].clientX - sx;
+							const dy = e.touches[0].clientY - sy;
+							if (overlay.dataset.locked === "") {
+								if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+									if (Math.abs(dy) > Math.abs(dx)) {
+										overlay.style.pointerEvents = "none";
+										overlay.dataset.locked = "vertical";
+									} else {
+										overlay.dataset.locked = "horizontal";
+									}
+								}
+							}
+							if (overlay.dataset.locked === "horizontal") {
+								const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+								if (track) {
+									track.style.transition = "none";
+									const basePercent = state.previewPanelTab === "chat" ? 0 : -50;
+									const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
+									track.style.transform = `translateX(${Math.max(-50, Math.min(0, basePercent + dragPercent))}%)`;
+								}
+							}
+						}}
+						@touchend=${(e: TouchEvent) => {
+							const overlay = e.currentTarget as HTMLElement;
+							overlay.style.pointerEvents = "auto";
+							if (overlay.dataset.locked !== "horizontal") return;
+							const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+							if (track) track.style.transition = "transform 0.3s ease-out";
+							const dx = e.changedTouches[0].clientX - Number(overlay.dataset.startX);
+							const threshold = (track?.parentElement?.clientWidth ?? 300) * 0.2;
+							if (dx > threshold && state.previewPanelTab === "preview") {
+								state.previewPanelTab = "chat";
+							} else if (dx < -threshold && state.previewPanelTab === "chat") {
+								state.previewPanelTab = "preview";
+							}
+							const finalPercent = state.previewPanelTab === "chat" ? 0 : -50;
+							if (track) track.style.transform = `translateX(${finalPercent}%)`;
+							renderApp();
+						}}
+					></div>
+				</div>
 			</div>
 		`;
 	};
