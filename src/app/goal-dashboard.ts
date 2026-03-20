@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { state, renderApp, type Goal } from "./state.js";
-import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState, fetchGoalArtifacts, fetchRoles, type GoalArtifact, type ArtifactType } from "./api.js";
+import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState, fetchGoalArtifacts, fetchRoles, type GoalArtifact } from "./api.js";
 import { setHashRoute } from "./routing.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
@@ -416,7 +416,7 @@ function derivePhase(artifactList: GoalArtifact[], taskList: Task[]): GoalPhase 
 // ARTIFACT HELPERS
 // ============================================================================
 
-const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
+const ARTIFACT_TYPE_LABELS: Record<string, string> = {
 	"design-doc": "Design Document",
 	"test-plan": "Test Plan",
 	"review-findings": "Review Findings",
@@ -426,7 +426,7 @@ const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
 	"custom": "Custom",
 };
 
-const ARTIFACT_TYPE_ICONS: Record<ArtifactType, string> = {
+const ARTIFACT_TYPE_ICONS: Record<string, string> = {
 	"design-doc": "\uD83D\uDCD0",
 	"test-plan": "\uD83E\uDDEA",
 	"review-findings": "\uD83D\uDD0D",
@@ -436,17 +436,17 @@ const ARTIFACT_TYPE_ICONS: Record<ArtifactType, string> = {
 	"custom": "\uD83D\uDCCB",
 };
 
-const REQUIRED_ARTIFACT_TYPES: ArtifactType[] = ["design-doc", "test-plan", "review-findings", "summary-report"];
+const REQUIRED_ARTIFACT_TYPES: string[] = ["design-doc", "test-plan", "review-findings", "summary-report"];
 
 interface ArtifactRequirementStatus {
-	type: ArtifactType;
+	type: string;
 	label: string;
 	required: boolean;
 	artifact: GoalArtifact | null;
 }
 
 function getArtifactStatuses(artifactList: GoalArtifact[]): ArtifactRequirementStatus[] {
-	const byType = new Map<ArtifactType, GoalArtifact>();
+	const byType = new Map<string, GoalArtifact>();
 	for (const a of artifactList) {
 		const existing = byType.get(a.type);
 		if (!existing || a.updatedAt > existing.updatedAt) {

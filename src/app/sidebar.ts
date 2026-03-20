@@ -113,11 +113,19 @@ export function renderSidebar() {
 				</button>
 				<button
 					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+					@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); import("./routing.js").then((m) => m.setHashRoute("artifact-specs")); }}
+					title="Manage artifact specs"
+				>
+					${icon(Crosshair, "sm")}
+					<span>Specs</span>
+				</button>
+				<button
+					class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 					@click=${() => showGoalDialog()}
 					title="New goal"
 				>
-					${icon(Crosshair, "sm")}
-					<span>New Goal</span>
+					${icon(Plus, "sm")}
+					<span>Goal</span>
 				</button>
 			</div>
 			<div class="flex-1 overflow-y-auto flex flex-col gap-0.5 py-2 px-0.5">

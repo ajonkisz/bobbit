@@ -320,19 +320,111 @@ export async function teardownTeam(goalId: string): Promise<boolean> {
 // GOAL ARTIFACT API
 // ============================================================================
 
-export type ArtifactType = "design-doc" | "test-plan" | "review-findings" | "gap-analysis" | "security-findings" | "summary-report" | "custom";
-
 export interface GoalArtifact {
 	id: string;
 	goalId: string;
 	name: string;
-	type: ArtifactType;
+	type: string;
+	specId?: string;
+	status?: string;
 	content: string;
 	producedBy: string;
 	skillId?: string;
 	version: number;
 	createdAt: number;
 	updatedAt: number;
+}
+
+// ============================================================================
+// ARTIFACT SPEC API
+// ============================================================================
+
+export type ArtifactKind = "analysis" | "deliverable" | "review" | "verification";
+export type ArtifactFormat = "markdown" | "html" | "diff" | "command";
+
+export interface ArtifactSpec {
+	id: string;
+	name: string;
+	description: string;
+	kind: ArtifactKind;
+	format: ArtifactFormat;
+	mustHave: string[];
+	shouldHave: string[];
+	mustNotHave: string[];
+	requires?: string[];
+	suggestedRole?: string;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export async function fetchArtifactSpecs(): Promise<ArtifactSpec[]> {
+	try {
+		const res = await gatewayFetch("/api/artifact-specs");
+		if (!res.ok) throw new Error(`Failed: ${res.status}`);
+		const data = await res.json();
+		return data.specs || [];
+	} catch (err) {
+		console.error("[api] fetchArtifactSpecs failed:", err);
+		return [];
+	}
+}
+
+export async function fetchArtifactSpec(id: string): Promise<ArtifactSpec | null> {
+	try {
+		const res = await gatewayFetch(`/api/artifact-specs/${encodeURIComponent(id)}`);
+		if (!res.ok) return null;
+		return await res.json();
+	} catch { return null; }
+}
+
+export async function createArtifactSpec(spec: { id: string; name: string; kind: string; format: string; description?: string; mustHave?: string[]; shouldHave?: string[]; mustNotHave?: string[]; requires?: string[]; suggestedRole?: string }): Promise<ArtifactSpec | null> {
+	try {
+		const res = await gatewayFetch("/api/artifact-specs", {
+			method: "POST",
+			body: JSON.stringify(spec),
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || `Failed: ${res.status}`);
+		}
+		return await res.json();
+	} catch (err) {
+		showConnectionError("Failed to create artifact spec", err instanceof Error ? err.message : String(err));
+		return null;
+	}
+}
+
+export async function updateArtifactSpec(id: string, updates: Partial<ArtifactSpec>): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/artifact-specs/${encodeURIComponent(id)}`, {
+			method: "PUT",
+			body: JSON.stringify(updates),
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || `Failed: ${res.status}`);
+		}
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to update artifact spec", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
+
+export async function deleteArtifactSpec(id: string): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/artifact-specs/${encodeURIComponent(id)}`, {
+			method: "DELETE",
+		});
+		if (!res.ok) {
+			const data = await res.json().catch(() => ({}));
+			throw new Error(data.error || `Failed: ${res.status}`);
+		}
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to delete artifact spec", err instanceof Error ? err.message : String(err));
+		return false;
+	}
 }
 
 export async function fetchGoalArtifacts(goalId: string): Promise<GoalArtifact[]> {

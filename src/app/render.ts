@@ -35,6 +35,8 @@ import { renderRoleManagerPage, loadRolePageData } from "./role-manager-page.js"
 import "./role-manager.css";
 import { renderToolManagerPage } from "./tool-manager-page.js";
 import "./tool-manager.css";
+import { renderArtifactSpecPage } from "./artifact-spec-page.js";
+import "./artifact-spec.css";
 
 // ============================================================================
 // MOBILE LANDING PAGE
@@ -61,8 +63,12 @@ function renderMobileLanding() {
 						${icon(Wrench, "xs")} Tools
 					</button>
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); setHashRoute("artifact-specs"); }}>
+						${icon(Crosshair, "xs")} Specs
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => showGoalDialog()}>
-						${icon(Crosshair, "xs")} New Goal
+						${icon(Plus, "xs")} Goal
 					</button>
 				</div>
 				${state.sessionsLoading
@@ -1011,6 +1017,9 @@ export function doRenderApp(): void {
 		}
 		if (route.view === "tools" || route.view === "tool-edit") {
 			return renderToolManagerPage();
+		}
+		if (route.view === "artifact-specs" || route.view === "artifact-spec-edit") {
+			return renderArtifactSpecPage();
 		}
 
 		if (connected && state.isGoalAssistantSession) {
