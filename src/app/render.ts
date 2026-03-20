@@ -491,8 +491,8 @@ function rolePreviewPanel() {
 // PREVIEW SWIPE (mobile)
 // ============================================================================
 
-/** Attach swipe-left/right gesture to #app (stable element, never recreated).
- *  Toggles between chat and preview tabs on mobile preview sessions. */
+/** Attach swipe gesture to the preview slider track.
+ *  Drags the track in real-time during touchmove, snaps on release. */
 function setupPreviewSwipe(): void {
 	const el = document.getElementById("app");
 	if (!el || (el as any).__swipeAttached) return;
@@ -500,27 +500,62 @@ function setupPreviewSwipe(): void {
 
 	let startX = 0;
 	let startY = 0;
+	let tracking = false;
+	let directionLocked = false;
 
 	el.addEventListener("touchstart", (e: TouchEvent) => {
+		if (!state.isPreviewSession) return;
+		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+		if (!track) return;
 		startX = e.touches[0].clientX;
 		startY = e.touches[0].clientY;
+		tracking = false;
+		directionLocked = false;
+		// Remove transition during drag for immediate response
+		track.style.transition = "none";
+	}, { passive: true });
+
+	el.addEventListener("touchmove", (e: TouchEvent) => {
+		if (!state.isPreviewSession) return;
+		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+		if (!track) return;
+		const dx = e.touches[0].clientX - startX;
+		const dy = e.touches[0].clientY - startY;
+
+		// Lock direction on first significant move
+		if (!directionLocked && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+			directionLocked = true;
+			tracking = Math.abs(dx) > Math.abs(dy);
+		}
+		if (!tracking) return;
+
+		// Base offset: 0% for chat, -50% for preview (of track width = 2x viewport)
+		const basePercent = state.previewPanelTab === "chat" ? 0 : -50;
+		const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
+		const clamped = Math.max(-50, Math.min(0, basePercent + dragPercent));
+		track.style.transform = `translateX(${clamped}%)`;
 	}, { passive: true });
 
 	el.addEventListener("touchend", (e: TouchEvent) => {
-		if (!state.isPreviewSession) return;
+		if (!state.isPreviewSession || !directionLocked) return;
+		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+		if (!track) return;
+		// Restore transition for snap animation
+		track.style.transition = "transform 0.3s ease-out";
+
+		if (!tracking) return;
 		const dx = e.changedTouches[0].clientX - startX;
-		const dy = e.changedTouches[0].clientY - startY;
-		// Require horizontal swipe > 60px and more horizontal than vertical
-		if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-		if (dx < 0 && state.previewPanelTab === "chat") {
-			// Swipe left → show preview
+		const threshold = track.parentElement!.clientWidth * 0.2; // 20% of viewport width
+
+		if (dx < -threshold && state.previewPanelTab === "chat") {
 			state.previewPanelTab = "preview";
-			renderApp();
-		} else if (dx > 0 && state.previewPanelTab === "preview") {
-			// Swipe right → show chat
+		} else if (dx > threshold && state.previewPanelTab === "preview") {
 			state.previewPanelTab = "chat";
-			renderApp();
 		}
+		// Snap to final position
+		const finalPercent = state.previewPanelTab === "chat" ? 0 : -50;
+		track.style.transform = `translateX(${finalPercent}%)`;
+		renderApp();
 	}, { passive: true });
 }
 
@@ -825,12 +860,15 @@ export function doRenderApp(): void {
 					</div>
 				`;
 			}
+			const slideX = state.previewPanelTab === "chat" ? 0 : -100;
 			return html`
 				${reconnectBanner()}
-				${state.previewPanelTab === "chat"
-					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
-					: html`<div class="flex-1 min-h-0 flex flex-col">${htmlPreviewPanel()}</div>`
-				}
+				<div class="preview-slider flex-1 min-h-0" style="overflow:hidden;position:relative;">
+					<div class="preview-slider__track" style="display:flex;width:200%;height:100%;transform:translateX(${slideX}%);transition:transform 0.3s ease-out;will-change:transform;">
+						<div style="width:50%;height:100%;min-width:0;display:flex;flex-direction:column;">${state.chatPanel}</div>
+						<div style="width:50%;height:100%;min-width:0;display:flex;flex-direction:column;">${htmlPreviewPanel()}</div>
+					</div>
+				</div>
 			`;
 		}
 		if (connected) return html`${reconnectBanner()}${state.chatPanel}`;
