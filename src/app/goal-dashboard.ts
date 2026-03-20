@@ -1,9 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
-import { ArrowLeft, Pencil, Play, Plus, Square, Trash2 } from "lucide";
 import { state, renderApp, type Goal } from "./state.js";
-import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState, fetchGoalArtifacts, type GoalArtifact, type ArtifactType } from "./api.js";
+import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState, fetchGoalArtifacts, fetchRoles, type GoalArtifact, type ArtifactType } from "./api.js";
 import { setHashRoute } from "./routing.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
@@ -41,17 +39,8 @@ export interface CommitInfo {
 }
 
 // ============================================================================
-// REPORT TYPES
-// ============================================================================
-
-
-
-// ============================================================================
 // DASHBOARD STATE
 // ============================================================================
-
-let previousStatValues: { done: number; inProgress: number; failed: number; agents: number } | null = null;
-let statChangeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
 let currentGoalId: string | null = null;
 let currentGoal: Goal | null = null;
@@ -66,6 +55,12 @@ let teamStopping = false;
 let loading = true;
 let error = "";
 
+/** Current dashboard tab */
+let dashboardTab: "tasks" | "agents" | "commits" | "artifacts" = "tasks";
+
+/** Role picker dropdown state */
+let roleDropdownOpen = false;
+
 // ============================================================================
 // DATA FETCHING
 // ============================================================================
@@ -76,7 +71,6 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	error = "";
 	renderApp();
 
-	// Start polling (runs independently of the main data load)
 	startAgentPolling(goalId);
 	startTaskPolling(goalId);
 
@@ -108,12 +102,9 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 
 		artifacts = fetchedArtifacts;
 
-
-		// Check if a team is active
 		const teamState = await getTeamState(goalId);
 		teamActive = teamState != null;
 
-		// Start artifact polling
 		startArtifactPolling(goalId);
 
 		loading = false;
@@ -137,24 +128,101 @@ export function clearDashboardState(): void {
 	teamStopping = false;
 	loading = true;
 	error = "";
-	previousStatValues = null;
-	for (const timer of statChangeTimers.values()) clearTimeout(timer);
-	statChangeTimers.clear();
+	dashboardTab = "tasks";
+	roleDropdownOpen = false;
 	stopAgentPolling();
 	stopTaskPolling();
 	stopArtifactPolling();
 }
 
 // ============================================================================
-// KANBAN BOARD
+// AGENT TYPES & POLLING
 // ============================================================================
 
-interface KanbanColumn {
-	key: string;
-	label: string;
-	dotColor: string;
-	tasks: Task[];
+export interface TeamAgent {
+	sessionId: string;
+	role: string;
+	status: string;
+	worktreePath: string;
+	branch: string;
+	task: string;
+	createdAt: number;
 }
+
+let agents: TeamAgent[] = [];
+let agentPollTimer: ReturnType<typeof setInterval> | null = null;
+let taskPollTimer: ReturnType<typeof setInterval> | null = null;
+
+async function fetchAgents(goalId: string): Promise<TeamAgent[]> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/team/agents`);
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.agents ?? [];
+	} catch {
+		return [];
+	}
+}
+
+function startTaskPolling(goalId: string): void {
+	stopTaskPolling();
+	taskPollTimer = setInterval(async () => {
+		if (!currentGoalId || currentGoalId !== goalId) return;
+		try {
+			const res = await gatewayFetch(`/api/goals/${goalId}/tasks`);
+			if (res.ok) {
+				const data = await res.json();
+				const newTasks: Task[] = data.tasks || [];
+				if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
+					tasks = newTasks;
+					renderApp();
+				}
+			}
+		} catch { /* ignore */ }
+	}, 10_000);
+}
+
+function stopTaskPolling(): void {
+	if (taskPollTimer) { clearInterval(taskPollTimer); taskPollTimer = null; }
+}
+
+function startAgentPolling(goalId: string): void {
+	stopAgentPolling();
+	fetchAgents(goalId).then((a) => { agents = a; renderApp(); });
+	agentPollTimer = setInterval(async () => {
+		agents = await fetchAgents(goalId);
+		const teamState = await getTeamState(goalId);
+		teamActive = teamState != null;
+		renderApp();
+	}, 5000);
+}
+
+function stopAgentPolling(): void {
+	if (agentPollTimer) { clearInterval(agentPollTimer); agentPollTimer = null; }
+	agents = [];
+}
+
+function startArtifactPolling(goalId: string): void {
+	stopArtifactPolling();
+	artifactPollTimer = setInterval(async () => {
+		if (!currentGoalId || currentGoalId !== goalId) return;
+		try {
+			const newArtifacts = await fetchGoalArtifacts(goalId);
+			if (JSON.stringify(newArtifacts) !== JSON.stringify(artifacts)) {
+				artifacts = newArtifacts;
+				renderApp();
+			}
+		} catch { /* ignore */ }
+	}, 10_000);
+}
+
+function stopArtifactPolling(): void {
+	if (artifactPollTimer) { clearInterval(artifactPollTimer); artifactPollTimer = null; }
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
 
 function getElapsedTime(task: Task): string {
 	if (task.state === "complete" || task.state === "skipped") {
@@ -196,133 +264,7 @@ function findAssigneeSession(sessionId: string | undefined) {
 	return state.gatewaySessions.find((s) => s.id === sessionId) || null;
 }
 
-function renderTaskCard(task: Task): TemplateResult {
-	const isDone = task.state === "complete";
-	const isFailed = task.state === "skipped";
-	const headSha = commits?.[0]?.sha;
-	const isStale = task.state === "complete" && (task.type === "test" || task.type === "review" || task.type === "code") && task.commitSha != null && headSha != null && task.commitSha !== headSha;
-	const assignee = findAssigneeSession(task.assignedSessionId);
-	const color = typeColor(task.type);
-
-	return html`
-		<div
-			class="kanban-card ${isStale ? "kanban-card--stale" : ""}"
-			style="
-				opacity: ${isDone || isStale ? "0.65" : "1"};
-				--card-type-color: ${color};
-			"
-		>
-			<div class="kanban-card-stripe" style="background: ${color};"></div>
-			<div class="kanban-card-body">
-				<div class="kanban-card-title">${task.title}</div>
-				<div class="kanban-card-meta">
-					<span class="kanban-type-badge" style="background: ${color}20; color: ${color};">
-						${typeLabel(task.type)}
-					</span>
-					${isStale ? html`<span class="kanban-stale-badge">Stale</span>` : nothing}
-					${assignee ? html`
-						<span class="kanban-assignee" title="${assignee.title}" @click=${(e: Event) => {
-							e.stopPropagation();
-							setHashRoute("session", assignee.id, true);
-						}}>
-							${statusBobbit(assignee.status, assignee.isCompacting, assignee.id, false, assignee.isAborting, assignee.role === "team-lead", assignee.role === "coder", assignee.accessory)}
-							<span class="kanban-assignee-name">${assignee.title || assignee.id.slice(0, 8)}</span>
-						</span>
-					` : nothing}
-					<span class="kanban-elapsed">${getElapsedTime(task)}</span>
-				</div>
-				${isFailed && task.resultSummary ? html`
-					<div class="kanban-error">${task.resultSummary}</div>
-				` : nothing}
-			</div>
-		</div>
-	`;
-}
-
-function renderKanbanColumn(col: KanbanColumn): TemplateResult {
-	return html`
-		<div class="kanban-column">
-			<div class="kanban-column-header">
-				<span class="kanban-column-dot" style="background: ${col.dotColor};"></span>
-				<span class="kanban-column-name">${col.label}</span>
-				<span class="kanban-column-count">${col.tasks.length}</span>
-			</div>
-			<div class="kanban-column-cards">
-				${col.tasks.length > 0
-					? col.tasks.map(renderTaskCard)
-					: html`<div class="kanban-empty">No tasks</div>`
-				}
-			</div>
-		</div>
-	`;
-}
-
-function renderKanbanBoard(taskList: Task[]): TemplateResult {
-	const columns: KanbanColumn[] = [
-		{ key: "todo", label: "Backlog", dotColor: "var(--kanban-backlog)", tasks: [] },
-		{ key: "in-progress", label: "In Progress", dotColor: "var(--kanban-in-progress)", tasks: [] },
-		{ key: "complete", label: "Done", dotColor: "var(--kanban-done)", tasks: [] },
-		// Stale tasks stay in Done but get a visual stale badge
-		{ key: "skipped", label: "Failed", dotColor: "var(--kanban-failed)", tasks: [] },
-	];
-
-	for (const task of taskList) {
-		const mappedKey = task.state === "blocked" ? "todo" : task.state;
-		const col = columns.find((c) => c.key === mappedKey);
-		if (col) col.tasks.push(task);
-	}
-
-	return html`
-		<div class="kanban-board">
-			${columns.map(renderKanbanColumn)}
-		</div>
-	`;
-}
-
-// ============================================================================
-// COMMIT TIMELINE
-// ============================================================================
-
-type BadgeStatus = "pass" | "fail" | "stale" | "pending";
-
-interface CommitBadges {
-	tests?: BadgeStatus;
-	review?: BadgeStatus;
-}
-
-function deriveBadges(commitList: CommitInfo[], taskList: Task[]): Map<string, CommitBadges> {
-	const badges = new Map<string, CommitBadges>();
-	for (const c of commitList) {
-		badges.set(c.sha, {});
-	}
-
-	const testTasks = taskList.filter(t => t.type === "test" && t.commitSha);
-	const reviewTasks = taskList.filter(t => t.type === "review" && t.commitSha);
-
-	for (const task of testTasks) {
-		const sha = task.commitSha!;
-		if (!badges.has(sha)) continue;
-		const b = badges.get(sha)!;
-		if (task.state === "complete") b.tests = "pass";
-		else if (task.state === "skipped") b.tests = "fail";
-		else if (false) b.tests = "stale";
-		else if (task.state === "in-progress") b.tests = "pending";
-	}
-
-	for (const task of reviewTasks) {
-		const sha = task.commitSha!;
-		if (!badges.has(sha)) continue;
-		const b = badges.get(sha)!;
-		if (task.state === "complete") b.review = "pass";
-		else if (task.state === "skipped") b.review = "fail";
-		else if (false) b.review = "stale";
-		else if (task.state === "in-progress") b.review = "pending";
-	}
-
-	return badges;
-}
-
-function formatRelativeTime(timestamp: string): string {
+function formatRelativeTime(timestamp: string | number): string {
 	const diffMs = Date.now() - new Date(timestamp).getTime();
 	const mins = Math.floor(diffMs / 60_000);
 	if (mins < 1) return "just now";
@@ -333,134 +275,12 @@ function formatRelativeTime(timestamp: string): string {
 	return `${days}d ago`;
 }
 
-function renderCommitBadge(label: string, status: BadgeStatus): TemplateResult {
-	return html`<span class="commit-status-dot commit-status-dot--${status}" title="${label}: ${status}"></span>`;
-}
-
-function renderCommitTimeline(commitList: CommitInfo[], taskList: Task[]): TemplateResult {
-	if (commitList.length === 0) {
-		return html`<div class="commit-timeline-empty">No commits found on this branch.</div>`;
-	}
-
-	const badges = deriveBadges(commitList, taskList);
-
-	return html`
-		<div class="commit-timeline">
-			${commitList.map((commit, index) => {
-				const isHead = index === 0;
-				const b = badges.get(commit.sha) || {};
-				return html`
-					<div class="commit-item" data-sha="${commit.sha}">
-						<div class="${isHead ? "commit-dot commit-dot--head" : "commit-dot"}"></div>
-						<div class="commit-content">
-							<div class="commit-header">
-								<code class="commit-sha">${commit.shortSha}</code>
-								${b.tests ? renderCommitBadge("Tests", b.tests) : nothing}
-								${b.review ? renderCommitBadge("Review", b.review) : nothing}
-								<span class="commit-time">${formatRelativeTime(commit.timestamp)}</span>
-							</div>
-							<div class="commit-message">${commit.message}</div>
-							<div class="commit-author">${commit.author}</div>
-						</div>
-					</div>
-				`;
-			})}
-		</div>
-	`;
-}
-
-// ============================================================================
-// AGENT ACTIVITY PANEL
-// ============================================================================
-
-export interface TeamAgent {
-	sessionId: string;
-	role: string;
-	status: string; // "starting" | "idle" | "streaming" | "terminated"
-	worktreePath: string;
-	branch: string;
-	task: string;
-	createdAt: number;
-}
-
-let agents: TeamAgent[] = [];
-let agentPollTimer: ReturnType<typeof setInterval> | null = null;
-let taskPollTimer: ReturnType<typeof setInterval> | null = null;
-
-async function fetchAgents(goalId: string): Promise<TeamAgent[]> {
-	try {
-		const res = await gatewayFetch(`/api/goals/${goalId}/team/agents`);
-		if (!res.ok) return [];
-		const data = await res.json();
-		return data.agents ?? [];
-	} catch {
-		return [];
-	}
-}
-
-function startTaskPolling(goalId: string): void {
-	stopTaskPolling();
-	taskPollTimer = setInterval(async () => {
-		if (!currentGoalId || currentGoalId !== goalId) return;
-		try {
-			const res = await gatewayFetch(`/api/goals/${goalId}/tasks`);
-			if (res.ok) {
-				const data = await res.json();
-				const newTasks: Task[] = data.tasks || [];
-				// Only re-render if data actually changed
-				if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
-					tasks = newTasks;
-					renderApp();
-				}
-			}
-		} catch { /* ignore poll errors */ }
-	}, 10_000);
-}
-
-function stopTaskPolling(): void {
-	if (taskPollTimer) {
-		clearInterval(taskPollTimer);
-		taskPollTimer = null;
-	}
-}
-
-function startAgentPolling(goalId: string): void {
-	stopAgentPolling();
-	// Initial fetch
-	fetchAgents(goalId).then((a) => {
-		agents = a;
-		renderApp();
-	});
-	// Poll every 5 seconds
-	agentPollTimer = setInterval(async () => {
-		agents = await fetchAgents(goalId);
-		// Also refresh team active state
-		const teamState = await getTeamState(goalId);
-		teamActive = teamState != null;
-		renderApp();
-	}, 5000);
-}
-
-function stopAgentPolling(): void {
-	if (agentPollTimer) {
-		clearInterval(agentPollTimer);
-		agentPollTimer = null;
-	}
-	agents = [];
-}
-
-function agentStatusLabel(status: string): "working" | "idle" | "blocked" {
-	if (status === "streaming") return "working";
-	if (status === "idle") return "idle";
-	return "blocked";
-}
-
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
-	coder: { bg: "oklch(0.62 0.15 250 / 0.15)", text: "oklch(0.62 0.15 250)" },
-	tester: { bg: "oklch(0.65 0.15 145 / 0.15)", text: "oklch(0.65 0.15 145)" },
-	reviewer: { bg: "oklch(0.70 0.14 75 / 0.15)", text: "oklch(0.70 0.14 75)" },
-	lead: { bg: "oklch(0.60 0.15 300 / 0.15)", text: "oklch(0.60 0.15 300)" },
-	"team-lead": { bg: "oklch(0.60 0.15 300 / 0.15)", text: "oklch(0.60 0.15 300)" },
+	coder: { bg: "oklch(0.62 0.15 250 / 0.15)", text: "oklch(0.72 0.15 250)" },
+	tester: { bg: "oklch(0.65 0.15 145 / 0.15)", text: "oklch(0.72 0.15 145)" },
+	reviewer: { bg: "oklch(0.70 0.14 75 / 0.15)", text: "oklch(0.78 0.14 75)" },
+	lead: { bg: "oklch(0.55 0.15 290 / 0.15)", text: "oklch(0.72 0.15 290)" },
+	"team-lead": { bg: "oklch(0.55 0.15 290 / 0.15)", text: "oklch(0.72 0.15 290)" },
 };
 
 function getRoleColor(role: string): { bg: string; text: string } {
@@ -472,24 +292,6 @@ function getRoleLabel(role: string): string {
 	return role.toUpperCase();
 }
 
-const AVATAR_COLORS = [
-	"oklch(0.62 0.15 250)", "oklch(0.65 0.15 145)", "oklch(0.70 0.14 75)", "oklch(0.60 0.15 300)", "oklch(0.60 0.20 25)",
-	"oklch(0.65 0.15 220)", "oklch(0.65 0.18 350)", "oklch(0.65 0.12 175)", "oklch(0.70 0.14 55)", "oklch(0.55 0.15 300)",
-];
-
-function getAvatarColor(sessionId: string): string {
-	let hash = 0;
-	for (let i = 0; i < sessionId.length; i++) {
-		hash = ((hash << 5) - hash + sessionId.charCodeAt(i)) | 0;
-	}
-	return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function getInitials(role: string): string {
-	if (role === "team-lead") return "TL";
-	return role.charAt(0).toUpperCase();
-}
-
 function formatAgentName(agent: TeamAgent): string {
 	const session = state.gatewaySessions.find((s) => s.id === agent.sessionId);
 	if (session?.title) return session.title;
@@ -497,89 +299,18 @@ function formatAgentName(agent: TeamAgent): string {
 	return agent.role.charAt(0).toUpperCase() + agent.role.slice(1);
 }
 
-export function renderAgentPanel(agentList: TeamAgent[]): TemplateResult {
-	if (agentList.length === 0) {
-		return html`
-			<div class="agent-panel">
-				<div class="agent-panel-header">Agents</div>
-				<div class="agent-panel-empty">No active agents</div>
-			</div>
-		`;
-	}
-
-	return html`
-		<div class="agent-panel">
-			<div class="agent-panel-header">Agents <span class="agent-count">${agentList.length}</span></div>
-			${agentList.map((agent) => {
-				const statusLabel = agentStatusLabel(agent.status);
-				const roleColor = getRoleColor(agent.role);
-				const session = state.gatewaySessions.find(s => s.id === agent.sessionId);
-
-				return html`
-					<div class="agent-row" @click=${() => connectToSession(agent.sessionId, true)} title="Open session">
-						<div class="agent-bobbit">
-							${statusBobbit(session?.status ?? agent.status, session?.isCompacting ?? false, agent.sessionId, false, session?.isAborting ?? false, agent.role === "team-lead", agent.role === "coder", session?.accessory)}
-						</div>
-						<div class="agent-info">
-							<div class="agent-name-row">
-								<span class="agent-name">${formatAgentName(agent)}</span>
-								<span class="role-badge" style="background: ${roleColor.bg}; color: ${roleColor.text}">
-									${getRoleLabel(agent.role)}
-								</span>
-							</div>
-							<div class="agent-task">${agent.task || "No active task"}</div>
-						</div>
-						<div class="agent-status-dot agent-status-${statusLabel}" title="${statusLabel}"></div>
-					</div>
-				`;
-			})}
-		</div>
-	`;
-}
-
 // ============================================================================
-// ARTIFACT POLLING
-// ============================================================================
-
-function startArtifactPolling(goalId: string): void {
-	stopArtifactPolling();
-	artifactPollTimer = setInterval(async () => {
-		if (!currentGoalId || currentGoalId !== goalId) return;
-		try {
-			const newArtifacts = await fetchGoalArtifacts(goalId);
-			if (JSON.stringify(newArtifacts) !== JSON.stringify(artifacts)) {
-				artifacts = newArtifacts;
-				renderApp();
-			}
-		} catch { /* ignore poll errors */ }
-	}, 10_000);
-}
-
-function stopArtifactPolling(): void {
-	if (artifactPollTimer) {
-		clearInterval(artifactPollTimer);
-		artifactPollTimer = null;
-	}
-}
-
-// ============================================================================
-// PHASE INDICATOR
+// PHASE DERIVATION
 // ============================================================================
 
 type GoalPhase = "planning" | "design" | "implementation" | "review" | "complete";
 
-interface PhaseInfo {
-	phase: GoalPhase;
-	label: string;
-	description: string;
-}
-
-const PHASES: PhaseInfo[] = [
-	{ phase: "planning", label: "Planning", description: "No artifacts produced yet" },
-	{ phase: "design", label: "Design", description: "Design document exists" },
-	{ phase: "implementation", label: "Implementation", description: "Design + test plan ready" },
-	{ phase: "review", label: "Review", description: "Review findings produced" },
-	{ phase: "complete", label: "Complete", description: "All required artifacts exist" },
+const PHASES: { phase: GoalPhase; label: string }[] = [
+	{ phase: "planning", label: "Planning" },
+	{ phase: "design", label: "Design" },
+	{ phase: "implementation", label: "Implementation" },
+	{ phase: "review", label: "Review" },
+	{ phase: "complete", label: "Complete" },
 ];
 
 function derivePhase(artifactList: GoalArtifact[]): GoalPhase {
@@ -595,50 +326,9 @@ function derivePhase(artifactList: GoalArtifact[]): GoalPhase {
 	return "planning";
 }
 
-const PHASE_COLORS: Record<GoalPhase, string> = {
-	planning: "var(--muted-foreground)",
-	design: "oklch(0.60 0.15 300)",
-	implementation: "oklch(0.62 0.15 250)",
-	review: "oklch(0.70 0.14 75)",
-	complete: "oklch(0.65 0.15 145)",
-};
-
-function renderPhaseIndicator(artifactList: GoalArtifact[]): TemplateResult {
-	const currentPhase = derivePhase(artifactList);
-	const currentIdx = PHASES.findIndex((p) => p.phase === currentPhase);
-
-	return html`
-		<div class="phase-indicator">
-			<div class="phase-indicator-header">Phase</div>
-			<div class="phase-track">
-				${PHASES.map((p, i) => {
-					const isActive = i === currentIdx;
-					const isPast = i < currentIdx;
-					const isFuture = i > currentIdx;
-					const color = isPast || isActive ? PHASE_COLORS[p.phase] : "hsl(var(--border))";
-					return html`
-						<div class="phase-step ${isActive ? "phase-step--active" : ""} ${isPast ? "phase-step--past" : ""} ${isFuture ? "phase-step--future" : ""}">
-							<div class="phase-dot ${isActive ? "phase-dot--active" : ""}" style="background: ${color};"></div>
-							${i < PHASES.length - 1 ? html`<div class="phase-line" style="background: ${isPast ? PHASE_COLORS[PHASES[i + 1].phase] : "hsl(var(--border))"};"></div>` : nothing}
-							<div class="phase-label" style="color: ${isActive ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))"}">${p.label}</div>
-						</div>
-					`;
-				})}
-			</div>
-		</div>
-	`;
-}
-
 // ============================================================================
-// REQUIRED ARTIFACTS PANEL
+// ARTIFACT HELPERS
 // ============================================================================
-
-interface ArtifactRequirementStatus {
-	type: ArtifactType;
-	label: string;
-	required: boolean;
-	artifact: GoalArtifact | null;
-}
 
 const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
 	"design-doc": "Design Document",
@@ -650,29 +340,33 @@ const ARTIFACT_TYPE_LABELS: Record<ArtifactType, string> = {
 };
 
 const ARTIFACT_TYPE_ICONS: Record<ArtifactType, string> = {
-	"design-doc": "\uD83D\uDCD0",       // 📐
-	"test-plan": "\uD83E\uDDEA",         // 🧪
-	"review-findings": "\uD83D\uDD0D",   // 🔍
-	"gap-analysis": "\uD83D\uDCCA",      // 📊
-	"security-findings": "\uD83D\uDD12", // 🔒
-	"custom": "\uD83D\uDCCB",            // 📋
+	"design-doc": "\uD83D\uDCD0",
+	"test-plan": "\uD83E\uDDEA",
+	"review-findings": "\uD83D\uDD0D",
+	"gap-analysis": "\uD83D\uDCCA",
+	"security-findings": "\uD83D\uDD12",
+	"custom": "\uD83D\uDCCB",
 };
 
 const REQUIRED_ARTIFACT_TYPES: ArtifactType[] = ["design-doc", "test-plan", "review-findings"];
+
+interface ArtifactRequirementStatus {
+	type: ArtifactType;
+	label: string;
+	required: boolean;
+	artifact: GoalArtifact | null;
+}
 
 function getArtifactStatuses(artifactList: GoalArtifact[]): ArtifactRequirementStatus[] {
 	const byType = new Map<ArtifactType, GoalArtifact>();
 	for (const a of artifactList) {
 		const existing = byType.get(a.type);
-		// Keep the latest version
 		if (!existing || a.updatedAt > existing.updatedAt) {
 			byType.set(a.type, a);
 		}
 	}
 
 	const statuses: ArtifactRequirementStatus[] = [];
-
-	// Required artifacts first
 	for (const type of REQUIRED_ARTIFACT_TYPES) {
 		statuses.push({
 			type,
@@ -681,8 +375,6 @@ function getArtifactStatuses(artifactList: GoalArtifact[]): ArtifactRequirementS
 			artifact: byType.get(type) || null,
 		});
 	}
-
-	// Additional artifacts that exist but aren't in the required list
 	for (const a of artifactList) {
 		if (!REQUIRED_ARTIFACT_TYPES.includes(a.type) && !statuses.some((s) => s.type === a.type)) {
 			statuses.push({
@@ -693,7 +385,6 @@ function getArtifactStatuses(artifactList: GoalArtifact[]): ArtifactRequirementS
 			});
 		}
 	}
-
 	return statuses;
 }
 
@@ -706,129 +397,47 @@ function toggleArtifactExpand(artifactId: string): void {
 	renderApp();
 }
 
-function formatArtifactTime(timestamp: number): string {
-	const diffMs = Date.now() - timestamp;
-	const mins = Math.floor(diffMs / 60_000);
-	if (mins < 1) return "just now";
-	if (mins < 60) return `${mins}m ago`;
-	const hours = Math.floor(mins / 60);
-	if (hours < 24) return `${hours}h ago`;
-	const days = Math.floor(hours / 24);
-	return `${days}d ago`;
+// ============================================================================
+// COMMIT BADGE DERIVATION
+// ============================================================================
+
+type BadgeStatus = "pass" | "fail" | "stale" | "pending";
+
+interface CommitBadges {
+	tests?: BadgeStatus;
+	review?: BadgeStatus;
 }
 
-function renderArtifactStatus(status: ArtifactRequirementStatus): TemplateResult {
-	const { type, label, required, artifact } = status;
-	const iconStr = ARTIFACT_TYPE_ICONS[type] || "\uD83D\uDCCB";
-	const exists = artifact != null;
-	const isExpanded = artifact ? expandedArtifactIds.has(artifact.id) : false;
-	const isNew = artifact != null && (Date.now() - artifact.updatedAt) < 5 * 60_000;
-	const isRevised = artifact != null && artifact.version > 1;
+function deriveBadges(commitList: CommitInfo[], taskList: Task[]): Map<string, CommitBadges> {
+	const badges = new Map<string, CommitBadges>();
+	for (const c of commitList) badges.set(c.sha, {});
 
-	return html`
-		<div class="artifact-row ${exists ? "artifact-row--exists" : "artifact-row--missing"}"
-			@click=${() => artifact && toggleArtifactExpand(artifact.id)}>
-			<div class="artifact-icon">${iconStr}</div>
-			<div class="artifact-info">
-				<div class="artifact-name">
-					${label}
-					${required ? html`<span class="artifact-required-badge">Required</span>` : nothing}
-					${isRevised ? html`<span class="artifact-revised-badge">Revised</span>` : nothing}
-					${isNew ? html`<span class="artifact-new-badge">New</span>` : nothing}
-				</div>
-				<div class="artifact-meta">
-					${exists
-						? html`<span class="artifact-status artifact-status--exists">v${artifact!.version}</span>
-							<span class="artifact-time">${formatArtifactTime(artifact!.updatedAt)}</span>`
-						: html`<span class="artifact-status artifact-status--missing">Missing</span>`
-					}
-				</div>
-			</div>
-			${exists ? html`
-				<span class="artifact-chevron ${isExpanded ? "artifact-chevron--open" : ""}">›</span>
-			` : nothing}
-		</div>
-		${isExpanded && artifact ? html`
-			<div class="artifact-content-panel">
-				<div class="artifact-content-header">
-					<span>${artifact.name}</span>
-					${artifact.skillId ? html`<span class="artifact-skill-badge">Skill: ${artifact.skillId}</span>` : nothing}
-				</div>
-				<pre class="artifact-content-body">${artifact.content}</pre>
-			</div>
-		` : nothing}
-	`;
-}
+	const testTasks = taskList.filter(t => t.type === "test" && t.commitSha);
+	const reviewTasks = taskList.filter(t => t.type === "review" && t.commitSha);
 
-function renderArtifactsPanel(artifactList: GoalArtifact[]): TemplateResult {
-	const statuses = getArtifactStatuses(artifactList);
+	for (const task of testTasks) {
+		const sha = task.commitSha!;
+		if (!badges.has(sha)) continue;
+		const b = badges.get(sha)!;
+		if (task.state === "complete") b.tests = "pass";
+		else if (task.state === "skipped") b.tests = "fail";
+		else if (task.state === "in-progress") b.tests = "pending";
+	}
 
-	return html`
-		<div class="artifacts-panel">
-			<div class="artifacts-panel-header">Artifacts</div>
-			${statuses.length > 0
-				? statuses.map(renderArtifactStatus)
-				: html`<div class="artifacts-panel-empty">No artifacts yet</div>`
-			}
-		</div>
-	`;
+	for (const task of reviewTasks) {
+		const sha = task.commitSha!;
+		if (!badges.has(sha)) continue;
+		const b = badges.get(sha)!;
+		if (task.state === "complete") b.review = "pass";
+		else if (task.state === "skipped") b.review = "fail";
+		else if (task.state === "in-progress") b.review = "pending";
+	}
+
+	return badges;
 }
 
 // ============================================================================
-// ARTIFACT TIMELINE
-// ============================================================================
-
-function renderArtifactTimeline(artifactList: GoalArtifact[]): TemplateResult {
-	if (artifactList.length === 0) return html``;
-
-	// Sort by updatedAt desc (most recent first)
-	const sorted = [...artifactList].sort((a, b) => b.updatedAt - a.updatedAt);
-
-	return html`
-		<div class="dashboard-section">
-			<h2 class="dashboard-section-title">Artifact Timeline</h2>
-			<div class="artifact-timeline">
-				${sorted.map((artifact, index) => {
-					const iconStr = ARTIFACT_TYPE_ICONS[artifact.type] || "\uD83D\uDCCB";
-					const isFirst = index === 0;
-					const isExpanded = expandedArtifactIds.has(artifact.id);
-					const session = state.gatewaySessions.find((s) => s.id === artifact.producedBy);
-					const producerName = session?.title || artifact.producedBy.slice(0, 8);
-					const isNew = (Date.now() - artifact.updatedAt) < 5 * 60_000;
-					const isRevised = artifact.version > 1;
-
-					return html`
-						<div class="artifact-timeline-item" @click=${() => toggleArtifactExpand(artifact.id)}>
-							<div class="${isFirst ? "artifact-timeline-dot artifact-timeline-dot--latest" : "artifact-timeline-dot"}"></div>
-							<div class="artifact-timeline-content">
-								<div class="artifact-timeline-header">
-									<span class="artifact-timeline-icon">${iconStr}</span>
-									<span class="artifact-timeline-name">${ARTIFACT_TYPE_LABELS[artifact.type] || artifact.name}</span>
-									<span class="artifact-timeline-version">v${artifact.version}</span>
-									${isRevised ? html`<span class="artifact-revised-badge">Revised</span>` : nothing}
-									${isNew ? html`<span class="artifact-new-badge">New</span>` : nothing}
-									<span class="artifact-timeline-time">${formatArtifactTime(artifact.updatedAt)}</span>
-								</div>
-								<div class="artifact-timeline-meta">
-									${isRevised ? html`<span>Revised</span><span>\u00B7</span>` : html`<span>Created</span><span>\u00B7</span>`}
-									<span>by ${producerName}</span>
-									${artifact.skillId ? html`<span>\u00B7</span><span>via ${artifact.skillId}</span>` : nothing}
-								</div>
-								${isExpanded ? html`
-									<pre class="artifact-content-body artifact-timeline-body">${artifact.content}</pre>
-								` : nothing}
-							</div>
-							<span class="artifact-chevron ${isExpanded ? "artifact-chevron--open" : ""}">›</span>
-						</div>
-					`;
-				})}
-			</div>
-		</div>
-	`;
-}
-
-
-// DASHBOARD LAYOUT
+// TEAM ACTIONS
 // ============================================================================
 
 async function handleStartTeam(goalId: string): Promise<void> {
@@ -857,113 +466,538 @@ async function handleEndTeam(goalId: string): Promise<void> {
 	renderApp();
 }
 
+// ============================================================================
+// SVG ICON HELPERS
+// ============================================================================
+
+const svgArrowLeft = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>`;
+const svgPencil = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>`;
+const svgTrash = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>`;
+const svgPlay = html`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+const svgStop = html`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>`;
+const svgPlus = html`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
+const svgChevronDown = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+const svgTeam = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
+const svgGitBranch = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M6 9v12"/></svg>`;
+const svgMerge = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>`;
+const svgDollar = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+const svgFolder = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+const svgTasks = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`;
+const svgAgents = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
+const svgCommit = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>`;
+const svgFile = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>`;
+const svgClock = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`;
+const svgPhaseArrow = html`<svg viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M0 6h16M13 2l4 4-4 4"/></svg>`;
+
+// ============================================================================
+// RENDER: NAV BAR
+// ============================================================================
+
 function renderNavBar(goal: Goal): TemplateResult {
 	const isTeamGoal = !!goal.team;
 
 	return html`
-		<div class="dashboard-nav">
-			<div class="dashboard-nav-left">
-				<button class="dashboard-back" @click=${() => setHashRoute("landing")} title="Back to sessions">
-					${icon(ArrowLeft, "sm")}
+		<div class="nav">
+			<div class="nav-left">
+				<button class="back-btn" @click=${() => setHashRoute("landing")} title="Back to sessions">
+					${svgArrowLeft}
 				</button>
-				<div class="dashboard-title-group">
-					<h1 class="dashboard-title">${goal.title}</h1>
-					${goal.branch ? html`<span class="dashboard-branch">${goal.branch}</span>` : nothing}
-				</div>
+				<span class="nav-title">${goal.title}</span>
 			</div>
-			<div class="dashboard-nav-right">
-				${Button({
-					variant: "ghost",
-					size: "sm",
-					onClick: () => showGoalDialog(goal),
-					children: html`<span class="inline-flex items-center gap-1">${icon(Pencil, "sm")} Edit</span>`,
-				})}
-				${Button({
-					variant: "ghost",
-					size: "sm",
-					onClick: () => deleteGoal(goal.id),
-					children: html`<span class="inline-flex items-center gap-1 text-destructive">${icon(Trash2, "sm")} Delete</span>`,
-				})}
-	
-				${Button({
-					variant: "default",
-					size: "sm",
-					onClick: () => createAndConnectSession(goal.id),
-					children: html`<span class="inline-flex items-center gap-1">${icon(Plus, "sm")} New Session</span>`,
-				})}
+			<div class="nav-right">
+				<button class="btn-icon" @click=${() => showGoalDialog(goal)} title="Edit goal">${svgPencil}</button>
+				<button class="btn-icon danger" @click=${() => deleteGoal(goal.id)} title="Delete goal">${svgTrash}</button>
+				${isTeamGoal ? renderTeamButton(goal) : renderSessionButton(goal)}
 			</div>
 		</div>
 	`;
 }
 
-function checkStatChanges(done: number, inProgress: number, failed: number, agents: number): void {
-	if (!previousStatValues) {
-		previousStatValues = { done, inProgress, failed, agents };
-		return;
+function renderTeamButton(goal: Goal): TemplateResult {
+	if (teamActive) {
+		return html`
+			<div class="btn-split">
+				<button class="btn-split-main danger" @click=${() => handleEndTeam(goal.id)} ?disabled=${teamStopping}>
+					${svgStop}
+					<span>${teamStopping ? "Stopping\u2026" : "Stop Team"}</span>
+				</button>
+			</div>
+		`;
 	}
-
-	const checks: Array<[string, number, number]> = [
-		["stat-done", previousStatValues.done, done],
-		["stat-progress", previousStatValues.inProgress, inProgress],
-		["stat-failed", previousStatValues.failed, failed],
-		["stat-agents", previousStatValues.agents, agents],
-	];
-
-	for (const [id, prev, curr] of checks) {
-		if (prev !== curr) {
-			const el = document.getElementById(id);
-			if (!el) continue;
-			// Clear any pending timer
-			const existing = statChangeTimers.get(id);
-			if (existing) clearTimeout(existing);
-			// Remove and re-add class to retrigger animation
-			el.classList.remove("dashboard-stat-value--changed");
-			// Force reflow to restart animation
-			void el.offsetWidth;
-			el.classList.add("dashboard-stat-value--changed");
-			statChangeTimers.set(id, setTimeout(() => {
-				el.classList.remove("dashboard-stat-value--changed");
-				statChangeTimers.delete(id);
-			}, 400));
-		}
-	}
-
-	previousStatValues = { done, inProgress, failed, agents };
+	return html`
+		<div class="btn-split">
+			<button class="btn-split-main" @click=${() => handleStartTeam(goal.id)} ?disabled=${teamStarting}>
+				${svgPlay}
+				<span>${teamStarting ? "Starting\u2026" : "Start Team"}</span>
+			</button>
+		</div>
+	`;
 }
 
-function renderSummaryHeader(goal: Goal, taskList: Task[]): TemplateResult {
+function renderSessionButton(goal: Goal): TemplateResult {
+	return html`
+		<div class="btn-split">
+			<button class="btn-split-main" @click=${() => createAndConnectSession(goal.id)}>
+				${svgPlus}
+				New Session
+			</button>
+			<button class="btn-split-chevron" @click=${(e: Event) => { e.stopPropagation(); toggleRoleDropdown(); }} title="Choose role">
+				${svgChevronDown}
+			</button>
+			${roleDropdownOpen ? html`
+				<div class="role-dropdown open" @click=${(e: Event) => e.stopPropagation()}>
+					${state.roles.length === 0
+						? html`<div class="role-dropdown-item" style="color:var(--text-tertiary)">No roles defined</div>`
+						: state.roles.map(role => html`
+							<button class="role-dropdown-item" @click=${() => { roleDropdownOpen = false; createAndConnectSession(goal.id, role.name); }}>
+								<span style="flex-shrink:0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>
+								<span class="role-label">${role.label}</span>
+							</button>
+						`)}
+				</div>
+			` : nothing}
+		</div>
+	`;
+}
+
+async function toggleRoleDropdown(): Promise<void> {
+	if (roleDropdownOpen) {
+		roleDropdownOpen = false;
+		renderApp();
+		return;
+	}
+	if (state.roles.length === 0) await fetchRoles();
+	roleDropdownOpen = true;
+	renderApp();
+}
+
+// Close role dropdown on outside click
+document.addEventListener("click", () => {
+	if (roleDropdownOpen) {
+		roleDropdownOpen = false;
+		renderApp();
+	}
+});
+
+// ============================================================================
+// RENDER: METADATA ROWS
+// ============================================================================
+
+function renderMetaRows(goal: Goal): TemplateResult {
+	const isTeamGoal = !!goal.team;
+	const worktreePath = goal.worktreePath || "";
+	const branch = goal.branch || "";
+
+	return html`
+		<div class="meta-rows">
+			<div class="meta-row">
+				<div class="meta-item">
+					${svgTeam}
+					<span class="meta-tag ${isTeamGoal ? "team-on" : "solo"}">${isTeamGoal ? "Team Mode" : "Solo Mode"}</span>
+				</div>
+				${branch ? html`
+					<span class="meta-sep">\u00B7</span>
+					<div class="meta-item">
+						${svgMerge}
+						<span class="meta-tag merge-clean">On branch</span>
+					</div>
+				` : nothing}
+			</div>
+			${branch || worktreePath ? html`
+				<div class="meta-row">
+					${branch ? html`
+						<div class="meta-item">
+							${svgGitBranch}
+							<span class="meta-label">branch</span>
+							<span class="meta-value mono">${branch}</span>
+						</div>
+					` : nothing}
+					${branch && worktreePath ? html`<span class="meta-sep">\u00B7</span>` : nothing}
+					${worktreePath ? html`
+						<div class="meta-item">
+							${svgFolder}
+							<span class="meta-label">worktree</span>
+							<span class="meta-value mono">${worktreePath}</span>
+						</div>
+					` : nothing}
+				</div>
+			` : nothing}
+		</div>
+	`;
+}
+
+// ============================================================================
+// RENDER: SUMMARY ROW
+// ============================================================================
+
+function renderSummaryRow(taskList: Task[], agentList: TeamAgent[]): TemplateResult {
 	const total = taskList.length;
 	const done = taskList.filter((t) => t.state === "complete").length;
 	const inProgress = taskList.filter((t) => t.state === "in-progress").length;
 	const failed = taskList.filter((t) => t.state === "skipped").length;
-	const activeAgents = state.gatewaySessions.filter(
-		(s) => s.goalId === goal.id && !s.delegateOf && (s.status === "streaming" || s.status === "busy"),
-	).length;
+	const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+	const circumference = 2 * Math.PI * 14; // radius 14
+	const offset = circumference - (pct / 100) * circumference;
 
-	// Schedule stat change detection after render
-	setTimeout(() => checkStatChanges(done, inProgress, failed, activeAgents), 0);
+	const workingAgents = agentList.filter(a => a.status === "streaming").length;
+	const idleAgents = agentList.length - workingAgents;
 
 	return html`
-		<div class="dashboard-summary">
-			<div class="dashboard-stat dashboard-stat--done">
-				<span class="dashboard-stat-value" id="stat-done">${done}/${total}</span>
-				<span class="dashboard-stat-label">Tasks done</span>
+		<div class="summary-row">
+			<div class="summary-ring">
+				<div class="ring-container">
+					<svg class="ring-bg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="14"/></svg>
+					<svg class="ring-fg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg>
+					<div class="ring-label">${pct}%</div>
+				</div>
+				<div>
+					<div class="ring-text">${done}/${total} tasks</div>
+					<div class="ring-sub">complete</div>
+				</div>
 			</div>
-			<div class="dashboard-stat dashboard-stat--progress">
-				<span class="dashboard-stat-value" id="stat-progress">${inProgress}</span>
-				<span class="dashboard-stat-label">In progress</span>
+			<div class="summary-stats">
+				<div class="mini-stat">
+					<span class="mini-stat-value" style="color:oklch(0.72 0.15 250)">${inProgress}</span>
+					<span class="mini-stat-label">Active</span>
+				</div>
+				<div class="mini-stat">
+					<span class="mini-stat-value" style="color:var(--destructive)">${failed}</span>
+					<span class="mini-stat-label">Failed</span>
+				</div>
+				<div class="mini-stat">
+					<span class="mini-stat-value" style="color:oklch(0.72 0.15 145)">${agentList.length}</span>
+					<span class="mini-stat-label">Agents</span>
+				</div>
 			</div>
-			<div class="dashboard-stat dashboard-stat--failed">
-				<span class="dashboard-stat-value" id="stat-failed">${failed}</span>
-				<span class="dashboard-stat-label">Failed</span>
-			</div>
-			<div class="dashboard-stat dashboard-stat--agents">
-				<span class="dashboard-stat-value" id="stat-agents">${activeAgents}</span>
-				<span class="dashboard-stat-label">Active agents</span>
+			${agentList.length > 0 ? html`
+				<div class="summary-agents">
+					<div class="bobbit-row">
+						${agentList.map(agent => {
+							const session = state.gatewaySessions.find(s => s.id === agent.sessionId);
+							return statusBobbit(
+								session?.status ?? agent.status,
+								session?.isCompacting ?? false,
+								agent.sessionId,
+								false,
+								session?.isAborting ?? false,
+								agent.role === "team-lead",
+								agent.role === "coder",
+								session?.accessory,
+							);
+						})}
+					</div>
+					<span class="bobbit-mini-label">${workingAgents} working, ${idleAgents} idle</span>
+				</div>
+			` : nothing}
+		</div>
+	`;
+}
+
+// ============================================================================
+// RENDER: PHASE PIPELINE
+// ============================================================================
+
+function renderPhasePipeline(artifactList: GoalArtifact[]): TemplateResult {
+	const currentPhase = derivePhase(artifactList);
+	const currentIdx = PHASES.findIndex((p) => p.phase === currentPhase);
+
+	return html`
+		<div class="phase-pipeline">
+			${PHASES.map((p, i) => {
+				const isDone = i < currentIdx;
+				const isActive = i === currentIdx;
+				const arrowClass = isDone ? "done" : isActive ? "active" : "";
+				const nodeClass = isDone ? "done" : isActive ? "active" : "";
+
+				return html`
+					${i > 0 ? html`<div class="phase-arrow ${arrowClass}">${svgPhaseArrow}</div>` : nothing}
+					<div class="phase-node ${nodeClass}">
+						${isDone ? html`<span class="phase-check">\u2713</span>` : nothing}
+						${p.label}
+					</div>
+				`;
+			})}
+		</div>
+	`;
+}
+
+// ============================================================================
+// RENDER: TAB BAR
+// ============================================================================
+
+function setTab(tab: typeof dashboardTab): void {
+	dashboardTab = tab;
+	renderApp();
+}
+
+function renderTabBar(): TemplateResult {
+	const tabs: Array<{ id: typeof dashboardTab; label: string; icon: TemplateResult; count: number }> = [
+		{ id: "tasks", label: "Tasks", icon: svgTasks, count: tasks.length },
+		{ id: "agents", label: "Agents", icon: svgAgents, count: agents.length },
+		{ id: "commits", label: "Commits", icon: svgCommit, count: commits.length },
+		{ id: "artifacts", label: "Artifacts", icon: svgFile, count: artifacts.length },
+	];
+
+	return html`
+		<div class="tab-bar">
+			${tabs.map(t => html`
+				<div class="tab ${dashboardTab === t.id ? "active" : ""}" @click=${() => setTab(t.id)}>
+					${t.icon}
+					${t.label}
+					<span class="tab-count">${t.count}</span>
+				</div>
+			`)}
+		</div>
+	`;
+}
+
+// ============================================================================
+// RENDER: TASKS TAB
+// ============================================================================
+
+function statusChipClass(s: TaskState): string {
+	switch (s) {
+		case "todo": return "chip-todo";
+		case "in-progress": return "chip-progress";
+		case "complete": return "chip-done";
+		case "blocked": return "chip-blocked";
+		case "skipped": return "chip-failed";
+	}
+}
+
+function statusLabel(s: TaskState): string {
+	switch (s) {
+		case "todo": return "Backlog";
+		case "in-progress": return "In Progress";
+		case "complete": return "Done";
+		case "blocked": return "Blocked";
+		case "skipped": return "Failed";
+	}
+}
+
+function renderTasksTab(): TemplateResult {
+	if (tasks.length === 0) {
+		return html`<div class="tab-empty">${svgTasks}<span>No tasks yet</span></div>`;
+	}
+
+	return html`
+		<div class="tab-panel-inner" style="padding-top:0;">
+			<table class="task-table">
+				<thead><tr>
+					<th style="width:35%">Task</th>
+					<th style="width:10%">Type</th>
+					<th style="width:14%">Status</th>
+					<th style="width:20%">Assignee</th>
+					<th style="width:8%">Time</th>
+				</tr></thead>
+				<tbody>
+					${tasks.map(task => {
+						const isDone = task.state === "complete";
+						const isFailed = task.state === "skipped";
+						const assignee = findAssigneeSession(task.assignedSessionId);
+						const color = typeColor(task.type);
+
+						return html`
+							<tr style="${isDone ? "opacity:0.55" : ""}">
+								<td class="task-title-cell">
+									${task.title}
+									${isFailed && task.resultSummary ? html`
+										<div style="font-size:11px;color:var(--destructive);margin-top:3px;">${task.resultSummary}</div>
+									` : nothing}
+								</td>
+								<td><span class="type-tag" style="background:${color}20;color:${color}">${typeLabel(task.type)}</span></td>
+								<td><span class="status-chip ${statusChipClass(task.state)}"><span class="dot"></span>${statusLabel(task.state)}</span></td>
+								<td>
+									${assignee
+										? html`<div class="assignee-cell assignee-cell-link" @click=${(e: Event) => { e.stopPropagation(); connectToSession(assignee.id, true); }}>
+											${statusBobbit(assignee.status, assignee.isCompacting, assignee.id, false, assignee.isAborting, assignee.role === "team-lead", assignee.role === "coder", assignee.accessory)}
+											${assignee.title || assignee.id.slice(0, 8)}
+										</div>`
+										: html`<span style="font-size:12px;color:var(--text-tertiary)">Unassigned</span>`
+									}
+								</td>
+								<td class="elapsed-cell">${getElapsedTime(task)}</td>
+							</tr>
+						`;
+					})}
+				</tbody>
+			</table>
+		</div>
+	`;
+}
+
+// ============================================================================
+// RENDER: AGENTS TAB
+// ============================================================================
+
+function renderAgentsTab(): TemplateResult {
+	if (agents.length === 0) {
+		return html`<div class="tab-empty">${svgAgents}<span>No active agents</span></div>`;
+	}
+
+	return html`
+		<div class="tab-panel-inner">
+			<div class="agent-grid">
+				${agents.map(agent => {
+					const session = state.gatewaySessions.find(s => s.id === agent.sessionId);
+					const isWorking = agent.status === "streaming";
+					const roleColor = getRoleColor(agent.role);
+					const tasksDone = tasks.filter(t => t.assignedSessionId === agent.sessionId && t.state === "complete").length;
+					const agentCommits = commits.filter(c => {
+						const s = state.gatewaySessions.find(gs => gs.id === agent.sessionId);
+						return s && c.author === (s.title || s.id.slice(0, 8));
+					}).length;
+					const elapsed = Date.now() - agent.createdAt;
+					const mins = Math.floor(elapsed / 60_000);
+					const timeStr = mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+
+					return html`
+						<div class="agent-card" @click=${() => connectToSession(agent.sessionId, true)}>
+							<div class="agent-card-bobbit">
+								${statusBobbit(
+									session?.status ?? agent.status,
+									session?.isCompacting ?? false,
+									agent.sessionId,
+									false,
+									session?.isAborting ?? false,
+									agent.role === "team-lead",
+									agent.role === "coder",
+									session?.accessory,
+								)}
+							</div>
+							<div class="agent-card-info">
+								<div class="agent-card-name-row">
+									<span class="agent-card-name">${formatAgentName(agent)}</span>
+									<span class="role-tag" style="background:${roleColor.bg};color:${roleColor.text}">${getRoleLabel(agent.role)}</span>
+									<span class="status-indicator ${isWorking ? "working" : "idle"}"></span>
+								</div>
+								<div class="agent-card-task">${agent.task || "No active task"}</div>
+								<div class="agent-card-meta">
+									<div class="agent-card-meta-item">${svgTasks} ${tasksDone} completed</div>
+									${agentCommits > 0 ? html`<div class="agent-card-meta-item">${svgCommit} ${agentCommits} commits</div>` : nothing}
+									<div class="agent-card-meta-item">${svgClock} ${timeStr}</div>
+								</div>
+							</div>
+						</div>
+					`;
+				})}
 			</div>
 		</div>
 	`;
 }
+
+// ============================================================================
+// RENDER: COMMITS TAB
+// ============================================================================
+
+function renderCommitsTab(): TemplateResult {
+	if (commits.length === 0) {
+		return html`<div class="tab-empty">${svgCommit}<span>No commits found on this branch</span></div>`;
+	}
+
+	const badges = deriveBadges(commits, tasks);
+
+	return html`
+		<div class="tab-panel-inner" style="padding-top:0;">
+			<div class="commit-list">
+				${commits.map((commit, index) => {
+					const isHead = index === 0;
+					const b = badges.get(commit.sha) || {};
+					return html`
+						<div class="commit-row">
+							<div class="commit-dot-col"><div class="cdot ${isHead ? "head" : ""}"></div></div>
+							<code class="commit-sha2">${commit.shortSha}</code>
+							<div class="commit-msg2">${commit.message}</div>
+							<div class="commit-badges2">
+								${b.tests === "pass" ? html`<span class="cbadge cbadge-pass">\u2713 Tests</span>` : nothing}
+								${b.tests === "fail" ? html`<span class="cbadge cbadge-fail">\u2717 Tests</span>` : nothing}
+								${b.tests === "pending" ? html`<span class="cbadge cbadge-pending">\u23F3 Tests</span>` : nothing}
+								${b.review === "pass" ? html`<span class="cbadge cbadge-pass">\u2713 Review</span>` : nothing}
+								${b.review === "fail" ? html`<span class="cbadge cbadge-fail">\u2717 Review</span>` : nothing}
+								${b.review === "pending" ? html`<span class="cbadge cbadge-pending">\u23F3 Review</span>` : nothing}
+							</div>
+							<div class="commit-author2">${commit.author}</div>
+							<div class="commit-time2">${formatRelativeTime(commit.timestamp)}</div>
+						</div>
+					`;
+				})}
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
+// RENDER: ARTIFACTS TAB
+// ============================================================================
+
+function renderArtifactsTab(): TemplateResult {
+	const statuses = getArtifactStatuses(artifacts);
+
+	if (statuses.length === 0) {
+		return html`<div class="tab-empty">${svgFile}<span>No artifacts yet</span></div>`;
+	}
+
+	return html`
+		<div class="tab-panel-inner" style="padding-top:0;">
+			<div class="artifact-list">
+				${statuses.map(status => {
+					const { type, label, required, artifact } = status;
+					const iconStr = ARTIFACT_TYPE_ICONS[type] || "\uD83D\uDCCB";
+					const exists = artifact != null;
+					const isMissing = !exists;
+					const isExpanded = artifact ? expandedArtifactIds.has(artifact.id) : false;
+
+					return html`
+						<div class="artifact-item ${isMissing ? "missing" : ""}"
+							@click=${() => artifact && toggleArtifactExpand(artifact.id)}>
+							<div class="artifact-status-icon ${exists ? "exists" : "missing-icon"}">${iconStr}</div>
+							<div class="artifact-main">
+								<div class="artifact-name-row">
+									<span class="artifact-name">${label}</span>
+									${required ? html`<span class="artifact-badge badge-required">Required</span>` : nothing}
+									${exists ? html`<span class="artifact-badge badge-version">v${artifact!.version}</span>` : nothing}
+									${isMissing ? html`<span class="artifact-badge badge-missing-label">Missing</span>` : nothing}
+								</div>
+								<div class="artifact-detail">
+									${exists ? html`
+										<span>${formatRelativeTime(artifact!.updatedAt)}</span>
+										${artifact!.producedBy ? html`
+											<span class="artifact-detail-sep">\u00B7</span>
+											<span>${(() => {
+												const s = state.gatewaySessions.find(gs => gs.id === artifact!.producedBy);
+												return s?.title || artifact!.producedBy.slice(0, 8);
+											})()}</span>
+										` : nothing}
+									` : nothing}
+									${isMissing && required ? html`
+										<span class="artifact-blocks">\u26A0 Blocks ${type === "review-findings" ? "goal completion" : "implementation tasks"}</span>
+									` : nothing}
+									${isMissing && !required ? html`<span>Optional</span>` : nothing}
+								</div>
+							</div>
+							${exists ? html`
+								<div class="artifact-right"><span class="artifact-view-btn">${isExpanded ? "Hide" : "View"}</span></div>
+							` : nothing}
+						</div>
+						${isExpanded && artifact ? html`
+							<div class="artifact-content-panel">
+								<div class="artifact-content-header">
+									<span>${artifact.name}</span>
+									${artifact.skillId ? html`<span class="artifact-skill-badge">Skill: ${artifact.skillId}</span>` : nothing}
+								</div>
+								<pre class="artifact-content-body">${artifact.content}</pre>
+							</div>
+						` : nothing}
+					`;
+				})}
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
+// RENDER: MAIN DASHBOARD
+// ============================================================================
 
 export function renderGoalDashboard(): TemplateResult {
 	if (loading) {
@@ -995,30 +1029,29 @@ export function renderGoalDashboard(): TemplateResult {
 		`;
 	}
 
+	const activeTab = dashboardTab;
+
 	return html`
 		<div class="dashboard-container">
 			${renderNavBar(currentGoal)}
-			${renderSummaryHeader(currentGoal, tasks)}
-			${renderPhaseIndicator(artifacts)}
-			<div class="dashboard-body">
-				<div class="dashboard-main-content">
-					<div class="dashboard-section">
-						<h2 class="dashboard-section-title">Tasks</h2>
-						${renderKanbanBoard(tasks)}
-					</div>
-					${renderArtifactTimeline(artifacts)}
-					${commits.length > 0 ? html`
-						<div class="dashboard-section">
-							<h2 class="dashboard-section-title">Commit Timeline</h2>
-							${renderCommitTimeline(commits, tasks)}
-						</div>
-					` : nothing}
-				</div>
-				<div class="dashboard-right-panel">
-					${renderAgentPanel(agents)}
-					${renderArtifactsPanel(artifacts)}
-				</div>
+			${renderMetaRows(currentGoal)}
+			${renderSummaryRow(tasks, agents)}
+			${renderPhasePipeline(artifacts)}
+			${renderTabBar()}
+			<div class="tab-content">
+				<div class="tab-panel ${activeTab === "tasks" ? "active" : ""}">${activeTab === "tasks" ? renderTasksTab() : nothing}</div>
+				<div class="tab-panel ${activeTab === "agents" ? "active" : ""}">${activeTab === "agents" ? renderAgentsTab() : nothing}</div>
+				<div class="tab-panel ${activeTab === "commits" ? "active" : ""}">${activeTab === "commits" ? renderCommitsTab() : nothing}</div>
+				<div class="tab-panel ${activeTab === "artifacts" ? "active" : ""}">${activeTab === "artifacts" ? renderArtifactsTab() : nothing}</div>
 			</div>
 		</div>
 	`;
+}
+
+// ============================================================================
+// BACKWARD COMPAT: renderAgentPanel (exported but only used internally before)
+// ============================================================================
+
+export function renderAgentPanel(agentList: TeamAgent[]): TemplateResult {
+	return renderAgentsTab();
 }
