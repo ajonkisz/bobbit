@@ -298,14 +298,28 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		};
 
 		remote.onToolProposal = (proposal) => {
-			if (!state.toolPreviewNameEdited) state.toolPreviewName = proposal.tool;
-			if (!state.toolPreviewDocsEdited && proposal.action === "docs") state.toolPreviewDocs = proposal.content;
-			if (!state.toolPreviewDescriptionEdited && proposal.action === "docs") {
-				// Extract first line as description
-				const firstLine = proposal.content.split("\n")[0]?.trim();
-				if (firstLine) state.toolPreviewDescription = firstLine;
+			state.toolPreviewName = proposal.tool;
+			// Map action to checklist item
+			const actionToItem: Record<string, keyof typeof state.toolPreviewChecklist> = {
+				"docs": "docs",
+				"renderer": "renderer",
+				"tests": "tests",
+				"config": "config",
+				"access": "config",
+				"new-tool": "config",
+			};
+			const item = actionToItem[proposal.action];
+			if (item) {
+				state.toolPreviewChecklist[item] = "done";
 			}
-			state.toolPreviewAction = proposal.action;
+			// Update docs content if docs action
+			if (proposal.action === "docs") {
+				state.toolPreviewDocs = proposal.content;
+			}
+			// Update renderer preview HTML if renderer action
+			if (proposal.action === "renderer") {
+				state.toolPreviewRendererHtml = proposal.content;
+			}
 			state.hasReceivedToolProposal = true;
 			if (state.toolAssistantTab === "chat" && !isDesktop()) {
 				state.toolAssistantTab = "preview";
@@ -450,16 +464,10 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		if (state.isToolAssistantSession) {
 			state.toolAssistantTab = "chat";
 			state.toolPreviewName = "";
-			state.toolPreviewDescription = "";
-			state.toolPreviewGroup = "";
+			state.toolPreviewChecklist = { docs: "pending", renderer: "pending", tests: "pending", config: "pending" };
 			state.toolPreviewDocs = "";
-			state.toolPreviewAction = "";
-			state.toolPreviewNameEdited = false;
-			state.toolPreviewDescriptionEdited = false;
-			state.toolPreviewGroupEdited = false;
-			state.toolPreviewDocsEdited = false;
+			state.toolPreviewRendererHtml = "";
 			state.hasReceivedToolProposal = false;
-			state.toolPreviewDocsEditMode = false;
 		}
 
 		if (options?.isToolAssistant && !isExisting) {

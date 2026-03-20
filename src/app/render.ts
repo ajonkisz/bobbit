@@ -499,135 +499,97 @@ function rolePreviewPanel() {
 // ============================================================================
 
 function toolPreviewPanel() {
-	const handleSaveTool = async () => {
-		const toolName = state.toolPreviewName.trim();
-		if (!toolName) return;
-
-		const res = await gatewayFetch(`/api/tools/${encodeURIComponent(toolName)}`, {
-			method: "PUT",
-			body: JSON.stringify({
-				description: state.toolPreviewDescription.trim() || undefined,
-				group: state.toolPreviewGroup.trim() || undefined,
-				docs: state.toolPreviewDocs.trim() || undefined,
-			}),
-		});
-		if (!res.ok && res.status !== 404) {
-			// 404 is expected if tool doesn't exist yet; other errors are real
-			console.error(`Failed to save tool metadata: ${res.status}`);
-		}
-
-		const sessionId = activeSessionId();
-		if (state.remoteAgent) {
-			state.remoteAgent.disconnect();
-			state.remoteAgent = null;
-			state.connectionStatus = "disconnected";
-		}
-		state.isToolAssistantSession = false;
-		state.hasReceivedToolProposal = false;
-		localStorage.removeItem("gateway.sessionId");
-
-		if (sessionId) {
-			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
-		}
-
-		// Navigate to the tools page
-		const { loadToolPageData } = await import("./tool-manager-page.js");
-		await loadToolPageData();
-		setHashRoute("tools");
-		renderApp();
-	};
-
-	const handleCancel = () => {
+	const handleDone = () => {
 		backToSessions();
 	};
 
-	const TOOL_GROUPS = ["File System", "Shell", "Web", "Browser", "Agent", "Team", "Tasks", "Artifacts", "Other"];
+	const handleViewTool = async () => {
+		const toolName = state.toolPreviewName.trim();
+		if (!toolName) return;
+		const { loadToolPageData } = await import("./tool-manager-page.js");
+		await loadToolPageData();
+		setHashRoute("tool-edit", toolName);
+		renderApp();
+	};
+
+	const checklist = state.toolPreviewChecklist;
+	const checklistItems = [
+		{ key: "docs" as const, label: "Documentation", desc: "Usage examples, parameter descriptions" },
+		{ key: "renderer" as const, label: "Renderer", desc: "Custom tool call display component" },
+		{ key: "tests" as const, label: "Tests", desc: "Unit and E2E test coverage" },
+		{ key: "config" as const, label: "Configuration", desc: "Tool metadata, groups, role access" },
+	];
+
+	const statusIcon = (s: "pending" | "in-progress" | "done") =>
+		s === "done" ? html`<span class="text-green-500">&#10003;</span>`
+		: s === "in-progress" ? html`<span class="text-yellow-500 animate-pulse">&#9679;</span>`
+		: html`<span class="text-muted-foreground">&#9675;</span>`;
+
+	const doneCount = Object.values(checklist).filter((s) => s === "done").length;
+	const total = checklistItems.length;
 
 	return html`
 		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
 			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+				<!-- Tool name header -->
 				<div>
-					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Tool Name</label>
-					${Input({
-						type: "text",
-						value: state.toolPreviewName,
-						placeholder: "tool-name",
-						onInput: (e: Event) => {
-							state.toolPreviewName = (e.target as HTMLInputElement).value;
-							state.toolPreviewNameEdited = true;
-						},
-					})}
+					<div class="text-xs text-muted-foreground mb-1">Tool</div>
+					<div class="text-lg font-semibold">${state.toolPreviewName || html`<span class="text-muted-foreground italic">Waiting for assistant...</span>`}</div>
 				</div>
+
+				<!-- Progress bar -->
 				<div>
-					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Description</label>
-					${Input({
-						type: "text",
-						value: state.toolPreviewDescription,
-						placeholder: "Short description of what the tool does",
-						onInput: (e: Event) => {
-							state.toolPreviewDescription = (e.target as HTMLInputElement).value;
-							state.toolPreviewDescriptionEdited = true;
-						},
-					})}
-				</div>
-				<div>
-					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Group</label>
-					<div class="flex flex-wrap gap-1">
-						${TOOL_GROUPS.map((g) => {
-							const isSelected = state.toolPreviewGroup === g;
-							return html`
-								<button
-									class="text-xs px-2 py-1 rounded border transition-colors ${isSelected ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}"
-									@click=${() => {
-										state.toolPreviewGroup = g;
-										state.toolPreviewGroupEdited = true;
-										renderApp();
-									}}
-								>${g}</button>
-							`;
-						})}
+					<div class="flex items-center justify-between mb-1.5">
+						<span class="text-xs text-muted-foreground font-medium">Progress</span>
+						<span class="text-xs text-muted-foreground">${doneCount}/${total}</span>
+					</div>
+					<div class="h-1.5 rounded-full bg-secondary overflow-hidden">
+						<div class="h-full rounded-full bg-primary transition-all duration-500" style="width: ${(doneCount / total) * 100}%"></div>
 					</div>
 				</div>
-				${state.toolPreviewAction ? html`
+
+				<!-- Checklist -->
+				<div class="flex flex-col gap-2">
+					${checklistItems.map((item) => html`
+						<div class="flex items-start gap-2.5 p-2.5 rounded-md border border-border ${checklist[item.key] === "done" ? "bg-green-500/5" : ""}">
+							<div class="mt-0.5 text-sm">${statusIcon(checklist[item.key])}</div>
+							<div class="flex-1 min-w-0">
+								<div class="text-sm font-medium">${item.label}</div>
+								<div class="text-xs text-muted-foreground">${item.desc}</div>
+							</div>
+						</div>
+					`)}
+				</div>
+
+				<!-- Documentation preview -->
+				${state.toolPreviewDocs ? html`
 					<div>
-						<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-secondary text-secondary-foreground">
-							Action: ${state.toolPreviewAction}
-						</span>
+						<div class="text-xs text-muted-foreground mb-1.5 font-medium">Documentation Preview</div>
+						<div class="p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm max-h-[200px]">
+							<markdown-block .content=${state.toolPreviewDocs}></markdown-block>
+						</div>
 					</div>
 				` : ""}
-				<div class="flex-1 flex flex-col min-h-0">
-					<div class="flex items-center justify-between mb-1.5">
-						<label class="text-xs text-muted-foreground font-medium">Documentation</label>
-						<button
-							class="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-							@click=${() => { state.toolPreviewDocsEditMode = !state.toolPreviewDocsEditMode; renderApp(); }}
-						>
-							${state.toolPreviewDocsEditMode ? "Preview" : "Edit"}
-						</button>
+
+				<!-- Renderer preview -->
+				${state.toolPreviewRendererHtml ? html`
+					<div>
+						<div class="text-xs text-muted-foreground mb-1.5 font-medium">Renderer Preview</div>
+						<div class="p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm max-h-[300px]">
+							<markdown-block .content=${state.toolPreviewRendererHtml}></markdown-block>
+						</div>
 					</div>
-					${state.toolPreviewDocsEditMode
-						? html`<textarea
-								class="flex-1 min-h-[200px] p-3 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
-								.value=${state.toolPreviewDocs}
-								@input=${(e: Event) => {
-									state.toolPreviewDocs = (e.target as HTMLTextAreaElement).value;
-									state.toolPreviewDocsEdited = true;
-								}}
-							></textarea>`
-						: html`<div class="flex-1 min-h-[200px] p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm">
-								<markdown-block .content=${state.toolPreviewDocs || "_No documentation yet — the assistant will populate this_"}></markdown-block>
-							</div>`
-					}
-				</div>
+				` : ""}
 			</div>
+
+			<!-- Footer -->
 			<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
-				${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
-				${Button({
+				${Button({ variant: "ghost", onClick: handleDone, children: "Close" })}
+				${state.toolPreviewName ? Button({
 					variant: "default",
-					onClick: handleSaveTool,
-					disabled: !state.toolPreviewName.trim(),
-					children: html`<span class="inline-flex items-center gap-1.5">${icon(Wrench, "sm")} Save Tool</span>`,
-				})}
+					onClick: handleViewTool,
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(Wrench, "sm")} View Tool</span>`,
+				}) : ""}
 			</div>
 		</div>
 	`;
