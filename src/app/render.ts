@@ -491,65 +491,123 @@ function rolePreviewPanel() {
 // PREVIEW SWIPE (mobile)
 // ============================================================================
 
-/** Edge-swipe: narrow strips on screen edges for sliding between chat ↔ preview.
- *  No direction-locking needed — edge strips don't conflict with content scrolling. */
-
-const EDGE_WIDTH = 30; // px from screen edge that triggers swipe
-
-function makeEdgeStrip(side: "left" | "right"): HTMLDivElement {
-	const strip = document.createElement("div");
-	strip.className = `preview-edge-${side}`;
-	strip.style.cssText = `position:absolute;top:0;bottom:0;${side}:0;width:${EDGE_WIDTH}px;z-index:10;touch-action:none;`;
-
-	let startX = 0;
-
-	strip.addEventListener("touchstart", (e: TouchEvent) => {
+/** Script injected into the preview iframe srcdoc to detect rightward swipes
+ *  and send position updates to the parent via postMessage.
+ *  Only rightward swipes are captured; all other gestures pass through normally. */
+const PREVIEW_SWIPE_SCRIPT = `<script>
+(function() {
+	var startX = 0, startY = 0, captured = false, decided = false;
+	document.addEventListener('touchstart', function(e) {
 		startX = e.touches[0].clientX;
-		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-		if (track) track.style.transition = "none";
-	});
+		startY = e.touches[0].clientY;
+		captured = false;
+		decided = false;
+	}, {passive: true});
+	document.addEventListener('touchmove', function(e) {
+		if (decided && !captured) return;
+		var dx = e.touches[0].clientX - startX;
+		var dy = e.touches[0].clientY - startY;
+		if (!decided && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+			decided = true;
+			captured = dx > 0 && Math.abs(dx) > Math.abs(dy);
+			if (captured) parent.postMessage({type:'preview-swipe-start'}, '*');
+		}
+		if (captured) {
+			e.preventDefault();
+			parent.postMessage({type:'preview-swipe-move', dx: dx}, '*');
+		}
+	}, {passive: false});
+	document.addEventListener('touchend', function(e) {
+		if (!captured) return;
+		var dx = e.changedTouches[0].clientX - startX;
+		parent.postMessage({type:'preview-swipe-end', dx: dx}, '*');
+		captured = false;
+		decided = false;
+	}, {passive: true});
+})();
+<\/script>`;
 
-	strip.addEventListener("touchmove", (e: TouchEvent) => {
-		e.preventDefault(); // prevent scroll — this is an intentional swipe on the edge strip
+/** Listen for postMessage from the preview iframe and drive the slider track.
+ *  Also handles leftward swipes on the chat side (#app touch events). */
+function setupPreviewSwipe(): void {
+	if ((window as any).__previewSwipeListening) return;
+	(window as any).__previewSwipeListening = true;
+
+	// === iframe → parent: rightward swipe on preview ===
+	window.addEventListener("message", (e: MessageEvent) => {
+		if (!state.isPreviewSession || state.previewPanelTab !== "preview") return;
 		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
 		if (!track) return;
-		const dx = e.touches[0].clientX - startX;
-		const basePercent = state.previewPanelTab === "chat" ? 0 : -50;
-		const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
-		track.style.transform = `translateX(${Math.max(-50, Math.min(0, basePercent + dragPercent))}%)`;
+
+		if (e.data?.type === "preview-swipe-start") {
+			track.style.transition = "none";
+		} else if (e.data?.type === "preview-swipe-move") {
+			const dx: number = e.data.dx;
+			const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
+			track.style.transform = `translateX(${Math.max(-50, Math.min(0, -50 + dragPercent))}%)`;
+		} else if (e.data?.type === "preview-swipe-end") {
+			track.style.transition = "transform 0.3s ease-out";
+			const dx: number = e.data.dx;
+			const threshold = track.parentElement!.clientWidth * 0.2;
+			if (dx > threshold) {
+				state.previewPanelTab = "chat";
+			}
+			track.style.transform = `translateX(${state.previewPanelTab === "chat" ? 0 : -50}%)`;
+			renderApp();
+		}
 	});
 
-	strip.addEventListener("touchend", (e: TouchEvent) => {
+	// === chat side: leftward swipe to show preview ===
+	let chatStartX = 0, chatStartY = 0, chatCaptured = false, chatDecided = false;
+	const el = document.getElementById("app")!;
+
+	el.addEventListener("touchstart", (e: TouchEvent) => {
+		if (!state.isPreviewSession || state.previewPanelTab !== "chat") return;
+		chatStartX = e.touches[0].clientX;
+		chatStartY = e.touches[0].clientY;
+		chatCaptured = false;
+		chatDecided = false;
+	}, { passive: true });
+
+	el.addEventListener("touchmove", (e: TouchEvent) => {
+		if (!state.isPreviewSession || state.previewPanelTab !== "chat") return;
+		if (chatDecided && !chatCaptured) return;
+		const dx = e.touches[0].clientX - chatStartX;
+		const dy = e.touches[0].clientY - chatStartY;
+		if (!chatDecided && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+			chatDecided = true;
+			chatCaptured = dx < 0 && Math.abs(dx) > Math.abs(dy); // leftward
+			if (chatCaptured) {
+				const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+				if (track) track.style.transition = "none";
+			}
+		}
+		if (chatCaptured) {
+			const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
+			if (track) {
+				const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
+				track.style.transform = `translateX(${Math.max(-50, Math.min(0, dragPercent))}%)`;
+			}
+		}
+	}, { passive: true });
+
+	el.addEventListener("touchend", (e: TouchEvent) => {
+		if (!chatCaptured) return;
 		const track = document.querySelector(".preview-slider__track") as HTMLElement | null;
-		if (!track) return;
-		track.style.transition = "transform 0.3s ease-out";
-		const dx = e.changedTouches[0].clientX - startX;
-		const threshold = track.parentElement!.clientWidth * 0.2;
-		if (dx < -threshold && state.previewPanelTab === "chat") state.previewPanelTab = "preview";
-		else if (dx > threshold && state.previewPanelTab === "preview") state.previewPanelTab = "chat";
-		track.style.transform = `translateX(${state.previewPanelTab === "chat" ? 0 : -50}%)`;
+		if (track) {
+			track.style.transition = "transform 0.3s ease-out";
+			const dx = e.changedTouches[0].clientX - chatStartX;
+			const threshold = track.parentElement!.clientWidth * 0.2;
+			if (dx < -threshold) state.previewPanelTab = "preview";
+			track.style.transform = `translateX(${state.previewPanelTab === "chat" ? 0 : -50}%)`;
+		}
+		chatCaptured = false;
+		chatDecided = false;
 		renderApp();
-	});
-
-	return strip;
+	}, { passive: true });
 }
 
-function setupPreviewSwipe(): void { /* no-op, replaced by ensurePreviewOverlay */ }
-
-/** Ensure edge strips exist on the slider for swipe navigation. Called after each render. */
-function ensurePreviewOverlay(): void {
-	if (!state.isPreviewSession || isDesktop()) return;
-	const slider = document.querySelector(".preview-slider") as HTMLElement | null;
-	if (!slider || slider.querySelector(".preview-edge-right")) return;
-
-	// Right edge of chat panel → swipe left to preview
-	slider.appendChild(makeEdgeStrip("right"));
-	// Left edge of preview panel: position it at viewport-width offset inside the track
-	const wrap = document.querySelector(".preview-iframe-wrap") as HTMLElement | null;
-	if (wrap && !wrap.querySelector(".preview-edge-left")) {
-		wrap.appendChild(makeEdgeStrip("left"));
-	}
-}
+function ensurePreviewOverlay(): void { /* no-op — swipe handled via postMessage */ }
 
 // ============================================================================
 // RENDER APP
@@ -792,7 +850,7 @@ export function doRenderApp(): void {
 						class="w-full border-0"
 						style="position:absolute;inset:0;height:100%;"
 						sandbox="allow-scripts allow-same-origin"
-						.srcdoc=${state.previewPanelHtml}
+						.srcdoc=${state.previewPanelHtml + PREVIEW_SWIPE_SCRIPT}
 					></iframe>
 				</div>
 			</div>
