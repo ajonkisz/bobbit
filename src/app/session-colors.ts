@@ -277,11 +277,13 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 	const compactSquish = isCompacting && !isCancelling;
 	const baseTransform = isCompacting
 		? (compactSquish
-			? "transform-origin:0 9px;animation:bobbit-squish 1.5s ease-in-out infinite;"
+			? "transform-origin:0 9px;animation:bobbit-squish 3s ease-in-out infinite;"
 			: "transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(4.5px);transform-origin:0 9px;")
 		: "transform:scale(1.6);transform-origin:0 0;";
 	const eyeAnim = isSelected
-		? `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 ${isCompacting ? "9px" : "0"};`
+		? (compactSquish
+			? "transform-origin:0 9px;animation:bobbit-squish 3s ease-in-out infinite;"
+			: `animation:${isCompacting ? "bobbit-eyes-squash" : "bobbit-eyes"} 6s step-end infinite;transform-origin:0 ${isCompacting ? "9px" : "0"};`)
 		: baseTransform;
 
 	const eyeTop = addsHeight ? "4px" : "0";
@@ -299,7 +301,7 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 	const isCrown = acc.id === "crown";
 	const accTransform = isCompacting
 		? (compactSquish
-			? `transform-origin:0 9px;animation:${isCrown ? "bobbit-squish-crown" : "bobbit-squish"} 1.5s ease-in-out infinite;`
+			? `transform-origin:0 9px;animation:${isCrown ? "bobbit-squish-crown" : "bobbit-squish"} 3s ease-in-out infinite;`
 			: `transform:scale(1.6) scaleX(1.0) scaleY(0.75) translateY(${isBandanaStyle ? "4px" : "4.5px"})${isCrown ? " translateX(-0.5px)" : ""};transform-origin:0 9px;`)
 		: `transform:scale(1.6)${isBandanaStyle ? " translateY(-0.5px)" : ""}${isCrown ? " translateX(-0.5px)" : ""};transform-origin:0 0;`;
 	const accTop = addsHeight ? `${acc.yOffset}px` : "0";
