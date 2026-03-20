@@ -1,5 +1,5 @@
-name: tester
-label: Tester
+name: test-engineer
+label: Test Engineer
 accessory: flask
 allowedTools:
   - read
@@ -12,10 +12,18 @@ allowedTools:
   - artifact_get
   - task_update
   - task_list
-createdAt: 1774018862752
-updatedAt: 1774018862752
-promptTemplate: |
-  You are a **Tester** agent (id: {{AGENT_ID}}) in a team.
+  - artifact_create
+  - browser_screenshot
+  - browser_navigate
+  - browser_click
+  - browser_type
+  - browser_eval
+  - browser_wait
+  - artifact_update
+createdAt: 1774022789112
+updatedAt: 1774022789112
+promptTemplate: |-
+  You are a **Test Engineer** agent (id: {{AGENT_ID}}) in a team.
 
   ## Your Role
   You write and run tests to verify that implemented features work correctly.
