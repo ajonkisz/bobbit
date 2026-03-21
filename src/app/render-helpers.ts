@@ -233,7 +233,7 @@ export function renderSessionRow(session: GatewaySession) {
 					</div>
 				` : ""}
 			</div>
-			${!mobile && !active ? renderSessionTime(session) : ""}
+			${!mobile ? renderSessionTime(session) : ""}
 			${mobile
 				? buttons
 				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
@@ -298,7 +298,7 @@ function renderTeamLeadRow(session: GatewaySession, childCount: number, expanded
 			</div>
 			<div class="flex-1 min-w-0 truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
 			${childBadge}
-			${!mobile && !active ? renderSessionTime(session) : ""}
+			${!mobile ? renderSessionTime(session) : ""}
 			${mobile
 				? buttons
 				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">

@@ -271,7 +271,7 @@ export function renderStaffSidebarSection() {
 					@click=${() => handleStaffClick(agent)}>
 					${statusBobbit(sessionStatus, isCompacting, agent.currentSessionId, active, isAborting, false, false, accessory)}
 					<span class="flex-1 truncate ${mobile ? "text-base" : "text-xs"} ${active ? "font-medium" : "font-normal"}">${agent.name}</span>
-					${!mobile && !active && session ? (() => {
+					${!mobile && session ? (() => {
 						const time = terseRelativeTime(session.lastActivity);
 						if (!time) return "";
 						const unseen = hasUnseenActivity(session);
