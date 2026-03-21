@@ -727,8 +727,8 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 												return html`<button
 													class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer"
 													style="${selected
-														? "background: hsl(var(--primary) / 0.15); color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.3);"
-														: "background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); border-color: transparent;"}"
+														? "background: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.4);"
+														: "background: hsl(var(--muted) / 0.5); color: hsl(var(--foreground) / 0.7); border-color: hsl(var(--border));"}"
 													title=${trait.description}
 													@click=${() => {
 														const current = pendingTraits !== null ? [...pendingTraits] : [...initialTraits];

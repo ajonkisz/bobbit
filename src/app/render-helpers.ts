@@ -144,7 +144,7 @@ export function renderSessionRow(session: GatewaySession) {
 					<div class="flex flex-wrap gap-0.5 mt-0.5">
 						${session.traits.map((t) => html`<span
 							class="text-[9px] leading-none px-1 py-px rounded-md"
-							style="background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); opacity: 0.8;"
+							style="background: hsl(var(--primary) / 0.15); color: hsl(var(--primary)); opacity: 0.9;"
 							title=${t}
 						>${t}</span>`)}
 					</div>
