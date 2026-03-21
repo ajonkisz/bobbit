@@ -239,12 +239,12 @@ export function renderStaffSidebarSection() {
 				<span class="flex-1 ${mobile ? "text-sm" : "text-[10px]"} text-muted-foreground uppercase tracking-wider font-medium">Staff</span>
 				<div class="flex items-center" @click=${(e: Event) => e.stopPropagation()}>
 					<button
-						class="${mobile ? "p-1.5 rounded" : "p-0.5 rounded-md"} text-muted-foreground active:bg-secondary/50 hover:bg-secondary/50 transition-colors"
+						class="${mobile ? "p-2 rounded" : "p-0.5 rounded-md"} text-muted-foreground active:bg-secondary/50 hover:bg-secondary/50 transition-colors"
 						@click=${() => { import("./staff-page.js").then((m) => m.loadStaffPageData()); import("./routing.js").then((m) => m.setHashRoute("staff")); }}
 						title="Manage staff agents"
 					>${icon(List, mobile ? "sm" : "xs")}</button>
 					<button
-						class="${mobile ? "p-1.5 rounded" : "p-0.5 rounded-md"} text-muted-foreground active:bg-secondary/50 hover:bg-secondary/50 transition-colors"
+						class="${mobile ? "p-2 rounded" : "p-0.5 rounded-md"} text-muted-foreground active:bg-secondary/50 hover:bg-secondary/50 transition-colors"
 						@click=${createStaffAssistantSession}
 						title="New staff agent"
 					>${icon(Plus, mobile ? "sm" : "xs")}</button>
