@@ -1289,6 +1289,14 @@ async function handleApiRoute(
 			sessionManager.persistSessionMetadata(session).catch(() => {});
 		}
 
+		if (typeof body.accessory === "string") {
+			const session = sessionManager.getSession(id);
+			if (session) {
+				session.accessory = body.accessory || undefined;
+				sessionManager.persistSessionMetadata(session).catch(() => {});
+			}
+		}
+
 		if (Array.isArray(body.personalities) && !roleHandledPersonalities) {
 			const newPersonalities = body.personalities as string[];
 			// Validate personality names

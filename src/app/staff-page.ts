@@ -3,10 +3,11 @@ import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
 import { ArrowLeft, Clock, Eye, Pencil, Play, Pause, Plus, Trash2, UserCheck, Zap } from "lucide";
-import { fetchStaff, fetchStaffAgent, updateStaffAgent, deleteStaffAgent, wakeStaffAgent, type StaffAgent } from "./api.js";
+import { fetchStaff, fetchStaffAgent, updateStaffAgent, deleteStaffAgent, wakeStaffAgent, fetchPersonalities, gatewayFetch, refreshSessions, type StaffAgent, type PersonalityData } from "./api.js";
 import { state, renderApp } from "./state.js";
 import { setHashRoute } from "./routing.js";
 import { connectToSession } from "./session-manager.js";
+import { BOBBIT_HUE_ROTATIONS, ACCESSORY_IDS, sessionColorMap, setSessionColor, statusBobbit, getAccessory } from "./session-colors.js";
 
 // ============================================================================
 // STATE
@@ -29,6 +30,12 @@ let editPromptEditMode = false;
 let editCwd = "";
 let editTriggers: TriggerDef[] = [];
 let editMemory = "";
+
+// Session appearance state
+let editColorIndex = -1;
+let editAccessory = "none";
+let editPersonalities: string[] = [];
+let availablePersonalities: PersonalityData[] = [];
 
 interface TriggerDef {
 	type: string;
@@ -75,6 +82,7 @@ function showEdit(agent: StaffAgent): void {
 	editMemory = agent.memory || "";
 	saving = false;
 	deleting = false;
+	loadSessionAppearance(agent);
 	setHashRoute("staff-edit", agent.id);
 }
 
@@ -92,8 +100,19 @@ export function navigateToStaffEdit(staffId: string): void {
 		editMemory = agent.memory || "";
 		saving = false;
 		deleting = false;
+		loadSessionAppearance(agent);
 	}
 	renderApp();
+}
+
+async function loadSessionAppearance(agent: StaffAgent): Promise<void> {
+	const session = agent.currentSessionId
+		? state.gatewaySessions.find((s) => s.id === agent.currentSessionId)
+		: undefined;
+	editColorIndex = session ? (sessionColorMap.get(session.id) ?? -1) : -1;
+	editAccessory = session?.accessory || "none";
+	editPersonalities = session?.personalities || [];
+	fetchPersonalities().then((p) => { availablePersonalities = p; renderApp(); });
 }
 
 // ============================================================================
@@ -112,6 +131,27 @@ async function handleSave(): Promise<void> {
 		triggers: editTriggers,
 		memory: editMemory,
 	});
+	// Save session appearance (color, accessory, personality)
+	if (selectedStaff.currentSessionId) {
+		const sid = selectedStaff.currentSessionId;
+		const session = state.gatewaySessions.find((s) => s.id === sid);
+		const origColor = sessionColorMap.get(sid) ?? -1;
+		const origAccessory = session?.accessory || "none";
+		const origPersonalities = session?.personalities || [];
+		if (editColorIndex !== origColor && editColorIndex >= 0) {
+			setSessionColor(sid, editColorIndex);
+		}
+		const patchBody: Record<string, unknown> = {};
+		if (editAccessory !== origAccessory) patchBody.accessory = editAccessory;
+		if (JSON.stringify(editPersonalities) !== JSON.stringify(origPersonalities)) patchBody.personalities = editPersonalities;
+		if (Object.keys(patchBody).length > 0) {
+			await gatewayFetch(`/api/sessions/${sid}`, {
+				method: "PATCH",
+				body: JSON.stringify(patchBody),
+			});
+			await refreshSessions();
+		}
+	}
 	if (ok) {
 		staffList = await fetchStaff();
 		const updated = staffList.find((s) => s.id === selectedStaff!.id);
@@ -229,7 +269,7 @@ function renderTriggerCard(trigger: TriggerDef, index: number) {
 					class="text-[10px] px-1.5 py-0.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
 					title="Remove trigger"
 					@click=${() => removeTrigger(index)}
-				>\u2715</button>
+				>${"\u2715"}</button>
 			</div>
 
 			${trigger.type === "schedule" ? html`
@@ -289,9 +329,7 @@ function describeCron(cron: string): string {
 	const parts = cron.trim().split(/\s+/);
 	if (parts.length !== 5) return cron ? `Custom: ${cron}` : "";
 	const [min, hour, dom, mon, dow] = parts;
-
 	const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
 	let timeStr = "";
 	if (min !== "*" && hour !== "*") {
 		const h = parseInt(hour, 10);
@@ -302,7 +340,6 @@ function describeCron(cron: string): string {
 			timeStr = `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
 		}
 	}
-
 	if (hour.startsWith("*/")) {
 		const n = hour.slice(2);
 		const base = min === "0" ? "on the hour" : `at :${min.padStart(2, "0")}`;
@@ -430,6 +467,10 @@ function renderListView(): TemplateResult {
 function renderEditView(): TemplateResult {
 	if (!selectedStaff) return html`<div class="p-4">Staff agent not found</div>`;
 
+	const acc = getAccessory(editAccessory);
+	const hasAccessory = acc.id !== "none" && acc.shadow !== "";
+	const ROW_SIZE = Math.ceil(BOBBIT_HUE_ROTATIONS.length / 2);
+
 	return html`
 		<div class="flex-1 flex flex-col overflow-hidden">
 			<div class="flex items-center justify-between p-4 border-b border-border shrink-0">
@@ -500,6 +541,85 @@ function renderEditView(): TemplateResult {
 						onInput: (e: Event) => { editCwd = (e.target as HTMLInputElement).value; renderApp(); },
 					})}
 				</div>
+				<!-- Colour picker -->
+				<div>
+					<div class="text-xs text-muted-foreground mb-2 font-medium">Colour</div>
+					<div class="flex flex-col gap-2">
+						${[0, ROW_SIZE].map((start) => html`
+							<div class="flex gap-2 justify-center">
+								${BOBBIT_HUE_ROTATIONS.slice(start, start + ROW_SIZE).map((rot: number, j: number) => {
+									const i = start + j;
+									const isSelected = editColorIndex === i;
+									const accShadow = hasAccessory ? acc.shadow : "";
+									const accCounterFilter = acc.id !== "flask" ? `filter:hue-rotate(${-rot}deg);` : "";
+									return html`
+										<button
+											class="relative transition-all rounded-lg flex items-center justify-center
+												${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : "hover:bg-secondary/50"}"
+											style="width:${hasAccessory ? 34 : 28}px;height:24px;"
+											title="Colour ${i + 1}"
+											@click=${() => { editColorIndex = i; renderApp(); }}
+										>
+											<span style="position:absolute;left:${hasAccessory ? 3 : 4}px;top:3px;filter:hue-rotate(${rot}deg);">
+												<span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(2);transform-origin:0 0;box-shadow:3px 0px 0 #000,4px 0px 0 #000,5px 0px 0 #000,6px 0px 0 #000,7px 0px 0 #000,2px 1px 0 #000,3px 1px 0 #8ec63f,4px 1px 0 #8ec63f,5px 1px 0 #8ec63f,6px 1px 0 #b5d98a,7px 1px 0 #b5d98a,8px 1px 0 #000,1px 2px 0 #000,2px 2px 0 #8ec63f,3px 2px 0 #8ec63f,4px 2px 0 #8ec63f,5px 2px 0 #8ec63f,6px 2px 0 #8ec63f,7px 2px 0 #b5d98a,8px 2px 0 #8ec63f,9px 2px 0 #000,0px 3px 0 #000,1px 3px 0 #8ec63f,2px 3px 0 #8ec63f,3px 3px 0 #8ec63f,4px 3px 0 #8ec63f,5px 3px 0 #8ec63f,6px 3px 0 #8ec63f,7px 3px 0 #8ec63f,8px 3px 0 #8ec63f,9px 3px 0 #000,0px 4px 0 #000,1px 4px 0 #8ec63f,2px 4px 0 #8ec63f,3px 4px 0 #1a3010,4px 4px 0 #8ec63f,5px 4px 0 #8ec63f,6px 4px 0 #1a3010,7px 4px 0 #8ec63f,8px 4px 0 #8ec63f,9px 4px 0 #000,0px 5px 0 #000,1px 5px 0 #8ec63f,2px 5px 0 #8ec63f,3px 5px 0 #1a3010,4px 5px 0 #8ec63f,5px 5px 0 #8ec63f,6px 5px 0 #1a3010,7px 5px 0 #8ec63f,8px 5px 0 #8ec63f,9px 5px 0 #000,0px 6px 0 #000,1px 6px 0 #6b9930,2px 6px 0 #8ec63f,3px 6px 0 #8ec63f,4px 6px 0 #8ec63f,5px 6px 0 #8ec63f,6px 6px 0 #8ec63f,7px 6px 0 #8ec63f,8px 6px 0 #8ec63f,9px 6px 0 #000,1px 7px 0 #000,2px 7px 0 #6b9930,3px 7px 0 #8ec63f,4px 7px 0 #8ec63f,5px 7px 0 #8ec63f,6px 7px 0 #8ec63f,7px 7px 0 #8ec63f,8px 7px 0 #000,2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000;"></span>
+												${hasAccessory ? html`<span style="position:absolute;left:0;top:0;display:block;width:1px;height:1px;image-rendering:pixelated;transform:scale(2);transform-origin:0 0;box-shadow:${accShadow};${accCounterFilter}"></span>` : ""}
+											</span>
+										</button>
+									`;
+								})}
+							</div>
+						`)}
+					</div>
+				</div>
+				<!-- Accessory picker -->
+				<div>
+					<div class="text-xs text-muted-foreground mb-2 font-medium">Accessory</div>
+					<div class="flex flex-wrap gap-2 justify-center">
+						${ACCESSORY_IDS.map((accId: string) => {
+							const a = getAccessory(accId);
+							const isSelected = editAccessory === accId;
+							return html`
+								<button
+									class="relative transition-all rounded-lg flex flex-col items-center gap-0.5 px-1 py-1
+										${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : "hover:bg-secondary/50"}"
+									style="width:40px;"
+									title="${a.label}"
+									@click=${() => { editAccessory = accId; renderApp(); }}
+								>
+									<span class="block" style="width:20px;height:18px;position:relative;">
+										${statusBobbit("idle", false, undefined, false, false, false, false, accId, true)}
+									</span>
+									<span class="text-[9px] text-muted-foreground truncate w-full text-center">${a.label}</span>
+								</button>
+							`;
+						})}
+					</div>
+				</div>
+				<!-- Personalities -->
+				${availablePersonalities.length > 0 ? html`
+					<div>
+						<div class="text-xs text-muted-foreground mb-1.5 font-medium">Personalities</div>
+						<div class="flex flex-wrap gap-1">
+							${availablePersonalities.map((p: PersonalityData) => {
+								const selected = editPersonalities.includes(p.name);
+								return html`<button
+									class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer ${selected
+										? "bg-primary/15 text-primary border-primary/30"
+										: "bg-muted/60 text-foreground/70 border-border"}"
+									title=${p.description}
+									@click=${() => {
+										if (selected) {
+											editPersonalities = editPersonalities.filter((n: string) => n !== p.name);
+										} else {
+											editPersonalities = [...editPersonalities, p.name];
+										}
+										renderApp();
+									}}
+								>${p.label}</button>`;
+							})}
+						</div>
+					</div>
+				` : ""}
 				<div>
 					<div class="flex items-center justify-between mb-1.5">
 						<label class="text-xs text-muted-foreground font-medium">Triggers</label>

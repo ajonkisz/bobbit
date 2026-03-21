@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Bot, ChevronDown, Goal as GoalIcon, Layers, MessagesSquare, PanelLeftClose, PanelLeftOpen, Plus, Sparkles, Users, Wrench } from "lucide";
+import { Bot, ChevronDown, Goal as GoalIcon, Layers, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Sparkles, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -256,7 +256,7 @@ export function renderStaffSidebarSection() {
 					<div class="absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-6 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
 						<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
 							@click=${(e: Event) => { e.stopPropagation(); window.location.hash = `#/staff/${agent.id}`; }}
-							title="Configure">${icon(Wrench, "xs")}</button>
+							title="Edit">${icon(Pencil, "xs")}</button>
 					</div>
 				</div>
 			`; }) : ""}
