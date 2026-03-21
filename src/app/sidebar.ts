@@ -223,10 +223,10 @@ async function handleStaffClick(agent: typeof state.staffList[0]): Promise<void>
 function renderStaffSidebarSection() {
 	ensureStaffLoaded();
 	const list = state.staffList.filter((s) => s.state !== "retired");
-	if (list.length === 0 && !staffSectionExpanded) return "";
+	// Always show the Staff section so users can create their first staff agent
 
 	return html`
-		${list.length > 0 || staffSectionExpanded ? html`<div class="border-t border-border/50 my-1.5 mx-1"></div>` : ""}
+		<div class="border-t border-border/50 my-1.5 mx-1"></div>
 		<div class="flex flex-col gap-0.5">
 			<div class="flex items-center gap-1 px-1 py-0.5">
 				<div class="flex-1 flex items-center gap-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
