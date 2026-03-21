@@ -137,10 +137,6 @@ JSONL over stdin/stdout to the agent subprocess. Commands include: `prompt`, `st
 
 Tool-call assistant messages are held in `_deferredAssistantMessage` instead of going straight into `messages[]`. The streaming container shows them live via `streamMessage`. They flush to `messages[]` when the next `message_update` arrives (which replaces the streaming container content simultaneously) or when `agent_end` fires. This prevents both `MessageList` and `StreamingMessageContainer` from rendering the same content.
 
-### Prompt queue & message dispatch
-
-User messages are routed through a server-side `PromptQueue` that handles queuing when the agent is busy, priority sorting for steered messages, and automatic draining on turn completion. See [docs/prompt-queue.md](docs/prompt-queue.md) for the full architecture — dispatch paths, WS protocol, client-side optimistic rendering, and error handling.
-
 ### System prompt assembly
 
 Each session's system prompt is assembled by `system-prompt.ts` from three layers (in order):
