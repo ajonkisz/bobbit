@@ -19,3 +19,4 @@ allowedTools:
   - browser_eval
   - browser_wait
   - workflow
+  - bash_bg

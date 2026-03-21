@@ -10,5 +10,9 @@ mustHave:
   - Review findings
 shouldHave: []
 mustNotHave: []
+requires:
+  - test-results
+  - evidence-of-documentation
+  - implementation
 createdAt: 1774047381110
-updatedAt: 1774047381110
+updatedAt: 1774112728688
