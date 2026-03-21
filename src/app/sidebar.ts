@@ -103,10 +103,9 @@ export function renderRolePickerDropdown() {
 						${_cachedTraits.map(trait => {
 							const selected = _pickerTraits.has(trait.name);
 							return html`<button
-								class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer"
-								style="${selected
-									? "background: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.4);"
-									: "background: hsl(var(--muted) / 0.5); color: hsl(var(--foreground) / 0.7); border-color: hsl(var(--border));"}"
+								class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer ${selected
+									? "bg-primary/15 text-primary border-primary/30"
+									: "bg-muted/60 text-foreground/70 border-border"}"
 								title=${trait.description}
 								@click=${() => toggleTrait(trait.name)}
 							>${trait.label}</button>`;
@@ -118,7 +117,7 @@ export function renderRolePickerDropdown() {
 			<div class="border-t border-border/50 px-3 py-2">
 				<button
 					class="w-full text-center px-3 py-1.5 text-sm rounded-md transition-colors"
-					style="background: hsl(var(--primary)); color: hsl(var(--primary-foreground));"
+					class="bg-primary text-primary-foreground"
 					@click=${doCreate}
 				>Create Session</button>
 			</div>

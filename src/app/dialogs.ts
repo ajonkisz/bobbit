@@ -725,10 +725,9 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 												const displayTraits = pendingTraits !== null ? pendingTraits : initialTraits;
 												const selected = displayTraits.includes(trait.name);
 												return html`<button
-													class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer"
-													style="${selected
-														? "background: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.4);"
-														: "background: hsl(var(--muted) / 0.5); color: hsl(var(--foreground) / 0.7); border-color: hsl(var(--border));"}"
+													class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer ${selected
+														? "bg-primary/15 text-primary border-primary/30"
+														: "bg-muted/60 text-foreground/70 border-border"}"
 													title=${trait.description}
 													@click=${() => {
 														const current = pendingTraits !== null ? [...pendingTraits] : [...initialTraits];
