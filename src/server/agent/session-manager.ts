@@ -610,6 +610,15 @@ export class SessionManager {
 			bridgeOptions.env = { ...bridgeOptions.env, BOBBIT_GOAL_ID: goalId };
 		}
 
+		// Determine tool restrictions: explicit role tools > default allowed tools > no restriction
+		let effectiveAllowedTools = opts?.allowedTools;
+		if (!effectiveAllowedTools && this.toolManager) {
+			const defaults = this.toolManager.getDefaultAllowedTools();
+			if (defaults && defaults.length > 0) {
+				effectiveAllowedTools = defaults;
+			}
+		}
+
 		const assistantDef = assistantType ? getAssistantDef(assistantType) : undefined;
 		if (assistantDef) {
 			// Assistant sessions get their specialized prompt
@@ -631,8 +640,8 @@ export class SessionManager {
 			}
 
 			// Append tool restrictions if allowedTools is specified and non-empty
-			if (opts?.allowedTools && opts.allowedTools.length > 0) {
-				const toolList = opts.allowedTools.join(", ");
+			if (effectiveAllowedTools && effectiveAllowedTools.length > 0) {
+				const toolList = effectiveAllowedTools.join(", ");
 				goalSpec = (goalSpec || "") + `\n\n---\n\n## Tool Restrictions\n\nYou are ONLY allowed to use the following tools: ${toolList}\n\nDo NOT use any other tools. If a task requires a tool you don't have access to, explain what you need and ask for help instead of attempting to use the restricted tool.`;
 			}
 
@@ -692,7 +701,7 @@ export class SessionManager {
 			assistantType,
 			taskId: opts?.taskId,
 			traits: opts?.traitNames,
-			allowedTools: opts?.allowedTools,
+			allowedTools: effectiveAllowedTools ?? opts?.allowedTools,
 			promptQueue: new PromptQueue(),
 		};
 

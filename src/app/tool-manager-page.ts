@@ -3,7 +3,7 @@ import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
 import { ArrowLeft, ChevronDown, Pencil, Plus, Wrench } from "lucide";
-import { fetchTools, fetchToolDetail, updateTool, fetchRoles, gatewayFetch, type ToolInfo, type RoleData } from "./api.js";
+import { fetchTools, fetchToolDetail, updateTool, updateDefaultAllowedTools, fetchRoles, gatewayFetch, type ToolInfo, type RoleData } from "./api.js";
 import { state, renderApp } from "./state.js";
 import { setHashRoute } from "./routing.js";
 import { renderTool } from "../ui/tools/index.js";
@@ -93,6 +93,8 @@ type View = "list" | "edit";
 let currentView: View = "list";
 let tools: ToolInfo[] = [];
 let roles: RoleData[] = [];
+/** Default allowed tools for no-role sessions. null = all tools allowed. */
+let defaultAllowedTools: string[] | null = null;
 let selectedTool: ToolInfo | null = null;
 let loading = true;
 let editDescription = "";
@@ -111,8 +113,9 @@ export async function loadToolPageData(): Promise<void> {
 	loading = true;
 	saving = false;
 	renderApp();
-	const [t, r] = await Promise.all([fetchTools(), fetchRoles()]);
-	tools = t;
+	const [toolsResult, r] = await Promise.all([fetchTools(), fetchRoles()]);
+	tools = toolsResult.tools;
+	defaultAllowedTools = toolsResult.defaultAllowedTools;
 	roles = r;
 	loading = false;
 	renderApp();
@@ -214,6 +217,28 @@ async function createToolAssistantSession(): Promise<void> {
 // ACTIONS
 // ============================================================================
 
+async function toggleGeneralToolAccess(toolName: string): Promise<void> {
+	// If defaultAllowedTools is null (all allowed), switching to explicit list with this tool removed
+	if (defaultAllowedTools === null) {
+		// Start with all tool names minus this one
+		const allToolNames = tools.map((t) => t.name).filter((n) => n !== toolName);
+		defaultAllowedTools = allToolNames;
+	} else if (defaultAllowedTools.includes(toolName)) {
+		// Remove it
+		defaultAllowedTools = defaultAllowedTools.filter((n) => n !== toolName);
+	} else {
+		// Add it back
+		defaultAllowedTools = [...defaultAllowedTools, toolName];
+		// If all tools are now allowed, reset to null
+		const allToolNames = tools.map((t) => t.name);
+		if (allToolNames.every((n) => defaultAllowedTools!.includes(n))) {
+			defaultAllowedTools = null;
+		}
+	}
+	renderApp();
+	await updateDefaultAllowedTools(defaultAllowedTools);
+}
+
 async function handleSave(): Promise<void> {
 	if (!selectedTool) return;
 	saving = true;
@@ -227,8 +252,9 @@ async function handleSave(): Promise<void> {
 
 	if (ok) {
 		// Refresh tools list and update selectedTool
-		const [t] = await Promise.all([fetchTools()]);
-		tools = t;
+		const [toolsResult] = await Promise.all([fetchTools()]);
+		tools = toolsResult.tools;
+		defaultAllowedTools = toolsResult.defaultAllowedTools;
 		const updated = tools.find((t) => t.name === selectedTool!.name);
 		if (updated) {
 			// Fetch full detail to get docs back
@@ -400,6 +426,9 @@ function renderListView(): TemplateResult {
 function renderEditView(): TemplateResult {
 	if (!selectedTool) return html``;
 
+	// Determine whether this tool is allowed in the General (no-role) configuration
+	const generalAllowed = defaultAllowedTools === null || defaultAllowedTools.includes(selectedTool.name);
+
 	// Determine role access for this tool
 	const roleAccess = roles.map((role) => {
 		const allowed = role.allowedTools.includes(selectedTool!.name);
@@ -468,19 +497,24 @@ function renderEditView(): TemplateResult {
 				<div class="tools-section">
 					<h2 class="tools-section-title">Role Access</h2>
 					<p class="tools-note">Which roles can use this tool.</p>
-					${roleAccess.length > 0 ? html`
-						<div class="tools-role-list">
-							${roleAccess.map(({ role, allowed }) => html`
-								<div class="tools-role-row"
-									@click=${() => setHashRoute("role-edit", role.name)}>
-									<span class="tools-role-name">${role.label}</span>
-									<span class="tools-role-badge ${allowed ? "tools-role-badge--allowed" : "tools-role-badge--restricted"}">
-										${allowed ? "Allowed" : "Restricted"}
-									</span>
-								</div>
-							`)}
+					<div class="tools-role-list">
+						<div class="tools-role-row"
+							@click=${() => toggleGeneralToolAccess(selectedTool!.name)}>
+							<span class="tools-role-name">General</span>
+							<span class="tools-role-badge ${generalAllowed ? "tools-role-badge--allowed" : "tools-role-badge--restricted"}">
+								${generalAllowed ? "Allowed" : "Restricted"}
+							</span>
 						</div>
-					` : html`<p class="tools-note">No roles defined yet.</p>`}
+						${roleAccess.map(({ role, allowed }) => html`
+							<div class="tools-role-row"
+								@click=${() => setHashRoute("role-edit", role.name)}>
+								<span class="tools-role-name">${role.label}</span>
+								<span class="tools-role-badge ${allowed ? "tools-role-badge--allowed" : "tools-role-badge--restricted"}">
+									${allowed ? "Allowed" : "Restricted"}
+								</span>
+							</div>
+						`)}
+					</div>
 				</div>
 
 				<!-- Tool Assistant shortcut -->

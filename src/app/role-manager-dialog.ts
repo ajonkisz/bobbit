@@ -38,9 +38,9 @@ let dialogContainer: HTMLDivElement | null = null;
 async function loadData(): Promise<void> {
 	loading = true;
 	rerender();
-	const [r, t] = await Promise.all([fetchRoles(), fetchTools()]);
+	const [r, toolsResult] = await Promise.all([fetchRoles(), fetchTools()]);
 	roles = r;
-	availableTools = t;
+	availableTools = toolsResult.tools;
 	loading = false;
 	rerender();
 }
@@ -540,8 +540,8 @@ export function showRoleEditDialogFromProposal(proposal: { name: string; label: 
 
 	// Ensure we have the tools list loaded
 	if (availableTools.length === 0) {
-		fetchTools().then((t) => {
-			availableTools = t;
+		fetchTools().then((result) => {
+			availableTools = result.tools;
 			rerenderProposal();
 		});
 	}

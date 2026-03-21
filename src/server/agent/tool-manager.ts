@@ -156,4 +156,14 @@ export class ToolManager {
 		this.store.put(meta);
 		return true;
 	}
+
+	/** Get the default allowed tools for sessions without a role. null = all tools. */
+	getDefaultAllowedTools(): string[] | null {
+		return this.store.getDefaultAllowedTools();
+	}
+
+	/** Set the default allowed tools. null = all tools allowed. */
+	setDefaultAllowedTools(tools: string[] | null): void {
+		this.store.setDefaultAllowedTools(tools);
+	}
 }

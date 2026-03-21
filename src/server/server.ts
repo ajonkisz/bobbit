@@ -463,8 +463,29 @@ async function handleApiRoute(
 
 	// GET /api/tools — list available agent tools
 	if (url.pathname === "/api/tools" && req.method === "GET") {
-		json({ tools: toolManager.getAvailableTools() });
+		json({ tools: toolManager.getAvailableTools(), defaultAllowedTools: toolManager.getDefaultAllowedTools() });
 		return;
+	}
+
+	// GET/PUT /api/tools/defaults — manage default allowed tools for no-role sessions
+	if (url.pathname === "/api/tools/defaults") {
+		if (req.method === "GET") {
+			json({ defaultAllowedTools: toolManager.getDefaultAllowedTools() });
+			return;
+		}
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			// body.defaultAllowedTools: string[] | null
+			const tools = body.defaultAllowedTools;
+			if (tools !== null && !Array.isArray(tools)) {
+				json({ error: "defaultAllowedTools must be an array of tool names or null" }, 400);
+				return;
+			}
+			toolManager.setDefaultAllowedTools(tools);
+			json({ ok: true, defaultAllowedTools: tools });
+			return;
+		}
 	}
 
 	// Routes with tool :name parameter
