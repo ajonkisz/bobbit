@@ -857,7 +857,8 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 		const sessionId = activeSessionId();
 		await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, team: teamValue, worktree: worktreeValue });
 		state.activeGoalProposal = null;
-		if (sessionId) {
+		// Only terminate goal-assistant sessions — regular sessions that suggested a goal should keep running.
+		if (sessionId && state.isGoalAssistantSession) {
 			const { terminateSession } = await import("./session-manager.js");
 			await terminateSession(sessionId);
 		}
