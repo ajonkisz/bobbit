@@ -616,6 +616,8 @@ function artifactSpecPreviewPanel() {
 		state.isArtifactSpecAssistantSession = false;
 		state.activeArtifactSpecProposal = null;
 		localStorage.removeItem("gateway.sessionId");
+		setHashRoute("landing");
+		state.appView = "authenticated";
 
 		const { createArtifactSpec } = await import("./api.js");
 		await createArtifactSpec({
@@ -630,6 +632,12 @@ function artifactSpecPreviewPanel() {
 			requires: state.specPreviewRequires.split(",").map((s) => s.trim()).filter(Boolean),
 			suggestedRole: state.specPreviewSuggestedRole || undefined,
 		});
+
+		if (sessionId) {
+			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+			clearSessionModel(sessionId);
+		}
+		await refreshSessions();
 
 		const { loadArtifactSpecPageData } = await import("./artifact-spec-page.js");
 		await loadArtifactSpecPageData();
