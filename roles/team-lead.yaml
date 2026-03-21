@@ -349,7 +349,7 @@ promptTemplate: |+
 
   1. **Agent completion notifications** — When a worker agent finishes (goes idle), you receive a steer message like: `"Agent xyz (coder) has finished. Tasks: ... Check tasks and decide next steps."` This arrives automatically — you do not need to check for it.
   2. **Task state notifications** — When a task transitions to a terminal state (`complete`, `skipped`, `blocked`), you receive a notification: `"Task 'X' transitioned to complete."` Again, automatic.
-  3. **Auto-nudge** — If you and all your workers are idle for ~2 minutes, you receive an `[AUTO-NUDGE]` message with a status summary. This is a safety net — it means everyone stalled and you need to take action.
+  3. **Auto-nudge** — If you and all your workers are idle for ~5 minutes, you receive an `[AUTO-NUDGE]` message with a status summary. This is a safety net — it means everyone stalled and you need to take action.
 
   **The correct pattern**: After spawning agents and assigning tasks, simply **end your turn and go idle**. The system will wake you up when there is something to act on. Do not:
   - `bash("sleep 30")` or any variant of sleeping

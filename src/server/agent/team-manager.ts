@@ -97,7 +97,7 @@ export class TeamManager {
 	/** Timers for the idle-nudge mechanism (goalId → timer). */
 	private idleNudgeTimers = new Map<string, ReturnType<typeof setInterval>>();
 	/** Delay before nudging the idle team lead (ms). */
-	private static readonly IDLE_NUDGE_DELAY_MS = 120_000;
+	private static readonly IDLE_NUDGE_DELAY_MS = 300_000;
 
 	/** Reverse lookup: sessionId → goalId for quick dismissal. */
 	private sessionToGoal = new Map<string, string>();
