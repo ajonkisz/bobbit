@@ -21,7 +21,7 @@ import { createAndConnectSession, connectToSession } from "./session-manager.js"
 import { showGoalDialog } from "./dialogs.js";
 import { refreshSessions, fetchRoles, fetchPersonalities, fetchStaff, wakeStaffAgent, type PersonalityData } from "./api.js";
 import { statusBobbit, sessionAcronym } from "./session-colors.js";
-import { renderGoalGroup, renderSessionRow, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
+import { renderGoalGroup, renderSessionRow, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY, terseRelativeTime, hasUnseenActivity, formatSessionAge } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
 
 // ============================================================================
@@ -271,6 +271,12 @@ export function renderStaffSidebarSection() {
 					@click=${() => handleStaffClick(agent)}>
 					${statusBobbit(sessionStatus, isCompacting, agent.currentSessionId, active, isAborting, false, false, accessory)}
 					<span class="flex-1 truncate ${mobile ? "text-base" : "text-xs"} ${active ? "font-medium" : "font-normal"}">${agent.name}</span>
+					${!mobile && !active && session ? (() => {
+						const time = terseRelativeTime(session.lastActivity);
+						if (!time) return "";
+						const unseen = hasUnseenActivity(session);
+						return html`<span class="shrink-0 flex items-center gap-0.5 text-[10px] tabular-nums ${unseen ? "text-foreground font-medium" : "text-muted-foreground/50"}" title="${formatSessionAge(session.lastActivity)}">${time}${unseen ? html`<span class="text-primary" style="font-size:6px;line-height:1;">●</span>` : ""}</span>`;
+					})() : ""}
 					${mobile
 						? editBtn
 						: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">

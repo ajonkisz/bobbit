@@ -86,9 +86,92 @@ export function formatSessionAge(timestamp: number): string {
 	return `${days}d ago`;
 }
 
+/** Ultra-terse relative time: "now", "1m", "49m", "2h", "1d", etc. */
+export function terseRelativeTime(timestamp: number): string {
+	if (!timestamp || !Number.isFinite(timestamp)) return "";
+	const diff = Date.now() - timestamp;
+	if (diff < 60_000) return "now";
+	const mins = Math.floor(diff / 60_000);
+	if (mins < 60) return `${mins}m`;
+	const hours = Math.floor(diff / 3_600_000);
+	if (hours < 24) return `${hours}h`;
+	const days = Math.floor(diff / 86_400_000);
+	return `${days}d`;
+}
+
+// ============================================================================
+// SESSION VISIT TRACKING
+// ============================================================================
+
+const VISITED_KEY = "bobbit-session-visited";
+
+/** In-memory cache of session visit timestamps. */
+let _visitedMap: Record<string, number> | null = null;
+
+function loadVisitedMap(): Record<string, number> {
+	if (!_visitedMap) {
+		try {
+			_visitedMap = JSON.parse(localStorage.getItem(VISITED_KEY) || "{}");
+		} catch {
+			_visitedMap = {};
+		}
+	}
+	return _visitedMap!;
+}
+
+/** Record that the user visited a session right now. */
+export function markSessionVisited(sessionId: string): void {
+	const map = loadVisitedMap();
+	map[sessionId] = Date.now();
+	localStorage.setItem(VISITED_KEY, JSON.stringify(map));
+}
+
+/** Returns true if the session has activity the user hasn't seen yet.
+ *  "Unseen" means: session is idle/terminated AND lastActivity > last visit time. */
+export function hasUnseenActivity(session: GatewaySession): boolean {
+	// Active sessions don't show unseen — user will see it when they connect
+	if (session.status === "streaming" || session.status === "busy") return false;
+	// Currently viewed session is never unseen
+	if (activeSessionId() === session.id) return false;
+	const map = loadVisitedMap();
+	const lastVisit = map[session.id] || 0;
+	return session.lastActivity > lastVisit;
+}
+
+// ============================================================================
+// SIDEBAR TIME REFRESH
+// ============================================================================
+
+let _timeRefreshTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Start a 60s timer that re-renders the app to update relative times. */
+export function startTimeRefresh(): void {
+	if (_timeRefreshTimer) return;
+	_timeRefreshTimer = setInterval(() => renderApp(), 60_000);
+}
+
+export function stopTimeRefresh(): void {
+	if (_timeRefreshTimer) { clearInterval(_timeRefreshTimer); _timeRefreshTimer = null; }
+}
+
 // ============================================================================
 // UNIFIED SESSION ROW
 // ============================================================================
+
+// ============================================================================
+// SESSION TIME + UNSEEN BADGE
+// ============================================================================
+
+/** Render terse relative time with optional unseen indicator dot. */
+function renderSessionTime(session: GatewaySession) {
+	const time = terseRelativeTime(session.lastActivity);
+	if (!time) return "";
+	const unseen = hasUnseenActivity(session);
+	return html`<span
+		class="shrink-0 flex items-center gap-0.5 text-[10px] tabular-nums ${unseen ? "text-foreground font-medium" : "text-muted-foreground/50"}"
+		title="${formatSessionAge(session.lastActivity)}"
+	>${time}${unseen ? html`<span class="text-primary" style="font-size:6px;line-height:1;">●</span>` : ""}</span>`;
+}
 
 /**
  * Compact one-line session row used by both desktop sidebar and mobile landing.
@@ -150,6 +233,7 @@ export function renderSessionRow(session: GatewaySession) {
 					</div>
 				` : ""}
 			</div>
+			${!mobile && !active ? renderSessionTime(session) : ""}
 			${mobile
 				? buttons
 				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
@@ -214,6 +298,7 @@ function renderTeamLeadRow(session: GatewaySession, childCount: number, expanded
 			</div>
 			<div class="flex-1 min-w-0 truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
 			${childBadge}
+			${!mobile && !active ? renderSessionTime(session) : ""}
 			${mobile
 				? buttons
 				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">

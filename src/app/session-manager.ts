@@ -15,11 +15,13 @@ import {
 	GW_SESSION_KEY,
 } from "./state.js";
 import { gatewayFetch, refreshSessions, startSessionPolling, updateLocalSessionTitle, updateLocalSessionStatus, fetchGitStatus } from "./api.js";
+import { startTimeRefresh } from "./render-helpers.js";
 import { getRouteFromHash, setHashRoute, saveSessionModel, loadSessionModel, clearSessionModel, saveDraft, loadDraft } from "./routing.js";
 import { sessionHueRotation } from "./session-colors.js";
 import { showConnectionError, confirmAction, checkOAuthStatus, openOAuthDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { teardownMobileScrollTracking } from "./mobile-header.js";
 import { storage } from "./storage.js";
+import { markSessionVisited } from "./render-helpers.js";
 
 // ============================================================================
 // GOAL DRAFT PERSISTENCE HELPERS
@@ -241,6 +243,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 	renderApp();
 	await refreshSessions();
 	startSessionPolling();
+	startTimeRefresh();
 }
 
 // ============================================================================
@@ -317,6 +320,8 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			// Refresh git status when agent becomes idle (turn finished)
 			if (status === "idle") {
 				refreshGitStatusForSession(sessionId);
+				// Keep the active session marked as visited so it doesn't show unseen
+				markSessionVisited(sessionId);
 			}
 			renderApp();
 		};
@@ -444,6 +449,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		state.remoteAgent = remote;
 		state.appView = "authenticated";
 		localStorage.setItem(GW_SESSION_KEY, sessionId);
+		markSessionVisited(sessionId);
 
 		document.documentElement.style.setProperty("--bobbit-hue-rotate", `${sessionHueRotation(sessionId)}deg`);
 		// Refresh sessions so newly created sessions have role/accessory data
