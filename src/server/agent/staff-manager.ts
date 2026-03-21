@@ -5,13 +5,14 @@ import type { SessionManager } from "./session-manager.js";
 export class StaffManager {
 	private store = new StaffStore();
 
-	createStaff(
+	async createStaff(
 		name: string,
 		description: string,
 		systemPrompt: string,
 		cwd: string,
+		sessionManager: SessionManager,
 		opts?: { triggers?: StaffTrigger[]; roleId?: string },
-	): PersistedStaff {
+	): Promise<PersistedStaff> {
 		const now = Date.now();
 		const id = randomUUID();
 
@@ -35,6 +36,23 @@ export class StaffManager {
 			updatedAt: now,
 		};
 		this.store.put(staff);
+
+		// Create the permanent session for this staff agent
+		let fullPrompt = staff.systemPrompt;
+		if (staff.memory) {
+			fullPrompt += "\n\n---\n\n## Pinned Context\n\n" + staff.memory;
+		}
+		const session = await sessionManager.createSession(staff.cwd, undefined, undefined, undefined, {
+			rolePrompt: fullPrompt,
+			env: { BOBBIT_STAFF_ID: id },
+		});
+		session.staffId = id;
+		sessionManager.persistSessionMetadata(session).catch((err: any) => {
+			console.error(`[staff-manager] Failed to persist staff session metadata:`, err);
+		});
+		this.store.update(id, { currentSessionId: session.id });
+		staff.currentSessionId = session.id;
+
 		return staff;
 	}
 
@@ -70,9 +88,19 @@ export class StaffManager {
 		return this.store.update(id, updates);
 	}
 
-	deleteStaff(id: string): boolean {
+	async deleteStaff(id: string, sessionManager: SessionManager): Promise<boolean> {
 		const staff = this.store.get(id);
 		if (!staff) return false;
+
+		// Terminate the permanent session if it exists
+		if (staff.currentSessionId) {
+			try {
+				await sessionManager.terminateSession(staff.currentSessionId);
+			} catch (err) {
+				console.error(`[staff-manager] Failed to terminate session ${staff.currentSessionId} for staff ${id}:`, err);
+			}
+		}
+
 		this.store.remove(id);
 		return true;
 	}
@@ -99,8 +127,9 @@ export class StaffManager {
 	}
 
 	/**
-	 * Wake a staff agent: create a new session with the staff's system prompt + memory,
-	 * enqueue the prompt, and track the session.
+	 * Wake a staff agent: enqueue a prompt on its permanent session.
+	 * If the session doesn't exist yet (legacy migration), create one first.
+	 * If the session subprocess is terminated, restore it before enqueuing.
 	 */
 	async wake(
 		staffId: string,
@@ -111,56 +140,42 @@ export class StaffManager {
 		if (!staff) throw new Error("Staff agent not found");
 		if (staff.state !== "active") throw new Error(`Staff agent is ${staff.state}, cannot wake`);
 
-		// Build system prompt: staff's base prompt + memory context
-		let fullPrompt = staff.systemPrompt;
-		if (staff.memory) {
-			fullPrompt += "\n\n---\n\n## Memory (persistent context from prior sessions)\n\n" + staff.memory;
+		const wakePrompt = prompt || "You have been woken. Review your memory and carry out your mission.";
+
+		// Legacy migration: if no permanent session exists, create one
+		if (!staff.currentSessionId) {
+			let fullPrompt = staff.systemPrompt;
+			if (staff.memory) {
+				fullPrompt += "\n\n---\n\n## Pinned Context\n\n" + staff.memory;
+			}
+			const session = await sessionManager.createSession(staff.cwd, undefined, undefined, undefined, {
+				rolePrompt: fullPrompt,
+				env: { BOBBIT_STAFF_ID: staffId },
+			});
+			session.staffId = staffId;
+			sessionManager.persistSessionMetadata(session).catch((err: any) => {
+				console.error(`[staff-manager] Failed to persist staff session metadata:`, err);
+			});
+			this.store.update(staffId, { currentSessionId: session.id, lastWakeAt: Date.now() });
+
+			await sessionManager.enqueuePrompt(session.id, wakePrompt);
+			console.log(`[staff-manager] Woke staff "${staff.name}" (${staffId}) → session ${session.id} (legacy migration)`);
+			return session.id;
 		}
 
-		// Create session with staff's system prompt injected as goal spec
-		const session = await sessionManager.createSession(staff.cwd, undefined, undefined, undefined, {
-			rolePrompt: fullPrompt,
-			env: { BOBBIT_STAFF_ID: staffId },
-		});
+		// Ensure the session subprocess is alive (restore if terminated)
+		const session = sessionManager.getSession(staff.currentSessionId);
+		if (!session || session.status === "terminated") {
+			await sessionManager.ensureSessionAlive(staff.currentSessionId);
+		}
 
-		// Mark the session as belonging to this staff agent
-		session.staffId = staffId;
-		sessionManager.persistSessionMetadata(session).catch((err: any) => {
-			console.error(`[staff-manager] Failed to persist staff session metadata for ${session.id}:`, err);
-		});
+		// Enqueue the wake prompt on the existing session
+		await sessionManager.enqueuePrompt(staff.currentSessionId, wakePrompt);
 
-		// Update staff state
-		this.store.update(staffId, {
-			lastWakeAt: Date.now(),
-			currentSessionId: session.id,
-		});
+		// Update last wake time
+		this.store.update(staffId, { lastWakeAt: Date.now() });
 
-		// Enqueue the wake prompt
-		const wakePrompt = prompt || "You have been woken. Review your memory and carry out your mission.";
-		await sessionManager.enqueuePrompt(session.id, wakePrompt);
-
-		console.log(`[staff-manager] Woke staff "${staff.name}" (${staffId}) → session ${session.id}`);
-		return session.id;
-	}
-
-	/**
-	 * Get all sessions belonging to a staff agent.
-	 */
-	getSessionsByStaffId(staffId: string, sessionManager: SessionManager): Array<{
-		id: string;
-		title: string;
-		status: string;
-		createdAt: number;
-		lastActivity: number;
-	}> {
-		return sessionManager.listSessions()
-			.filter((s) => s.staffId === staffId)
-			.map((s) => ({
-				id: s.id,
-				title: s.title,
-				status: s.status,
-				createdAt: s.createdAt,
-				lastActivity: s.lastActivity,
-			}));
+		console.log(`[staff-manager] Woke staff "${staff.name}" (${staffId}) → session ${staff.currentSessionId}`);
+		return staff.currentSessionId;
 	}
 }
