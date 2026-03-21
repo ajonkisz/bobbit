@@ -102,9 +102,9 @@ export function renderRolePickerDropdown() {
 			<!-- Roles -->
 			<div class="${_cachedTraits.length > 0 ? "border-t border-border/50 mt-1 pt-1" : ""}">
 				<div class="px-3 pt-1 pb-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Role</div>
-				${state.roles.length === 0
+				${state.roles.filter(r => r.name !== "general").length === 0
 					? html`<div class="px-3 py-1 text-xs text-muted-foreground">No roles defined</div>`
-					: state.roles.map(role => html`
+					: state.roles.filter(r => r.name !== "general").map(role => html`
 						<button class="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary/50 active:bg-secondary text-foreground flex items-center gap-2 ${_pickerRole === role.name ? "bg-primary/10" : ""}"
 							@click=${() => selectRole(role.name)}>
 							<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>

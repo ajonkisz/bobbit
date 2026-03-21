@@ -39,7 +39,7 @@ function getTooltipEl(): HTMLDivElement {
 export function showSessionTooltip(e: MouseEvent, session: GatewaySession, displayTitle: string): void {
 	if (_tooltipTimer) clearTimeout(_tooltipTimer);
 	const el = getTooltipEl();
-	const roleLabel = session.assistantType === "goal" ? "Goal Assistant" : session.role || "";
+	const roleLabel = session.assistantType === "goal" ? "Goal Assistant" : (session.role && session.role !== "general" ? session.role : "");
 	el.innerHTML = `
 		<div class="tt-title">${escapeHtml(displayTitle)}</div>
 		<div class="tt-cwd">${escapeHtml(session.cwd)}</div>
