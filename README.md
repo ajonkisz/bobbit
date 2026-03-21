@@ -147,6 +147,10 @@ Sessions are the core abstraction. Each session is a running `pi-coding-agent` c
 - **Manual rename**: Sessions can be renamed via the UI (pencil icon) or the `PUT /api/sessions/:id/title` endpoint.
 - **Multi-device**: Multiple browser tabs/devices can connect to the same session. Events are broadcast to all clients.
 
+## Prompt queue & message dispatch
+
+User messages are routed through a server-side prompt queue that handles queuing when the agent is busy, priority sorting for steered (interrupt) messages, and automatic draining when the agent finishes a turn. The client renders user messages optimistically and deduplicates against server echoes. See [docs/prompt-queue.md](docs/prompt-queue.md) for the full architecture.
+
 ## System prompt
 
 Each agent session's system prompt is assembled from three layers, in order:
