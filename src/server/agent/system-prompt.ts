@@ -88,6 +88,8 @@ export interface PromptParts {
 	taskDependsOn?: string[];
 	/** Personality traits to inject into the system prompt */
 	traits?: Array<{ label: string; promptFragment: string }>;
+	/** Pre-formatted tool documentation section to append */
+	toolDocs?: string;
 }
 
 /**
@@ -133,7 +135,12 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 		sections.push(lines.join("\n"));
 	}
 
-	// 4. Task context
+	// 4. Tool documentation
+	if (parts.toolDocs?.trim()) {
+		sections.push(parts.toolDocs.trim());
+	}
+
+	// 5. Task context
 	if (parts.taskTitle || parts.taskType) {
 		const taskLines: string[] = ["# Current Task"];
 		if (parts.taskType) taskLines.push(`\n**Type**: ${parts.taskType}`);

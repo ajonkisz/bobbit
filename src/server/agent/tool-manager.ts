@@ -10,6 +10,7 @@ interface BaseToolInfo {
 	description: string;
 	group: string;
 	renderer?: string;
+	docs?: string;
 }
 
 export interface ToolInfo {
@@ -44,6 +45,7 @@ function loadToolDefinitions(): BaseToolInfo[] {
 						description: data.description || "",
 						group: data.group || "Other",
 						renderer: data.renderer,
+						docs: data.docs,
 					});
 				}
 			} catch (err) {
@@ -98,6 +100,43 @@ export class ToolManager {
 			hasRenderer: !!base.renderer,
 			rendererFile: base.renderer,
 		};
+	}
+
+	/**
+	 * Returns formatted tool documentation for inclusion in system prompts.
+	 * Groups tools by category and includes docs for any tool that has them.
+	 * If `toolNames` is provided, only includes those tools; otherwise includes all.
+	 */
+	getToolDocsForPrompt(toolNames?: string[]): string {
+		const tools = loadToolDefinitions();
+		const grouped = new Map<string, Array<{ name: string; description: string; docs: string }>>();
+
+		for (const tool of tools) {
+			if (toolNames && !toolNames.includes(tool.name)) continue;
+			const override = this.store.get(tool.name);
+			const docs = override?.docs ?? tool.docs;
+			if (!docs) continue;
+
+			const group = override?.group ?? tool.group;
+			if (!grouped.has(group)) grouped.set(group, []);
+			grouped.get(group)!.push({
+				name: tool.name,
+				description: override?.description ?? tool.description,
+				docs: docs.trim(),
+			});
+		}
+
+		if (grouped.size === 0) return "";
+
+		const sections: string[] = ["# Tool Documentation"];
+		for (const [group, entries] of grouped) {
+			sections.push(`\n## ${group}\n`);
+			for (const entry of entries) {
+				sections.push(`### ${entry.name}\n\n${entry.docs}\n`);
+			}
+		}
+
+		return sections.join("\n");
 	}
 
 	/** Updates custom tool metadata (description, group, docs). */
