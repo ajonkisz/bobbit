@@ -76,10 +76,6 @@ function renderMobileLanding() {
 							@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
 							${icon(Sparkles, "xs")} Personalities
 						</button>
-						<button class="hidden sm:flex flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors items-center justify-center gap-1"
-							@click=${() => { import("./staff-page.js").then((m) => m.loadStaffPageData()); setHashRoute("staff"); }}>
-							${icon(UserCheck, "xs")} Staff
-						</button>
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 							@click=${() => showGoalDialog()}>
 							${icon(GoalIcon, "xs")} New Goal
