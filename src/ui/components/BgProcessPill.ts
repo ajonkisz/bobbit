@@ -24,6 +24,8 @@ export class BgProcessPill extends LitElement {
 	@state() private expanded = false;
 	@state() private logs: { ts: number; text: string }[] = [];
 	@state() private loadingLogs = false;
+	/** Timestamp of the latest log entry from the initial fetch — used to dedupe WS events */
+	private _fetchedUpTo = 0;
 
 	createRenderRoot() {
 		return this;
@@ -55,6 +57,11 @@ export class BgProcessPill extends LitElement {
 
 	/** Called externally when a bg_process_output WS event arrives. */
 	appendOutput(text: string, ts?: number) {
+		if (this._fetchedUpTo > 0) {
+			// Skip lines already covered by the initial fetch
+			const timestamp = ts || Date.now();
+			if (timestamp <= this._fetchedUpTo) return;
+		}
 		const timestamp = ts || Date.now();
 		const lines = text.split("\n").filter((l) => l.length > 0);
 		if (lines.length === 0) return;
@@ -76,6 +83,9 @@ export class BgProcessPill extends LitElement {
 				this.logs = (data.log || []).map((e: any) =>
 					typeof e === "string" ? { ts: 0, text: e } : e
 				);
+				if (this.logs.length > 0) {
+					this._fetchedUpTo = this.logs[this.logs.length - 1].ts;
+				}
 			}
 		} catch { /* ignore */ } finally {
 			this.loadingLogs = false;
@@ -140,11 +150,11 @@ export class BgProcessPill extends LitElement {
 			${this.expanded
 				? html`
 					<div
-						class="fixed z-50 bg-card border border-border rounded-lg shadow-lg p-3 text-xs"
-						style="max-width:min(500px, calc(100vw - 1rem)); min-width: 300px;"
+						class="fixed z-50 bg-card border border-border rounded-lg shadow-lg p-2 text-xs"
+						style="max-width:calc(100vw - 2rem); width: 900px;"
 						id="bg-process-dropdown"
 					>
-						<div class="flex items-center justify-between mb-2">
+						<div class="flex items-center justify-between mb-1.5">
 							<div class="flex items-center gap-1.5 text-foreground font-medium text-sm min-w-0">
 								${statusDot}
 								<span class="truncate font-mono">${p.id}</span>
@@ -163,24 +173,16 @@ export class BgProcessPill extends LitElement {
 							</div>
 						</div>
 
-						<div class="text-muted-foreground mb-2 font-mono break-all">${p.command}</div>
+						<div class="text-muted-foreground mb-1.5 font-mono text-[11px] break-all leading-tight">${p.command}</div>
 
-						<div class="border-t border-border pt-2 mt-1">
-							<div class="mb-1">
-								<span class="text-muted-foreground font-medium">Output</span>
-							</div>
-							${this.loadingLogs
-								? html`<div class="text-muted-foreground animate-pulse">Loading...</div>`
-								: html`
-									<div class="h-[200px] overflow-y-auto bg-background rounded p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all" id="bg-log-output">
-										${this.logs.length > 0
-											? this.logs.map((entry) => html`<div>${entry.ts
-												? html`<span class="text-muted-foreground select-none">${this._fmtTime(entry.ts)} </span>`
-												: nothing}${entry.text}</div>`)
-											: html`<div class="text-muted-foreground text-center py-2">(no output yet)</div>`}
-									</div>
-								`}
-						</div>
+						${this.loadingLogs
+							? html`<div class="text-muted-foreground animate-pulse">Loading...</div>`
+							: html`<div class="h-[180px] overflow-y-auto bg-background rounded px-2 py-1.5 font-mono text-[11px] leading-snug break-all" id="bg-log-output">${this.logs.length > 0
+										? this.logs.map((entry) => html`<div class="whitespace-pre-wrap">${entry.ts
+											? html`<span class="text-muted-foreground select-none">${this._fmtTime(entry.ts)} </span>`
+											: nothing}${entry.text}</div>`)
+										: html`<div class="text-muted-foreground text-center py-1">(no output yet)</div>`}</div>
+							`}
 					</div>
 				`
 				: nothing}
@@ -199,8 +201,26 @@ export class BgProcessPill extends LitElement {
 		const dropdown = this.querySelector("#bg-process-dropdown") as HTMLElement;
 		if (!btn || !dropdown) return;
 		const rect = btn.getBoundingClientRect();
-		// Position above the button, aligned to its left edge
-		dropdown.style.left = `${rect.left}px`;
-		dropdown.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+		const dropRect = dropdown.getBoundingClientRect();
+
+		// Horizontal: align to button left, but clamp to viewport
+		let left = rect.left;
+		if (left + dropRect.width > window.innerWidth - 8) {
+			left = window.innerWidth - dropRect.width - 8;
+		}
+		if (left < 8) left = 8;
+
+		// Vertical: prefer above the button, fall back to below if not enough space
+		let bottom = window.innerHeight - rect.top + 4;
+		if (rect.top < dropRect.height + 12) {
+			// Not enough room above — show below
+			dropdown.style.bottom = "auto";
+			dropdown.style.top = `${rect.bottom + 4}px`;
+		} else {
+			dropdown.style.top = "auto";
+			dropdown.style.bottom = `${bottom}px`;
+		}
+
+		dropdown.style.left = `${left}px`;
 	}
 }
