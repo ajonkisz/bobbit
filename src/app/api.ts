@@ -183,7 +183,7 @@ export async function fetchGitStatus(sessionId: string): Promise<GitStatusData |
 // ============================================================================
 
 export async function createGoal(title: string, cwd: string, opts?: { spec?: string; team?: boolean; worktree?: boolean }): Promise<Goal | null> {
-	const { spec = "", team = false, worktree = false } = opts ?? {};
+	const { spec = "", team = true, worktree = true } = opts ?? {};
 	try {
 		const res = await gatewayFetch("/api/goals", {
 			method: "POST",

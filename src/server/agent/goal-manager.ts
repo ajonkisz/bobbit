@@ -34,7 +34,7 @@ export class GoalManager {
 	private store = new GoalStore();
 
 	createGoal(title: string, cwd: string, opts?: { spec?: string; team?: boolean; worktree?: boolean }): PersistedGoal {
-		const { spec = "", team = false, worktree = false } = opts ?? {};
+		const { spec = "", team = true, worktree = true } = opts ?? {};
 		const now = Date.now();
 		const id = randomUUID();
 
