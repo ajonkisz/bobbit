@@ -18,6 +18,7 @@ import type { ColorStore } from "./color-store.js";
 import type { TraitManager } from "./trait-manager.js";
 import type { RoleManager } from "./role-manager.js";
 import type { ToolManager } from "./tool-manager.js";
+import { computeToolActivationArgs } from "./tool-activation.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -481,6 +482,15 @@ export class SessionManager {
 			bridgeOptions.args = ["--extension", extensionPath];
 		}
 
+		// Restore tool activation from role's allowedTools
+		if (ps.role && this.roleManager) {
+			const role = this.roleManager.getRole(ps.role);
+			if (role && role.allowedTools.length > 0) {
+				const activation = computeToolActivationArgs(role.allowedTools);
+				bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
+			}
+		}
+
 		// Re-assemble system prompt (global + AGENTS.md + goal spec)
 		const assistantDef = ps.assistantType ? getAssistantDef(ps.assistantType) : undefined;
 		if (assistantDef) {
@@ -678,6 +688,12 @@ export class SessionManager {
 				traits: opts?.traits,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		}
+
+		// Apply tool activation args based on allowedTools (controls --tools and --extension flags)
+		if (effectiveAllowedTools && effectiveAllowedTools.length > 0) {
+			const activation = computeToolActivationArgs(effectiveAllowedTools);
+			bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 		}
 
 		const rpcClient = new RpcBridge(bridgeOptions);
@@ -1097,6 +1113,12 @@ export class SessionManager {
 			}
 		}
 
+		// Apply tool activation args based on role's allowedTools
+		if (role.allowedTools.length > 0) {
+			const activation = computeToolActivationArgs(role.allowedTools);
+			bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
+		}
+
 		const rpcClient = new RpcBridge(bridgeOptions);
 		let switchingSession = true;
 		const unsub = rpcClient.onEvent((event: any) => {
@@ -1209,6 +1231,15 @@ export class SessionManager {
 			bridgeOptions.env.BOBBIT_GOAL_ID = session.goalId;
 			if (!bridgeOptions.args?.includes("--extension")) {
 				bridgeOptions.args = ["--extension", GOAL_TOOLS_EXTENSION_PATH];
+			}
+		}
+
+		// Restore tool activation from role's allowedTools
+		if (session.role && this.roleManager) {
+			const role = this.roleManager.getRole(session.role);
+			if (role && role.allowedTools.length > 0) {
+				const activation = computeToolActivationArgs(role.allowedTools);
+				bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 			}
 		}
 
@@ -1446,6 +1477,26 @@ export class SessionManager {
 			const bridgeOptions: RpcBridgeOptions = { cwd: session.cwd };
 			if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
 			if (this.systemPromptPath) bridgeOptions.systemPromptPath = this.systemPromptPath;
+			bridgeOptions.env = { BOBBIT_SESSION_ID: id };
+
+			// Restore goal extension
+			if (session.goalId) {
+				bridgeOptions.env.BOBBIT_GOAL_ID = session.goalId;
+				const isTeamLead = session.role === "team-lead";
+				const extensionPath = isTeamLead
+					? path.resolve(__dirname, "../../../extensions/team-lead-tools.ts")
+					: GOAL_TOOLS_EXTENSION_PATH;
+				bridgeOptions.args = ["--extension", extensionPath];
+			}
+
+			// Restore tool activation from role's allowedTools
+			if (session.role && this.roleManager) {
+				const role = this.roleManager.getRole(session.role);
+				if (role && role.allowedTools.length > 0) {
+					const activation = computeToolActivationArgs(role.allowedTools);
+					bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
+				}
+			}
 
 			const rpcClient = new RpcBridge(bridgeOptions);
 			let switchingSession = true;
