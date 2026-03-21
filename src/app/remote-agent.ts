@@ -262,6 +262,7 @@ export class RemoteAgent {
 						resolve();
 						// On reconnect, request current messages to resync state
 						if (!initial) {
+							console.log(`[RemoteAgent] Reconnected — requesting messages to resync. Current messages.length=${this._state.messages.length}`);
 							this.requestMessages();
 							this.send({ type: "get_state" });
 						}
@@ -400,6 +401,7 @@ export class RemoteAgent {
 
 		// Don't add the user message locally — the server will echo it back
 		// as message_start/message_end events, keeping a single source of truth.
+		console.log(`[RemoteAgent] prompt() called, text="${text.substring(0, 50)}", messages.length=${this._state.messages.length}`);
 		this.send({
 			type: "prompt",
 			text,
@@ -556,6 +558,7 @@ export class RemoteAgent {
 				const msgs = Array.isArray(msg.data) ? msg.data : msg.data?.messages;
 				if (Array.isArray(msgs)) {
 					this._state.messages = msgs.map(enrichUserMessage);
+					console.log(`[RemoteAgent] messages response: ${msgs.length} messages replaced state. User messages: ${msgs.filter((m: any) => m.role === "user").length}`);
 					// Re-append synthetic compaction messages (/compact + result)
 					// so they survive the server's post-compaction refresh.
 					if (this._compactionSyntheticMessages.length > 0) {
@@ -880,6 +883,7 @@ export class RemoteAgent {
 						}
 
 						this._state.messages = [...this._state.messages, msg];
+						console.log(`[RemoteAgent] message_end(${msg.role}): appended, messages.length=${this._state.messages.length}`);
 					}
 				}
 				break;
