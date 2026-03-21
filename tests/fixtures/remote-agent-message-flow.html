@@ -5,10 +5,7 @@
 <script>
 /**
  * Simulates the RemoteAgent message state machine to test whether
- * user messages can be lost in various scenarios.
- *
- * We extract the relevant logic from remote-agent.ts and test it
- * without a real WebSocket connection.
+ * user messages survive wholesale messages replacements.
  */
 
 function extractText(message) {
@@ -43,11 +40,11 @@ class FakeRemoteAgent {
 		this._pendingAttachments = null;
 		this._compactionSyntheticMessages = [];
 		this._isCompacting = false;
+		this._liveEventMessages = [];
 	}
 
 	prompt(text, attachments) {
 		// Current behavior: does NOT add user message locally
-		// Just sends to server (simulated by doing nothing here)
 	}
 
 	flushDeferredMessage() {
@@ -59,8 +56,23 @@ class FakeRemoteAgent {
 	}
 
 	handleMessagesResponse(msgs) {
-		// Simulates handleServerMessage("messages")
 		this.state.messages = msgs.map(enrichUserMessage);
+
+		// Re-append any live-event messages missing from the server response
+		if (this._liveEventMessages.length > 0) {
+			const serverTexts = new Set(
+				this.state.messages
+					.filter(m => m.role === "user" || m.role === "user-with-attachments")
+					.map(m => extractText(m))
+			);
+			for (const liveMsg of this._liveEventMessages) {
+				if (!serverTexts.has(extractText(liveMsg))) {
+					this.state.messages = [...this.state.messages, liveMsg];
+				}
+			}
+			this._liveEventMessages = [];
+		}
+
 		if (this._compactionSyntheticMessages.length > 0) {
 			this.state.messages = [...this.state.messages, ...this._compactionSyntheticMessages];
 		}
@@ -106,6 +118,11 @@ class FakeRemoteAgent {
 							this._pendingAttachments = null;
 						}
 						this.state.messages = [...this.state.messages, msg];
+
+						// Track user messages from live events
+						if (msg.role === "user" || msg.role === "user-with-attachments") {
+							this._liveEventMessages.push(msg);
+						}
 					}
 				}
 				break;
@@ -113,20 +130,17 @@ class FakeRemoteAgent {
 	}
 }
 
-// Test results
 const results = [];
 function assert(condition, name) {
 	results.push({ name, passed: condition });
 }
 
 // ==========================================
-// Test 1: Normal flow — user message arrives via message_end
+// Test 1: Normal flow
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("Hello");
-	
-	// Server echoes user message
 	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
 	
 	const userMsgs = agent.state.messages.filter(m => m.role === "user");
@@ -135,166 +149,174 @@ function assert(condition, name) {
 }
 
 // ==========================================
-// Test 2: Reconnect scenario — messages response after live events
-// Simulates: prompt sent, WS drops, reconnects, get_messages response arrives
+// Test 2: Reconnect — server response includes user message
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("Hello");
-	
-	// User message echo arrives via live event
 	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
-	// Agent starts
 	agent.handleEvent({ type: "agent_start" });
 	
-	assert(agent.state.messages.length === 1, "Before reconnect: has user message");
-	
-	// Simulate reconnect — messages response wholesale replaces
+	// Reconnect — server response includes the user message
 	agent.handleMessagesResponse([
 		{ role: "user", content: [{ type: "text", text: "Hello" }] },
 		{ role: "assistant", content: [{ type: "text", text: "Hi there" }] },
 	]);
 	
 	const userMsgs = agent.state.messages.filter(m => m.role === "user");
-	assert(userMsgs.length === 1, "After reconnect: user message preserved (in server response)");
+	assert(userMsgs.length === 1, "Reconnect (server has msg): exactly one user message (no duplicate)");
 }
 
 // ==========================================
-// Test 3: Race condition — live message_end arrives AFTER messages response
-// This shouldn't happen normally, but tests the duplicate scenario
+// Test 3: BUG SCENARIO — stale messages response drops user message
+// Previously: user message LOST. Now: should be preserved.
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("Hello");
-	
-	// Messages response arrives first (e.g. from a previous get_messages)
-	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Hello" }] },
-	]);
-	
-	// Then the live message_end echo arrives (duplicate)
 	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
 	
-	const userMsgs = agent.state.messages.filter(m => m.role === "user");
-	assert(userMsgs.length === 2, "Race: duplicate user message (current behavior — no dedup)");
-	// This IS the expected current behavior — no dedup means duplicates
-}
-
-// ==========================================
-// Test 4: Messages response replaces in-flight user message
-// Scenario: user sends prompt, echo arrives, then reconnect messages response
-// arrives WITHOUT the user message (because server hadn't processed it yet)
-// ==========================================
-{
-	const agent = new FakeRemoteAgent();
-	agent.prompt("Hello");
-	
-	// Echo arrives
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
 	assert(agent.state.messages.length === 1, "Before stale response: has user message");
 	
-	// Stale messages response arrives (from before the prompt was processed)
+	// Stale messages response (doesn't include the user message)
 	agent.handleMessagesResponse([]);
 	
-	assert(agent.state.messages.length === 0, "After stale response: user message LOST");
-	// THIS IS THE BUG — if a stale messages response arrives, it wipes out live messages
+	const userMsgs = agent.state.messages.filter(m => m.role === "user");
+	assert(userMsgs.length === 1, "After stale response: user message PRESERVED");
 }
 
 // ==========================================
-// Test 5: Initial connect to existing session — requestMessages called
-// What if messages response arrives, then agent starts a new turn
-// and the user message echo comes in late?
+// Test 4: Compaction refresh drops user message
+// Previously: user message LOST. Now: should be preserved.
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
-	
-	// Connect to existing session — messages response has history
-	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Previous message" }] },
-		{ role: "assistant", content: [{ type: "text", text: "Previous response" }] },
-	]);
-	
-	// User sends new prompt
-	agent.prompt("New message");
-	
-	// Before echo arrives, another messages response (from state refresh, compaction, etc.)
-	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Previous message" }] },
-		{ role: "assistant", content: [{ type: "text", text: "Previous response" }] },
-	]);
-	
-	// Then user message echo arrives
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "New message" }] } });
-	
-	const newMsgs = agent.state.messages.filter(m => extractText(m) === "New message");
-	assert(newMsgs.length === 1, "Delayed echo after messages refresh: new user message arrives");
-}
-
-// ==========================================
-// Test 6: Compaction scenario — messages response replaces state
-// During compaction, the server sends a messages refresh. If user
-// sends a prompt right after compaction...
-// ==========================================
-{
-	const agent = new FakeRemoteAgent();
-	
-	// Some history
 	agent.handleMessagesResponse([
 		{ role: "user", content: [{ type: "text", text: "Old message" }] },
 		{ role: "assistant", content: [{ type: "text", text: "Old response" }] },
 	]);
 	
-	// User sends prompt
 	agent.prompt("After compaction");
-	
-	// Echo arrives
 	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "After compaction" }] } });
-	assert(agent.state.messages.length === 3, "Before compaction refresh: 3 messages");
 	
-	// Compaction messages refresh (server sends compacted history, may not include the latest prompt yet)
+	// Compaction refresh without the new message
 	agent.handleMessagesResponse([
 		{ role: "user", content: [{ type: "text", text: "Old message" }] },
 		{ role: "assistant", content: [{ type: "text", text: "Old response" }] },
-		// Note: "After compaction" might not be here if compaction was in flight
 	]);
 	
-	const afterCompMsgs = agent.state.messages.filter(m => extractText(m) === "After compaction");
-	assert(afterCompMsgs.length === 0, "Compaction refresh: user message LOST if not in server response");
-	// THIS IS ANOTHER MANIFESTATION — any messages refresh can wipe out live events
+	const afterMsgs = agent.state.messages.filter(m => extractText(m) === "After compaction");
+	assert(afterMsgs.length === 1, "Compaction refresh: user message PRESERVED");
 }
 
 // ==========================================
-// Test 7: What happens during auto-compaction?
-// auto_compaction_end triggers refreshAfterCompaction which sends 
-// get_messages + get_state
+// Test 5: Multiple rapid prompts — both survive stale refresh
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
+	agent.prompt("First");
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "First" }] } });
+	agent.prompt("Second");
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Second" }] } });
 	
-	// History
+	assert(agent.state.messages.length === 2, "Before refresh: two user messages");
+	
+	// Stale refresh with neither
+	agent.handleMessagesResponse([]);
+	
+	assert(agent.state.messages.length === 2, "After stale refresh: both user messages preserved");
+	assert(extractText(agent.state.messages[0]) === "First", "First message preserved");
+	assert(extractText(agent.state.messages[1]) === "Second", "Second message preserved");
+}
+
+// ==========================================
+// Test 6: Server response includes message — no duplicate
+// ==========================================
+{
+	const agent = new FakeRemoteAgent();
+	agent.prompt("Hello");
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
+	
+	// Server response DOES include the message
 	agent.handleMessagesResponse([
 		{ role: "user", content: [{ type: "text", text: "Hello" }] },
-		{ role: "assistant", content: [{ type: "text", text: "Hi" }] },
 	]);
 	
-	// User sends prompt
-	agent.prompt("New message");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "New message" }] } });
+	const userMsgs = agent.state.messages.filter(m => m.role === "user");
+	assert(userMsgs.length === 1, "Server has msg: no duplicate");
+}
+
+// ==========================================
+// Test 7: After successful refresh, live tracking is cleared
+// ==========================================
+{
+	const agent = new FakeRemoteAgent();
+	agent.prompt("Hello");
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
+	
+	// Refresh includes the message
+	agent.handleMessagesResponse([
+		{ role: "user", content: [{ type: "text", text: "Hello" }] },
+	]);
+	
+	// Second refresh without the message — should NOT re-append
+	// because _liveEventMessages was cleared after first refresh
+	agent.handleMessagesResponse([]);
+	
+	assert(agent.state.messages.length === 0, "After second refresh: live tracking cleared, no stale re-append");
+}
+
+// ==========================================
+// Test 8: Deferred assistant message not affected
+// ==========================================
+{
+	const agent = new FakeRemoteAgent();
+	agent.prompt("Hello");
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
 	agent.handleEvent({ type: "agent_start" });
 	
-	// Agent is now streaming. Meanwhile auto-compaction happens server-side.
-	// Server sends compaction_end, then refreshes messages.
-	// The refresh might not include the new user message if the agent
-	// hasn't committed it to its session file yet.
+	// Assistant message with tool call — deferred
+	agent.handleEvent({ type: "message_end", message: {
+		role: "assistant",
+		content: [{ type: "toolCall", id: "t1", name: "bash" }],
+	} });
 	
-	// We can't fully simulate this without knowing server internals,
-	// but the message replacement is the same mechanism.
-	assert(agent.state.messages.filter(m => extractText(m) === "New message").length === 1, 
-		"Before auto-compaction refresh: new message present");
+	assert(agent._deferredAssistantMessage !== null, "Deferred: assistant message held");
+	assert(agent.state.messages.length === 1, "Deferred: only user message in state.messages");
+	
+	// Next message_update flushes the deferred message
+	agent.handleEvent({ type: "message_update", message: { role: "assistant", content: [{ type: "text", text: "result" }] } });
+	
+	assert(agent._deferredAssistantMessage === null, "Flush: deferred cleared");
+	assert(agent.state.messages.length === 2, "Flush: both messages in state.messages");
+}
+
+// ==========================================
+// Test 9: Compaction synthetic messages preserved alongside fix
+// ==========================================
+{
+	const agent = new FakeRemoteAgent();
+	agent._compactionSyntheticMessages = [
+		{ role: "user", content: "compact cmd", id: "compact_user" },
+		{ role: "assistant", content: [{ type: "text", text: "Compacted." }], id: "compact_done" },
+	];
+	
+	agent.prompt("After compact");
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "After compact" }] } });
+	
+	agent.handleMessagesResponse([
+		{ role: "user", content: [{ type: "text", text: "Summary" }] },
+	]);
+	
+	// Should have: summary from server + re-appended "After compact" + compaction synthetics
+	const afterMsgs = agent.state.messages.filter(m => extractText(m) === "After compact");
+	assert(afterMsgs.length === 1, "Compaction + fix: live user message preserved");
+	assert(agent.state.messages.length === 4, "Compaction + fix: server msg + live msg + 2 synthetics");
 }
 
 // Print results
-document.title = results.every(r => r.passed) ? "PASS" : "FAIL";
+const allPassed = results.every(r => r.passed);
+document.title = allPassed ? "PASS" : "FAIL";
 window.__TEST_RESULTS = results;
 </script>
 </body>

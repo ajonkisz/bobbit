@@ -36,6 +36,12 @@ export class RemoteAgent {
 	// user message so thumbnails render in the message list.
 	private _pendingAttachments: any[] | null = null;
 
+	// Messages added via live events (message_end) that might not yet be
+	// reflected in the next server "messages" response.  When a wholesale
+	// messages refresh arrives, any live-event messages missing from the
+	// server list are re-appended so they aren't silently dropped.
+	private _liveEventMessages: any[] = [];
+
 	// Compaction tracking — persists across message refreshes.
 	// Exposed on state so the UI can queue messages during compact.
 	private _isCompacting = false;
@@ -262,7 +268,6 @@ export class RemoteAgent {
 						resolve();
 						// On reconnect, request current messages to resync state
 						if (!initial) {
-							console.log(`[RemoteAgent] Reconnected — requesting messages to resync. Current messages.length=${this._state.messages.length}`);
 							this.requestMessages();
 							this.send({ type: "get_state" });
 						}
@@ -401,7 +406,6 @@ export class RemoteAgent {
 
 		// Don't add the user message locally — the server will echo it back
 		// as message_start/message_end events, keeping a single source of truth.
-		console.log(`[RemoteAgent] prompt() called, text="${text.substring(0, 50)}", messages.length=${this._state.messages.length}`);
 		this.send({
 			type: "prompt",
 			text,
@@ -472,6 +476,7 @@ export class RemoteAgent {
 		this._state.error = undefined;
 		this._deferredAssistantMessage = null;
 		this._pendingAttachments = null;
+		this._liveEventMessages = [];
 	}
 
 	// ── Setters (Agent interface) ────────────────────────────────────
@@ -558,7 +563,25 @@ export class RemoteAgent {
 				const msgs = Array.isArray(msg.data) ? msg.data : msg.data?.messages;
 				if (Array.isArray(msgs)) {
 					this._state.messages = msgs.map(enrichUserMessage);
-					console.log(`[RemoteAgent] messages response: ${msgs.length} messages replaced state. User messages: ${msgs.filter((m: any) => m.role === "user").length}`);
+
+					// Re-append any live-event messages missing from the server
+					// response.  This prevents the wholesale replacement from
+					// silently dropping messages that arrived via message_end
+					// between a get_messages request and its response.
+					if (this._liveEventMessages.length > 0) {
+						const serverTexts = new Set(
+							this._state.messages
+								.filter((m: any) => m.role === "user" || m.role === "user-with-attachments")
+								.map((m: any) => extractText(m))
+						);
+						for (const liveMsg of this._liveEventMessages) {
+							if (!serverTexts.has(extractText(liveMsg))) {
+								this._state.messages = [...this._state.messages, liveMsg];
+							}
+						}
+						this._liveEventMessages = [];
+					}
+
 					// Re-append synthetic compaction messages (/compact + result)
 					// so they survive the server's post-compaction refresh.
 					if (this._compactionSyntheticMessages.length > 0) {
@@ -883,7 +906,12 @@ export class RemoteAgent {
 						}
 
 						this._state.messages = [...this._state.messages, msg];
-						console.log(`[RemoteAgent] message_end(${msg.role}): appended, messages.length=${this._state.messages.length}`);
+
+						// Track user messages from live events so they survive
+						// a wholesale messages refresh (reconnect, compaction).
+						if (msg.role === "user" || msg.role === "user-with-attachments") {
+							this._liveEventMessages.push(msg);
+						}
 					}
 				}
 				break;
