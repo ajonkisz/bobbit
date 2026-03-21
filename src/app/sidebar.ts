@@ -217,7 +217,7 @@ async function handleStaffClick(agent: typeof state.staffList[0]): Promise<void>
 	}
 }
 
-function renderStaffSidebarSection() {
+export function renderStaffSidebarSection() {
 	ensureStaffLoaded();
 	const list = state.staffList.filter((s) => s.state !== "retired");
 	// Always show the Staff section so users can create their first staff agent

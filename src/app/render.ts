@@ -19,7 +19,7 @@ import { createGoal, createRole, gatewayFetch, refreshSessions } from "./api.js"
 import { clearSessionModel } from "./routing.js";
 import { backToSessions, disconnectGateway, createAndConnectSession, connectToSession, terminateSession, saveGoalDraft, deleteGoalDraft, saveRoleDraft, deleteRoleDraft } from "./session-manager.js";
 import { openGatewayDialog, showQrCodeDialog, showRenameDialog, showGoalDialog } from "./dialogs.js";
-import { renderSidebar, toggleRolePicker, renderRolePickerDropdown } from "./sidebar.js";
+import { renderSidebar, toggleRolePicker, renderRolePickerDropdown, renderStaffSidebarSection } from "./sidebar.js";
 
 import { renderGoalGroup, renderSessionRow } from "./render-helpers.js";
 
@@ -112,6 +112,7 @@ function renderMobileLanding() {
 									${i > 0 ? html`<div class="border-t border-border/30 my-1 mx-2"></div>` : ""}
 									${renderGoalGroup(goal)}
 								`)}
+								${renderStaffSidebarSection()}
 								${sortedGoals.length > 0 ? html`
 									<div class="border-t border-border/30 my-1 mx-2"></div>
 									<div class="flex flex-col gap-0.5">
@@ -137,6 +138,7 @@ function renderMobileLanding() {
 										</div>
 										${isUngroupedExpanded ? ungroupedSessions.map(renderSessionRow) : ""}
 									</div>
+								${renderStaffSidebarSection()}
 								` : ungroupedSessions.length > 0 ? html`
 									<div class="flex flex-col gap-0.5">
 										<div class="flex items-center gap-1.5 px-2 py-1.5">
