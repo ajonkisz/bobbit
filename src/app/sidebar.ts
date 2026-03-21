@@ -167,8 +167,8 @@ function ensureStaffLoaded(): void {
 }
 
 /** Reload staff list (e.g. after creating one). */
-export function reloadStaffList(): void {
-	fetchStaff().then((list) => {
+export function reloadStaffList(): Promise<void> {
+	return fetchStaff().then((list) => {
 		state.staffList = list.map((s) => ({
 			id: s.id, name: s.name, description: s.description, state: s.state,
 			lastWakeAt: s.lastWakeAt, currentSessionId: s.currentSessionId, triggers: s.triggers,
@@ -216,6 +216,7 @@ async function handleStaffClick(agent: typeof state.staffList[0]): Promise<void>
 	// Fallback for legacy staff without a session
 	const result = await wakeStaffAgent(agent.id, "Manual wake from sidebar");
 	if (result?.sessionId) {
+		await reloadStaffList();
 		await refreshSessions();
 		await connectToSession(result.sessionId, false);
 	}
