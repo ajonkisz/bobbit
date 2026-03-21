@@ -63,18 +63,18 @@ function renderMobileLanding() {
 							${icon(Users, "xs")} Roles
 						</button>
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-							@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); setHashRoute("tools"); }}>
-							${icon(Wrench, "xs")} Tools
+							@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
+							${icon(Sparkles, "xs")} Personalities
 						</button>
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-							@click=${() => { import("./workflow-page.js").then((m) => m.loadWorkflowPageData()); setHashRoute("workflows"); }}>
-							${icon(Layers, "xs")} Workflows
+							@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); setHashRoute("tools"); }}>
+							${icon(Wrench, "xs")} Tools
 						</button>
 					</div>
 					<div class="flex items-center gap-1">
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-							@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
-							${icon(Sparkles, "xs")} Personalities
+							@click=${() => { import("./workflow-page.js").then((m) => m.loadWorkflowPageData()); setHashRoute("workflows"); }}>
+							${icon(Layers, "xs")} Workflows
 						</button>
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 							@click=${() => showGoalDialog()}>
