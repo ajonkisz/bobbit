@@ -1,5 +1,9 @@
 name: grep
 description: "Search file contents for a pattern"
+summary: "Search file contents by regex or literal pattern. Uses ripgrep internally."
+provider:
+  type: builtin
+  tool: grep
 group: File System
 docs: |
   Search file contents for a regex or literal pattern. Returns matching lines

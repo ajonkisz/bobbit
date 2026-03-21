@@ -1,4 +1,8 @@
 name: artifact_create
 description: "Create a goal artifact (design doc, findings, etc.)"
+summary: "Create a goal artifact (design-doc, test-plan, review-findings, etc.)."
+provider:
+  type: bobbit-extension
+  extension: goal-tools.ts
 group: Artifacts
 renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts

@@ -1,4 +1,8 @@
 name: team_list
 description: "List all agents in the team"
+summary: "List all team agents with role, status, and current task."
+provider:
+  type: bobbit-extension
+  extension: team-lead-tools.ts
 group: Team
 renderer: src/ui/tools/renderers/TeamToolRenderers.ts

@@ -1,5 +1,9 @@
 name: edit
 description: "Replace exact text in a file"
+summary: "Replace exact text in a file. Use for precise, surgical edits."
+provider:
+  type: builtin
+  tool: edit
 group: File System
 renderer: src/ui/tools/renderers/EditRenderer.ts
 docs: |

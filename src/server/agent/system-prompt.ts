@@ -90,6 +90,8 @@ export interface PromptParts {
 	traits?: Array<{ label: string; promptFragment: string }>;
 	/** Pre-formatted tool documentation section to append */
 	toolDocs?: string;
+	/** Allowed tool names for this session — used to filter tool docs */
+	allowedTools?: string[];
 }
 
 /**

@@ -1,4 +1,8 @@
 name: artifact_get
 description: "Get an artifact's full content"
+summary: "Get an artifact's full content by ID."
+provider:
+  type: bobbit-extension
+  extension: goal-tools.ts
 group: Artifacts
 renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts

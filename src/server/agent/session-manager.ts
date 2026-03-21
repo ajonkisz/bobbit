@@ -128,7 +128,7 @@ export class SessionManager {
 	/** Generate tool docs and inject into prompt parts before assembly. */
 	private assemblePrompt(sessionId: string, parts: Parameters<typeof assembleSystemPrompt>[1]): string | undefined {
 		if (this.toolManager && !parts.toolDocs) {
-			parts.toolDocs = this.toolManager.getToolDocsForPrompt();
+			parts.toolDocs = this.toolManager.getToolDocsForPrompt(parts.allowedTools);
 		}
 		return assembleSystemPrompt(sessionId, parts);
 	}
@@ -486,7 +486,7 @@ export class SessionManager {
 		if (ps.role && this.roleManager) {
 			const role = this.roleManager.getRole(ps.role);
 			if (role && role.allowedTools.length > 0) {
-				const activation = computeToolActivationArgs(role.allowedTools);
+				const activation = computeToolActivationArgs(role.allowedTools, this.toolManager);
 				bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 			}
 		}
@@ -620,12 +620,18 @@ export class SessionManager {
 			bridgeOptions.env = { ...bridgeOptions.env, BOBBIT_GOAL_ID: goalId };
 		}
 
-		// Determine tool restrictions: explicit role tools > default allowed tools > no restriction
+		// Determine tool restrictions: explicit role tools > default allowed tools > General role > no restriction
 		let effectiveAllowedTools = opts?.allowedTools;
 		if (!effectiveAllowedTools && this.toolManager) {
 			const defaults = this.toolManager.getDefaultAllowedTools();
 			if (defaults && defaults.length > 0) {
 				effectiveAllowedTools = defaults;
+			}
+		}
+		if (!effectiveAllowedTools && this.roleManager) {
+			const generalRole = this.roleManager.getRole("general");
+			if (generalRole && generalRole.allowedTools.length > 0) {
+				effectiveAllowedTools = generalRole.allowedTools;
 			}
 		}
 
@@ -686,13 +692,14 @@ export class SessionManager {
 				taskSpec,
 				taskDependsOn,
 				traits: opts?.traits,
+				allowedTools: effectiveAllowedTools,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
 
 		// Apply tool activation args based on allowedTools (controls --tools and --extension flags)
 		if (effectiveAllowedTools && effectiveAllowedTools.length > 0) {
-			const activation = computeToolActivationArgs(effectiveAllowedTools);
+			const activation = computeToolActivationArgs(effectiveAllowedTools, this.toolManager);
 			bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 		}
 
@@ -1115,7 +1122,7 @@ export class SessionManager {
 
 		// Apply tool activation args based on role's allowedTools
 		if (role.allowedTools.length > 0) {
-			const activation = computeToolActivationArgs(role.allowedTools);
+			const activation = computeToolActivationArgs(role.allowedTools, this.toolManager);
 			bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 		}
 
@@ -1238,7 +1245,7 @@ export class SessionManager {
 		if (session.role && this.roleManager) {
 			const role = this.roleManager.getRole(session.role);
 			if (role && role.allowedTools.length > 0) {
-				const activation = computeToolActivationArgs(role.allowedTools);
+				const activation = computeToolActivationArgs(role.allowedTools, this.toolManager);
 				bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 			}
 		}
@@ -1493,7 +1500,7 @@ export class SessionManager {
 			if (session.role && this.roleManager) {
 				const role = this.roleManager.getRole(session.role);
 				if (role && role.allowedTools.length > 0) {
-					const activation = computeToolActivationArgs(role.allowedTools);
+					const activation = computeToolActivationArgs(role.allowedTools, this.toolManager);
 					bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 				}
 			}

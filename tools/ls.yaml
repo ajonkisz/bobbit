@@ -1,5 +1,9 @@
 name: ls
 description: "List directory contents"
+summary: "List directory contents with entries sorted alphabetically."
+provider:
+  type: builtin
+  tool: ls
 group: File System
 docs: |
   List the contents of a directory. Returns entries sorted alphabetically, with
