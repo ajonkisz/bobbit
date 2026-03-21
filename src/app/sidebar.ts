@@ -494,18 +494,6 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 						${expanded ? renderCollapsedGoalSessions(goalSessions, goal) : ""}
 					`;
 				})}
-				${sortedGoals.length > 0 ? html`
-					<div class="w-7 border-t border-border/50 my-1.5"></div>
-					<button
-						class="flex items-center py-0.5 w-full rounded-md hover:bg-secondary/50 transition-colors" style="gap:0.225rem;"
-						title="Ungrouped sessions"
-						@click=${() => { setUngroupedExpanded(!ungroupedExpanded); renderApp(); }}
-					>
-						<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
-						<span class="text-[10px] font-extrabold tracking-wider text-muted-foreground" style="font-family: ui-monospace, monospace; line-height: 1;">SES</span>
-					</button>
-					${ungroupedExpanded ? ungrouped.map(renderCollapsedSession) : ""}
-				` : ungrouped.map(renderCollapsedSession)}
 				<div class="w-7 border-t border-border/50 my-1.5"></div>
 				${state.staffList.filter(s => s.state !== "retired").map((agent) => {
 					const session = agent.currentSessionId ? state.gatewaySessions.find(s => s.id === agent.currentSessionId) : undefined;
@@ -525,6 +513,18 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 						</button>
 					`;
 				})}
+				${sortedGoals.length > 0 ? html`
+					<div class="w-7 border-t border-border/50 my-1.5"></div>
+					<button
+						class="flex items-center py-0.5 w-full rounded-md hover:bg-secondary/50 transition-colors" style="gap:0.225rem;"
+						title="Ungrouped sessions"
+						@click=${() => { setUngroupedExpanded(!ungroupedExpanded); renderApp(); }}
+					>
+						<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
+						<span class="text-[10px] font-extrabold tracking-wider text-muted-foreground" style="font-family: ui-monospace, monospace; line-height: 1;">SES</span>
+					</button>
+					${ungroupedExpanded ? ungrouped.map(renderCollapsedSession) : ""}
+				` : ungrouped.map(renderCollapsedSession)}
 			</div>
 			<button
 				class="p-2 mb-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
