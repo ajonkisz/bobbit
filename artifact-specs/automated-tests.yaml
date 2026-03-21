@@ -1,0 +1,24 @@
+id: automated-tests
+name: Automated Tests
+description: Test code that verifies the goal's changes work correctly and guards against future regressions.
+kind: deliverable
+format: diff
+mustHave:
+  - Tests that exercise every must-have requirement from the goal spec
+  - All tests pass when run against the implementation branch
+  - Each test has a descriptive name that explains what behavior it verifies
+  - Tests fail meaningfully when the feature is removed or broken (not just smoke tests)
+  - Run command and passing output included as proof
+shouldHave:
+  - Edge case and error path coverage
+  - Tests follow the project's existing test patterns (file:// fixtures for unit, Playwright webServer for e2e)
+  - Test isolation — no dependence on external state or other tests' execution order
+mustNotHave:
+  - Tests that pass regardless of whether the implementation exists (tautological tests)
+  - Tests that depend on hardcoded timing, network calls, or non-deterministic behavior
+  - Modifications to existing passing tests solely to make new tests work
+requires:
+  - test-plan
+suggestedRole: test-engineer
+createdAt: 1774054836143
+updatedAt: 1774054872907
