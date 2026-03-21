@@ -5,6 +5,7 @@
  * (output, exit) to connected WebSocket clients.
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import type { WebSocket } from "ws";
 import type { ServerMessage } from "../ws/protocol.js";
 
@@ -41,12 +42,9 @@ function getShellConfig(): { shell: string; args: string[] } {
 	if (process.platform === "win32") {
 		// Use Git Bash on Windows if available, else cmd
 		const gitBash = "C:\\Program Files\\Git\\bin\\bash.exe";
-		try {
-			const fs = require("node:fs");
-			if (fs.existsSync(gitBash)) {
-				return { shell: gitBash, args: ["-c"] };
-			}
-		} catch { /* ignore */ }
+		if (existsSync(gitBash)) {
+			return { shell: gitBash, args: ["-c"] };
+		}
 		return { shell: "cmd.exe", args: ["/c"] };
 	}
 	return { shell: "/bin/bash", args: ["-c"] };
