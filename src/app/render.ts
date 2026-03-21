@@ -951,7 +951,7 @@ function staffPreviewPanel() {
 			triggers = JSON.parse(state.staffPreviewTriggers);
 		} catch { /* keep empty */ }
 
-		await createStaffAgent({
+		const result = await createStaffAgent({
 			name: trimmedName,
 			description: state.staffPreviewDescription,
 			systemPrompt: state.staffPreviewPrompt,
@@ -964,6 +964,10 @@ function staffPreviewPanel() {
 		}
 		reloadStaffList();
 		await refreshSessions();
+		if (result?.currentSessionId) {
+			const { connectToSession } = await import("./session-manager.js");
+			await connectToSession(result.currentSessionId, false);
+		}
 		renderApp();
 	};
 
