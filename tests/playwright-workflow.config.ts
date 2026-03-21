@@ -1,8 +1,23 @@
 import { defineConfig } from "@playwright/test";
 
 /**
- * Workflow status bar test config.
- * Connects to the already-running dev servers (harness mode).
+ * ⚠️  MANUAL TESTING ONLY — DO NOT use in CI or automated test runs.
+ *
+ * This config connects to an already-running dev server (started via
+ * `npm run dev:harness`). It has NO webServer isolation — it talks to
+ * whatever is running on the configured URLs, using the real ~/.pi
+ * token and state directory.
+ *
+ * For automated / CI testing, use playwright-e2e.config.ts instead,
+ * which spins up an isolated sandboxed gateway on port 3099 with
+ * BOBBIT_PI_DIR set to .e2e-pi/.
+ *
+ * Usage:
+ *   1. Start the dev server:  npm run dev:harness
+ *   2. Set env vars if needed:
+ *        FRONTEND_URL  (default: https://100.123.227.233:5173)
+ *        GATEWAY_URL   (default: https://100.123.227.233:3001)
+ *   3. Run:  npx playwright test --config tests/playwright-workflow.config.ts
  */
 export default defineConfig({
 	testDir: ".",

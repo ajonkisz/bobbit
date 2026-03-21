@@ -7,11 +7,16 @@
  */
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const BASE = "http://127.0.0.1:3098";
-const TOKEN = readFileSync(join(homedir(), ".pi", "gateway-token"), "utf-8").trim();
+
+/** The isolated PI directory used by the UI E2E test server — must match playwright-e2e-ui.config.ts */
+const E2E_UI_PI_DIR = join(__dirname, "..", "..", ".e2e-ui-pi");
+const TOKEN = readFileSync(join(E2E_UI_PI_DIR, "gateway-token"), "utf-8").trim();
 
 /** Create a goal assistant session via REST */
 async function createGoalAssistantSession(): Promise<string> {

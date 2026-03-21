@@ -1,7 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readE2EToken } from "./e2e-setup.js";
-
-const BASE = "http://127.0.0.1:3099";
+import { readE2EToken, BASE } from "./e2e-setup.js";
 let token: string;
 
 async function apiFetch(path: string, opts?: RequestInit): Promise<Response> {

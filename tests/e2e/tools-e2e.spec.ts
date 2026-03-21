@@ -14,7 +14,7 @@ import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import WebSocket from "ws";
-import { readE2EToken } from "./e2e-setup.js";
+import { readE2EToken, BASE, WS_BASE } from "./e2e-setup.js";
 
 // ---------------------------------------------------------------------------
 // Config — agent tool tests need much longer timeouts
@@ -25,8 +25,6 @@ test.setTimeout(120_000);
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BASE = "http://127.0.0.1:3099";
-const WS_BASE = "ws://127.0.0.1:3099";
 const TOKEN = readE2EToken();
 
 /** Authenticated REST helper */

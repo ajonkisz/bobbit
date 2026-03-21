@@ -1,14 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { readRealE2EToken, REAL_GW_URL } from "./e2e-real-setup.js";
 
 /**
  * End-to-end tests for the compaction workflow.
  *
  * Run with:
- *   npx playwright test tests/compaction.spec.ts --config tests/playwright-e2e.config.ts
+ *   npx playwright test tests/e2e/compaction.spec.ts --config tests/playwright-e2e.config.ts
  */
 
 // ---------------------------------------------------------------------------
@@ -16,14 +14,11 @@ import path from "node:path";
 // ---------------------------------------------------------------------------
 
 function readGatewayToken(): string {
-	const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
-	const token = fs.readFileSync(tokenPath, "utf-8").trim();
-	if (!token || token.length < 64) throw new Error("No valid gateway token found");
-	return token;
+	return readRealE2EToken();
 }
 
 function cleanupSessions(token: string) {
-	const gw = "http://localhost:3001";
+	const gw = REAL_GW_URL;
 	try {
 		const raw = execSync(
 			`curl -s -H "Authorization: Bearer ${token}" ${gw}/api/sessions`,

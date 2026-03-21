@@ -11,11 +11,9 @@
  * Run with: npm run build:server && npx playwright test --config playwright-e2e.config.ts tests/e2e/team-abort.spec.ts
  */
 import { test, expect } from "@playwright/test";
-import { readE2EToken } from "./e2e-setup.js";
+import { readE2EToken, BASE } from "./e2e-setup.js";
 
 test.setTimeout(60_000);
-
-const BASE = "http://127.0.0.1:3099";
 const TOKEN = readE2EToken();
 
 /** Authenticated REST helper */

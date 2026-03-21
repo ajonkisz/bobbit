@@ -8,9 +8,8 @@
 import { test, expect } from "@playwright/test";
 import { existsSync, copyFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { readE2EToken, E2E_PI_DIR } from "./e2e-setup.js";
+import { readE2EToken, E2E_PI_DIR, BASE } from "./e2e-setup.js";
 
-const BASE = "http://127.0.0.1:3099";
 const TOKEN = readE2EToken();
 const TOOLS_JSON = join(E2E_PI_DIR, "gateway-tools.json");
 const TOOLS_BACKUP = join(E2E_PI_DIR, "gateway-tools.json.bak-e2e");

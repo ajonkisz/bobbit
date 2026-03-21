@@ -7,9 +7,7 @@
 import { test, expect } from "@playwright/test";
 import { existsSync, readdirSync, mkdirSync, copyFileSync, unlinkSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { readE2EToken } from "./e2e-setup.js";
-
-const BASE = "http://127.0.0.1:3099";
+import { readE2EToken, BASE } from "./e2e-setup.js";
 const TOKEN = readE2EToken();
 const TRAITS_DIR = resolve(process.cwd(), "traits");
 const TRAITS_BACKUP_DIR = resolve(process.cwd(), "traits-backup-e2e");

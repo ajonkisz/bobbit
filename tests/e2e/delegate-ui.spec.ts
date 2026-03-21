@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { E2E_PI_DIR, readE2EToken } from "./e2e-setup.js";
 
 /**
  * Tests for delegate tool UI rendering, log links, and live progress.
@@ -20,15 +21,25 @@ import path from "node:path";
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Resolve the PI directory — uses BOBBIT_PI_DIR (E2E isolation) or ~/.pi */
+function getPiDir(): string {
+	return process.env.BOBBIT_PI_DIR || E2E_PI_DIR || path.join(os.homedir(), ".pi");
+}
+
 function readGatewayToken(): string {
-	const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
-	const token = fs.readFileSync(tokenPath, "utf-8").trim();
-	if (!token || token.length < 64) throw new Error("No valid gateway token found");
-	return token;
+	// Prefer E2E isolated token; fall back to real ~/.pi for manual runs
+	try {
+		return readE2EToken();
+	} catch {
+		const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
+		const token = fs.readFileSync(tokenPath, "utf-8").trim();
+		if (!token || token.length < 64) throw new Error("No valid gateway token found");
+		return token;
+	}
 }
 
 function getGatewayUrl(): string {
-	return process.env.GATEWAY_URL || "https://100.123.227.233:3001";
+	return process.env.GATEWAY_URL || "http://127.0.0.1:3099";
 }
 
 // ---------------------------------------------------------------------------
@@ -36,7 +47,7 @@ function getGatewayUrl(): string {
 // ---------------------------------------------------------------------------
 
 test.describe("Delegate logs endpoint", () => {
-	const logsDir = path.join(os.homedir(), ".pi", "delegate-logs");
+	const logsDir = path.join(getPiDir(), "delegate-logs");
 	const testId = `test-logserve-${Date.now()}`;
 	const logPath = path.join(logsDir, `${testId}.jsonl`);
 
@@ -393,7 +404,7 @@ test.describe("Delegate log viewer HTML", () => {
 		const gw = getGatewayUrl();
 
 		// Create a realistic log file
-		const logsDir = path.join(os.homedir(), ".pi", "delegate-logs");
+		const logsDir = path.join(getPiDir(), "delegate-logs");
 		const viewerId = `test-viewer-${Date.now()}`;
 		const viewerPath = path.join(logsDir, `${viewerId}.jsonl`);
 		const events = [

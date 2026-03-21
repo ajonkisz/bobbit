@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { readRealE2EToken } from "./e2e-real-setup.js";
 
 /**
  * End-to-end test for image attachments.
@@ -12,7 +12,7 @@ import path from "node:path";
  * agent subprocess → LLM vision API.
  *
  * Run with:
- *   npx playwright test tests/image-attachment.spec.ts --config tests/playwright-e2e.config.ts
+ *   npx playwright test tests/e2e/image-attachment.spec.ts --config tests/playwright-e2e.config.ts
  */
 
 // ---------------------------------------------------------------------------
@@ -20,10 +20,7 @@ import path from "node:path";
 // ---------------------------------------------------------------------------
 
 function readGatewayToken(): string {
-	const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
-	const token = fs.readFileSync(tokenPath, "utf-8").trim();
-	if (!token || token.length < 64) throw new Error("No valid gateway token found");
-	return token;
+	return readRealE2EToken();
 }
 
 async function openApp(page: Page, token: string) {

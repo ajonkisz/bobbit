@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { E2E_PI_DIR, readE2EToken } from "./e2e-setup.js";
 
 /**
  * E2E test: spawn sleeping delegates, open a second tab mid-execution,
@@ -14,11 +15,16 @@ import path from "node:path";
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 function readGatewayToken(): string {
-	return fs.readFileSync(path.join(os.homedir(), ".pi", "gateway-token"), "utf-8").trim();
+	// Prefer E2E isolated token; fall back to real ~/.pi for manual runs
+	try {
+		return readE2EToken();
+	} catch {
+		return fs.readFileSync(path.join(os.homedir(), ".pi", "gateway-token"), "utf-8").trim();
+	}
 }
 
-const FRONTEND = "https://100.123.227.233:5173";
-const API = "https://100.123.227.233:3001";
+const FRONTEND = process.env.FRONTEND_URL || "http://127.0.0.1:5174";
+const API = process.env.GATEWAY_URL || "http://127.0.0.1:3099";
 
 async function createSession(token: string): Promise<string> {
 	const resp = await fetch(`${API}/api/sessions`, {
