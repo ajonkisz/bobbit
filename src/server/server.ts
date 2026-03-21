@@ -25,6 +25,7 @@ import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
 import { ArtifactSpecStore } from "./agent/artifact-spec-store.js";
 import { ArtifactSpecManager } from "./agent/artifact-spec-manager.js";
 import { StaffManager } from "./agent/staff-manager.js";
+import { TriggerEngine } from "./agent/staff-trigger-engine.js";
 
 const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
 
@@ -71,6 +72,8 @@ export function createGateway(config: GatewayConfig) {
 	const artifactSpecStore = new ArtifactSpecStore();
 	const artifactSpecManager = new ArtifactSpecManager(artifactSpecStore);
 	const staffManager = new StaffManager();
+	const triggerEngine = new TriggerEngine(staffManager, sessionManager);
+	triggerEngine.start();
 	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,

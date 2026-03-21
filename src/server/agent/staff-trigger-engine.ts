@@ -1,0 +1,217 @@
+import { execFileSync } from "node:child_process";
+import type { StaffManager } from "./staff-manager.js";
+import type { SessionManager } from "./session-manager.js";
+import type { PersistedStaff, StaffTrigger } from "./staff-store.js";
+
+/**
+ * Check whether a single cron field matches a given numeric value.
+ *
+ * Supported syntax per field:
+ *   *       — any value
+ *   N       — exact match
+ *   N-M     — inclusive range
+ *   N/S     — step from 0 (alias for * /S when N is *)
+ *   N-M/S   — step within range (value in [N..M] and (value-N) % S === 0)
+ *   A,B,C   — comma-separated list (each element may itself be range/step)
+ */
+export function fieldMatches(field: string, value: number): boolean {
+	// Comma-separated list — any part matching is sufficient
+	const parts = field.split(",");
+	for (const part of parts) {
+		if (partMatches(part.trim(), value)) return true;
+	}
+	return false;
+}
+
+function partMatches(part: string, value: number): boolean {
+	if (part === "*") return true;
+
+	if (part.includes("/")) {
+		const [rangePart, stepStr] = part.split("/");
+		const step = parseInt(stepStr, 10);
+		if (isNaN(step) || step <= 0) return false;
+
+		if (rangePart === "*") {
+			return value % step === 0;
+		}
+
+		if (rangePart.includes("-")) {
+			const [loStr, hiStr] = rangePart.split("-");
+			const lo = parseInt(loStr, 10);
+			const hi = parseInt(hiStr, 10);
+			return value >= lo && value <= hi && (value - lo) % step === 0;
+		}
+
+		// Single value with step — treat like */step
+		return value % step === 0;
+	}
+
+	if (part.includes("-")) {
+		const [loStr, hiStr] = part.split("-");
+		const lo = parseInt(loStr, 10);
+		const hi = parseInt(hiStr, 10);
+		return value >= lo && value <= hi;
+	}
+
+	return parseInt(part, 10) === value;
+}
+
+/**
+ * Check whether a 5-field cron expression matches a given Date.
+ *
+ * Fields: minute hour day-of-month month day-of-week
+ * Day of week: 0 = Sunday, 7 = Sunday (both valid).
+ */
+export function cronMatches(expr: string, date: Date): boolean {
+	const fields = expr.trim().split(/\s+/);
+	if (fields.length !== 5) return false;
+
+	const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+
+	if (!fieldMatches(minute, date.getMinutes())) return false;
+	if (!fieldMatches(hour, date.getHours())) return false;
+	if (!fieldMatches(dayOfMonth, date.getDate())) return false;
+	if (!fieldMatches(month, date.getMonth() + 1)) return false;
+
+	// Day of week: normalize 7 → 0 (both mean Sunday)
+	const dow = date.getDay(); // 0=Sun
+	if (dayOfWeek !== "*") {
+		// Normalize the field so that 7 → 0
+		const normalized = dayOfWeek.replace(/\b7\b/g, "0");
+		if (!fieldMatches(normalized, dow)) return false;
+	}
+
+	return true;
+}
+
+/**
+ * TriggerEngine polls every 60 seconds, checking active staff agents' triggers.
+ *
+ * - Schedule triggers: cron expression evaluation against current time
+ * - Git triggers: compare latest commit SHA to persisted lastSeenSha
+ * - Manual triggers are never auto-fired (invoked via API only)
+ *
+ * Resource model: no processes run when staff agents are sleeping. Only the
+ * 60-second interval and cheap git log checks consume resources.
+ */
+export class TriggerEngine {
+	private intervalHandle: ReturnType<typeof setInterval> | null = null;
+
+	constructor(
+		private staffManager: StaffManager,
+		private sessionManager: SessionManager,
+	) {}
+
+	start(): void {
+		this.tick();
+		this.intervalHandle = setInterval(() => this.tick(), 60_000);
+		console.log("[trigger-engine] Started (60s poll interval)");
+	}
+
+	stop(): void {
+		if (this.intervalHandle) {
+			clearInterval(this.intervalHandle);
+			this.intervalHandle = null;
+			console.log("[trigger-engine] Stopped");
+		}
+	}
+
+	private tick(): void {
+		const allStaff = this.staffManager.listStaff();
+		for (const staff of allStaff) {
+			if (staff.state !== "active") continue;
+
+			// Skip if staff already has a live session (prevent concurrent wakes)
+			if (staff.currentSessionId) {
+				const session = this.sessionManager.getSession(staff.currentSessionId);
+				if (session && session.status !== "terminated") continue;
+				// Clear stale reference
+				this.staffManager.updateStaff(staff.id, { currentSessionId: undefined });
+			}
+
+			for (const trigger of staff.triggers) {
+				if (!trigger.enabled) continue;
+				if (trigger.type === "schedule") this.checkScheduleTrigger(staff, trigger);
+				else if (trigger.type === "git") this.checkGitTrigger(staff, trigger);
+				// "manual" triggers are only fired via the API, never by the engine
+			}
+		}
+	}
+
+	private checkScheduleTrigger(staff: PersistedStaff, trigger: StaffTrigger): void {
+		if (!trigger.config.cron) return;
+		const now = new Date();
+		if (!cronMatches(trigger.config.cron, now)) return;
+
+		// Don't re-fire in the same minute
+		if (trigger.lastFired) {
+			const lastFiredMinute = Math.floor(trigger.lastFired / 60_000);
+			const currentMinute = Math.floor(now.getTime() / 60_000);
+			if (lastFiredMinute === currentMinute) return;
+		}
+
+		void this.fireTrigger(staff, trigger);
+	}
+
+	private checkGitTrigger(staff: PersistedStaff, trigger: StaffTrigger): void {
+		const repo = trigger.config.repo || staff.cwd;
+		const branch = trigger.config.branch || "HEAD";
+
+		let sha: string;
+		try {
+			sha = execFileSync("git", ["log", "--format=%H", "-1", branch], {
+				cwd: repo,
+				stdio: "pipe",
+				timeout: 5_000,
+			})
+				.toString()
+				.trim();
+		} catch {
+			// Git command failed — repo may not exist or branch is invalid. Skip silently.
+			return;
+		}
+
+		if (!sha) return;
+
+		const previousSha = trigger.lastSeenSha;
+
+		if (previousSha && previousSha !== sha) {
+			// New commit(s) detected — build context and fire
+			let context = `New commit on ${branch}: ${sha}`;
+			try {
+				const log = execFileSync("git", ["log", "--oneline", `${previousSha}..${sha}`], {
+					cwd: repo,
+					stdio: "pipe",
+					timeout: 5_000,
+				})
+					.toString()
+					.trim();
+				if (log) context += "\n\nRecent commits:\n" + log;
+			} catch {
+				// Diff log failed — proceed with basic context
+			}
+
+			void this.fireTrigger(staff, trigger, context);
+		}
+
+		// Always update lastSeenSha (initializes on first tick, tracks on subsequent)
+		this.staffManager.updateTriggerState(staff.id, trigger.id, { lastSeenSha: sha });
+	}
+
+	private async fireTrigger(staff: PersistedStaff, trigger: StaffTrigger, extraContext?: string): Promise<void> {
+		console.log(`[trigger-engine] Firing ${trigger.type} trigger "${trigger.id}" for staff "${staff.name}"`);
+
+		this.staffManager.updateTriggerState(staff.id, trigger.id, { lastFired: Date.now() });
+
+		let prompt = trigger.prompt || `Trigger fired: ${trigger.type}`;
+		if (extraContext) {
+			prompt += "\n\n" + extraContext;
+		}
+
+		try {
+			await this.staffManager.wake(staff.id, prompt, this.sessionManager);
+		} catch (err) {
+			console.error(`[trigger-engine] Failed to wake staff "${staff.name}":`, err);
+		}
+	}
+}
