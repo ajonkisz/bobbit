@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { ChevronDown, Layers, PanelLeftClose, PanelLeftOpen, Plus, Users, Wrench } from "lucide";
+import { ChevronDown, Crosshair, Layers, PanelLeftClose, PanelLeftOpen, Plus, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -124,7 +124,7 @@ export function renderSidebar() {
 					@click=${() => showGoalDialog()}
 					title="New goal"
 				>
-					${icon(Plus, "sm")}
+					${icon(Crosshair, "sm")}
 					<span>Goal</span>
 				</button>
 			</div>
