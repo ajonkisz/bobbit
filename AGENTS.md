@@ -4,6 +4,8 @@
 
 A remote gateway for AI coding agents. Wraps pi-coding-agent in a WebSocket server with a browser-based chat UI. The user runs `bobbit` on a dev machine and interacts with the agent from any browser.
 
+For architecture details, REST API, WebSocket protocol, and feature documentation, see [README.md](README.md).
+
 ## Repo layout
 
 ```
@@ -13,34 +15,46 @@ src/
 │   ├── server.ts    # HTTP server, REST API, static serving, WS upgrade
 │   ├── harness.ts   # Dev server wrapper (watches sentinel file, auto-restarts)
 │   ├── harness-signal.ts  # Touches sentinel to trigger harness restart
+│   ├── index.ts     # Server barrel export
+│   ├── pi-dir.ts    # Resolves ~/.pi directory path (respects BOBBIT_PI_DIR env var)
 │   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, teams, title generation
-│   │   ├── session-manager.ts  # Create/destroy/restore sessions, broadcast events, force abort
-│   │   ├── session-store.ts    # Disk persistence (~/.pi/gateway-sessions.json)
-│   │   ├── rpc-bridge.ts       # JSONL stdin/stdout bridge to agent subprocess
-│   │   ├── event-buffer.ts     # Circular buffer for tool_execution_update replay on reconnect
-│   │   ├── title-generator.ts  # Auto-generate session titles via Claude Haiku
-│   │   ├── system-prompt.ts    # Assemble system prompt from global + AGENTS.md + goal spec
-│   │   ├── goal-manager.ts     # Goal CRUD operations
-│   │   ├── goal-store.ts       # Disk persistence (~/.pi/gateway-goals.json)
-│   │   ├── goal-artifact-store.ts  # Goal artifact storage (~/.pi/gateway-goal-artifacts.json)
-│   │   ├── goal-assistant.ts   # System prompt for the goal creation assistant
-│   │   ├── task-manager.ts     # Task CRUD and state transitions
-│   │   ├── task-store.ts       # Disk persistence (~/.pi/gateway-tasks.json)
-│   │   ├── team-manager.ts     # Team lifecycle (spawn/dismiss agents, start/complete/teardown)
-│   │   ├── team-store.ts       # Disk persistence (~/.pi/gateway-team-state.json)
-│   │   ├── team-names.ts       # Random name generator for team agents
-│   │   ├── team-prompts.ts     # System prompts for team lead and role agents
-│   │   ├── role-manager.ts     # Role definitions and management
-│   │   ├── role-store.ts       # Role persistence
-│   │   ├── role-assistant.ts   # System prompt for role assistant
-│   │   ├── tool-store.ts       # Tool metadata persistence (~/.pi/gateway-tools.json)
-│   │   ├── tool-assistant.ts   # System prompt for tool management assistant
-│   │   └── color-store.ts      # Per-session color index persistence (~/.pi/gateway-session-colors.json)
-│   ├── auth/        # Token auth, rate limiting, TLS, OAuth
-│   │   ├── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
+│   │   ├── artifact-spec-assistant.ts  # System prompt for artifact spec assistant
+│   │   ├── artifact-spec-manager.ts    # Artifact spec CRUD operations
+│   │   ├── artifact-spec-store.ts      # Artifact spec persistence (YAML files in artifact-specs/)
+│   │   ├── assistant-registry.ts       # Registry of assistant types (goal, role, tool, artifact-spec)
+│   │   ├── color-store.ts              # Per-session color index persistence (~/.pi/gateway-session-colors.json)
+│   │   ├── cost-tracker.ts             # Per-session token/cost tracking
+│   │   ├── event-buffer.ts             # Circular buffer for tool_execution_update replay on reconnect
+│   │   ├── goal-artifact-store.ts      # Goal artifact storage (~/.pi/gateway-goal-artifacts.json)
+│   │   ├── goal-assistant.ts           # System prompt for the goal creation assistant
+│   │   ├── goal-manager.ts             # Goal CRUD operations
+│   │   ├── goal-store.ts               # Disk persistence (~/.pi/gateway-goals.json)
+│   │   ├── name-generator.ts           # Random name generator for team agents
+│   │   ├── prompt-queue.ts             # Server-side prompt queue with priority sorting
+│   │   ├── role-assistant.ts           # System prompt for role assistant
+│   │   ├── role-manager.ts             # Role definitions, tool access, and management
+│   │   ├── role-store.ts               # Role persistence (YAML files in roles/)
+│   │   ├── rpc-bridge.ts               # JSONL stdin/stdout bridge to agent subprocess
+│   │   ├── session-manager.ts          # Create/destroy/restore sessions, broadcast events, force abort
+│   │   ├── session-store.ts            # Disk persistence (~/.pi/gateway-sessions.json)
+│   │   ├── system-prompt.ts            # Assemble system prompt from global + AGENTS.md + goal spec
+│   │   ├── task-manager.ts             # Task CRUD and state transitions
+│   │   ├── task-store.ts               # Disk persistence (~/.pi/gateway-tasks.json)
+│   │   ├── team-manager.ts             # Team lifecycle (spawn/dismiss agents, start/complete/teardown)
+│   │   ├── team-names.ts               # Themed name lists for team agents
+│   │   ├── team-store.ts               # Disk persistence (~/.pi/gateway-team-state.json)
+│   │   ├── title-generator.ts          # Auto-generate session titles via Claude Haiku
+│   │   ├── tool-assistant.ts           # System prompt for tool management assistant
+│   │   ├── tool-manager.ts             # Tool CRUD with renderer discovery
+│   │   ├── tool-store.ts               # Tool metadata persistence (~/.pi/gateway-tools.json)
+│   │   ├── trait-manager.ts            # Trait definitions and management
+│   │   └── trait-store.ts              # Trait persistence (~/.pi/gateway-traits.json)
+│   ├── auth/        # Token auth, rate limiting, TLS, OAuth, DNS
+│   │   ├── desec.ts       # deSEC dynamic DNS updates on startup
+│   │   ├── oauth.ts       # OAuth flow (start, complete, status)
 │   │   ├── rate-limit.ts  # IP-based rate limiting for auth failures
 │   │   ├── tls.ts         # Self-signed TLS certificate generation (~/.pi/gateway-tls/)
-│   │   └── oauth.ts       # OAuth flow (start, complete, status)
+│   │   └── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
 │   ├── ws/          # WebSocket protocol types and message handler
 │   │   ├── protocol.ts   # ClientMessage / ServerMessage type unions
 │   │   └── handler.ts    # Auth handshake, command routing, skill dispatch
@@ -56,36 +70,158 @@ src/
 │           └── test-suite-report.ts # Test suite analysis skill
 ├── ui/              # Lit web components (forked from pi-web-ui, NOT an npm dep)
 │   ├── ChatPanel.ts # Top-level UI orchestrator
+│   ├── app.css      # Global application styles
+│   ├── index.ts     # UI barrel export
+│   ├── speech-recognition.d.ts  # Web Speech API type declarations
 │   ├── components/  # MessageList, StreamingMessageContainer, AgentInterface, etc.
-│   │   ├── AgentInterface.ts    # Bridges agent events to UI state
-│   │   ├── MessageList.ts       # Renders state.messages (completed messages)
-│   │   ├── StreamingMessageContainer.ts  # Renders state.streamMessage (in-progress)
-│   │   ├── Messages.ts          # Message rendering by role
-│   │   ├── Input.ts             # Chat input with attachments
-│   │   ├── message-renderer-registry.ts  # Custom message type renderers
-│   │   └── sandbox/             # Sandboxed iframe runtime providers
+│   │   ├── AgentInterface.ts              # Bridges agent events to UI state
+│   │   ├── AttachmentTile.ts              # File attachment preview tile
+│   │   ├── ConsoleBlock.ts                # Console output display block
+│   │   ├── CustomProviderCard.ts          # Custom AI provider card
+│   │   ├── DiffBlock.ts                   # Diff visualization component
+│   │   ├── ErrorMessage.ts                # Error display component
+│   │   ├── ExpandableSection.ts           # Collapsible content section
+│   │   ├── GitStatusWidget.ts             # Git status display widget
+│   │   ├── Input.ts                       # Chat input with attachments
+│   │   ├── LiveTimer.ts                   # Live elapsed-time timer
+│   │   ├── MessageEditor.ts               # Inline message editing
+│   │   ├── MessageList.ts                 # Renders state.messages (completed messages)
+│   │   ├── Messages.ts                    # User, Assistant, Tool message renderers
+│   │   ├── ProviderKeyInput.ts            # API key input field
+│   │   ├── SandboxedIframe.ts             # Sandboxed iframe container
+│   │   ├── StreamingMessageContainer.ts   # Renders state.streamMessage (in-progress)
+│   │   ├── ThinkingBlock.ts               # AI thinking/reasoning display
+│   │   ├── ToolGroup.ts                   # Groups related tool calls
+│   │   ├── message-renderer-registry.ts   # Custom message type renderers
+│   │   └── sandbox/                       # Sandboxed iframe runtime providers
+│   │       ├── ArtifactsRuntimeProvider.ts    # Artifact rendering in sandbox
+│   │       ├── AttachmentsRuntimeProvider.ts  # Attachment handling in sandbox
+│   │       ├── ConsoleRuntimeProvider.ts      # Console capture in sandbox
+│   │       ├── FileDownloadRuntimeProvider.ts # File download from sandbox
+│   │       ├── RuntimeMessageBridge.ts        # Parent-iframe message bridge
+│   │       ├── RuntimeMessageRouter.ts        # Routes messages between providers
+│   │       └── SandboxRuntimeProvider.ts      # Base sandbox runtime provider
 │   ├── dialogs/     # ModelSelector, Settings, Sessions, AttachmentOverlay
+│   │   ├── ApiKeyPromptDialog.ts      # API key entry dialog
+│   │   ├── AttachmentOverlay.ts       # Full-screen attachment viewer
+│   │   ├── CustomProviderDialog.ts    # Custom provider configuration
+│   │   ├── ModelSelector.ts           # AI model selection dropdown
+│   │   ├── PersistentStorageDialog.ts # Storage permission dialog
+│   │   ├── ProvidersModelsTab.ts      # Provider/model settings tab
+│   │   ├── SessionListDialog.ts       # Session list/management dialog
+│   │   └── SettingsDialog.ts          # App settings dialog
+│   ├── prompts/
+│   │   └── prompts.ts    # Default prompt templates
 │   ├── tools/       # Tool call renderers
-│   │   ├── renderers/    # Per-tool renderers (Bash, Read, Write, Edit, Delegate, etc.)
-│   │   ├── artifacts/    # Artifact display (HTML, SVG, PDF, Markdown, etc.)
-│   │   └── renderer-registry.ts  # Tool name → renderer mapping
+│   │   ├── extract-document.ts    # Document text extraction
+│   │   ├── index.ts               # Tool renderer registration
+│   │   ├── javascript-repl.ts     # JavaScript REPL support
+│   │   ├── renderer-registry.ts   # Tool name → renderer mapping
+│   │   ├── types.ts               # Tool renderer type definitions
+│   │   ├── renderers/             # Per-tool renderers
+│   │   │   ├── ArtifactToolRenderers.ts   # Artifact tool renderers
+│   │   │   ├── BashRenderer.ts            # Shell command renderer
+│   │   │   ├── BrowserClickRenderer.ts    # Browser click tool renderer
+│   │   │   ├── BrowserEvalRenderer.ts     # Browser eval tool renderer
+│   │   │   ├── BrowserNavigateRenderer.ts # Browser navigate tool renderer
+│   │   │   ├── BrowserTypeRenderer.ts     # Browser type tool renderer
+│   │   │   ├── BrowserWaitRenderer.ts     # Browser wait tool renderer
+│   │   │   ├── CalculateRenderer.ts       # Calculator tool renderer
+│   │   │   ├── DefaultRenderer.ts         # Fallback tool renderer
+│   │   │   ├── DelegateRenderer.ts        # Delegate/sub-agent renderer
+│   │   │   ├── EditRenderer.ts            # File edit renderer with diff
+│   │   │   ├── FindRenderer.ts            # File find renderer
+│   │   │   ├── GetCurrentTimeRenderer.ts  # Time tool renderer
+│   │   │   ├── GrepRenderer.ts            # Grep results renderer
+│   │   │   ├── HtmlRenderer.ts            # HTML preview renderer
+│   │   │   ├── LsRenderer.ts             # Directory listing renderer
+│   │   │   ├── ReadRenderer.ts            # File read renderer
+│   │   │   ├── ScreenshotRenderer.ts      # Screenshot display renderer
+│   │   │   ├── SvgRenderer.ts             # SVG preview renderer
+│   │   │   ├── TaskToolRenderers.ts       # Task management tool renderers
+│   │   │   ├── TeamToolRenderers.ts       # Team management tool renderers
+│   │   │   ├── WebFetchRenderer.ts        # Web fetch results renderer
+│   │   │   ├── WebSearchRenderer.ts       # Web search results renderer
+│   │   │   ├── WriteRenderer.ts           # File write renderer
+│   │   │   ├── delegate-cards.ts          # Delegate status card components
+│   │   │   └── image-utils.ts             # Image processing utilities
+│   │   └── artifacts/             # Artifact display components
+│   │       ├── ArtifactElement.ts         # Base artifact element
+│   │       ├── ArtifactPill.ts            # Compact artifact indicator
+│   │       ├── Console.ts                 # Console artifact display
+│   │       ├── DocxArtifact.ts            # Word document artifact
+│   │       ├── ExcelArtifact.ts           # Excel spreadsheet artifact
+│   │       ├── GenericArtifact.ts         # Generic file artifact
+│   │       ├── HtmlArtifact.ts            # HTML artifact with live preview
+│   │       ├── ImageArtifact.ts           # Image artifact display
+│   │       ├── MarkdownArtifact.ts        # Markdown artifact renderer
+│   │       ├── PdfArtifact.ts             # PDF document artifact
+│   │       ├── SvgArtifact.ts             # SVG artifact display
+│   │       ├── TextArtifact.ts            # Plain text artifact
+│   │       ├── artifacts-tool-renderer.ts # Artifact tool integration
+│   │       ├── artifacts.ts               # Artifact type definitions
+│   │       └── index.ts                   # Artifact exports
 │   ├── storage/     # IndexedDB persistence (settings, provider keys, sessions)
+│   │   ├── app-storage.ts                       # App-level storage manager
+│   │   ├── store.ts                             # Generic store base class
+│   │   ├── types.ts                             # Storage type definitions
+│   │   ├── backends/
+│   │   │   └── indexeddb-storage-backend.ts      # IndexedDB storage backend
+│   │   └── stores/
+│   │       ├── command-history-store.ts          # Command history persistence
+│   │       ├── custom-providers-store.ts         # Custom AI provider persistence
+│   │       ├── goal-draft-store.ts              # Goal draft persistence
+│   │       ├── provider-keys-store.ts           # API key persistence
+│   │       ├── role-draft-store.ts              # Role draft persistence
+│   │       ├── sessions-store.ts                # Session metadata persistence
+│   │       ├── settings-store.ts                # App settings persistence
+│   │       └── spec-draft-store.ts              # Spec draft persistence
 │   └── utils/       # Formatting, auth token, model discovery, i18n
+│       ├── ansi.ts              # ANSI escape code processing
+│       ├── attachment-utils.ts  # File attachment helpers
+│       ├── auth-token.ts        # Auth token management
+│       ├── format.ts            # Text formatting utilities
+│       ├── i18n.ts              # Internationalization helpers
+│       ├── model-discovery.ts   # AI model discovery and listing
+│       ├── proxy-utils.ts       # Proxy configuration helpers
+│       └── test-sessions.ts     # Test session utilities
 ├── app/             # Browser entry point (connects to gateway)
-│   ├── main.ts      # Bootstrap, routing, session sidebar, QR code, OAuth
-│   ├── remote-agent.ts  # WebSocket ↔ Agent interface adapter (critical file)
-│   ├── custom-messages.ts  # Custom message type definitions
-│   ├── tool-manager-page.ts  # Tool management UI (list + detail views)
-│   ├── tool-manager.css       # Tool management page styles
-│   └── oauth.ts     # Browser-side OAuth flow
+│   ├── api.ts                   # REST API client helpers
+│   ├── app.css                  # Global app styles
+│   ├── artifact-spec-page.ts    # Artifact spec management page
+│   ├── artifact-spec.css        # Artifact spec page styles
+│   ├── custom-messages.ts       # Custom message type definitions
+│   ├── cwd-combobox.ts          # Working directory combobox component
+│   ├── dialogs.ts               # App-level dialog helpers
+│   ├── goal-dashboard.css       # Goal dashboard styles
+│   ├── goal-dashboard.ts        # Goal dashboard page
+│   ├── main.ts                  # Bootstrap, routing, session sidebar, QR code, OAuth
+│   ├── mobile-header.ts         # Mobile responsive header
+│   ├── oauth.ts                 # Browser-side OAuth flow
+│   ├── preview-panel.ts         # Live preview panel (split-pane HTML preview)
+│   ├── proposal-parsers.ts      # Parse assistant proposals (goal, role, tool, artifact-spec)
+│   ├── qrcode.d.ts              # QR code library type declarations
+│   ├── remote-agent.ts          # WebSocket ↔ Agent interface adapter (critical file)
+│   ├── render-helpers.ts        # Shared rendering helpers
+│   ├── render.ts                # App-level render functions
+│   ├── role-manager-dialog.ts   # Role creation/edit dialog
+│   ├── role-manager-page.ts     # Role management page
+│   ├── role-manager.css         # Role manager page styles
+│   ├── routing.ts               # Hash-based routing
+│   ├── session-colors.ts        # Session color assignment
+│   ├── session-manager.ts       # Client-side session management
+│   ├── sidebar.ts               # Desktop session sidebar
+│   ├── state.ts                 # App-level state management
+│   ├── storage.ts               # Client-side storage helpers
+│   ├── tool-manager-page.ts     # Tool management UI (list + detail views)
+│   └── tool-manager.css         # Tool management page styles
 ├── config/
 │   └── system-prompt.md  # Custom system prompt for agent sessions
 └── docs/
-    ├── dev-workflow.md          # Development workflow guide
-    └── bobbit-sprites.md       # Bobbit pixel art, animation & accessory system reference
+    ├── dev-workflow.md      # Development workflow guide
+    ├── prompt-queue.md      # Prompt queue architecture
+    └── bobbit-sprites.md    # Bobbit pixel art, animation & accessory system reference
 ```
-
-The bobbit is a pixel-art blob mascot rendered with CSS box-shadow, with animations, accessories, and color identity. See `docs/bobbit-sprites.md` for the full reference.
 
 ## Commands
 
@@ -112,290 +248,6 @@ When developing Bobbit itself, use `npm run dev:harness` instead of `npm run dev
 4. Relaunch the server
 
 The harness also auto-restarts on unexpected crashes. Sessions survive restarts thanks to disk persistence (`~/.pi/gateway-sessions.json`).
-
-## Key concepts
-
-### Sessions
-
-A **session** is a running pi-coding-agent child process, managed by `SessionManager`. Multiple WebSocket clients can connect to one session. Sessions persist to disk and restore on server restart.
-
-**Session persistence**: Metadata (id, title, cwd, agent session file, `wasStreaming` flag) stored in `~/.pi/gateway-sessions.json`. On restart, `restoreSessions()` re-spawns agents and uses `switch_session` RPC to resume from the agent's `.jsonl` file. If an agent was mid-turn when the server died (`wasStreaming: true`), it is automatically re-prompted with a system message to continue where it left off.
-
-### Auto-titles
-
-When the user sends their first prompt, `tryGenerateTitleFromPrompt()` fires immediately (before the agent replies) and calls `title-generator.ts`, which sends the user text to Claude Haiku (`claude-haiku-4-5-20251001`, `max_tokens: 12`) for a 2-3 word summary. Reads auth from `~/.pi/agent/auth.json`. Falls back silently if auth is unavailable. The explicit `generate_title` WS command uses `autoGenerateTitle()` which reads the full conversation history instead.
-
-### RPC Bridge
-
-JSONL over stdin/stdout to the agent subprocess. Commands include: `prompt`, `steer`, `follow_up`, `abort`, `get_state`, `get_messages`, `set_model`, `compact`, `switch_session`. Each command gets a unique request ID; the bridge matches `response` messages by ID. Non-response messages are forwarded as events to all listeners.
-
-### RemoteAgent
-
-`src/app/remote-agent.ts` is the browser-side WebSocket client that duck-types the Agent interface so ChatPanel can use it like a local agent. This is the most complex file — handles streaming message state, deferred tool-call messages to prevent duplicate rendering, compaction state, task completion notifications, and auto-reconnection with exponential backoff.
-
-### Deferred assistant messages
-
-Tool-call assistant messages are held in `_deferredAssistantMessage` instead of going straight into `messages[]`. The streaming container shows them live via `streamMessage`. They flush to `messages[]` when the next `message_update` arrives (which replaces the streaming container content simultaneously) or when `agent_end` fires. This prevents both `MessageList` and `StreamingMessageContainer` from rendering the same content.
-
-### System prompt assembly
-
-Each session's system prompt is assembled by `system-prompt.ts` from three layers (in order):
-
-1. Global `config/system-prompt.md`
-2. `AGENTS.md` from the session's working directory (with `@ref` resolution)
-3. Goal spec (if session belongs to a goal)
-
-The `AGENTS.md` supports `@FILENAME.md` syntax — lines matching `@somefile.md` are replaced inline with the referenced file's contents (resolved relative to the file's directory, recursive, with circular reference protection via a `seen` set). The assembled prompt is written to `~/.pi/session-prompts/{sessionId}.md` and passed to the agent via `--system-prompt`. Cleaned up when a session is terminated.
-
-### Force abort
-
-When the user aborts a streaming session, `forceAbort()` first tries a graceful `abort` RPC. If the agent doesn't become idle within a grace period (default 3s), it kills the process, emits a synthetic `agent_end` to connected clients, then spawns a fresh agent process and resumes the session via `switch_session`. This ensures sessions remain usable even if the agent hangs.
-
-## Goals
-
-Goals are a task-tracking layer on top of sessions. A goal has a title, spec (markdown), working directory, and state (`todo` | `in-progress` | `done`).
-
-**Storage**: `GoalStore` persists to `~/.pi/gateway-goals.json` (same load-on-construct, write-on-mutate pattern as `SessionStore`).
-
-**REST API**:
-- `GET /api/goals` — list all goals
-- `POST /api/goals` — create a goal (`{ title, cwd, spec }`)
-- `GET /api/goals/:id` — get a goal
-- `PUT /api/goals/:id` — update a goal
-- `DELETE /api/goals/:id` — delete a goal
-
-**Session integration**: When creating a session with `goalId`, the goal's cwd is used as default. Goals auto-transition from `todo` to `in-progress` when their first session starts. The goal's title, state, and spec are included in the assembled system prompt.
-
-**Goal assistant**: Sessions created with `goalAssistant: true` get a special system prompt (`GOAL_ASSISTANT_PROMPT`) that instructs the agent to help the user define a clear goal. The assistant outputs structured `<goal_proposal>` blocks with `<title>`, `<spec>`, and optional `<cwd>` tags. `RemoteAgent` parses these from assistant messages and fires the `onGoalProposal` callback.
-
-## Skills
-
-A skill is a named, reusable template for spawning an isolated sub-agent that produces a structured artifact. Skills replace the multi-phase workflow engine with a simpler, single-invocation model.
-
-### Architecture
-
-- **Types** (`src/server/skills/types.ts`): The `Skill` interface defines a skill template:
-  ```typescript
-  interface Skill {
-    id: string;                    // e.g. "code-review", "gap-analysis"
-    name: string;                  // Human-readable name
-    description: string;           // What this skill does
-    instructions: string;          // System prompt for the isolated sub-agent
-    isolation: "full" | "partial"; // Whether the sub-agent sees parent context
-    expectedOutput: string;        // Description of expected artifact format
-    timeoutMs?: number;            // Max execution time (default 10min)
-  }
-  ```
-- **Registry** (`src/server/skills/registry.ts`): In-memory store of skill definitions. Register at import time via `registerSkill()`. List/get skills at runtime.
-- **Sub-agents** (`src/server/skills/sub-agent.ts`): Isolated agent subprocesses for skill execution. Receive only skill instructions + explicit context + `AGENTS.md` — never the parent conversation. 10-minute default timeout.
-- **Git helpers** (`src/server/skills/git.ts`): Git worktree utilities for skills that need isolated repo access.
-- **Definition sync** (`src/server/skills/definitions-sync.ts`): Exports registered skills to `~/.pi/skill-definitions.json` at startup so agent-side tool extensions can discover available skills.
-
-### Built-in skills
-
-- **Code Review** (`code-review.ts`): Three independent review skills — `correctness-review`, `security-review`, and `design-review`. Each reviews a different aspect of a branch diff. The Team Lead invokes them individually and synthesises findings.
-- **Test Suite Report** (`test-suite-report.ts`): Single skill that analyses a test suite — creates a worktree, runs tests, and produces a structured report.
-
-### WebSocket protocol
-
-4 skill-related message types in `protocol.ts`:
-
-**Client → Server**: `invoke_skill` (with `skillId` and optional `context`)
-
-**Server → Client**: `skill_started`, `skill_completed`, `skill_failed`
-
-### REST endpoint
-
-- `GET /api/skills` — list available skill definitions
-
-## Goal Artifacts
-
-Goals can have **artifacts** — structured documents (design docs, test plans, review findings) that serve as both a process record and an enforcement mechanism.
-
-### GoalArtifact interface
-
-```typescript
-interface GoalArtifact {
-  id: string;
-  goalId: string;
-  name: string;              // e.g. "design-doc", "test-plan", "code-review-findings"
-  type: ArtifactType;        // "design-doc" | "test-plan" | "review-findings" | "gap-analysis" | "security-findings" | "custom"
-  content: string;           // The artifact content (markdown, JSON, etc.)
-  producedBy: string;        // Session ID that created it
-  skillId?: string;          // Skill that produced it (if applicable)
-  version: number;           // Incremented on revision
-  createdAt: number;
-  updatedAt: number;
-}
-```
-
-### Artifact requirements and enforcement
-
-Goals can declare which artifacts must exist before certain task types are allowed:
-
-```typescript
-interface ArtifactRequirement {
-  artifactType: ArtifactType;
-  blocksTaskTypes: string[];   // e.g. ["implementation"]
-  description: string;
-}
-```
-
-**Default requirements** (applied to all team goals unless overridden):
-- `design-doc` blocks `implementation` — a design document must exist before implementation tasks can be created
-- `review-findings` blocks goal completion — code review findings must exist before the goal can be completed
-
-When an agent tries to create a task via `POST /api/goals/:id/tasks`, the server checks artifact requirements. If a required artifact is missing, the request is rejected with **409 Conflict** and a message explaining which artifacts are needed. This is a hard gate — the agent must produce the required artifact first.
-
-### Storage
-
-`GoalArtifactStore` persists to `~/.pi/gateway-goal-artifacts.json` (same load-on-construct, write-on-mutate pattern as other stores). Artifact content is stored inline since artifacts are typically markdown/JSON documents.
-
-### REST endpoints
-
-- `GET /api/goals/:id/artifacts` — list artifacts for a goal
-- `POST /api/goals/:id/artifacts` — create an artifact (`{ name, type, content, producedBy, skillId? }`)
-- `GET /api/goals/:id/artifacts/:artifactId` — get a specific artifact
-- `PUT /api/goals/:id/artifacts/:artifactId` — revise an artifact (increments version)
-
-## Tool Management
-
-Tools can be browsed and documented via the tool management UI at `#/tools`. Each tool has editable metadata (description, group, docs) stored in `ToolStore`, layered on top of the built-in tool definitions from `AVAILABLE_TOOLS` in `role-manager.ts`.
-
-**Storage**: `ToolStore` persists to `~/.pi/gateway-tools.json` (same load-on-construct, write-on-mutate pattern as other stores). Stores custom overrides only — built-in tool names and defaults come from `role-manager.ts`.
-
-**REST API**:
-- `GET /api/tools` — list all tools (extended with `docs`, `hasRenderer`, `rendererFile` fields)
-- `GET /api/tools/:name` — get a single tool's full detail; 404 if unknown
-- `PUT /api/tools/:name` — update tool metadata (`{ description?, group?, docs? }`); 404 if unknown
-
-**UI pages**:
-- `#/tools` — grouped tool list with renderer status indicators (green = custom renderer, gray = default)
-- `#/tools/:toolName` — detail/edit view with description, group, documentation fields, renderer info, role access summary, and a renderer preview
-
-**Tool assistant**: Sessions created with `toolAssistant: true` get `TOOL_ASSISTANT_PROMPT` from `tool-assistant.ts`. The assistant helps write tool documentation, improve renderers, configure role access, and design new tools. It outputs structured `<tool_proposal>` blocks with `<tool>`, `<action>`, and `<content>` tags.
-
-## Compaction
-
-Context compaction reduces token usage by summarizing the conversation. Two modes exist:
-
-### Manual compaction
-
-Triggered by the user via the `compact` WS command. The handler:
-1. Sets `session.isCompacting = true` and broadcasts `compaction_start`
-2. Calls `rpcClient.compact()` (120s timeout) in a fire-and-forget async IIFE
-3. On success: broadcasts `compaction_end` with `tokensBefore`, then refreshes messages and state
-4. On failure: broadcasts `compaction_end` with error
-
-### Auto-compaction
-
-Triggered by the agent subprocess. Events `auto_compaction_start` / `auto_compaction_end` flow through the event system. On `auto_compaction_end` (if not aborted), `SessionManager.refreshAfterCompaction()` broadcasts refreshed messages and state.
-
-### Client-side compaction state (RemoteAgent)
-
-- `_isCompacting`: Tracks whether compaction is in progress. Used to re-add the placeholder message after server refreshes.
-- `_compactionSyntheticMessages`: The `/compact` user message and result message are stored separately so they survive the server's post-compaction `messages` refresh (which replaces the entire message array).
-- `_usageStaleAfterCompaction`: Set on `compaction_end`, cleared when a new assistant message with usage arrives. The UI checks this to avoid showing a misleading context percentage from pre-compaction state.
-- A `compacting_placeholder` message (id: `"compacting_placeholder"`) is added to `messages[]` during compaction and replaced with the result on completion.
-
-## Task completion notifications
-
-When the agent finishes a turn, `RemoteAgent` checks how long the task took. It notifies the user via three mechanisms:
-1. **Browser Notification API** — shows session title and elapsed time (requires HTTPS or localhost)
-2. **Title flash** — alternates document title with "Done (Xm)" until the tab regains focus
-3. **Audio beep** — two-tone sine wave (880 Hz, 1046 Hz) via Web Audio API
-
-Notification permission is requested on first user prompt (has user gesture context).
-
-## Reconnection
-
-`RemoteAgent` auto-reconnects on unexpected disconnects with exponential backoff (1s base, 30s max). On reconnect:
-1. Re-authenticates via `auth` message
-2. Requests current messages (`get_messages`) and state (`get_state`) to resync
-3. Server replays the latest `tool_execution_update` per tool call ID from the `EventBuffer` so reconnecting clients see delegate/skill progress immediately
-4. If the agent is streaming and no `streamMessage` exists (late join), the last assistant message is promoted to the streaming container and removed from `messages[]` to avoid duplicate rendering
-
-## Dual TypeScript configs
-
-- `tsconfig.server.json`: Node16 modules, targets `src/server/`, emits to `dist/server/`
-- `tsconfig.web.json`: Bundler resolution + DOM libs, covers `src/ui/` + `src/app/` (vite bundles these, tsc only type-checks)
-
-## npm dependencies vs forked code
-
-**From npm** (do not modify, update via npm): `pi-ai`, `pi-agent-core`, `pi-coding-agent`, `mini-lit`, `lit`, `ws`
-
-**Forked into repo** (our code, modify freely):
-- `src/ui/` ← was `@mariozechner/pi-web-ui`
-- `src/server/` ← was `@mariozechner/pi-gateway`
-
-If you need to change UI components or server behavior, edit the forked code directly. If you need changes to the agent itself (tool definitions, LLM interaction, etc.), those live in the npm packages upstream.
-
-## Networking
-
-Bobbit is accessed remotely over a **NordVPN mesh network**. The user runs the server on a dev machine and connects from other devices via a custom domain.
-
-**Port topology in dev mode:**
-- **Vite** (`:5173`) — user-facing HTTPS server, serves UI with HMR, proxies `/api/*` and `/ws/*` to the gateway
-- **Gateway** (`:3001`) — HTTPS server, REST API, WebSocket sessions, agent subprocess management
-
-In production (`npm start`), the gateway serves the bundled UI directly on `:3001`. No Vite.
-
-**deSEC dynamic DNS**: On startup, the gateway updates a deSEC A record (`~/.pi/desec.json`) so `bobbit.dedyn.io` resolves to the current mesh IP. Config:
-```json
-{ "domain": "bobbit.dedyn.io", "token": "<deSEC API token>" }
-```
-
-**Pitfall — E2E tests and DNS**: The deSEC update is skipped for loopback addresses (`127.0.0.1`, `localhost`). If the DNS record points to `127.0.0.1` and remote clients can't connect, a prior server start with `--host 127.0.0.1` likely clobbered it. Restart the server normally (without `--host`) to push the correct mesh IP. Clients may need a DNS cache flush.
-
-**TLS** is on by default. Certs are generated via mkcert (local CA) or openssl fallback:
-- `~/.pi/gateway-cert.pem` / `~/.pi/gateway-key.pem` — server cert and key
-- `~/.pi/gateway-tls/ca.crt` — CA cert (install on remote devices to trust)
-
-Vite reuses the same cert for its HTTPS server. The cert covers the current host IP + localhost; it regenerates automatically if the IP changes.
-
-See [docs/dev-workflow.md](docs/dev-workflow.md) for the full networking reference, troubleshooting table, and local-only setup.
-
-## Security notes
-
-- Auth token at `~/.pi/gateway-token` (256-bit, mode 0600)
-- All API + WS require token. Constant-time comparison. Rate limiting on failures.
-- **The token grants full shell access.** Treat it like an SSH private key.
-- Static file serving has traversal guard (resolved path must start with static dir).
-- Never bind to `0.0.0.0` — restrict access to the mesh network only.
-- OAuth flow (`/api/oauth/start`, `/api/oauth/complete`, `/api/oauth/status`) for obtaining API credentials.
-
-## QR code / multi-device access
-
-The QR code dialog (`src/app/main.ts` `showQrCodeDialog()`) encodes `window.location.origin` + the auth token. Since both the gateway and Vite auto-detect and bind to the NordLynx mesh IP, the QR code will contain a routable mesh address by default. The startup logs print the full URL with the token — users can copy-paste or scan from any device on the mesh.
-
-## Disk state summary
-
-All persistent state lives under `~/.pi/`:
-
-| File / Directory | Owner | Purpose |
-|---|---|---|
-| `gateway-token` | `token.ts` | Auth token (mode 0600) |
-| `gateway-sessions.json` | `SessionStore` | Session metadata (id, title, cwd, agentSessionFile, wasStreaming) |
-| `gateway-goals.json` | `GoalStore` | Goal definitions (title, spec, cwd, state) |
-| `gateway-session-colors.json` | `ColorStore` | Session → color index (0-19) mapping |
-| `gateway-tls/` | `tls.ts` | Self-signed TLS cert + key |
-| `session-prompts/{sessionId}.md` | `system-prompt.ts` | Assembled system prompts (cleaned up on session terminate) |
-| `gateway-goal-artifacts.json` | `GoalArtifactStore` | Goal artifact content and metadata |
-| `gateway-team-state.json` | `TeamStore` | Team state (agents, roles, goal associations) |
-| `gateway-tasks.json` | `TaskStore` | Task definitions, state, assignments |
-| `gateway-tools.json` | `ToolStore` | Tool metadata overrides (description, group, docs) |
-| `skill-definitions.json` | `definitions-sync.ts` | Exported skill definitions for agent discovery |
-| `gateway-url` | `cli.ts` | Last-started gateway base URL (e.g. `https://100.x.x.x:3001`) |
-| `desec.json` | `desec.ts` | deSEC dynDNS config (domain + API token) |
-| `gateway-cert.pem` | `tls.ts` | TLS server certificate |
-| `gateway-key.pem` | `tls.ts` | TLS server private key |
-
-| `agent/auth.json` | (external) | API auth credentials (read by title-generator) |
-| `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
-
-## Git conventions
-
-The primary branch is **`master`** (not `main`). If the user refers to "main", treat it as `master`. Never create a `main` branch.
 
 ## Development workflow
 
@@ -454,6 +306,8 @@ If you only changed UI code (`src/ui/`, `src/app/`), unit tests are sufficient. 
 
 **Change how messages render**: `src/ui/components/Messages.ts` for standard roles, `src/ui/components/message-renderer-registry.ts` for custom types.
 
+## Debugging tips
+
 **Debug duplicate messages**: The deferred message pattern in `remote-agent.ts` is subtle. `MessageList` renders `state.messages` (completed), `StreamingMessageContainer` renders `state.streamMessage` (in-progress). They must never show the same message. Tool-call messages stay in streaming until the next message starts. Check `flushDeferredMessage()` and `_deferredAssistantMessage`.
 
 **Debug session persistence**: Check `~/.pi/gateway-sessions.json` for persisted session data. Sessions restore on startup via `session-manager.ts` `restoreSessions()`. If an agent's `.jsonl` session file is missing, that session is skipped. Failed restores create dormant entries that revive on client connect.
@@ -461,3 +315,40 @@ If you only changed UI code (`src/ui/`, `src/app/`), unit tests are sufficient. 
 **Debug compaction issues**: Check `_isCompacting`, `_compactionSyntheticMessages`, and `_usageStaleAfterCompaction` in `remote-agent.ts`. The `compacting_placeholder` message must be filtered out and re-added correctly across server refreshes. Manual compaction is fire-and-forget from the WS handler's perspective.
 
 **Debug goal artifacts**: Goal artifacts are stored in `GoalArtifactStore` (`~/.pi/gateway-goal-artifacts.json`). Artifact requirements are enforced on task creation — if the server returns 409, check which artifacts are missing via `GET /api/goals/:id/artifacts`.
+
+## Git conventions
+
+The primary branch is **`master`** (not `main`). If the user refers to "main", treat it as `master`. Never create a `main` branch.
+
+## Disk state summary
+
+All persistent state lives under `~/.pi/`:
+
+| File / Directory | Owner | Purpose |
+|---|---|---|
+| `gateway-token` | `token.ts` | Auth token (mode 0600) |
+| `gateway-sessions.json` | `SessionStore` | Session metadata (id, title, cwd, agentSessionFile, wasStreaming) |
+| `gateway-goals.json` | `GoalStore` | Goal definitions (title, spec, cwd, state) |
+| `gateway-session-colors.json` | `ColorStore` | Session → color index (0-13) mapping |
+| `gateway-tls/` | `tls.ts` | Self-signed TLS cert + key |
+| `session-prompts/{sessionId}.md` | `system-prompt.ts` | Assembled system prompts (cleaned up on session terminate) |
+| `gateway-goal-artifacts.json` | `GoalArtifactStore` | Goal artifact content and metadata |
+| `gateway-team-state.json` | `TeamStore` | Team state (agents, roles, goal associations) |
+| `gateway-tasks.json` | `TaskStore` | Task definitions, state, assignments |
+| `gateway-tools.json` | `ToolStore` | Tool metadata overrides (description, group, docs) |
+| `gateway-session-costs.json` | `CostTracker` | Per-session token and cost data |
+| `skill-definitions.json` | `definitions-sync.ts` | Exported skill definitions for agent discovery |
+| `gateway-url` | `cli.ts` | Last-started gateway base URL (e.g. `https://100.x.x.x:3001`) |
+| `desec.json` | `desec.ts` | deSEC dynDNS config (domain + API token) |
+| `gateway-cert.pem` | `tls.ts` | TLS server certificate |
+| `gateway-key.pem` | `tls.ts` | TLS server private key |
+| `agent/auth.json` | (external) | API auth credentials (read by title-generator) |
+| `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
+
+Repo-local storage (YAML files, not in `~/.pi/`):
+
+| Directory | Owner | Purpose |
+|---|---|---|
+| `roles/*.yaml` | `RoleStore` | Role definitions and tool access |
+| `traits/*.yaml` | `TraitStore` | Trait definitions |
+| `artifact-specs/*.yaml` | `ArtifactSpecStore` | Artifact spec definitions |
