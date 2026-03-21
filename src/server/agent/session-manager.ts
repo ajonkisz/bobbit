@@ -1351,6 +1351,22 @@ export class SessionManager {
 		}
 	}
 
+	/**
+	 * Ensure a session's subprocess is alive. If the session is terminated or
+	 * dormant, attempt to restore it from persisted data.
+	 */
+	async ensureSessionAlive(sessionId: string): Promise<void> {
+		const existing = this.sessions.get(sessionId);
+		if (existing && existing.status !== "terminated") return; // already alive
+
+		// Try to restore from persisted data
+		const persisted = this.store.get(sessionId);
+		if (persisted) {
+			await this.restoreSession(persisted);
+			console.log(`[session-manager] Restored session ${sessionId} via ensureSessionAlive`);
+		}
+	}
+
 	async terminateSession(id: string): Promise<boolean> {
 		const session = this.sessions.get(id);
 		if (!session) return false;
