@@ -57,8 +57,8 @@ export class BgProcessPill extends LitElement {
 		if (!this.sessionId || !this.process) return;
 		this.loadingLogs = true;
 		try {
-			const url = localStorage.getItem("gw-url") || window.location.origin;
-			const token = localStorage.getItem("gw-token") || "";
+			const url = localStorage.getItem("gateway.url") || window.location.origin;
+			const token = localStorage.getItem("gateway.token") || "";
 			const res = await fetch(`${url}/api/sessions/${this.sessionId}/bg-processes/${this.process.id}/logs?tail=100`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
