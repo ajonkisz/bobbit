@@ -871,7 +871,7 @@ function renderTabBar(): TemplateResult {
 			${tabs.map(t => html`
 				<div class="tab ${dashboardTab === t.id ? "active" : ""}" @click=${() => setTab(t.id)}>
 					${t.icon}
-					${t.label}
+					<span class="tab-label">${t.label}</span>
 					<span class="tab-count">${t.count}</span>
 				</div>
 			`)}
