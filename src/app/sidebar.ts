@@ -315,12 +315,22 @@ export function renderSidebar() {
 					</button>
 					<button
 						class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
+						@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); import("./routing.js").then((m) => m.setHashRoute("personalities")); }}
+						title="Manage personalities"
+					>
+						${icon(Sparkles, "sm")}
+						<span>Personalities</span>
+					</button>
+					<button
+						class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 						@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); import("./routing.js").then((m) => m.setHashRoute("tools")); }}
 						title="Manage tools"
 					>
 						${icon(Wrench, "sm")}
 						<span>Tools</span>
 					</button>
+				</div>
+				<div class="flex items-center">
 					<button
 						class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
 						@click=${() => { import("./workflow-page.js").then((m) => m.loadWorkflowPageData()); import("./routing.js").then((m) => m.setHashRoute("workflows")); }}
@@ -328,16 +338,6 @@ export function renderSidebar() {
 					>
 						${icon(Layers, "sm")}
 						<span>Workflows</span>
-					</button>
-				</div>
-				<div class="flex items-center">
-					<button
-						class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
-						@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); import("./routing.js").then((m) => m.setHashRoute("personalities")); }}
-						title="Manage personalities"
-					>
-						${icon(Sparkles, "sm")}
-						<span>Personalities</span>
 					</button>
 					<button
 						class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
