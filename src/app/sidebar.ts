@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Bot, ChevronDown, Goal as GoalIcon, Layers, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Sparkles, Users, Wrench } from "lucide";
+import { Bot, ChevronDown, Goal as GoalIcon, Layers, List, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Sparkles, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
