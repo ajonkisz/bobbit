@@ -506,6 +506,25 @@ function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewayS
 					</button>
 					${ungroupedExpanded ? ungrouped.map(renderCollapsedSession) : ""}
 				` : ungrouped.map(renderCollapsedSession)}
+				<div class="w-7 border-t border-border/50 my-1.5"></div>
+				${state.staffList.filter(s => s.state !== "retired").map((agent) => {
+					const session = agent.currentSessionId ? state.gatewaySessions.find(s => s.id === agent.currentSessionId) : undefined;
+					const active = activeSessionId() === agent.currentSessionId;
+					const sessionStatus = session?.status || "terminated";
+					const isCompacting = session?.isCompacting || false;
+					const isAborting = session?.isAborting || false;
+					const accessory = session?.accessory;
+					return html`
+						<button
+							class="flex items-center gap-1 ${SESSION_ROW_PY} px-1 rounded-md transition-colors w-full ${active ? "bg-secondary" : "hover:bg-secondary/50"}"
+							title=${agent.name}
+							@click=${() => handleStaffClick(agent)}
+						>
+							${statusBobbit(sessionStatus, isCompacting, agent.currentSessionId, active, isAborting, false, false, accessory)}
+							<span class="text-[8px] font-bold tracking-wide ${active ? "text-foreground" : "text-muted-foreground"}" style="font-family: ui-monospace, monospace; line-height: 1;">${sessionAcronym(agent.name)}</span>
+						</button>
+					`;
+				})}
 			</div>
 			<button
 				class="p-2 mb-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
