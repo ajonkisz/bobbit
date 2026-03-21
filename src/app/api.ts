@@ -545,16 +545,7 @@ export async function wakeStaffAgent(id: string, prompt?: string): Promise<{ ses
 	}
 }
 
-export async function fetchStaffSessions(id: string): Promise<GatewaySession[]> {
-	try {
-		const res = await gatewayFetch(`/api/staff/${id}/sessions`);
-		if (!res.ok) return [];
-		const data = await res.json();
-		return data.sessions || data || [];
-	} catch {
-		return [];
-	}
-}
+
 
 // ============================================================================
 // PERSONALITY API

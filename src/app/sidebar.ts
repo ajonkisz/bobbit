@@ -204,15 +204,12 @@ async function createStaffAssistantSession(e: Event): Promise<void> {
 }
 
 async function handleStaffClick(agent: typeof state.staffList[0]): Promise<void> {
-	// If the staff agent has a current session, connect to it
+	// Staff agents always have a permanent session — just connect to it
 	if (agent.currentSessionId) {
-		const existing = state.gatewaySessions.find((s) => s.id === agent.currentSessionId);
-		if (existing) {
-			await connectToSession(agent.currentSessionId, true);
-			return;
-		}
+		await connectToSession(agent.currentSessionId, true);
+		return;
 	}
-	// Otherwise do a manual wake
+	// Fallback for legacy staff without a session
 	const result = await wakeStaffAgent(agent.id, "Manual wake from sidebar");
 	if (result?.sessionId) {
 		await refreshSessions();

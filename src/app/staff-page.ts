@@ -2,8 +2,8 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
-import { ArrowLeft, Clock, Pencil, Play, Pause, Plus, Trash2, UserCheck, Zap } from "lucide";
-import { fetchStaff, fetchStaffAgent, updateStaffAgent, deleteStaffAgent, wakeStaffAgent, fetchStaffSessions, type StaffAgent } from "./api.js";
+import { ArrowLeft, Clock, Eye, Pencil, Play, Pause, Plus, Trash2, UserCheck, Zap } from "lucide";
+import { fetchStaff, fetchStaffAgent, updateStaffAgent, deleteStaffAgent, wakeStaffAgent, type StaffAgent } from "./api.js";
 import { state, renderApp } from "./state.js";
 import { setHashRoute } from "./routing.js";
 import { connectToSession } from "./session-manager.js";
@@ -28,7 +28,6 @@ let editPrompt = "";
 let editCwd = "";
 let editTriggers = "[]";
 let editMemory = "";
-let staffSessions: any[] = [];
 
 // ============================================================================
 // DATA LOADING
@@ -68,11 +67,6 @@ function showEdit(agent: StaffAgent): void {
 	saving = false;
 	deleting = false;
 	setHashRoute("staff-edit", agent.id);
-	// Fetch sessions in background
-	fetchStaffSessions(agent.id).then((s) => {
-		staffSessions = s;
-		renderApp();
-	});
 }
 
 export function navigateToStaffEdit(staffId: string): void {
@@ -88,11 +82,6 @@ export function navigateToStaffEdit(staffId: string): void {
 		editMemory = agent.memory || "";
 		saving = false;
 		deleting = false;
-		staffSessions = [];
-		fetchStaffSessions(agent.id).then((s) => {
-			staffSessions = s;
-			renderApp();
-		});
 	}
 	renderApp();
 }
@@ -117,6 +106,7 @@ async function handleSave(): Promise<void> {
 		systemPrompt: editPrompt,
 		cwd: editCwd,
 		triggers,
+		memory: editMemory,
 	});
 	if (ok) {
 		staffList = await fetchStaff();
@@ -291,6 +281,12 @@ function renderEditView(): TemplateResult {
 						onClick: handleWake,
 						children: html`<span class="inline-flex items-center gap-1">${icon(Zap, "sm")} Wake Now</span>`,
 					})}
+					${selectedStaff.currentSessionId ? Button({
+						variant: "outline",
+						size: "sm",
+						onClick: () => connectToSession(selectedStaff!.currentSessionId!, true),
+						children: html`<span class="inline-flex items-center gap-1">${icon(Eye, "sm")} View Session</span>`,
+					}) : ""}
 					${Button({
 						variant: "ghost",
 						size: "sm",
@@ -352,32 +348,16 @@ function renderEditView(): TemplateResult {
 					></textarea>
 				</div>
 
-				<!-- Memory (read-only) -->
+				<!-- Pinned Context -->
 				<div>
-					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Memory (read-only)</label>
-					<div class="p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm max-h-[200px] font-mono whitespace-pre-wrap">
-						${editMemory || html`<span class="text-muted-foreground italic">No memory accumulated yet</span>`}
-					</div>
-				</div>
-
-				<!-- Session History -->
-				<div>
-					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Session History</label>
-					${staffSessions.length === 0
-						? html`<div class="text-xs text-muted-foreground italic p-2">No sessions yet</div>`
-						: html`
-							<div class="flex flex-col gap-1">
-								${staffSessions.slice(0, 20).map((s: any) => html`
-									<div class="flex items-center gap-2 px-2 py-1.5 rounded-md border border-border/50 hover:bg-secondary/30 cursor-pointer text-xs transition-colors"
-										@click=${() => connectToSession(s.id, true)}>
-										<span class="text-muted-foreground">${new Date(s.createdAt).toLocaleString()}</span>
-										<span class="flex-1 truncate">${s.title || "Untitled"}</span>
-										<span class="text-muted-foreground">${s.status}</span>
-									</div>
-								`)}
-							</div>
-						`
-					}
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Pinned Context (optional)</label>
+					<p class="text-[10px] text-muted-foreground mb-1">Injected into the system prompt. Survives conversation compaction.</p>
+					<textarea
+						class="w-full p-2 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+						rows="4"
+						.value=${editMemory}
+						@input=${(e: Event) => { editMemory = (e.target as HTMLTextAreaElement).value; renderApp(); }}
+					></textarea>
 				</div>
 
 				<!-- Save -->
