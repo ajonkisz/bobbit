@@ -486,7 +486,7 @@ export class SessionManager {
 		if (ps.role && this.roleManager) {
 			const role = this.roleManager.getRole(ps.role);
 			if (role && role.allowedTools.length > 0) {
-				const activation = computeToolActivationArgs(role.allowedTools);
+				const activation = computeToolActivationArgs(role.allowedTools, this.toolManager);
 				bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 			}
 		}
@@ -692,7 +692,7 @@ export class SessionManager {
 
 		// Apply tool activation args based on allowedTools (controls --tools and --extension flags)
 		if (effectiveAllowedTools && effectiveAllowedTools.length > 0) {
-			const activation = computeToolActivationArgs(effectiveAllowedTools);
+			const activation = computeToolActivationArgs(effectiveAllowedTools, this.toolManager);
 			bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 		}
 
@@ -1115,7 +1115,7 @@ export class SessionManager {
 
 		// Apply tool activation args based on role's allowedTools
 		if (role.allowedTools.length > 0) {
-			const activation = computeToolActivationArgs(role.allowedTools);
+			const activation = computeToolActivationArgs(role.allowedTools, this.toolManager);
 			bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 		}
 
@@ -1238,7 +1238,7 @@ export class SessionManager {
 		if (session.role && this.roleManager) {
 			const role = this.roleManager.getRole(session.role);
 			if (role && role.allowedTools.length > 0) {
-				const activation = computeToolActivationArgs(role.allowedTools);
+				const activation = computeToolActivationArgs(role.allowedTools, this.toolManager);
 				bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 			}
 		}
@@ -1493,7 +1493,7 @@ export class SessionManager {
 			if (session.role && this.roleManager) {
 				const role = this.roleManager.getRole(session.role);
 				if (role && role.allowedTools.length > 0) {
-					const activation = computeToolActivationArgs(role.allowedTools);
+					const activation = computeToolActivationArgs(role.allowedTools, this.toolManager);
 					bridgeOptions.args = [...activation.args, ...(bridgeOptions.args || [])];
 				}
 			}

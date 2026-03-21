@@ -4,13 +4,21 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { ToolStore } from "./tool-store.js";
 
+export interface ToolProvider {
+	type: 'builtin' | 'user-extension' | 'bobbit-extension';
+	tool?: string;       // for builtin
+	extension?: string;  // for user-extension and bobbit-extension
+}
+
 /** Base tool definition loaded from YAML */
 interface BaseToolInfo {
 	name: string;
 	description: string;
+	summary?: string;
 	group: string;
 	renderer?: string;
 	docs?: string;
+	provider?: ToolProvider;
 }
 
 export interface ToolInfo {
@@ -43,9 +51,11 @@ function loadToolDefinitions(): BaseToolInfo[] {
 					tools.push({
 						name: data.name,
 						description: data.description || "",
+						summary: data.summary,
 						group: data.group || "Other",
 						renderer: data.renderer,
 						docs: data.docs,
+						provider: data.provider,
 					});
 				}
 			} catch (err) {
@@ -137,6 +147,18 @@ export class ToolManager {
 		}
 
 		return sections.join("\n");
+	}
+
+	/** Returns the provider info for a tool, or undefined if not found. */
+	getToolProvider(name: string): ToolProvider | undefined {
+		const tools = loadToolDefinitions();
+		const base = tools.find((t) => t.name === name);
+		return base?.provider;
+	}
+
+	/** Returns all tool names from YAML definitions. */
+	getAllToolNames(): string[] {
+		return loadToolDefinitions().map((t) => t.name);
 	}
 
 	/** Updates custom tool metadata (description, group, docs). */
