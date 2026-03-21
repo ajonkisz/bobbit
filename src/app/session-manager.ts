@@ -534,6 +534,20 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			renderApp();
 		};
 
+		remote.onStaffProposal = (proposal) => {
+			state.activeStaffProposal = proposal;
+			if (!state.staffPreviewNameEdited) state.staffPreviewName = proposal.name;
+			if (!state.staffPreviewDescriptionEdited) state.staffPreviewDescription = proposal.description;
+			if (!state.staffPreviewPromptEdited) state.staffPreviewPrompt = proposal.prompt;
+			if (!state.staffPreviewTriggersEdited) state.staffPreviewTriggers = proposal.triggers || "[]";
+			if (!state.staffPreviewCwdEdited) state.staffPreviewCwd = proposal.cwd || "";
+			state.assistantHasProposal = true;
+			if (state.assistantTab === "chat" && !isDesktop()) {
+				state.assistantTab = "preview";
+			}
+			renderApp();
+		};
+
 		state.connectionStatus = "connected";
 		state.remoteAgent = remote;
 		state.appView = "authenticated";

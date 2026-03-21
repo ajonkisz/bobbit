@@ -854,16 +854,19 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 		saving = true;
 		renderProposalDialog();
 
-		const sessionId = activeSessionId();
-		await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, team: teamValue, worktree: worktreeValue });
-		state.activeGoalProposal = null;
-		// Only terminate goal-assistant sessions — regular sessions that suggested a goal should keep running.
-		if (sessionId && state.assistantType === "goal") {
-			const { terminateSession } = await import("./session-manager.js");
-			await terminateSession(sessionId);
+		try {
+			const sessionId = activeSessionId();
+			await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, team: teamValue, worktree: worktreeValue });
+			state.activeGoalProposal = null;
+			// Only terminate goal-assistant sessions — regular sessions that suggested a goal should keep running.
+			if (sessionId && state.assistantType === "goal") {
+				const { terminateSession } = await import("./session-manager.js");
+				await terminateSession(sessionId);
+			}
+		} finally {
+			saving = false;
+			cleanup();
 		}
-		saving = false;
-		cleanup();
 	};
 
 	const renderProposalDialog = () => {
