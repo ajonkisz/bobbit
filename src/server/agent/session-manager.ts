@@ -631,14 +631,8 @@ export class SessionManager {
 			bridgeOptions.env = { ...bridgeOptions.env, BOBBIT_GOAL_ID: goalId };
 		}
 
-		// Determine tool restrictions: explicit role tools > default allowed tools > General role > no restriction
+		// Determine tool restrictions: explicit role tools > General role > no restriction
 		let effectiveAllowedTools = opts?.allowedTools;
-		if (!effectiveAllowedTools && this.toolManager) {
-			const defaults = this.toolManager.getDefaultAllowedTools();
-			if (defaults && defaults.length > 0) {
-				effectiveAllowedTools = defaults;
-			}
-		}
 		if (!effectiveAllowedTools && this.roleManager) {
 			const generalRole = this.roleManager.getRole("general");
 			if (generalRole && generalRole.allowedTools.length > 0) {

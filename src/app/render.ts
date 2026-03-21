@@ -307,7 +307,7 @@ let _toolsLoaded = false;
 function ensureToolsLoaded(): void {
 	if (_toolsLoaded) return;
 	_toolsLoaded = true;
-	fetchTools().then((result) => { _availableTools = result.tools; renderApp(); });
+	fetchTools().then((tools) => { _availableTools = tools; renderApp(); });
 }
 
 function rolePreviewPanel() {

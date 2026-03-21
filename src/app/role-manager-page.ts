@@ -84,9 +84,9 @@ export async function loadRolePageData(): Promise<void> {
 	saving = false;
 	deleting = false;
 	renderApp();
-	const [r, toolsResult] = await Promise.all([fetchRoles(), fetchTools()]);
+	const [r, t] = await Promise.all([fetchRoles(), fetchTools()]);
 	roles = r;
-	availableTools = toolsResult.tools;
+	availableTools = t;
 	loading = false;
 	renderApp();
 }

@@ -515,40 +515,20 @@ export interface ToolInfo {
 	rendererFile?: string;
 }
 
-export interface FetchToolsResult {
-	tools: ToolInfo[];
-	defaultAllowedTools: string[] | null;
-}
-
-export async function fetchTools(): Promise<FetchToolsResult> {
+export async function fetchTools(): Promise<ToolInfo[]> {
 	try {
 		const res = await gatewayFetch("/api/tools");
 		if (!res.ok) throw new Error(`Failed to fetch tools: ${res.status}`);
 		const data = await res.json();
-		let tools = data.tools || data || [];
+		const tools = data.tools || data || [];
 		// Handle legacy string[] format
 		if (tools.length > 0 && typeof tools[0] === "string") {
-			tools = tools.map((name: string) => ({ name, description: "", group: "Other" }));
+			return tools.map((name: string) => ({ name, description: "", group: "Other" }));
 		}
-		return {
-			tools,
-			defaultAllowedTools: data.defaultAllowedTools ?? null,
-		};
+		return tools;
 	} catch (err) {
 		console.error("[role-api] fetchTools failed:", err);
-		return { tools: [], defaultAllowedTools: null };
-	}
-}
-
-export async function updateDefaultAllowedTools(tools: string[] | null): Promise<boolean> {
-	try {
-		const res = await gatewayFetch("/api/tools/defaults", {
-			method: "PUT",
-			body: JSON.stringify({ defaultAllowedTools: tools }),
-		});
-		return res.ok;
-	} catch {
-		return false;
+		return [];
 	}
 }
 
