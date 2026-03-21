@@ -262,7 +262,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 
 	state.appView = "authenticated";
 	const route = getRouteFromHash();
-	if (route.view !== "session" && route.view !== "goal-dashboard" && route.view !== "roles" && route.view !== "role-edit") {
+	if (route.view !== "session" && route.view !== "goal-dashboard" && route.view !== "roles" && route.view !== "role-edit" && route.view !== "staff" && route.view !== "staff-edit") {
 		setHashRoute("landing");
 	}
 	renderApp();
@@ -274,7 +274,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 // CONNECT TO SESSION
 // ============================================================================
 
-export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isArtifactSpecAssistant?: boolean; isPreview?: boolean; assistantType?: string }): Promise<void> {
+export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isArtifactSpecAssistant?: boolean; isStaffAssistant?: boolean; isPreview?: boolean; assistantType?: string }): Promise<void> {
 	if (state.connectingSessionId) return;
 	state.connectingSessionId = sessionId;
 
@@ -420,6 +420,22 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			renderApp();
 		};
 
+		remote.onStaffProposal = (proposal) => {
+			state.activeStaffProposal = proposal;
+			if (state.assistantType === "staff") {
+				if (!state.staffPreviewNameEdited) state.staffPreviewName = proposal.name;
+				if (!state.staffPreviewDescriptionEdited) state.staffPreviewDescription = proposal.description;
+				if (!state.staffPreviewPromptEdited) state.staffPreviewPrompt = proposal.prompt;
+				if (!state.staffPreviewTriggersEdited) state.staffPreviewTriggers = proposal.triggers || "[]";
+				if (!state.staffPreviewCwdEdited) state.staffPreviewCwd = proposal.cwd || "";
+				state.assistantHasProposal = true;
+				if (state.assistantTab === "chat" && !isDesktop()) {
+					state.assistantTab = "preview";
+				}
+			}
+			renderApp();
+		};
+
 		remote.onArtifactSpecProposal = (proposal) => {
 			state.activeArtifactSpecProposal = proposal;
 			if (!state.specPreviewIdEdited) state.specPreviewId = proposal.id;
@@ -472,6 +488,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			: options?.isRoleAssistant || sessionData?.roleAssistant ? "role"
 			: options?.isToolAssistant || sessionData?.toolAssistant ? "tool"
 			: options?.isArtifactSpecAssistant || sessionData?.artifactSpecAssistant ? "artifact-spec"
+			: options?.isStaffAssistant || sessionData?.staffAssistant ? "staff"
 			: null);
 		state.assistantTab = "chat";
 		state.assistantHasProposal = false;
@@ -617,12 +634,33 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			}
 		}
 
+		// Clear staff proposal when connecting to a non-staff-assistant session
+		if (state.assistantType !== "staff") {
+			state.activeStaffProposal = null;
+		}
+
+		if (state.assistantType === "staff") {
+			state.assistantTab = "chat";
+			state.staffPreviewName = "";
+			state.staffPreviewDescription = "";
+			state.staffPreviewPrompt = "";
+			state.staffPreviewTriggers = "[]";
+			state.staffPreviewCwd = "";
+			state.staffPreviewNameEdited = false;
+			state.staffPreviewDescriptionEdited = false;
+			state.staffPreviewPromptEdited = false;
+			state.staffPreviewTriggersEdited = false;
+			state.staffPreviewCwdEdited = false;
+			state.assistantHasProposal = false;
+		}
+
 		// Auto-prompt for new assistant sessions
 		const AUTO_PROMPTS: Record<string, string> = {
 			goal: "Start the goal creation session.",
 			role: "Start the role creation session.",
 			tool: "Start the tool assistant session. Help me document, improve, or create tools.",
 			"artifact-spec": "Start the artifact spec creation session.",
+			staff: "Start the staff agent creation session.",
 		};
 		if (state.assistantType && !isExisting) {
 			const autoPrompt = AUTO_PROMPTS[state.assistantType];
