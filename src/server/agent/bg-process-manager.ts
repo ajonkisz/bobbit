@@ -9,6 +9,11 @@ import { existsSync } from "node:fs";
 import type { WebSocket } from "ws";
 import type { ServerMessage } from "../ws/protocol.js";
 
+export interface LogEntry {
+	ts: number;
+	text: string;
+}
+
 export interface BgProcess {
 	id: string;
 	command: string;
@@ -17,7 +22,7 @@ export interface BgProcess {
 	stdout: string[];
 	stderr: string[];
 	/** Combined interleaved output (capped at MAX_LOG_LINES) */
-	log: string[];
+	log: LogEntry[];
 	status: "running" | "exited";
 	exitCode: number | null;
 	startTime: number;
@@ -102,17 +107,19 @@ export class BgProcessManager {
 		let logBytes = 0;
 
 		const appendLog = (line: string) => {
-			bg.log.push(line);
+			const entry: LogEntry = { ts: Date.now(), text: line };
+			bg.log.push(entry);
 			logBytes += line.length;
 			// Trim oldest lines if over limits
 			while (bg.log.length > MAX_LOG_LINES || logBytes > MAX_LOG_BYTES) {
 				const removed = bg.log.shift();
-				if (removed) logBytes -= removed.length;
+				if (removed) logBytes -= removed.text.length;
 			}
 		};
 
 		child.stdout?.on("data", (chunk: Buffer) => {
 			const text = chunk.toString("utf-8");
+			const ts = Date.now();
 			const lines = text.split("\n");
 			for (const line of lines) {
 				if (line.length > 0) {
@@ -128,11 +135,13 @@ export class BgProcessManager {
 				processId: id,
 				stream: "stdout",
 				text,
+				ts,
 			} as any);
 		});
 
 		child.stderr?.on("data", (chunk: Buffer) => {
 			const text = chunk.toString("utf-8");
+			const ts = Date.now();
 			const lines = text.split("\n");
 			for (const line of lines) {
 				if (line.length > 0) {
@@ -147,6 +156,7 @@ export class BgProcessManager {
 				processId: id,
 				stream: "stderr",
 				text,
+				ts,
 			} as any);
 		});
 
@@ -185,7 +195,7 @@ export class BgProcessManager {
 		return Array.from(map.values()).map((bg) => this.toInfo(bg));
 	}
 
-	getLogs(sessionId: string, processId: string): { log: string[]; stdout: string[]; stderr: string[] } | null {
+	getLogs(sessionId: string, processId: string): { log: LogEntry[]; stdout: string[]; stderr: string[] } | null {
 		const bg = this.processes.get(sessionId)?.get(processId);
 		if (!bg) return null;
 		return { log: bg.log, stdout: bg.stdout, stderr: bg.stderr };

@@ -638,6 +638,7 @@ export class AgentInterface extends LitElement {
 						<div class="absolute right-2 bottom-full mb-1.5 z-10 pointer-events-auto flex items-center gap-1.5 flex-wrap justify-end" style="max-width:calc(100% - 1rem)">
 							${this.bgProcesses.map((p) => html`
 								<bg-process-pill
+									data-id="${p.id}"
 									.process=${p}
 									.sessionId=${this.session?.sessionId ?? ''}
 									.onKill=${this.onBgProcessKill}

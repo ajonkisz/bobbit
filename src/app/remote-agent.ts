@@ -92,7 +92,7 @@ export class RemoteAgent {
 	/** Callback fired when the server-side prompt queue changes. */
 	onQueueUpdate?: (queue: QueuedMessage[]) => void;
 	/** Callback fired when background process state changes. */
-	onBgProcessUpdate?: () => void;
+	onBgProcessEvent?: (msg: { type: string; processId?: string; stream?: string; text?: string; ts?: number; exitCode?: number | null; process?: any }) => void;
 	private _title = "New session";
 
 	constructor() {
@@ -656,7 +656,7 @@ export class RemoteAgent {
 			case "bg_process_created":
 			case "bg_process_output":
 			case "bg_process_exited":
-				this.onBgProcessUpdate?.();
+				this.onBgProcessEvent?.(msg as any);
 				break;
 
 			case "error":

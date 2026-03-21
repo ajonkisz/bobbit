@@ -22,7 +22,7 @@ export class BgProcessPill extends LitElement {
 	@property({ attribute: false }) onDismiss?: (id: string) => void;
 
 	@state() private expanded = false;
-	@state() private logs: string[] = [];
+	@state() private logs: { ts: number; text: string }[] = [];
 	@state() private loadingLogs = false;
 
 	createRenderRoot() {
@@ -53,6 +53,15 @@ export class BgProcessPill extends LitElement {
 		}
 	}
 
+	/** Called externally when a bg_process_output WS event arrives. */
+	appendOutput(text: string, ts?: number) {
+		const timestamp = ts || Date.now();
+		const lines = text.split("\n").filter((l) => l.length > 0);
+		if (lines.length === 0) return;
+		this.logs = [...this.logs, ...lines.map((l) => ({ ts: timestamp, text: l }))];
+		this.updateComplete.then(() => this._scrollToBottom());
+	}
+
 	private async _fetchLogs() {
 		if (!this.sessionId || !this.process) return;
 		this.loadingLogs = true;
@@ -64,7 +73,9 @@ export class BgProcessPill extends LitElement {
 			});
 			if (res.ok) {
 				const data = await res.json();
-				this.logs = data.log || [];
+				this.logs = (data.log || []).map((e: any) =>
+					typeof e === "string" ? { ts: 0, text: e } : e
+				);
 			}
 		} catch { /* ignore */ } finally {
 			this.loadingLogs = false;
@@ -81,6 +92,11 @@ export class BgProcessPill extends LitElement {
 	private _dismiss(e: MouseEvent) {
 		e.stopPropagation();
 		if (this.onDismiss) this.onDismiss(this.process.id);
+	}
+
+	private _fmtTime(ts: number): string {
+		const d = new Date(ts);
+		return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 	}
 
 	private _scrollToBottom() {
@@ -147,22 +163,18 @@ export class BgProcessPill extends LitElement {
 						<div class="text-muted-foreground mb-2 font-mono break-all">${p.command}</div>
 
 						<div class="border-t border-border pt-2 mt-1">
-							<div class="flex items-center justify-between mb-1">
+							<div class="mb-1">
 								<span class="text-muted-foreground font-medium">Output</span>
-								<button
-									class="text-[10px] text-muted-foreground hover:text-foreground"
-									@click=${(e: MouseEvent) => { e.stopPropagation(); this._fetchLogs(); }}
-								>Refresh</button>
 							</div>
 							${this.loadingLogs
 								? html`<div class="text-muted-foreground animate-pulse">Loading...</div>`
 								: html`
 									<div class="h-[200px] overflow-y-auto bg-background rounded p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all" id="bg-log-output">
-										<div class="flex flex-col min-h-full justify-end">
-											${this.logs.length > 0
-												? this.logs.map((line) => html`<div>${line}</div>`)
-												: html`<div class="text-muted-foreground text-center py-2">(no output yet)</div>`}
-										</div>
+										${this.logs.length > 0
+											? this.logs.map((entry) => html`<div>${entry.ts
+												? html`<span class="text-muted-foreground select-none">${this._fmtTime(entry.ts)} </span>`
+												: nothing}${entry.text}</div>`)
+											: html`<div class="text-muted-foreground text-center py-2">(no output yet)</div>`}
 									</div>
 								`}
 						</div>

@@ -54,5 +54,5 @@ export type ServerMessage =
 	| { type: "task_changed"; task: unknown }
 	| { type: "tasks_list"; tasks: unknown[] }
 	| { type: "bg_process_created"; process: { id: string; command: string; pid: number; status: string; exitCode: number | null; startTime: number } }
-	| { type: "bg_process_output"; processId: string; stream: "stdout" | "stderr"; text: string }
+	| { type: "bg_process_output"; processId: string; stream: "stdout" | "stderr"; text: string; ts: number }
 	| { type: "bg_process_exited"; processId: string; exitCode: number | null };

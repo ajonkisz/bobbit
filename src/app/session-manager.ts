@@ -355,8 +355,23 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		remote.onWorkflowUpdate = () => renderApp();
 
-		remote.onBgProcessUpdate = () => {
-			refreshBgProcessesForSession(sessionId);
+		remote.onBgProcessEvent = (msg) => {
+			const ai = state.chatPanel?.agentInterface;
+			if (!ai || activeSessionId() !== sessionId) return;
+
+			if (msg.type === "bg_process_created" && msg.process) {
+				// Add the new process to the list
+				ai.bgProcesses = [...ai.bgProcesses, msg.process];
+			} else if (msg.type === "bg_process_output" && msg.processId && msg.text) {
+				// Stream output to the pill
+				const pill = ai.querySelector(`bg-process-pill[data-id="${msg.processId}"]`) as any;
+				if (pill?.appendOutput) pill.appendOutput(msg.text, msg.ts);
+			} else if (msg.type === "bg_process_exited" && msg.processId) {
+				// Update status in the process list
+				ai.bgProcesses = ai.bgProcesses.map((p) =>
+					p.id === msg.processId ? { ...p, status: "exited" as const, exitCode: msg.exitCode ?? null } : p
+				);
+			}
 		};
 
 		remote.onGoalProposal = (proposal) => {
