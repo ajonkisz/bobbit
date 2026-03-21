@@ -5,6 +5,7 @@ provider:
   type: bobbit-extension
   extension: team-lead-tools.ts
 group: Team
+renderer: src/ui/tools/renderers/PersonalityToolRenderers.ts
 docs: |
   Define a new personality that can be applied to agents via `team_spawn`.
   Personalities modify how agents approach their work (communication style,

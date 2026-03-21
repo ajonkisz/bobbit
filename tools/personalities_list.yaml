@@ -5,6 +5,7 @@ provider:
   type: bobbit-extension
   extension: team-lead-tools.ts
 group: Team
+renderer: src/ui/tools/renderers/PersonalityToolRenderers.ts
 docs: |
   List all available personalities that can be applied to spawned agents.
   Each personality modifies the agent's behavior via system prompt additions.

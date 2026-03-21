@@ -23,6 +23,7 @@ import { TeamSpawnRenderer, TeamListRenderer, TeamDismissRenderer, TeamCompleteR
 import { TaskListRenderer, TaskCreateRenderer, TaskUpdateRenderer } from "./renderers/TaskToolRenderers.js";
 import { ArtifactListRenderer, ArtifactCreateRenderer, ArtifactGetRenderer, ArtifactUpdateRenderer } from "./renderers/ArtifactToolRenderers.js";
 import { BgProcessRenderer } from "./renderers/BgProcessRenderer.js";
+import { PersonalitiesListRenderer, PersonalitiesCreateRenderer } from "./renderers/PersonalityToolRenderers.js";
 import type { ToolRenderResult } from "./types.js";
 
 // Register all built-in tool renderers
@@ -59,6 +60,8 @@ registerToolRenderer("artifact_create", new ArtifactCreateRenderer());
 registerToolRenderer("artifact_get", new ArtifactGetRenderer());
 registerToolRenderer("artifact_update", new ArtifactUpdateRenderer());
 registerToolRenderer("bash_bg", new BgProcessRenderer());
+registerToolRenderer("personalities_list", new PersonalitiesListRenderer());
+registerToolRenderer("personalities_create", new PersonalitiesCreateRenderer());
 
 const defaultRenderer = new DefaultRenderer();
 
