@@ -115,14 +115,22 @@ export class AssistantMessage extends LitElement {
 		// Render content in the order it appears
 		const orderedParts: TemplateResult[] = [];
 
-		// Collect tool calls into runs for grouping (only when not streaming)
+		// Detect <suggest_goal/> tag in text content
 		const content = this.message.content;
+		const hasSuggestGoal = content.some(
+			c => c.type === 'text' && /<suggest_goal\s*\/?>/.test(c.text)
+		);
+
+		// Collect tool calls into runs for grouping (only when not streaming)
 		let i = 0;
 		while (i < content.length) {
 			const chunk = content[i];
 
 			if (chunk.type === "text" && chunk.text.trim() !== "") {
-				orderedParts.push(html`<markdown-block .content=${chunk.text}></markdown-block>`);
+				const displayText = chunk.text.replace(/<suggest_goal\s*\/?>/g, '');
+				if (displayText.trim() !== '') {
+					orderedParts.push(html`<markdown-block .content=${displayText}></markdown-block>`);
+				}
 				i++;
 			} else if (chunk.type === "thinking" && chunk.thinking.trim() !== "") {
 				orderedParts.push(
@@ -205,6 +213,15 @@ export class AssistantMessage extends LitElement {
 			} else {
 				i++;
 			}
+		}
+
+		if (hasSuggestGoal) {
+			orderedParts.push(html`
+				<button class="suggest-goal-btn" @click=${(e: Event) => {
+					e.stopPropagation();
+					this.dispatchEvent(new CustomEvent('suggest-goal', { bubbles: true, composed: true }));
+				}}>+ Create Goal</button>
+			`);
 		}
 
 		return html`

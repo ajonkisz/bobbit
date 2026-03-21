@@ -317,3 +317,7 @@ The filter outputs just pass/fail counts + failure details. Use `--verbose` to s
 There are no flaky tests. Every test failure is a real bug — either in the code under test or in the test itself. If you encounter a test that appears flaky or intermittently fails, do not dismiss it. Stop, investigate the root cause, and fix it before moving on.
 
 If you add a new feature or fix a bug, add or update tests. E2E tests go in `tests/e2e/`. Unit-style tests go in `tests/`.
+
+## Goal suggestions
+
+When you notice something that deserves its own goal — an out-of-scope idea, an improvement you shouldn't pursue now, or a user request that would benefit from structured tracking — include `<suggest_goal/>` anywhere in your response. The UI will show a subtle button letting the user create a goal from the conversation context.

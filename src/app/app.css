@@ -366,6 +366,28 @@
 }
 
 /* ============================================================================
+ * SUGGEST GOAL BUTTON — subtle CTA on agent messages with <suggest_goal/>
+ * ============================================================================ */
+.suggest-goal-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-top: 8px;
+	padding: 4px 10px;
+	font-size: 0.75rem;
+	color: var(--muted-foreground);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: transparent;
+	cursor: pointer;
+	transition: color 0.15s, border-color 0.15s;
+}
+.suggest-goal-btn:hover {
+	color: var(--foreground);
+	border-color: var(--foreground);
+}
+
+/* ============================================================================
  * RECONNECT BANNER — slide-down entrance
  * ============================================================================ */
 .reconnect-banner {
