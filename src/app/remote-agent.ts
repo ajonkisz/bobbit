@@ -404,19 +404,24 @@ export class RemoteAgent {
 		this._compactionSyntheticMessages = [];
 		this._usageStaleAfterCompaction = false;
 
-		// Add the user message optimistically so it renders immediately.
-		// The server will echo it back via message_end; we deduplicate there.
-		const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-		const optimisticMsg: any = {
-			role: attachments?.length ? "user-with-attachments" : "user",
-			content: [{ type: "text", text }],
-			timestamp: Date.now(),
-			id: optimisticId,
-			...(attachments?.length ? { attachments } : {}),
-		};
-		this._state.messages = [...this._state.messages, optimisticMsg];
-		this._liveEventMessages.push(optimisticMsg);
-		this.emit({ type: "message_end", message: optimisticMsg });
+		// Add the user message optimistically so it renders immediately —
+		// but only when the agent is idle. If streaming, the prompt is queued
+		// server-side and the server will echo it in the correct position
+		// (interleaved with responses). Rendering it now would stack multiple
+		// user messages together before any response.
+		if (!this._state.isStreaming) {
+			const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+			const optimisticMsg: any = {
+				role: attachments?.length ? "user-with-attachments" : "user",
+				content: [{ type: "text", text }],
+				timestamp: Date.now(),
+				id: optimisticId,
+				...(attachments?.length ? { attachments } : {}),
+			};
+			this._state.messages = [...this._state.messages, optimisticMsg];
+			this._liveEventMessages.push(optimisticMsg);
+			this.emit({ type: "message_end", message: optimisticMsg });
+		}
 
 		this.send({
 			type: "prompt",

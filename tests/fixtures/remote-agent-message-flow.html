@@ -46,17 +46,20 @@ class FakeRemoteAgent {
 	}
 
 	prompt(text, attachments) {
-		// Optimistic: add user message immediately
-		const optimisticId = `optimistic_${++_idCounter}`;
-		const msg = {
-			role: attachments ? "user-with-attachments" : "user",
-			content: [{ type: "text", text }],
-			timestamp: Date.now(),
-			id: optimisticId,
-			...(attachments ? { attachments } : {}),
-		};
-		this.state.messages = [...this.state.messages, msg];
-		this._liveEventMessages.push(msg);
+		// Only add optimistic message when agent is idle.
+		// If streaming, server queues the prompt and echoes it in order.
+		if (!this.state.isStreaming) {
+			const optimisticId = `optimistic_${++_idCounter}`;
+			const msg = {
+				role: attachments ? "user-with-attachments" : "user",
+				content: [{ type: "text", text }],
+				timestamp: Date.now(),
+				id: optimisticId,
+				...(attachments ? { attachments } : {}),
+			};
+			this.state.messages = [...this.state.messages, msg];
+			this._liveEventMessages.push(msg);
+		}
 	}
 
 	flushDeferredMessage() {
@@ -238,21 +241,33 @@ function assert(condition, name) {
 }
 
 // ==========================================
-// Test 6: Multiple rapid prompts
+// Test 6: Queued prompt while streaming — no optimistic for second
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("First");
+	assert(agent.state.messages.length === 1, "Queue: first optimistic appears");
+	
+	// Agent starts streaming (processing first prompt)
+	agent.handleEvent({ type: "agent_start" });
+	
+	// User queues second prompt while agent is streaming
 	agent.prompt("Second");
+	assert(agent.state.messages.length === 1, "Queue: no optimistic for second (agent streaming)");
 	
-	assert(agent.state.messages.length === 2, "Rapid: both optimistic messages present");
-	
-	// Server echoes both
+	// Server echoes first, then response, then second
 	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "First" }], id: "s1" } });
+	agent.handleEvent({ type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "Response 1" }] } });
+	agent.handleEvent({ type: "agent_end" });
+	agent.handleEvent({ type: "agent_start" });
 	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Second" }], id: "s2" } });
 	
-	assert(agent.state.messages.length === 2, "Rapid: still exactly 2 after dedup");
-	assert(!agent.state.messages.some(m => m.id?.startsWith("optimistic_")), "Rapid: no optimistic IDs remain");
+	const msgs = agent.state.messages;
+	assert(msgs.length === 3, "Queue: 3 messages (user, assistant, user)");
+	assert(extractText(msgs[0]) === "First", "Queue: first message correct");
+	assert(msgs[0].id === "s1", "Queue: first deduped to server ID");
+	assert(msgs[1].role === "assistant", "Queue: response interleaved");
+	assert(extractText(msgs[2]) === "Second", "Queue: second message correct");
 }
 
 // ==========================================
