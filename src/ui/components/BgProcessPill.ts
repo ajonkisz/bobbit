@@ -68,6 +68,8 @@ export class BgProcessPill extends LitElement {
 			}
 		} catch { /* ignore */ } finally {
 			this.loadingLogs = false;
+			await this.updateComplete;
+			this._scrollToBottom();
 		}
 	}
 
@@ -79,6 +81,11 @@ export class BgProcessPill extends LitElement {
 	private _dismiss(e: MouseEvent) {
 		e.stopPropagation();
 		if (this.onDismiss) this.onDismiss(this.process.id);
+	}
+
+	private _scrollToBottom() {
+		const el = this.querySelector("#bg-log-output");
+		if (el) el.scrollTop = el.scrollHeight;
 	}
 
 	private _shortCommand(): string {
@@ -150,10 +157,12 @@ export class BgProcessPill extends LitElement {
 							${this.loadingLogs
 								? html`<div class="text-muted-foreground animate-pulse">Loading...</div>`
 								: html`
-									<div class="max-h-[300px] overflow-y-auto bg-background rounded p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all">
-										${this.logs.length > 0
-											? this.logs.map((line) => html`<div>${line}</div>`)
-											: html`<span class="text-muted-foreground">(no output yet)</span>`}
+									<div class="h-[200px] overflow-y-auto bg-background rounded p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all" id="bg-log-output">
+										<div class="flex flex-col min-h-full justify-end">
+											${this.logs.length > 0
+												? this.logs.map((line) => html`<div>${line}</div>`)
+												: html`<div class="text-muted-foreground text-center py-2">(no output yet)</div>`}
+										</div>
 									</div>
 								`}
 						</div>
