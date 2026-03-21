@@ -108,12 +108,13 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerTool({
 		name: "bash",
+		label: "Bash",
 		description: "Execute a bash command. Returns stdout+stderr. Output truncated to last 2000 lines / 50KB.",
 		parameters: Type.Object({
 			command: Type.String({ description: "The bash command to execute" }),
 			timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (default: 300)" })),
 		}),
-		async execute({ command, timeout }, { abortSignal, onUpdate }) {
+		async execute(_toolCallId, { command, timeout }, abortSignal, onUpdate) {
 			return new Promise((resolve) => {
 				const timeoutSec = timeout ?? DEFAULT_TIMEOUT;
 				const { shell, args } = getShellConfig();
@@ -146,7 +147,7 @@ export default function (pi: ExtensionAPI) {
 					if (abortSignal.aborted) {
 						child.kill();
 						clearTimeout(timer);
-						resolve({ output: "", exitCode: undefined, cancelled: true, truncated: false });
+						resolve({ content: [{ type: "text" as const, text: "" }], details: { truncated: false } });
 						return;
 					}
 					abortSignal.addEventListener("abort", abortHandler, { once: true });
@@ -173,7 +174,7 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					// Stream to agent UI
-					if (onUpdate) onUpdate(text);
+					if (onUpdate) onUpdate({ content: [{ type: "text" as const, text }], details: {} });
 				};
 
 				child.stdout?.on("data", handleData);
@@ -205,7 +206,7 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					resolve({
-						resultForAssistant: `Exit code: ${cancelled ? "killed" : code}\n${output}`,
+						content: [{ type: "text" as const, text: `Exit code: ${cancelled ? "killed" : code}\n${output}` }],
 						details: { truncated, fullOutputPath: tempFilePath },
 					});
 				});
@@ -215,7 +216,7 @@ export default function (pi: ExtensionAPI) {
 					if (abortSignal) abortSignal.removeEventListener("abort", abortHandler);
 					if (tempFileStream) tempFileStream.end();
 					resolve({
-						resultForAssistant: `Error spawning command: ${err.message}`,
+						content: [{ type: "text" as const, text: `Error spawning command: ${err.message}` }],
 						details: {},
 					});
 				});
@@ -227,6 +228,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.registerTool({
 		name: "bash_bg",
+		label: "Background Process",
 		description: "Manage background shell processes. Actions: create (start a process), logs (view output), kill (terminate), list (show all).",
 		parameters: Type.Object({
 			action: Type.Union([
@@ -239,45 +241,45 @@ export default function (pi: ExtensionAPI) {
 			id: Type.Optional(Type.String({ description: "Background process ID (for 'logs' and 'kill')" })),
 			tail: Type.Optional(Type.Number({ description: "Number of log lines to return (default: 200)" })),
 		}),
-		async execute({ action, command, id, tail }) {
+		async execute(_toolCallId, { action, command, id, tail }) {
+			const text = (t: string) => ({ content: [{ type: "text" as const, text: t }], details: {} });
+
 			if (!sessionId || !baseUrl) {
-				return { resultForAssistant: "Error: Missing BOBBIT_SESSION_ID or gateway credentials" };
+				return text("Error: Missing BOBBIT_SESSION_ID or gateway credentials");
 			}
 
 			try {
 				switch (action) {
 					case "create": {
-						if (!command) return { resultForAssistant: "Error: 'command' is required for create" };
+						if (!command) return text("Error: 'command' is required for create");
 						const result = await api("POST", `/api/sessions/${sessionId}/bg-processes`, { command }) as any;
-						return {
-							resultForAssistant: `Background process started.\nID: ${result.id}\nPID: ${result.pid}\nCommand: ${command}\n\nUse bash_bg with action "logs" and id "${result.id}" to check output.\nUse bash_bg with action "kill" and id "${result.id}" to terminate.`,
-						};
+						return text(`Background process started.\nID: ${result.id}\nPID: ${result.pid}\nCommand: ${command}\n\nUse bash_bg with action "logs" and id "${result.id}" to check output.\nUse bash_bg with action "kill" and id "${result.id}" to terminate.`);
 					}
 					case "logs": {
-						if (!id) return { resultForAssistant: "Error: 'id' is required for logs" };
+						if (!id) return text("Error: 'id' is required for logs");
 						const logs = await api("GET", `/api/sessions/${sessionId}/bg-processes/${id}/logs?tail=${tail || 200}`) as any;
 						const output = logs.log?.join("\n") || "(no output)";
-						return { resultForAssistant: `Logs for ${id}:\n${output}` };
+						return text(`Logs for ${id}:\n${output}`);
 					}
 					case "kill": {
-						if (!id) return { resultForAssistant: "Error: 'id' is required for kill" };
+						if (!id) return text("Error: 'id' is required for kill");
 						await api("DELETE", `/api/sessions/${sessionId}/bg-processes/${id}`);
-						return { resultForAssistant: `Background process ${id} killed.` };
+						return text(`Background process ${id} killed.`);
 					}
 					case "list": {
 						const data = await api("GET", `/api/sessions/${sessionId}/bg-processes`) as any;
 						const procs = data.processes || [];
-						if (procs.length === 0) return { resultForAssistant: "No background processes." };
+						if (procs.length === 0) return text("No background processes.");
 						const lines = procs.map((p: any) =>
 							`${p.id} [${p.status}] pid=${p.pid} cmd="${p.command}"${p.exitCode !== null ? ` exit=${p.exitCode}` : ""}`
 						);
-						return { resultForAssistant: `Background processes:\n${lines.join("\n")}` };
+						return text(`Background processes:\n${lines.join("\n")}`);
 					}
 					default:
-						return { resultForAssistant: `Unknown action: ${action}` };
+						return text(`Unknown action: ${action}`);
 				}
 			} catch (err: any) {
-				return { resultForAssistant: `Error: ${err.message}` };
+				return text(`Error: ${err.message}`);
 			}
 		},
 	});
