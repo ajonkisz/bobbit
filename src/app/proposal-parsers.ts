@@ -30,4 +30,10 @@ export const PROPOSAL_PARSERS: ProposalParser[] = [
 		requiredFields: ["id", "name"],
 		callbackName: "onArtifactSpecProposal",
 	},
+	{
+		tag: "staff_proposal",
+		fields: ["name", "description", "prompt", "triggers", "cwd"],
+		requiredFields: ["name", "prompt"],
+		callbackName: "onStaffProposal",
+	},
 ];
