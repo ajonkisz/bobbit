@@ -87,6 +87,8 @@ export class RemoteAgent {
 	/** Callback fired when a tool proposal is detected in an assistant message. */
 	onToolProposal?: (proposal: { tool: string; action: string; content: string }) => void;
 	onArtifactSpecProposal?: (proposal: { id: string; name: string; description: string; kind: string; format: string; mustHave: string; shouldHave: string; mustNotHave: string; requires: string; suggestedRole: string }) => void;
+	/** Callback fired when a staff proposal is detected in an assistant message. */
+	onStaffProposal?: (proposal: { name: string; description: string; prompt: string; triggers: string; cwd: string }) => void;
 	/** Callback fired when tool execution updates (for real-time progress). */
 	onWorkflowUpdate?: () => void;
 	/** Callback fired when the server-side prompt queue changes. */

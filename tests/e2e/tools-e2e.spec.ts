@@ -751,21 +751,25 @@ test.describe.serial("Agent tools", () => {
 		}
 	});
 
-	test("web_search tool", async () => {
+	// web_search, web_fetch, and delegate come from user extensions (~/.pi/extensions/)
+	// which are not present in the sandboxed E2E test environment (BOBBIT_PI_DIR).
+	// These tests are skipped here; they can be run manually against a full dev server.
+
+	test.skip("web_search tool — requires user extensions", async () => {
 		await verifyToolUsed(
 			'Use the web_search tool to search for "Playwright test framework". Just do the search and briefly report results.',
 			"web_search",
 		);
 	});
 
-	test("web_fetch tool", async () => {
+	test.skip("web_fetch tool — requires user extensions", async () => {
 		await verifyToolUsed(
 			"Use the web_fetch tool to fetch the URL https://httpbin.org/get and show me the response.",
 			"web_fetch",
 		);
 	});
 
-	test("delegate tool", async () => {
+	test.skip("delegate tool — requires user extensions", async () => {
 		await verifyToolUsed(
 			'Use the delegate tool to run this task in a separate agent process: "Run echo DELEGATE_OK using bash and report the output." You must use the delegate tool.',
 			"delegate",

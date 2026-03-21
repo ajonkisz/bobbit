@@ -33,6 +33,7 @@ export default defineConfig({
 		'**/real-app-mobile*',   // needs Vite UI (server runs --no-ui)
 	],
 	timeout: 30_000,
+	workers: 1, // serial — all tests share a single gateway instance
 	webServer: {
 		command: `node dist/server/cli.js --host 127.0.0.1 --port ${E2E_PORT} --no-tls --no-ui`,
 		url: `http://127.0.0.1:${E2E_PORT}/api/sessions`,
