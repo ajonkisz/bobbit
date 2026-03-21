@@ -162,10 +162,19 @@ export function stopTimeRefresh(): void {
 // SESSION TIME + UNSEEN BADGE
 // ============================================================================
 
+/** Render "active" with a subtle shimmer wave across each letter. */
+function renderActiveShimmer() {
+	const letters = "active".split("");
+	return html`<span class="shrink-0 flex items-center text-[10px] text-muted-foreground/50" style="letter-spacing:0.01em;">${letters.map((ch, i) =>
+		html`<span class="sidebar-shimmer-letter" style="animation-delay:${i * 0.18}s">${ch}</span>`
+	)}</span>`;
+}
+
 /** Render terse relative time with optional unseen indicator dot. */
 function renderSessionTime(session: GatewaySession) {
 	const isActive = session.status === "streaming" || session.status === "busy" || session.isCompacting;
-	const time = isActive ? "active" : terseRelativeTime(session.lastActivity);
+	if (isActive) return renderActiveShimmer();
+	const time = terseRelativeTime(session.lastActivity);
 	if (!time) return "";
 	const unseen = hasUnseenActivity(session);
 	return html`<span

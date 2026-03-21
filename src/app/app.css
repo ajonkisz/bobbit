@@ -404,3 +404,15 @@
 		transform: translateY(0);
 	}
 }
+
+/* Sidebar "active" shimmer — mexican wave of brightness across letters */
+.sidebar-shimmer-letter {
+	display: inline-block;
+	animation: sidebar-shimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes sidebar-shimmer {
+	0%, 100% { opacity: 0.5; }
+	25% { opacity: 1; }
+	50% { opacity: 0.5; }
+}
