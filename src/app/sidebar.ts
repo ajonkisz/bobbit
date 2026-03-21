@@ -237,15 +237,23 @@ function renderStaffSidebarSection() {
 					title="New staff agent"
 				>${icon(Plus, "xs")}</button>
 			</div>
-			${staffSectionExpanded ? list.map((agent) => html`
-				<div class="flex items-center gap-1.5 px-2 ${SESSION_ROW_PY} rounded-md hover:bg-secondary/50 cursor-pointer transition-colors"
+			${staffSectionExpanded ? list.map((agent) => {
+				const session = agent.currentSessionId
+					? state.gatewaySessions.find((s) => s.id === agent.currentSessionId)
+					: undefined;
+				const active = activeSessionId() === agent.currentSessionId;
+				const sessionStatus = session?.status || "terminated";
+				const isCompacting = session?.isCompacting || false;
+				const isAborting = session?.isAborting || false;
+				const accessory = session?.accessory;
+				return html`
+				<div class="flex items-center gap-1.5 px-2 ${SESSION_ROW_PY} rounded-md ${active ? "bg-secondary" : "hover:bg-secondary/50"} cursor-pointer transition-colors"
 					@click=${() => handleStaffClick(agent)}>
-					<span class="w-1.5 h-1.5 rounded-full shrink-0 ${agent.state === "active" ? "bg-green-500" : "bg-yellow-500"}"></span>
-					<span class="flex-1 text-xs truncate text-foreground">${agent.name}</span>
+					${statusBobbit(sessionStatus, isCompacting, agent.currentSessionId, active, isAborting, false, false, accessory)}
+					<span class="flex-1 text-xs truncate ${active ? "text-foreground font-medium" : "text-foreground"}">${agent.name}</span>
 					${agent.lastWakeAt ? html`<span class="text-[10px] text-muted-foreground shrink-0">${relativeTime(agent.lastWakeAt)}</span>` : ""}
 				</div>
-			`) : ""}
-		</div>
+			`; }) : ""}
 	`;
 }
 
@@ -254,7 +262,8 @@ function renderStaffSidebarSection() {
 // ============================================================================
 
 export function renderSidebar() {
-	const ungroupedSessions = state.gatewaySessions.filter((s) => !s.goalId && !s.delegateOf);
+	const staffSessionIds = new Set(state.staffList.map((s) => s.currentSessionId).filter(Boolean));
+	const ungroupedSessions = state.gatewaySessions.filter((s) => !s.goalId && !s.delegateOf && !staffSessionIds.has(s.id));
 	const stateOrder: Record<GoalState, number> = { "in-progress": 0, "todo": 1, "complete": 2, "shelved": 3 };
 	const sortedGoals = [...state.goals].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
 
@@ -409,7 +418,8 @@ export function renderSidebar() {
 
 function renderCollapsedSidebar(sortedGoals: Goal[], ungroupedSessions: GatewaySession[]) {
 	const allSessions = state.gatewaySessions;
-	const ungrouped = allSessions.filter((s) => !s.goalId && !s.delegateOf);
+	const staffSessionIds = new Set(state.staffList.map((s) => s.currentSessionId).filter(Boolean));
+	const ungrouped = allSessions.filter((s) => !s.goalId && !s.delegateOf && !staffSessionIds.has(s.id));
 
 	const renderCollapsedSession = (s: GatewaySession) => {
 		const active = activeSessionId() === s.id;
