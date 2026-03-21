@@ -162,7 +162,15 @@ export class StaffManager {
 		// Ensure the session subprocess is alive (restore if terminated)
 		const session = sessionManager.getSession(staff.currentSessionId);
 		if (!session || session.status === "terminated") {
-			await sessionManager.ensureSessionAlive(staff.currentSessionId);
+			try {
+				await sessionManager.ensureSessionAlive(staff.currentSessionId);
+			} catch {
+				// Session was deleted — clear and recreate
+				console.log(`[staff-manager] Session ${staff.currentSessionId} unrecoverable, creating new one for "${staff.name}"`);
+				this.store.update(staffId, { currentSessionId: undefined as any });
+				staff.currentSessionId = undefined as any;
+				return this.wake(staffId, prompt, sessionManager);
+			}
 		}
 
 		// Enqueue the wake prompt on the existing session
