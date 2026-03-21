@@ -47,9 +47,7 @@ export class StaffManager {
 			env: { BOBBIT_STAFF_ID: id },
 		});
 		session.staffId = id;
-		sessionManager.persistSessionMetadata(session).catch((err: any) => {
-			console.error(`[staff-manager] Failed to persist staff session metadata:`, err);
-		});
+		await sessionManager.persistSessionMetadata(session);
 		this.store.update(id, { currentSessionId: session.id });
 		staff.currentSessionId = session.id;
 
@@ -153,9 +151,7 @@ export class StaffManager {
 				env: { BOBBIT_STAFF_ID: staffId },
 			});
 			session.staffId = staffId;
-			sessionManager.persistSessionMetadata(session).catch((err: any) => {
-				console.error(`[staff-manager] Failed to persist staff session metadata:`, err);
-			});
+			await sessionManager.persistSessionMetadata(session);
 			this.store.update(staffId, { currentSessionId: session.id, lastWakeAt: Date.now() });
 
 			await sessionManager.enqueuePrompt(session.id, wakePrompt);

@@ -126,10 +126,10 @@ export class TriggerEngine {
 			// Skip if a wake is already in-flight for this staff (async race guard)
 			if (this.wakingInProgress.has(staff.id)) continue;
 
-			// Skip if the staff's permanent session is currently streaming (busy)
+			// Skip if the staff's permanent session is currently busy (streaming or starting)
 			if (staff.currentSessionId) {
 				const session = this.sessionManager.getSession(staff.currentSessionId);
-				if (session && session.status === "streaming") continue;
+				if (session && (session.status === "streaming" || session.status === "starting")) continue;
 			}
 
 			for (const trigger of staff.triggers) {

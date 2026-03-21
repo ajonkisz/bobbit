@@ -474,6 +474,9 @@ export class SessionManager {
 		if (ps.goalId) {
 			bridgeOptions.env.BOBBIT_GOAL_ID = ps.goalId;
 		}
+		if (ps.staffId) {
+			bridgeOptions.env.BOBBIT_STAFF_ID = ps.staffId;
+		}
 
 		// Restore extension args for goal/team sessions
 		if (ps.goalId && !ps.assistantType) {
@@ -1354,6 +1357,7 @@ export class SessionManager {
 	/**
 	 * Ensure a session's subprocess is alive. If the session is terminated or
 	 * dormant, attempt to restore it from persisted data.
+	 * Throws if the session cannot be restored.
 	 */
 	async ensureSessionAlive(sessionId: string): Promise<void> {
 		const existing = this.sessions.get(sessionId);
@@ -1361,10 +1365,11 @@ export class SessionManager {
 
 		// Try to restore from persisted data
 		const persisted = this.store.get(sessionId);
-		if (persisted) {
-			await this.restoreSession(persisted);
-			console.log(`[session-manager] Restored session ${sessionId} via ensureSessionAlive`);
+		if (!persisted) {
+			throw new Error(`Cannot restore session ${sessionId}: no persisted data found`);
 		}
+		await this.restoreSession(persisted);
+		console.log(`[session-manager] Restored session ${sessionId} via ensureSessionAlive`);
 	}
 
 	async terminateSession(id: string): Promise<boolean> {
