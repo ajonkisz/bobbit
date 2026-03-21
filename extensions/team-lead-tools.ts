@@ -74,17 +74,17 @@ export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "team_spawn",
 		label: "Spawn Team Agent",
-		description: "Spawn a new role agent with its own git worktree. Returns the new session ID and worktree path. Optionally specify personality traits to shape how the agent works.",
-		promptSnippet: "Spawn a coder, reviewer, or tester agent with a task description and optional personality traits.",
+		description: "Spawn a new role agent with its own git worktree. Returns the new session ID and worktree path. Optionally specify personalities to shape how the agent works.",
+		promptSnippet: "Spawn a coder, reviewer, or tester agent with a task description and optional personalities.",
 		parameters: Type.Object({
 			role: Type.String({ description: "Agent role: 'coder', 'reviewer', or 'tester'" }),
 			task: Type.String({ description: "Task description sent as the agent's first prompt" }),
-			traits: Type.Optional(Type.Array(Type.String(), { description: "Personality trait names (e.g. 'thorough', 'creative'). If omitted, uses the role's default traits." })),
+			personalities: Type.Optional(Type.Array(Type.String(), { description: "Personality names (e.g. 'thorough', 'creative'). If omitted, uses the role's default personalities." })),
 		}),
 		async execute(_id, params) {
 			try {
 				const body: Record<string, unknown> = { role: params.role, task: params.task };
-				if (params.traits && params.traits.length > 0) body.traits = params.traits;
+				if (params.personalities && params.personalities.length > 0) body.personalities = params.personalities;
 				return ok(await api("POST", `/api/goals/${goalId}/team/spawn`, body));
 			} catch (e: any) { return err(e.message); }
 		},
@@ -179,23 +179,23 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
-		name: "traits_list",
-		label: "List Traits",
-		description: "List all available personality traits that can be applied to spawned agents. Each trait modifies how the agent approaches its work.",
-		promptSnippet: "List all available personality traits with descriptions.",
+		name: "personalities_list",
+		label: "List Personalities",
+		description: "List all available personalities that can be applied to spawned agents. Each personality modifies how the agent approaches its work.",
+		promptSnippet: "List all available personalities with descriptions.",
 		parameters: Type.Object({}),
 		async execute() {
 			try {
-				return ok(await api("GET", "/api/traits"));
+				return ok(await api("GET", "/api/personalities"));
 			} catch (e: any) { return err(e.message); }
 		},
 	});
 
 	pi.registerTool({
-		name: "traits_create",
-		label: "Create Trait",
-		description: "Define a new personality trait that can be applied to agents via team_spawn.",
-		promptSnippet: "Define a new personality trait for team agents.",
+		name: "personalities_create",
+		label: "Create Personality",
+		description: "Define a new personality that can be applied to agents via team_spawn.",
+		promptSnippet: "Define a new personality for team agents.",
 		parameters: Type.Object({
 			name: Type.String({ description: "Lowercase alphanumeric + hyphens identifier" }),
 			label: Type.String({ description: "Human-readable display name" }),
@@ -204,7 +204,7 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_id, params) {
 			try {
-				return ok(await api("POST", "/api/traits", {
+				return ok(await api("POST", "/api/personalities", {
 					name: params.name,
 					label: params.label,
 					description: params.description,

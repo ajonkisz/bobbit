@@ -130,7 +130,7 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 
 	// 3.5. Personalities
 	if (parts.personalities && parts.personalities.length > 0) {
-		const lines = ["## Personality\n", "You should embody these traits in how you work:"];
+		const lines = ["## Personality\n", "You should embody these personalities in how you work:"];
 		for (const personality of parts.personalities) {
 			lines.push(`- **${personality.label}**: ${personality.promptFragment}`);
 		}

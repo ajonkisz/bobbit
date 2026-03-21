@@ -1,0 +1,7 @@
+name: personalities_create
+description: "Define a new personality for agents"
+summary: "Define a new personality that can be applied to agents via team_spawn."
+provider:
+  type: bobbit-extension
+  extension: team-lead-tools.ts
+group: Team

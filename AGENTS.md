@@ -47,8 +47,8 @@ src/
 │   │   ├── tool-assistant.ts           # System prompt for tool management assistant
 │   │   ├── tool-manager.ts             # Tool CRUD with renderer discovery
 │   │   ├── tool-store.ts               # Tool metadata persistence (~/.pi/gateway-tools.json)
-│   │   ├── trait-manager.ts            # Trait definitions and management
-│   │   └── trait-store.ts              # Trait persistence (~/.pi/gateway-traits.json)
+│   │   ├── personality-manager.ts       # Personality definitions and management
+│   │   └── personality-store.ts        # Personality persistence (YAML files in personalities/)
 │   ├── auth/        # Token auth, rate limiting, TLS, OAuth, DNS
 │   │   ├── desec.ts       # deSEC dynamic DNS updates on startup
 │   │   ├── oauth.ts       # OAuth flow (start, complete, status)
@@ -350,5 +350,5 @@ Repo-local storage (YAML files, not in `~/.pi/`):
 | Directory | Owner | Purpose |
 |---|---|---|
 | `roles/*.yaml` | `RoleStore` | Role definitions and tool access |
-| `traits/*.yaml` | `TraitStore` | Trait definitions |
+| `personalities/*.yaml` | `PersonalityStore` | Personality definitions |
 | `artifact-specs/*.yaml` | `ArtifactSpecStore` | Artifact spec definitions |

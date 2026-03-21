@@ -15,8 +15,8 @@ export interface Role {
 	allowedTools: string[];
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory: string;
-	/** Default personality traits applied when no explicit traits are specified */
-	defaultTraits?: string[];
+	/** Default personalities applied when no explicit personalities are specified */
+	defaultPersonalities?: string[];
 	createdAt: number;
 	updatedAt: number;
 }
@@ -67,7 +67,7 @@ export class RoleStore {
 						promptTemplate: data.promptTemplate ?? "",
 						allowedTools: Array.isArray(data.allowedTools) ? data.allowedTools : [],
 						accessory: data.accessory ?? "none",
-						defaultTraits: Array.isArray(data.defaultTraits) ? data.defaultTraits : undefined,
+						defaultPersonalities: Array.isArray(data.defaultPersonalities) ? data.defaultPersonalities : undefined,
 						createdAt: data.createdAt ?? 0,
 						updatedAt: data.updatedAt ?? 0,
 					});
@@ -87,8 +87,8 @@ export class RoleStore {
 				accessory: role.accessory,
 				allowedTools: role.allowedTools,
 			};
-			if (role.defaultTraits && role.defaultTraits.length > 0) {
-				obj.defaultTraits = role.defaultTraits;
+			if (role.defaultPersonalities && role.defaultPersonalities.length > 0) {
+				obj.defaultPersonalities = role.defaultPersonalities;
 			}
 			obj.createdAt = role.createdAt;
 			obj.updatedAt = role.updatedAt;

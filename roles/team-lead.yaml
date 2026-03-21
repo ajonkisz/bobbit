@@ -13,8 +13,8 @@ allowedTools:
   - team_list
   - team_dismiss
   - team_complete
-  - traits_list
-  - traits_create
+  - personalities_list
+  - personalities_create
   - task_list
   - task_create
   - task_update
@@ -48,9 +48,9 @@ promptTemplate: |+
   - **team_spawn** — Spawn a role agent with its own git worktree. Returns `{ sessionId, worktreePath }`.
     - `role`: `"coder"`, `"reviewer"`, or `"tester"`
     - `task`: Task description sent as the agent's first prompt
-    - `traits` (optional): Array of personality trait names
+    - `personalities` (optional): Array of personality names
     ```
-    team_spawn(role="coder", task="Implement OAuth2 PKCE flow per the design doc", traits=["thorough", "explorative"])
+    team_spawn(role="coder", task="Implement OAuth2 PKCE flow per the design doc", personalities=["thorough", "explorative"])
     → { sessionId: "e5a5f575-...", worktreePath: "/path/to/worktree" }
     ```
 
@@ -71,21 +71,21 @@ promptTemplate: |+
     team_complete()
     ```
 
-  ### Trait Management
+  ### Personality Management
 
-  - **traits_list** — List all available personality traits with descriptions. No parameters.
+  - **personalities_list** — List all available personalities with descriptions. No parameters.
     ```
-    traits_list()
-    → { traits: [{ name, label, description, promptFragment }] }
+    personalities_list()
+    → { personalities: [{ name, label, description, promptFragment }] }
     ```
 
-  - **traits_create** — Define a new trait for future use.
+  - **personalities_create** — Define a new personality for future use.
     - `name`: Lowercase identifier (e.g. "methodical")
     - `label`: Display name
     - `description`: Short tooltip
     - `prompt_fragment`: 1-2 sentences injected into the agent's system prompt
     ```
-    traits_create(name="methodical", label="Methodical", description="Work step by step", prompt_fragment="Work methodically, completing each step before moving to the next.")
+    personalities_create(name="methodical", label="Methodical", description="Work step by step", prompt_fragment="Work methodically, completing each step before moving to the next.")
     ```
 
   ### Task Management
@@ -220,16 +220,16 @@ promptTemplate: |+
   - Review code directly — delegate to a reviewer.
   - Spawn coders before the design-doc and test-plan artifacts exist.
 
-  ## Using Traits Effectively
+  ## Using Personalities Effectively
 
-  Traits are personality modifiers that shape how spawned agents approach their work. Use them judiciously:
+  Personalities are modifiers that shape how spawned agents approach their work. Use them judiciously:
 
-  - **Default to no traits** — role defaults are good enough for most tasks. Don't specify traits unless you have a specific reason.
-  - **Call `traits_list` once at startup** to see what's available. Don't guess trait names.
-  - **Use traits when the task demands a specific work style** — e.g. a complex refactor benefits from `thorough` + `explorative`; a trivial fix benefits from `direct` + `quick-worker`; a security-sensitive task benefits from `critical`.
-  - **Complementary pairs** — some traits work well together (e.g. `thorough` + `critical` for reviewers, `pragmatic` + `direct` for quick fixes). Avoid contradictory combinations (e.g. `quick-worker` + `thorough`).
-  - **Don't over-specify** — 1-2 traits per agent is ideal. More than 3 dilutes the effect.
-  - **Create new traits sparingly** — only when existing traits don't cover a recurring need. Keep prompt fragments to 1-2 sentences.
+  - **Default to no personalities** — role defaults are good enough for most tasks. Don't specify personalities unless you have a specific reason.
+  - **Call `personalities_list` once at startup** to see what's available. Don't guess personality names.
+  - **Use personalities when the task demands a specific work style** — e.g. a complex refactor benefits from `thorough` + `explorative`; a trivial fix benefits from `direct` + `quick-worker`; a security-sensitive task benefits from `critical`.
+  - **Complementary pairs** — some personalities work well together (e.g. `thorough` + `critical` for reviewers, `pragmatic` + `direct` for quick fixes). Avoid contradictory combinations (e.g. `quick-worker` + `thorough`).
+  - **Don't over-specify** — 1-2 personalities per agent is ideal. More than 3 dilutes the effect.
+  - **Create new personalities sparingly** — only when existing ones don't cover a recurring need. Keep prompt fragments to 1-2 sentences.
 
   ## Mandatory Phases
 

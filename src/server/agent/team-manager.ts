@@ -454,7 +454,7 @@ export class TeamManager {
 			const allowedTools = storedRoleDef.allowedTools;
 
 			// Resolve personalities: explicit > role defaults
-			const personalityNames = opts?.personalities ?? storedRoleDef.defaultTraits;
+			const personalityNames = opts?.personalities ?? storedRoleDef.defaultPersonalities;
 			let resolvedPersonalities: Array<{ label: string; promptFragment: string }> | undefined;
 			if (personalityNames && personalityNames.length > 0 && this.config.personalityManager) {
 				resolvedPersonalities = this.config.personalityManager.resolvePersonalities(personalityNames);

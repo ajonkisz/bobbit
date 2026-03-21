@@ -373,8 +373,8 @@ async function handleApiRoute(
 		} else if (roleForMeta) {
 			// Use role's default personalities if no explicit personalities provided
 			const role = roleManager.getRole(roleForMeta.name);
-			if (role?.defaultTraits && role.defaultTraits.length > 0) {
-				personalityNames = role.defaultTraits;
+			if (role?.defaultPersonalities && role.defaultPersonalities.length > 0) {
+				personalityNames = role.defaultPersonalities;
 			}
 		}
 
