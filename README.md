@@ -17,9 +17,9 @@ Bobbit wraps [pi-coding-agent](https://github.com/nickarrow/nickarrow) in a WebS
                         └──────────────────────────┘
 ```
 
-1. **Gateway** (`src/server/`) — Node.js HTTP + WebSocket server. Manages agent sessions as child processes communicating over JSONL on stdin/stdout. Sessions persist to disk and survive server restarts. Serves the built UI as static files or runs headless behind a vite dev server.
+1. **Gateway** (`src/server/`) — Node.js HTTP + WebSocket server. Manages agent sessions as child processes communicating over JSONL on stdin/stdout. Sessions persist to disk and survive server restarts. Serves the built UI as static files or runs headless behind a Vite dev server.
 2. **Browser client** (`src/app/`) — Connects to the gateway via WebSocket. Renders the chat UI using components from `src/ui/`. Desktop layout has a session sidebar; mobile has a landing page with session cards. Supports multi-device access and QR code sharing.
-3. **UI components** (`src/ui/`) — Lit-based component library (forked from pi-web-ui). Message rendering, specialized tool call renderers (bash, read, write, edit, grep, find, ls), model selection, settings, and more.
+3. **UI components** (`src/ui/`) — Lit-based component library (forked from pi-web-ui). Message rendering, specialised tool call renderers, model selection, settings, and more.
 
 ## Quick start
 
@@ -29,23 +29,23 @@ npm run build     # compile server + bundle UI
 npm start         # start gateway on :3001, serves UI
 ```
 
-The gateway auto-detects the NordLynx (NordVPN mesh) interface and binds to it. If NordVPN isn't running, the gateway exits with an error. Open the printed URL from any device on the mesh. The auth token is printed to the terminal.
+The gateway auto-detects the NordLynx (NordVPN mesh) interface and binds to it. Pass `--host <addr>` to override. Open the printed URL from any device on the mesh.
 
 ### Development
 
 ```bash
 npm run build:server   # compile server TypeScript (required before first run)
-npm run dev            # starts gateway + vite dev server concurrently
-npm run dev:harness    # same, but with auto-restart harness (recommended)
+npm run dev:harness    # gateway with auto-restart harness + vite dev server (recommended)
+npm run dev            # gateway + vite without the harness
 ```
 
-Both the gateway (`:3001`) and Vite (`:5173`) auto-bind to the NordLynx mesh IP. Vite proxies `/api` and `/ws` to the gateway. UI changes hot-reload instantly.
+Both the gateway (`:3001`) and Vite (`:5173`) auto-bind to the NordLynx mesh IP. Vite proxies `/api` and `/ws` to the gateway. UI changes hot-reload instantly. Server changes require `npm run restart-server` to rebuild and restart.
 
-See [docs/dev-workflow.md](docs/dev-workflow.md) for the full development workflow, including when to restart the server and how agents should make changes.
+See [docs/dev-workflow.md](docs/dev-workflow.md) for the full development workflow.
 
 ### Dev server harness
 
-Use `npm run dev:harness` when developing Bobbit itself. The harness wraps the server process and watches a sentinel file (`~/.pi/gateway-restart`). When an agent finishes making server-side changes, it runs `npm run restart-server` to:
+Use `npm run dev:harness` when developing Bobbit itself. The harness wraps the server process and watches a sentinel file (`~/.pi/gateway-restart`). Running `npm run restart-server` triggers:
 
 1. Kill the running server
 2. Wait for the port to clear
@@ -67,119 +67,701 @@ bobbit [options]
 --no-ui             Don't serve any UI (gateway-only mode)
 --new-token         Force-generate a new auth token
 --show-token        Print the current token and exit
+--no-tls            Disable TLS (on by default)
 ```
 
-## Architecture
+## Repo layout
 
-### Server (`src/server/`)
+```
+src/
+├── server/          # Node.js gateway (HTTP + WebSocket + child process management)
+│   ├── cli.ts       # Entry point, arg parsing, NordLynx detection, TLS setup, system prompt resolution
+│   ├── server.ts    # HTTP server, REST API, static serving, WS upgrade
+│   ├── index.ts     # Barrel export for server public API
+│   ├── pi-dir.ts    # Central ~/.pi state directory resolution (overridable via BOBBIT_PI_DIR)
+│   ├── harness.ts   # Dev server wrapper (watches sentinel file, auto-restarts)
+│   ├── harness-signal.ts  # Touches sentinel to trigger harness restart
+│   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, teams, title generation
+│   │   ├── session-manager.ts      # Create/destroy/restore sessions, broadcast events, force abort
+│   │   ├── session-store.ts        # Disk persistence (~/.pi/gateway-sessions.json)
+│   │   ├── rpc-bridge.ts           # JSONL stdin/stdout bridge to agent subprocess
+│   │   ├── event-buffer.ts         # Circular buffer for tool_execution_update replay on reconnect
+│   │   ├── title-generator.ts      # Auto-generate session titles via Claude Haiku
+│   │   ├── system-prompt.ts        # Assemble system prompt from global + AGENTS.md + goal spec
+│   │   ├── goal-manager.ts         # Goal CRUD, worktree creation, state transitions
+│   │   ├── goal-store.ts           # Goal disk persistence (~/.pi/gateway-goals.json)
+│   │   ├── goal-artifact-store.ts  # Goal artifact storage (~/.pi/gateway-goal-artifacts.json)
+│   │   ├── goal-assistant.ts       # System prompt for goal creation assistant
+│   │   ├── task-manager.ts         # Task CRUD, state machine, assignment, dependencies
+│   │   ├── task-store.ts           # Task disk persistence (~/.pi/gateway-tasks.json)
+│   │   ├── team-manager.ts         # Team lifecycle (spawn/dismiss agents, start/complete/teardown)
+│   │   ├── team-store.ts           # Team state persistence (~/.pi/gateway-team-state.json)
+│   │   ├── team-names.ts           # Fun name pool generator for team agents (per-role)
+│   │   ├── name-generator.ts       # Generates role-themed names via Claude Haiku
+│   │   ├── role-manager.ts         # Role definitions CRUD, built-in tool registry
+│   │   ├── role-store.ts           # Role persistence (YAML, ~/.pi/roles/)
+│   │   ├── role-assistant.ts       # System prompt for role creation assistant
+│   │   ├── tool-store.ts           # Tool metadata persistence (~/.pi/gateway-tools.json)
+│   │   ├── tool-manager.ts         # Tool listing with renderer detection and metadata overlay
+│   │   ├── tool-assistant.ts       # System prompt for tool management assistant
+│   │   ├── trait-manager.ts        # Personality trait CRUD and resolution
+│   │   ├── trait-store.ts          # Trait persistence (YAML)
+│   │   ├── cost-tracker.ts         # Per-session/goal/task token and cost tracking
+│   │   ├── prompt-queue.ts         # Server-side prompt queue with priority steering
+│   │   ├── color-store.ts          # Per-session color index persistence
+│   │   ├── artifact-spec-manager.ts  # Artifact spec CRUD and validation
+│   │   ├── artifact-spec-store.ts    # Artifact spec persistence (YAML)
+│   │   ├── artifact-spec-assistant.ts # System prompt for artifact spec assistant
+│   │   └── assistant-registry.ts     # Unified registry of assistant types (goal, role, tool, artifact-spec)
+│   ├── auth/        # Token auth, rate limiting, TLS, OAuth, DNS
+│   │   ├── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
+│   │   ├── rate-limit.ts  # IP-based rate limiting for auth failures
+│   │   ├── tls.ts         # TLS certificate generation (mkcert CA or openssl fallback)
+│   │   ├── oauth.ts       # OAuth PKCE flow (start, complete, status)
+│   │   └── desec.ts       # deSEC dynamic DNS A record updates
+│   ├── ws/          # WebSocket protocol types and message handler
+│   │   ├── protocol.ts   # ClientMessage / ServerMessage type unions
+│   │   └── handler.ts    # Auth handshake, command routing, skill dispatch
+│   └── skills/      # Reusable skill definitions with isolated sub-agent execution
+│       ├── types.ts           # Skill interface definition
+│       ├── registry.ts        # In-memory skill definition registry
+│       ├── sub-agent.ts       # Spawn isolated agent subprocesses for skill execution
+│       ├── git.ts             # Git worktree create/cleanup helpers
+│       ├── definitions-sync.ts  # Export definitions to ~/.pi/skill-definitions.json
+│       ├── index.ts           # Barrel export + auto-registration of built-in skills
+│       └── definitions/       # Built-in skill templates
+│           ├── code-review.ts       # Correctness, security, and design review skills
+│           └── test-suite-report.ts # Test suite analysis skill
+├── ui/              # Lit web components (forked from pi-web-ui, NOT an npm dep)
+│   ├── ChatPanel.ts # Top-level UI orchestrator
+│   ├── app.css      # Global styles and CSS custom properties
+│   ├── index.ts     # Barrel export for all UI components
+│   ├── speech-recognition.d.ts  # Web Speech API type declarations
+│   ├── prompts/
+│   │   └── prompts.ts          # Built-in prompt templates
+│   ├── components/  # Core UI components
+│   │   ├── AgentInterface.ts    # Bridges agent events to UI state
+│   │   ├── MessageList.ts       # Renders state.messages (completed messages)
+│   │   ├── StreamingMessageContainer.ts  # Renders state.streamMessage (in-progress)
+│   │   ├── Messages.ts          # Message rendering by role (user, assistant, tool)
+│   │   ├── Input.ts             # Chat input with attachments and voice
+│   │   ├── MessageEditor.ts     # Inline message editing
+│   │   ├── AttachmentTile.ts    # Attachment preview tiles
+│   │   ├── ConsoleBlock.ts      # Console output rendering
+│   │   ├── CustomProviderCard.ts  # Custom AI provider display card
+│   │   ├── DiffBlock.ts         # Diff rendering component
+│   │   ├── ErrorMessage.ts      # Error display component
+│   │   ├── ExpandableSection.ts # Collapsible content sections
+│   │   ├── GitStatusWidget.ts   # Git branch/status display
+│   │   ├── LiveTimer.ts         # Real-time elapsed timer
+│   │   ├── SandboxedIframe.ts   # Sandboxed iframe container
+│   │   ├── ThinkingBlock.ts     # Agent thinking indicator
+│   │   ├── ToolGroup.ts         # Groups consecutive tool calls
+│   │   ├── ProviderKeyInput.ts  # API key input field
+│   │   ├── message-renderer-registry.ts  # Custom message type renderers
+│   │   └── sandbox/             # Sandboxed iframe runtime providers
+│   │       ├── ArtifactsRuntimeProvider.ts
+│   │       ├── AttachmentsRuntimeProvider.ts
+│   │       ├── ConsoleRuntimeProvider.ts
+│   │       ├── FileDownloadRuntimeProvider.ts
+│   │       ├── RuntimeMessageBridge.ts
+│   │       ├── RuntimeMessageRouter.ts
+│   │       └── SandboxRuntimeProvider.ts
+│   ├── dialogs/     # Modal dialogs
+│   │   ├── ApiKeyPromptDialog.ts
+│   │   ├── AttachmentOverlay.ts
+│   │   ├── CustomProviderDialog.ts
+│   │   ├── ModelSelector.ts
+│   │   ├── PersistentStorageDialog.ts
+│   │   ├── ProvidersModelsTab.ts
+│   │   ├── SessionListDialog.ts
+│   │   └── SettingsDialog.ts
+│   ├── tools/       # Tool call renderers
+│   │   ├── index.ts             # Barrel export + renderer registration
+│   │   ├── renderer-registry.ts # Tool name → renderer mapping
+│   │   ├── types.ts             # Renderer type definitions
+│   │   ├── extract-document.ts  # Document extraction utilities
+│   │   ├── javascript-repl.ts   # JavaScript REPL renderer
+│   │   ├── renderers/           # Per-tool renderers
+│   │   │   ├── ArtifactToolRenderers.ts
+│   │   │   ├── BashRenderer.ts
+│   │   │   ├── BrowserClickRenderer.ts
+│   │   │   ├── BrowserEvalRenderer.ts
+│   │   │   ├── BrowserNavigateRenderer.ts
+│   │   │   ├── BrowserTypeRenderer.ts
+│   │   │   ├── BrowserWaitRenderer.ts
+│   │   │   ├── CalculateRenderer.ts
+│   │   │   ├── DefaultRenderer.ts
+│   │   │   ├── DelegateRenderer.ts
+│   │   │   ├── EditRenderer.ts
+│   │   │   ├── FindRenderer.ts
+│   │   │   ├── GetCurrentTimeRenderer.ts
+│   │   │   ├── GrepRenderer.ts
+│   │   │   ├── HtmlRenderer.ts
+│   │   │   ├── LsRenderer.ts
+│   │   │   ├── ReadRenderer.ts
+│   │   │   ├── ScreenshotRenderer.ts
+│   │   │   ├── SvgRenderer.ts
+│   │   │   ├── TaskToolRenderers.ts
+│   │   │   ├── TeamToolRenderers.ts
+│   │   │   ├── WebFetchRenderer.ts
+│   │   │   ├── WebSearchRenderer.ts
+│   │   │   ├── WriteRenderer.ts
+│   │   │   ├── delegate-cards.ts
+│   │   │   └── image-utils.ts
+│   │   └── artifacts/           # Artifact display components
+│   │       ├── ArtifactElement.ts
+│   │       ├── ArtifactPill.ts
+│   │       ├── Console.ts
+│   │       ├── DocxArtifact.ts
+│   │       ├── ExcelArtifact.ts
+│   │       ├── GenericArtifact.ts
+│   │       ├── HtmlArtifact.ts
+│   │       ├── ImageArtifact.ts
+│   │       ├── MarkdownArtifact.ts
+│   │       ├── PdfArtifact.ts
+│   │       ├── SvgArtifact.ts
+│   │       ├── TextArtifact.ts
+│   │       ├── artifacts-tool-renderer.ts
+│   │       ├── artifacts.ts
+│   │       └── index.ts
+│   ├── storage/     # IndexedDB persistence
+│   │   ├── app-storage.ts
+│   │   ├── store.ts
+│   │   ├── types.ts
+│   │   └── backends/
+│   │   │   └── indexeddb-storage-backend.ts
+│   │   └── stores/
+│   │       ├── command-history-store.ts
+│   │       ├── custom-providers-store.ts
+│   │       ├── goal-draft-store.ts
+│   │       ├── provider-keys-store.ts
+│   │       ├── role-draft-store.ts
+│   │       ├── sessions-store.ts
+│   │       ├── settings-store.ts
+│   │       └── spec-draft-store.ts
+│   └── utils/       # Shared utilities
+│       ├── ansi.ts            # ANSI escape code handling
+│       ├── attachment-utils.ts  # Attachment processing
+│       ├── auth-token.ts      # Auth token retrieval
+│       ├── format.ts          # Text formatting helpers
+│       ├── i18n.ts            # Internationalisation strings
+│       ├── model-discovery.ts # AI model detection and listing
+│       ├── proxy-utils.ts     # Proxy URL utilities
+│       └── test-sessions.ts   # Test session fixtures
+├── app/             # Browser entry point (connects to gateway)
+│   ├── main.ts              # Bootstrap, routing, session sidebar, QR code, OAuth
+│   ├── remote-agent.ts      # WebSocket ↔ Agent interface adapter
+│   ├── state.ts             # Global app state (sessions, goals, connection status)
+│   ├── api.ts               # Gateway REST API client helpers
+│   ├── routing.ts           # Hash-based URL routing (#/, #/session/{id}, #/goal/{id}, etc.)
+│   ├── render.ts            # Top-level render function, header bar, layout
+│   ├── render-helpers.ts    # Shared rendering utilities (icons, badges)
+│   ├── sidebar.ts           # Desktop session/goal sidebar
+│   ├── session-manager.ts   # Session create/connect/disconnect lifecycle
+│   ├── session-colors.ts    # Session color picker UI
+│   ├── storage.ts           # IndexedDB store initialisation
+│   ├── dialogs.ts           # Confirmation and prompt dialogs
+│   ├── goal-dashboard.ts    # Goal detail page with tabs (overview, tasks, artifacts, team)
+│   ├── goal-dashboard.css   # Goal dashboard styles
+│   ├── role-manager-page.ts # Role list and detail page
+│   ├── role-manager-dialog.ts # Role creation/edit dialog
+│   ├── role-manager.css     # Role manager styles
+│   ├── tool-manager-page.ts # Tool list and detail page
+│   ├── tool-manager.css     # Tool manager styles
+│   ├── artifact-spec-page.ts  # Artifact spec list and detail page
+│   ├── artifact-spec.css      # Artifact spec page styles
+│   ├── preview-panel.ts     # Live HTML preview split-pane
+│   ├── mobile-header.ts     # Mobile top header bar
+│   ├── proposal-parsers.ts  # Parses structured proposals from assistant messages
+│   ├── cwd-combobox.ts      # Working directory selector combobox
+│   ├── custom-messages.ts   # Custom message type registration
+│   ├── oauth.ts             # Browser-side OAuth flow
+│   ├── qrcode.d.ts          # QR code library type declarations
+│   └── app.css              # App-level styles (imports ui/app.css)
+├── config/
+│   └── system-prompt.md     # Custom system prompt for agent sessions
+└── docs/
+    ├── dev-workflow.md      # Development workflow guide
+    ├── bobbit-sprites.md    # Bobbit pixel art, animation & accessory system reference
+    └── prompt-queue.md      # Prompt queue architecture
+```
+
+## Architecture — Server
+
+### Top-level files
 
 | File | Purpose |
 |---|---|
-| `cli.ts` | Entry point. Parses args, auto-detects NordLynx IP and embedded UI, resolves custom system prompt from `config/system-prompt.md`, starts the gateway. |
-| `server.ts` | HTTP server with REST API routes + WebSocket upgrade handling + static file serving. |
+| `cli.ts` | Entry point. Parses args, auto-detects NordLynx IP and embedded UI, resolves custom system prompt from `config/system-prompt.md`, sets up TLS, updates deSEC DNS, starts the gateway. |
+| `server.ts` | HTTP server with REST API routes + WebSocket upgrade handling + static file serving with SPA fallback. |
+| `index.ts` | Barrel export of the server's public API (`createGateway`, `SessionManager`, `RpcBridge`, etc.). |
+| `pi-dir.ts` | Resolves the `~/.pi` state directory. Override via `BOBBIT_PI_DIR` env var for test isolation. |
 | `harness.ts` | Dev server wrapper. Watches sentinel file for restart signals, auto-restarts on crash. |
 | `harness-signal.ts` | Touches the sentinel file to trigger a harness restart. |
-| `agent/session-manager.ts` | Creates/destroys/restores agent sessions. Manages RPC bridge lifecycle, client connections, auto-title generation, and disk persistence. |
-| `agent/session-store.ts` | Persists session metadata to `~/.pi/gateway-sessions.json`. Sessions restore on server restart via `switch_session` RPC. |
-| `agent/rpc-bridge.ts` | Spawns `pi-coding-agent --mode rpc` as a child process. Sends commands via JSONL on stdin, receives responses and streaming events on stdout. |
-| `agent/event-buffer.ts` | Buffers recent agent events so late-joining clients can catch up. |
-| `agent/title-generator.ts` | Auto-generates 2-3 word session titles via Claude Haiku after the first agent turn. Falls back silently if auth is unavailable. |
-| `auth/token.ts` | Generates 256-bit tokens, persists to `~/.pi/gateway-token`, validates with constant-time comparison. |
-| `auth/rate-limit.ts` | IP-based rate limiting for failed auth attempts. |
-| `auth/oauth.ts` | OAuth flow support for provider API keys. |
-| `ws/protocol.ts` | TypeScript types for the WebSocket protocol (client and server message types). |
-| `ws/handler.ts` | WebSocket message handler. Authenticates the connection, then routes commands to the agent RPC bridge. |
 
-### REST API
+### `agent/` — Session lifecycle, goals, teams, persistence
 
-All routes require `Authorization: Bearer <token>`.
+| File | Purpose |
+|---|---|
+| `session-manager.ts` | Creates/destroys/restores agent sessions. Manages RPC bridge lifecycle, client connections, auto-title generation, prompt queuing, cost tracking, and disk persistence. |
+| `session-store.ts` | Persists session metadata to `~/.pi/gateway-sessions.json`. Sessions restore on server restart via `switch_session` RPC. |
+| `rpc-bridge.ts` | Spawns `pi-coding-agent --mode rpc` as a child process. Sends commands via JSONL on stdin, receives responses and streaming events on stdout. |
+| `event-buffer.ts` | Circular buffer of recent agent events. Replays the latest `tool_execution_update` per tool call ID on reconnect. |
+| `title-generator.ts` | Auto-generates 2–3 word session titles via Claude Haiku. Reads auth from `~/.pi/agent/auth.json`. |
+| `system-prompt.ts` | Assembles session system prompts from three layers: global `config/system-prompt.md`, `AGENTS.md` (with `@ref` resolution), and goal spec. Writes to `~/.pi/session-prompts/`. |
+| `goal-manager.ts` | Goal CRUD operations, auto-transition from `todo` to `in-progress`, optional git worktree creation. |
+| `goal-store.ts` | Persists goals to `~/.pi/gateway-goals.json`. States: `todo`, `in-progress`, `complete`, `shelved`. |
+| `goal-artifact-store.ts` | Stores goal artifacts (design docs, test plans, review findings) in `~/.pi/gateway-goal-artifacts.json`. |
+| `goal-assistant.ts` | System prompt for goal creation assistant sessions. Outputs `<goal_proposal>` blocks. |
+| `task-manager.ts` | Task CRUD with state machine (todo → in-progress → complete/skipped/blocked), assignment, and dependency tracking. |
+| `task-store.ts` | Persists tasks to `~/.pi/gateway-tasks.json`. |
+| `team-manager.ts` | Team lifecycle: start team lead, spawn/dismiss role agents with git worktrees, notify lead on task completion. |
+| `team-store.ts` | Persists team state to `~/.pi/gateway-team-state.json`. |
+| `team-names.ts` | Fun name pools for team agents, loaded from `data/team-names/` per role. Falls back to generic pool. |
+| `name-generator.ts` | Generates role-themed funny names for team agents via Claude Haiku. |
+| `role-manager.ts` | Role definitions CRUD. Maintains built-in tool registry (`AVAILABLE_TOOLS`). |
+| `role-store.ts` | Persists roles as YAML files under `~/.pi/roles/`. |
+| `role-assistant.ts` | System prompt for role creation assistant sessions. |
+| `tool-store.ts` | Stores tool metadata overrides (description, group, docs) in `~/.pi/gateway-tools.json`. |
+| `tool-manager.ts` | Merges base tool definitions (from YAML) with store overrides. Detects tool renderers in `src/ui/tools/renderers/`. |
+| `tool-assistant.ts` | System prompt for tool management assistant sessions. |
+| `trait-manager.ts` | Personality trait CRUD and resolution (maps trait names to prompt fragments). |
+| `trait-store.ts` | Persists traits as YAML files. |
+| `cost-tracker.ts` | Tracks per-session token usage and cost. Aggregates to goal and task level. Persists to `~/.pi/gateway-costs.json`. |
+| `prompt-queue.ts` | Server-side prompt queue. Steered messages sort before non-steered. Auto-drains when agent becomes idle. |
+| `color-store.ts` | Maps session IDs to color indices (0–13). Persists to `~/.pi/gateway-session-colors.json`. |
+| `artifact-spec-manager.ts` | Artifact spec CRUD and validation. Enforces ID pattern (lowercase alphanumeric + hyphens). |
+| `artifact-spec-store.ts` | Persists artifact specs as YAML files. Defines `ArtifactSpec` with kind, format, mustHave/shouldHave/mustNotHave sections. |
+| `artifact-spec-assistant.ts` | System prompt for artifact spec creation assistant. |
+| `assistant-registry.ts` | Unified registry mapping assistant types (`goal`, `role`, `tool`, `artifact-spec`) to their prompts and titles. |
+
+### `auth/` — Authentication, TLS, DNS
+
+| File | Purpose |
+|---|---|
+| `token.ts` | Generates 256-bit tokens, persists to `~/.pi/gateway-token` (mode 0600), validates with constant-time comparison. |
+| `rate-limit.ts` | IP-based rate limiting for failed auth attempts. Auto-cleanup every 60s. |
+| `tls.ts` | Auto-generates TLS certificates. Prefers mkcert (local CA) with openssl fallback. Regenerates on IP change. |
+| `oauth.ts` | Server-side OAuth PKCE flow. Generates code verifier/challenge, returns auth URL, exchanges code for tokens. Stores credentials in `~/.pi/agent/auth.json`. |
+| `desec.ts` | Updates a deSEC dynDNS A record on startup so the custom domain resolves to the current mesh IP. Config in `~/.pi/desec.json`. |
+
+### `ws/` — WebSocket protocol
+
+| File | Purpose |
+|---|---|
+| `protocol.ts` | TypeScript types for all client and server WebSocket message types. |
+| `handler.ts` | WebSocket connection handler. Authenticates, routes commands to the RPC bridge or session manager, dispatches skill invocations. |
+
+### `skills/` — Isolated sub-agent execution
+
+| File | Purpose |
+|---|---|
+| `types.ts` | `Skill` interface: id, name, description, instructions, isolation level, expected output, timeout. |
+| `registry.ts` | In-memory store of skill definitions. `registerSkill()` at import time, `getSkill()`/`listSkills()` at runtime. |
+| `sub-agent.ts` | Spawns isolated agent subprocesses for skill execution. 10-minute default timeout. Receives only skill instructions + context + `AGENTS.md`. |
+| `git.ts` | Git worktree create/cleanup helpers used by skills and team agents. |
+| `definitions-sync.ts` | Exports registered skills to `~/.pi/skill-definitions.json` at startup for agent discovery. |
+| `index.ts` | Barrel export + auto-registration of built-in skills. |
+| `definitions/code-review.ts` | Three independent review skills: `correctness-review`, `security-review`, `design-review`. |
+| `definitions/test-suite-report.ts` | Single skill that runs tests in a worktree and produces a structured report. |
+
+## REST API
+
+All routes require `Authorization: Bearer <token>`. Token can also be passed as `?token=` query parameter.
+
+### Health & Info
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/health` | Health check + session count |
-| `GET` | `/api/sessions` | List active sessions (includes title, status, client count) |
-| `POST` | `/api/sessions` | Create a new agent session |
+| `GET` | `/api/connection-info` | List network interface addresses for multi-device access |
+| `GET` | `/api/ca-cert` | Download the Bobbit CA certificate for device trust |
+
+### Sessions
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/sessions` | List all sessions (includes title, status, color, goal) |
+| `POST` | `/api/sessions` | Create a session (normal, delegate, or with role/traits/assistant type) |
 | `GET` | `/api/sessions/:id` | Get session details |
 | `DELETE` | `/api/sessions/:id` | Terminate a session |
-| `PUT` | `/api/sessions/:id/title` | Rename a session |
-| `GET` | `/api/connection-info` | List network addresses for multi-device access |
+| `PATCH` | `/api/sessions/:id` | Update session properties (title, colorIndex, preview, roleId, traits, assistantType, goalId) |
+| `PUT` | `/api/sessions/:id/title` | Rename a session (legacy endpoint) |
+| `POST` | `/api/sessions/:id/wait` | Block until session becomes idle, then return output |
+| `GET` | `/api/sessions/:id/output` | Get final assistant output from the last turn |
+| `GET` | `/api/sessions/:id/git-status` | Git status for session's working directory (branch, ahead/behind, dirty files) |
+| `GET` | `/api/sessions/:id/cost` | Token usage and cost for a single session |
+
+### Goals
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/goals` | List all goals |
+| `POST` | `/api/goals` | Create a goal (`{ title, cwd, spec, team?, worktree? }`) |
+| `GET` | `/api/goals/:id` | Get a goal |
+| `PUT` | `/api/goals/:id` | Update a goal (title, cwd, state, spec, team, repoPath, branch) |
+| `DELETE` | `/api/goals/:id` | Delete a goal and its tasks |
+| `GET` | `/api/goals/:id/commits` | Commit history for goal branch (excludes primary branch commits) |
+| `GET` | `/api/goals/:id/git-status` | Git status for goal worktree (branch, ahead/behind primary, clean) |
+| `GET` | `/api/goals/:id/cost` | Aggregate cost across all sessions linked to a goal |
+
+### Goal Tasks
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/goals/:id/tasks` | List tasks for a goal |
+| `POST` | `/api/goals/:id/tasks` | Create a task (`{ title, type, spec?, parentTaskId?, dependsOn? }`) |
+
+### Goal Artifacts
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/goals/:id/artifacts` | List artifacts for a goal |
+| `POST` | `/api/goals/:id/artifacts` | Create an artifact (`{ name, type, content, producedBy, skillId?, specId?, status? }`) |
+| `GET` | `/api/goals/:id/artifacts/:artifactId` | Get a specific artifact |
+| `PUT` | `/api/goals/:id/artifacts/:artifactId` | Revise an artifact (increments version) |
+
+### Goal Team
+
+Routes accept both `/team/` and legacy `/swarm/` paths.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/goals/:id/team` | Get team state for a goal |
+| `POST` | `/api/goals/:id/team/start` | Start a team (creates team lead session) |
+| `POST` | `/api/goals/:id/team/spawn` | Spawn a role agent (`{ role, task, traits? }`) |
+| `POST` | `/api/goals/:id/team/dismiss` | Dismiss a role agent (`{ sessionId }`) |
+| `POST` | `/api/goals/:id/team/steer` | Steer a team agent mid-turn (`{ sessionId, message }`) |
+| `POST` | `/api/goals/:id/team/abort` | Force-abort a stuck team agent (`{ sessionId }`) |
+| `POST` | `/api/goals/:id/team/prompt` | Send prompt to a team agent, queued if busy (`{ sessionId, message }`) |
+| `GET` | `/api/goals/:id/team/agents` | List agents for a team goal |
+| `POST` | `/api/goals/:id/team/complete` | Complete a team (dismiss agents, keep team lead) |
+| `POST` | `/api/goals/:id/team/teardown` | Fully tear down a team (dismiss all + terminate team lead) |
+
+### Tasks
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/tasks/:id` | Get a task |
+| `PUT` | `/api/tasks/:id` | Update a task (title, spec, state, assignedSessionId, dependsOn) |
+| `DELETE` | `/api/tasks/:id` | Delete a task |
+| `POST` | `/api/tasks/:id/assign` | Assign a task to a session (`{ sessionId }`) |
+| `POST` | `/api/tasks/:id/transition` | Transition task state (`{ state }`) |
+| `GET` | `/api/tasks/:id/cost` | Cost for the session assigned to a task |
+
+### Tools
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/tools` | List all available agent tools (with docs, renderer status) |
+| `GET` | `/api/tools/:name` | Get a single tool's full detail |
+| `PUT` | `/api/tools/:name` | Update tool metadata (`{ description?, group?, docs? }`) |
+
+### Roles
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/roles` | List all roles |
+| `POST` | `/api/roles` | Create a role (`{ name, label, promptTemplate, allowedTools?, accessory? }`) |
+| `GET` | `/api/roles/:name` | Get a role |
+| `PUT` | `/api/roles/:name` | Update a role |
+| `DELETE` | `/api/roles/:name` | Delete a role |
+
+### Traits
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/traits` | List all personality traits |
+| `POST` | `/api/traits` | Create a trait (`{ name, label, description, promptFragment }`) |
+| `GET` | `/api/traits/:name` | Get a trait |
+| `PUT` | `/api/traits/:name` | Update a trait |
+| `DELETE` | `/api/traits/:name` | Delete a trait |
+
+### Skills
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/skills` | List available skill definitions (id, name, description) |
+
+### Artifact Specs
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/artifact-specs` | List all artifact specs |
+| `POST` | `/api/artifact-specs` | Create a spec (`{ id, name, kind, format, description?, mustHave?, shouldHave?, mustNotHave?, requires?, suggestedRole? }`) |
+| `GET` | `/api/artifact-specs/:id` | Get a spec |
+| `PUT` | `/api/artifact-specs/:id` | Update a spec |
+| `DELETE` | `/api/artifact-specs/:id` | Delete a spec (blocked if referenced by existing artifacts) |
+
+### OAuth
+
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/api/oauth/status` | OAuth provider status |
-| `POST` | `/api/oauth/start` | Begin an OAuth flow |
-| `POST` | `/api/oauth/complete` | Complete an OAuth flow |
+| `POST` | `/api/oauth/start` | Begin an OAuth flow, returns auth URL |
+| `POST` | `/api/oauth/complete` | Exchange code for tokens (`{ flowId, code }`) |
 
-### WebSocket protocol
+### Preview
 
-Connect to `ws://<host>:<port>/ws/<session-id>`. First message must be `{ "type": "auth", "token": "<token>" }`. After `auth_ok`, the client can send commands and receives streaming events.
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/preview` | Get preview HTML for a session (`?sessionId=`) |
+| `POST` | `/api/preview` | Set preview HTML for a session (`?sessionId=`, `{ html }`) |
 
-**Client → Server:** `auth`, `prompt`, `steer`, `follow_up`, `abort`, `set_model`, `compact`, `get_state`, `get_messages`, `set_title`, `generate_title`, `ping`
+## WebSocket protocol
 
-**Server → Client:** `auth_ok`, `auth_failed`, `state`, `messages`, `event`, `session_status`, `session_title`, `client_joined`, `client_left`, `error`, `pong`
+Connect to `wss://<host>:<port>/ws/<session-id>`. First message must be `{ "type": "auth", "token": "<token>" }`. After `auth_ok`, the client can send commands and receives streaming events.
 
-### Browser client (`src/app/`)
+### Client → Server
+
+| Type | Fields | Description |
+|---|---|---|
+| `auth` | `token` | Authenticate the connection |
+| `prompt` | `text`, `images?`, `attachments?` | Send a user prompt |
+| `steer` | `text` | Interrupt the agent mid-turn with guidance |
+| `follow_up` | `text` | Send a follow-up message |
+| `steer_queued` | `messageId` | Promote a queued message to steered (priority) |
+| `remove_queued` | `messageId` | Remove a message from the queue |
+| `abort` | — | Abort the current agent turn |
+| `retry` | — | Retry the last failed turn |
+| `set_model` | `provider`, `modelId` | Switch the AI model |
+| `compact` | — | Trigger context compaction |
+| `get_state` | — | Request current agent state |
+| `get_messages` | — | Request full message history |
+| `set_title` | `title` | Set session title |
+| `generate_title` | — | Auto-generate title from conversation |
+| `ping` | — | Keepalive ping |
+| `invoke_skill` | `skillId`, `context?` | Invoke an isolated skill sub-agent |
+| `task_create` | `goalId`, `title`, `taskType`, `parentTaskId?`, `spec?`, `dependsOn?` | Create a task |
+| `task_update` | `taskId`, `updates` | Update a task (title, spec, state, assignment, deps) |
+| `task_delete` | `taskId` | Delete a task |
+
+### Server → Client
+
+| Type | Key Fields | Description |
+|---|---|---|
+| `auth_ok` | — | Authentication succeeded |
+| `auth_failed` | — | Authentication failed |
+| `state` | `data` | Current agent state snapshot |
+| `messages` | `data` | Full message history array |
+| `event` | `data` | Streaming agent event (message_start, content_delta, tool calls, etc.) |
+| `session_status` | `status` | Session status change (idle, streaming, etc.) |
+| `session_title` | `sessionId`, `title` | Title changed |
+| `client_joined` | `clientId` | Another client connected |
+| `client_left` | `clientId` | A client disconnected |
+| `error` | `message`, `code` | Error message |
+| `pong` | — | Keepalive response |
+| `skill_started` | `skillId` | Skill execution began |
+| `skill_completed` | `skillId`, `result` | Skill produced output |
+| `skill_failed` | `skillId`, `error` | Skill execution failed |
+| `cost_update` | `sessionId`, `goalId?`, `taskId?`, `cost` | Token usage and cost update |
+| `queue_update` | `sessionId`, `queue` | Prompt queue changed |
+| `task_changed` | `task` | A task was created, updated, or deleted |
+| `tasks_list` | `tasks` | Full task list for a goal |
+
+## Features
+
+### Sessions
+
+Each session is a running `pi-coding-agent` child process with its own conversation history.
+
+- **Persistence**: Session metadata (id, title, cwd, agent session file, `wasStreaming` flag) persists to `~/.pi/gateway-sessions.json`. On server restart, sessions restore by re-spawning agents and using `switch_session` RPC to resume from the agent's `.jsonl` file. If an agent was mid-turn when the server died, it is automatically re-prompted.
+- **Auto-titles**: When the user sends their first prompt, `tryGenerateTitleFromPrompt()` fires **immediately** (before the agent replies) and calls Claude Haiku for a 2–3 word summary. The explicit `generate_title` command uses the full conversation history instead.
+- **Multi-device**: Multiple browser tabs/devices can connect to the same session. Events are broadcast to all clients.
+- **Force abort**: If a graceful abort doesn't make the agent idle within 3 seconds, the process is killed, a synthetic `agent_end` is emitted, and a fresh agent is spawned to resume the session.
+
+### Goals
+
+Goals are a task-tracking layer on top of sessions. A goal has a title, spec (markdown), working directory, and state (`todo` | `in-progress` | `complete` | `shelved`).
+
+- **Goal assistant**: Sessions created with `assistantType: "goal"` get a special prompt that helps users define clear goals. The assistant outputs structured `<goal_proposal>` blocks parsed by the browser client.
+- **Auto-transition**: Goals move from `todo` to `in-progress` when their first session starts.
+- **Worktrees**: Goals can optionally create a dedicated git worktree for isolated work.
+
+### Teams
+
+A team is a group of agent sessions working together on a goal, coordinated by a team lead.
+
+- **Team lead**: A special session created when the team starts. Gets a system prompt with team orchestration tools (`team_spawn`, `team_list`, `team_dismiss`, `team_complete`).
+- **Role agents**: Spawned by the team lead with a specific role (coder, reviewer, tester, or custom). Each gets its own git worktree and role-specific system prompt with restricted tool access.
+- **Lifecycle**: Start → spawn role agents → agents work on tasks → complete (dismiss agents, keep lead) or teardown (dismiss all).
+
+### Tasks
+
+Tasks are work items within a goal, managed via REST API or WebSocket commands.
+
+- **State machine**: `todo` → `in-progress` → `complete` | `skipped` | `blocked`. Terminal states (`complete`, `skipped`) have no outgoing transitions.
+- **Assignment**: Tasks can be assigned to sessions. The team manager notifies the team lead when assigned tasks reach terminal or blocked states.
+- **Dependencies**: Tasks can declare dependencies on other tasks via `dependsOn`.
+
+### Roles
+
+Custom role definitions that control agent behaviour and tool access.
+
+- **Built-in tools**: `role-manager.ts` maintains `AVAILABLE_TOOLS` — the master list of agent tool names.
+- **Per-role configuration**: Each role has a name, label, prompt template, allowed tools list, accessory (for the mascot), and optional default traits.
+- **Storage**: Roles persist as YAML files under `~/.pi/roles/`.
+
+### Traits
+
+Personality traits that modify agent behaviour via prompt fragments.
+
+- Each trait has a name, label, description, and `promptFragment` that gets injected into the system prompt.
+- Sessions can have multiple traits. Traits can be set at creation time or updated via `PATCH /api/sessions/:id`.
+- Roles can define default traits applied when no explicit traits are provided.
+
+### Skills
+
+Skills are reusable templates for spawning isolated sub-agents that produce structured artifacts.
+
+- **Isolation**: Sub-agents receive only skill instructions + explicit context + `AGENTS.md` — never the parent conversation.
+- **Built-in skills**: `correctness-review`, `security-review`, `design-review` (three code review perspectives), and `test-suite-report` (runs tests and produces a structured report).
+- **Invocation**: Via `invoke_skill` WebSocket command. Server broadcasts `skill_started`, then `skill_completed` or `skill_failed`.
+- **Definition sync**: Registered skills are exported to `~/.pi/skill-definitions.json` for agent-side tool extensions to discover.
+
+### Cost Tracking
+
+Per-session token usage and cost tracking, aggregated to goal and task level.
+
+- Tracks input tokens, output tokens, cache read/write tokens, and total cost.
+- Updated via `cost_update` WebSocket events broadcast to connected clients.
+- Query via `GET /api/sessions/:id/cost`, `GET /api/goals/:id/cost`, or `GET /api/tasks/:id/cost`.
+
+### Prompt Queue
+
+Server-side queuing of user messages when the agent is busy.
+
+- Steered messages sort before non-steered (priority interrupt).
+- Queue auto-drains when the agent finishes a turn.
+- Client can promote queued messages to steered (`steer_queued`) or remove them (`remove_queued`).
+- Queue state broadcast to clients via `queue_update` events.
+
+See [docs/prompt-queue.md](docs/prompt-queue.md) for the full architecture.
+
+### Artifact Specs
+
+Templates that define what a good goal artifact looks like.
+
+- Each spec has an id, name, description, kind (`analysis`, `deliverable`, `review`, `verification`), format (`markdown`, `html`, `diff`, `command`), and quality criteria (`mustHave`, `shouldHave`, `mustNotHave`).
+- Specs can declare dependency ordering via `requires` (other spec IDs that must be satisfied first).
+- Referenced by goal artifacts via `specId` to enforce quality gates.
+
+### Assistant Registry
+
+A unified registry (`assistant-registry.ts`) maps assistant types to their prompts and display titles:
+
+- `goal` — Goal creation assistant
+- `role` — Role creation assistant
+- `tool` — Tool management assistant
+- `artifact-spec` — Artifact spec creation assistant
+
+Sessions created with an `assistantType` get the corresponding system prompt automatically.
+
+### Compaction
+
+Context compaction reduces token usage by summarising the conversation.
+
+- **Manual**: User triggers via `compact` WebSocket command. Server calls `rpcClient.compact()` (120s timeout), then refreshes messages and state.
+- **Auto**: Triggered by the agent subprocess when context grows too large. Events flow through the event system and the UI refreshes automatically.
+
+### System Prompt Assembly
+
+Each session's system prompt is assembled from three layers:
+
+1. **Global** — `config/system-prompt.md` from the Bobbit project root
+2. **AGENTS.md** — From the session's working directory, with `@FILENAME.md` inline inclusion (recursive, circular-reference safe)
+3. **Goal spec** — If the session belongs to a goal, the goal's spec is appended
+
+The assembled prompt is written to `~/.pi/session-prompts/{sessionId}.md` and cleaned up on session termination.
+
+### Reconnection
+
+`RemoteAgent` auto-reconnects on unexpected disconnects with exponential backoff (1s base, 30s max). On reconnect: re-authenticates, requests current messages and state, server replays the latest `tool_execution_update` per tool call ID from the `EventBuffer`.
+
+### Task Completion Notifications
+
+When the agent finishes a turn, the browser client notifies the user via:
+1. **Browser Notification API** — Shows session title and elapsed time
+2. **Title flash** — Alternates document title with "Done (Xm)" until tab regains focus
+3. **Audio beep** — Two-tone sine wave (880 Hz, 1046 Hz) via Web Audio API
+
+## Browser client (`src/app/`)
 
 | File | Purpose |
 |---|---|
-| `main.ts` | App bootstrap. Hash-based routing (`#/` landing, `#/session/{id}` connected). Desktop sidebar + mobile landing page. Session management (create, connect, rename, terminate). Model/thinking selectors in header. QR code dialog, OAuth integration. |
-| `remote-agent.ts` | `RemoteAgent` class — WebSocket adapter that implements the `Agent` interface expected by the UI's `ChatPanel`. Translates WebSocket events into the streaming message model. Uses a deferred-message pattern to prevent duplicate rendering of tool-call messages. Handles `session_title` events for live title updates. |
+| `main.ts` | App bootstrap. Routing setup, session sidebar, QR code dialog, OAuth integration. |
+| `remote-agent.ts` | `RemoteAgent` — WebSocket adapter implementing the `Agent` interface for `ChatPanel`. Handles streaming state, deferred messages, compaction, reconnection, and notifications. |
+| `state.ts` | Global app state: sessions list, goals list, active session/goal, connection status, panel states. |
+| `api.ts` | Gateway REST API client helpers (`gatewayFetch`, `patchSession`, etc.). |
+| `routing.ts` | Hash-based URL routing (`#/` landing, `#/session/{id}`, `#/goal/{id}`, `#/roles`, `#/tools`, `#/artifact-specs`). |
+| `render.ts` | Top-level render function. Header bar with model/thinking selectors, layout orchestration. |
+| `render-helpers.ts` | Shared rendering utilities (Lucide icons, badges, delete confirmations). |
+| `sidebar.ts` | Desktop sidebar: session list, goal list, create buttons, collapse toggle. |
+| `session-manager.ts` | Session create/connect/disconnect lifecycle, preview polling. |
+| `session-colors.ts` | Session color picker UI component. |
+| `storage.ts` | IndexedDB store initialisation (settings, provider keys, sessions, goals, roles, specs). |
+| `dialogs.ts` | Confirmation and prompt dialog helpers. |
+| `goal-dashboard.ts` | Goal detail page with tabs: overview, tasks, artifacts, team, commits, cost. |
+| `role-manager-page.ts` | Role list page and detail/edit view. |
+| `role-manager-dialog.ts` | Role creation and editing dialog. |
+| `tool-manager-page.ts` | Tool list (grouped) and detail page with docs editing. |
+| `artifact-spec-page.ts` | Artifact spec list and detail/edit page. |
+| `preview-panel.ts` | Live HTML preview split-pane. Polls `GET /api/preview` and auto-refreshes iframe. |
+| `mobile-header.ts` | Mobile-only top header bar, always pinned. |
+| `proposal-parsers.ts` | Parses structured proposals (`<goal_proposal>`, `<role_proposal>`, `<tool_proposal>`, `<artifact_spec_proposal>`) from assistant messages. |
+| `cwd-combobox.ts` | Working directory selector with git branch display. |
 | `custom-messages.ts` | Custom message type registration (system notifications). |
-| `oauth.ts` | OAuth UI flow helpers. |
+| `oauth.ts` | Browser-side OAuth flow (proxied token exchange). |
 
-### UI components (`src/ui/`)
+## UI components (`src/ui/`)
 
 Forked from `@mariozechner/pi-web-ui`. Lit-based web components.
 
-- `ChatPanel.ts` — Top-level orchestrator: wires agent, message list, input, model selector
-- `components/AgentInterface.ts` — Bridges agent events to message-list + streaming-message-container, context window usage bar
-- `components/MessageList.ts` — Renders completed messages
-- `components/StreamingMessageContainer.ts` — Renders in-progress streaming content
-- `components/Messages.ts` — User, Assistant, Tool message renderers
-- `components/MessageEditor.ts` — Inline message editing
-- `dialogs/` — ModelSelector, Settings, Sessions, API keys, etc.
-- `tools/renderers/` — Specialized renderers for Bash, Read, Write, Edit, Grep, Find, Ls tool calls
-- `storage/` — IndexedDB-backed persistence for sessions, settings, provider keys
+- **`ChatPanel.ts`** — Top-level orchestrator: wires agent, message list, input, model selector
+- **`components/`** — Core components: `AgentInterface` (event→state bridge), `MessageList`, `StreamingMessageContainer`, `Messages` (per-role renderers), `Input` (chat input with attachments), `MessageEditor`, `GitStatusWidget`, `ThinkingBlock`, `ToolGroup`, sandboxed iframe providers
+- **`dialogs/`** — `ModelSelector`, `SettingsDialog`, `SessionListDialog`, `AttachmentOverlay`, `ApiKeyPromptDialog`, `CustomProviderDialog`, `PersistentStorageDialog`, `ProvidersModelsTab`
+- **`tools/`** — Specialised renderers for 20+ tool types (Bash, Read, Write, Edit, Grep, Find, Ls, Delegate, Browser*, WebSearch, WebFetch, Screenshot, SVG, HTML, Task, Team, Calculate, GetCurrentTime) + artifact display (HTML, SVG, PDF, Markdown, Docx, Excel, images)
+- **`storage/`** — IndexedDB-backed persistence with typed stores for settings, sessions, provider keys, command history, goal/role/spec drafts
+- **`utils/`** — ANSI handling, text formatting, auth token, model discovery, i18n, proxy utilities
 
-## Session management
+## Dependencies
 
-Sessions are the core abstraction. Each session is a running `pi-coding-agent` child process with its own conversation history.
+### Runtime
 
-- **Persistence**: Session metadata (id, title, cwd, agent session file path) persists to `~/.pi/gateway-sessions.json`. On server restart, sessions are restored by re-spawning agent processes and using the `switch_session` RPC command to resume from the agent's `.jsonl` session file.
-- **Auto-titles**: After the first agent turn completes, the gateway sends the conversation to Claude Haiku to generate a 2-3 word summary title (e.g. "Fix Login Bug", "Redis Setup"). Uses OAuth or API key auth from `~/.pi/agent/auth.json`. Falls back silently if unavailable.
-- **Manual rename**: Sessions can be renamed via the UI (pencil icon) or the `PUT /api/sessions/:id/title` endpoint.
-- **Multi-device**: Multiple browser tabs/devices can connect to the same session. Events are broadcast to all clients.
+| Package | Purpose |
+|---|---|
+| `@lmstudio/sdk` | LM Studio local model integration |
+| `@mariozechner/mini-lit` | Minimal Lit component library (buttons, dialogs, alerts, inputs) |
+| `@mariozechner/pi-agent-core` | Agent interface types and event model |
+| `@mariozechner/pi-ai` | AI model abstraction (providers, streaming, tool calling) |
+| `@mariozechner/pi-coding-agent` | The coding agent (spawned as subprocess) |
+| `@mariozechner/pi-tui` | Terminal UI utilities |
+| `acme-client` | ACME/Let's Encrypt client for TLS certificates |
+| `docx-preview` | DOCX document rendering in browser |
+| `jszip` | ZIP file handling (used by document renderers) |
+| `lit` | Web component framework |
+| `lucide` | Icon library |
+| `mkcert` | Local CA certificate generation |
+| `ollama` | Ollama local model integration |
+| `pdfjs-dist` | PDF rendering in browser |
+| `qrcode` | QR code generation for mobile access |
+| `ws` | WebSocket server |
+| `xlsx` | Excel spreadsheet parsing |
+| `yaml` | YAML parsing/serialisation (roles, traits, artifact specs) |
 
-## Prompt queue & message dispatch
+### Development
 
-User messages are routed through a server-side prompt queue that handles queuing when the agent is busy, priority sorting for steered (interrupt) messages, and automatic draining when the agent finishes a turn. The client renders user messages optimistically and deduplicates against server echoes. See [docs/prompt-queue.md](docs/prompt-queue.md) for the full architecture.
-
-## System prompt
-
-Each agent session's system prompt is assembled from three layers, in order:
-
-1. **Global system prompt** — `config/system-prompt.md` in the Bobbit project root. Applies to all sessions. Good for tone, output style, or global rules.
-2. **AGENTS.md** — If the session's working directory contains an `AGENTS.md` file, its contents are included under a "Project Context" heading. This is the per-project context file — describe the codebase, conventions, and constraints here.
-3. **Goal spec** — If the session belongs to a goal, the goal's markdown spec is appended under a "Goal" heading with the goal title and status.
-
-### `@FILENAME.md` references
-
-`AGENTS.md` (and any file it references) supports inline file inclusion. A line containing only `@somefile.md` is replaced with the contents of that file, resolved relative to the referencing file's directory. References are resolved recursively. Circular references are detected and replaced with a comment.
-
-```markdown
-# My Project
-
-@docs/architecture.md
-@docs/conventions.md
-
-## Quick notes
-- Use TypeScript strict mode
-```
-
-This lets you split project context across multiple files while keeping a single entry point. Files that are *not* inlined via `@` are still available on disk for the agent to read with its tools when needed.
-
-## QR code / multi-device access
-
-The QR code encodes whatever origin the browser is currently using. Since the gateway and Vite auto-bind to the NordLynx mesh IP, the QR code will contain a routable mesh address by default — scannable from any phone on the same NordVPN mesh network.
-
-If you override `--host` to `localhost` and open via `http://localhost:...`, the QR code will point to localhost and won't work from a phone. Always open via the mesh IP printed in the startup logs.
+| Package | Purpose |
+|---|---|
+| `@playwright/test` | Browser testing framework |
+| `@tailwindcss/vite` | Tailwind CSS Vite plugin |
+| `@types/node` | Node.js type definitions |
+| `@types/ws` | WebSocket type definitions |
+| `concurrently` | Run multiple processes (gateway + vite) |
+| `shx` | Cross-platform shell commands |
+| `typescript` | TypeScript compiler |
+| `vite` | Frontend build tool and dev server |
 
 ## Security model
 
@@ -190,33 +772,45 @@ If you override `--host` to `localhost` and open via `http://localhost:...`, the
 - Constant-time token comparison prevents timing attacks
 - IP-based rate limiting on failed auth attempts (automatic lockout)
 - 5-second auth timeout on WebSocket connections
-- Static file serving has directory traversal prevention
-- Gateway auto-binds to the NordLynx mesh IP — never `0.0.0.0`. Pass `--host` to override.
-- Token is passed in the URL query string for browser auto-connect — the URL itself is the credential
+- Static file serving has directory traversal prevention (resolved path must start with static dir)
+- Gateway auto-binds to the NordLynx mesh IP — never `0.0.0.0`
+- TLS on by default with auto-generated certificates
+- OAuth PKCE flow for obtaining API credentials securely
+
+## Networking
+
+Bobbit is accessed remotely over a **NordVPN mesh network**. The gateway auto-detects the NordLynx interface and binds to its IPv4 address.
+
+**Port topology in dev mode:**
+- **Vite** (`:5173`) — User-facing HTTPS, serves UI with HMR, proxies `/api/*` and `/ws/*` to the gateway
+- **Gateway** (`:3001`) — HTTPS, REST API, WebSocket sessions, agent subprocess management
+
+In production (`npm start`), the gateway serves the bundled UI directly on `:3001`.
+
+**deSEC dynamic DNS**: On startup, the gateway updates a deSEC A record so a custom domain (e.g. `bobbit.dedyn.io`) resolves to the current mesh IP. Config stored in `~/.pi/desec.json`. Skipped for loopback addresses to avoid clobbering the record during tests.
+
+**TLS** is on by default. Certs are generated via mkcert (local CA) or openssl fallback. The cert covers the current host IP + localhost and regenerates automatically if the IP changes. Vite reuses the same cert.
+
+**QR code**: Encodes `window.location.origin` + auth token. Scannable from any device on the NordVPN mesh.
+
+See [docs/dev-workflow.md](docs/dev-workflow.md) for the full networking reference, troubleshooting, and local-only setup.
 
 ## Testing
 
 ```bash
-npm test              # Mobile header unit tests (Playwright)
-npm run test:e2e      # E2E tests (requires running gateway + vite)
+npm run check         # Type-check server + web without emitting
+npm test              # Unit tests (Playwright with file:// fixtures)
+npm run test:e2e      # E2E tests (auto-starts sandboxed gateway)
 ```
 
-E2E tests require a separate gateway and Vite instance running on localhost. See `tests/playwright-e2e.config.ts` for setup details.
+**E2E tests** use Playwright's `webServer` config in `playwright-e2e.config.ts` to **automatically start a sandboxed gateway on port 3099**. No manual server setup needed. The test server runs with `BOBBIT_PI_DIR=.e2e-pi/` so all state files are fully isolated from the dev server's `~/.pi/`.
 
-## Dependencies
+**Unit tests** use `file://` fixtures — plain HTML/JS files that test logic without a build step. See `tests/mobile-header.spec.ts` for the pattern.
 
-Uses these packages from npm (not forked):
-- `@mariozechner/pi-ai` — AI model abstraction (providers, streaming, tool calling)
-- `@mariozechner/pi-agent-core` — Agent interface types and event model
-- `@mariozechner/pi-coding-agent` — The actual coding agent (spawned as subprocess)
-- `@mariozechner/mini-lit` — Minimal Lit component library (buttons, dialogs, alerts)
-- `lit` — Web component framework
-- `ws` — WebSocket server
-- `qrcode` — QR code generation for mobile access
-
-Forked into this repo (not npm dependencies):
-- `pi-web-ui` → `src/ui/` — Chat UI components, customized for gateway use
-- `pi-gateway` → `src/server/` — Gateway server, combined into same package
+Pipe Playwright output through the test filter for concise results:
+```bash
+npx playwright test --config playwright-e2e.config.ts --reporter=json 2>/dev/null | node scripts/test-filter.mjs
+```
 
 ## Build structure
 
@@ -225,11 +819,17 @@ dist/
 ├── server/         # tsc output (Node16 modules)
 │   ├── cli.js      # bin entry point
 │   ├── harness.js  # dev server wrapper
-│   └── agent/      # session manager, rpc bridge, title generator, store
+│   └── ...         # all server modules
 └── ui/             # vite output (browser bundle)
     └── index.html  # SPA entry
 ```
 
 Two separate TypeScript configs:
 - `tsconfig.server.json` — Node16 module resolution, `src/server/` → `dist/server/`
-- `tsconfig.web.json` — Bundler resolution + DOM libs, `src/ui/` + `src/app/` (bundled by vite, not emitted by tsc)
+- `tsconfig.web.json` — Bundler resolution + DOM libs, `src/ui/` + `src/app/` (bundled by Vite, tsc only type-checks)
+
+## Bobbit mascot
+
+The bobbit is a pixel-art blob mascot rendered with CSS `box-shadow`, with idle/working/starting animations, 14 colour identities (via `hue-rotate`), and role-based accessories (hardhat, magnifying glass, test tube, crown, etc.).
+
+See [docs/bobbit-sprites.md](docs/bobbit-sprites.md) for the full sprite reference, animation system, and accessory catalogue.
