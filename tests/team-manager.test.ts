@@ -1,14 +1,19 @@
-import { describe, it, before, beforeEach, afterEach, mock } from "node:test";
+import { describe, it, before, beforeEach, afterEach, after, mock } from "node:test";
 import assert from "node:assert/strict";
-import { TeamManager } from "../src/server/agent/team-manager.ts";
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-// Clean up persisted team state to avoid cross-test contamination
-const SWARM_STORE_FILE = path.join(os.homedir(), ".pi", "gateway-teams.json");
-function clearTeamStore() { try { fs.unlinkSync(SWARM_STORE_FILE); } catch { /* ignore */ } }
+// Isolate from real ~/.pi state by using a temp directory
+const TEST_PI_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "bobbit-team-test-"));
+process.env.BOBBIT_PI_DIR = TEST_PI_DIR;
+
+// Import AFTER setting env var so piDir() picks it up
+const { TeamManager } = await import("../src/server/agent/team-manager.ts");
+
+const TEAM_STORE_FILE = path.join(TEST_PI_DIR, "gateway-teams.json");
+function clearTeamStore() { try { fs.unlinkSync(TEAM_STORE_FILE); } catch { /* ignore */ } }
 clearTeamStore();
 
 // ---------------------------------------------------------------------------
@@ -74,7 +79,10 @@ function createMockSessionManager(goals: Map<string, MockGoal> = new Map()): any
 				status: "idle" as const,
 				titleGenerated: false,
 				goalId,
-				rpcClient: { prompt: mock.fn(async () => {}) },
+				rpcClient: {
+					prompt: mock.fn(async () => {}),
+					onEvent: mock.fn(() => {}),
+				},
 				clients: new Set(),
 			};
 			sessions.set(id, session);
@@ -99,20 +107,81 @@ function createMockSessionManager(goals: Map<string, MockGoal> = new Map()): any
 	};
 }
 
+/** Mock RoleStore that provides the roles TeamManager expects */
+function createMockRoleStore() {
+	const roles = new Map<string, any>([
+		["team-lead", { name: "team-lead", label: "Team Lead", promptTemplate: "You are a team lead. Branch: {{GOAL_BRANCH}}, Agent: {{AGENT_ID}}", allowedTools: ["bash", "read", "write"], accessory: "crown", createdAt: 0, updatedAt: 0 }],
+		["coder", { name: "coder", label: "Coder", promptTemplate: "You are a coder. Branch: {{GOAL_BRANCH}}, Agent: {{AGENT_ID}}", allowedTools: ["bash", "read", "write", "edit"], accessory: "headphones", createdAt: 0, updatedAt: 0 }],
+		["reviewer", { name: "reviewer", label: "Reviewer", promptTemplate: "You are a reviewer. Branch: {{GOAL_BRANCH}}, Agent: {{AGENT_ID}}", allowedTools: ["bash", "read"], accessory: "monocle", createdAt: 0, updatedAt: 0 }],
+		["tester", { name: "tester", label: "Tester", promptTemplate: "You are a tester. Branch: {{GOAL_BRANCH}}, Agent: {{AGENT_ID}}", allowedTools: ["bash", "read", "write"], accessory: "magnifier", createdAt: 0, updatedAt: 0 }],
+	]);
+	return {
+		get: (name: string) => roles.get(name),
+		getAll: () => Array.from(roles.values()),
+		put: (role: any) => roles.set(role.name, role),
+		remove: (name: string) => roles.delete(name),
+		reload: () => {},
+		update: () => true,
+	};
+}
+
+/** Mock ColorStore */
+function createMockColorStore() {
+	const colors = new Map<string, number>();
+	return {
+		get: (sessionId: string) => colors.get(sessionId),
+		set: (sessionId: string, idx: number) => colors.set(sessionId, idx),
+		remove: (sessionId: string) => colors.delete(sessionId),
+		getAll: () => Object.fromEntries(colors),
+	};
+}
+
+/** Mock TaskManager */
+function createMockTaskManager() {
+	const tasks: any[] = [];
+	return {
+		getTasksByGoal: (_goalId: string) => tasks,
+		createTask: (_goalId: string, task: any) => { tasks.push(task); return task; },
+		getTask: (id: string) => tasks.find((t: any) => t.id === id),
+		updateTask: (_id: string, _updates: any) => true,
+		deleteTask: (_id: string) => true,
+	};
+}
+
 const DEFAULT_CONFIG = {
 	gatewayUrl: "https://10.5.0.2:3000",
 	authToken: "test-token-123",
+	roleStore: createMockRoleStore(),
+	colorStore: createMockColorStore(),
+	taskManager: createMockTaskManager(),
 };
+
+/** Track managers to clean up idle-nudge timers after tests */
+const _createdManagers: InstanceType<typeof TeamManager>[] = [];
 
 /** Create a TeamManager with a clean persisted state. */
 function createTeamManager(sm: any, config = DEFAULT_CONFIG): InstanceType<typeof TeamManager> {
 	clearTeamStore();
-	return new TeamManager(sm, config);
+	const tm = new TeamManager(sm, config);
+	_createdManagers.push(tm);
+	return tm;
 }
 
 // ---------------------------------------------------------------------------
 // Tests: startTeam
 // ---------------------------------------------------------------------------
+
+// Clean up idle-nudge timers so the process can exit
+after(() => {
+	for (const tm of _createdManagers) {
+		for (const [, timer] of (tm as any).idleNudgeTimers) {
+			clearInterval(timer);
+		}
+		(tm as any).idleNudgeTimers.clear();
+	}
+	// Clean up temp PI dir
+	try { fs.rmSync(TEST_PI_DIR, { recursive: true }); } catch { /* ignore */ }
+});
 
 describe("TeamManager", () => {
 	describe("startTeam", () => {
@@ -128,12 +197,8 @@ describe("TeamManager", () => {
 			assert.ok(session, "should return a session");
 			assert.equal(session.id, "session-0");
 			assert.ok(
-				session.title.includes("Team Lead"),
-				`title should include "Team Lead", got: ${session.title}`,
-			);
-			assert.ok(
-				session.title.includes("Test Goal"),
-				`title should include goal title, got: ${session.title}`,
+				session.title.startsWith("Team Lead:"),
+				`title should start with "Team Lead:", got: ${session.title}`,
 			);
 			assert.equal(session.titleGenerated, true);
 		});
@@ -247,7 +312,7 @@ describe("TeamManager", () => {
 			await team.startTeam("goal-1");
 
 			await assert.rejects(() => team.spawnRole("goal-1", "hacker", "do stuff"), {
-				message: /Invalid role/,
+				message: /not found/,
 			});
 		});
 
@@ -487,7 +552,7 @@ describe("TeamManager", () => {
 			});
 		});
 
-		it("should terminate team lead and update goal state", async () => {
+		it("should update goal state and keep team lead alive", async () => {
 			const goals = new Map<string, MockGoal>();
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
@@ -501,11 +566,13 @@ describe("TeamManager", () => {
 			// Goal state should be "complete"
 			assert.equal(goal.state, "complete");
 
-			// Team should be removed
-			assert.equal(team.getTeamState("goal-1"), undefined);
+			// Team state should still exist (team lead remains for reporting)
+			const state = team.getTeamState("goal-1");
+			assert.ok(state, "team state should still exist");
+			assert.equal(state!.teamLeadSessionId, session.id);
 
-			// Team lead session should have been terminated
-			assert.equal(sm._sessions.has(session.id), false);
+			// Team lead session should still be alive
+			assert.equal(sm._sessions.has(session.id), true);
 		});
 
 		it("should dismiss all role agents during completion", async () => {
@@ -561,9 +628,11 @@ describe("TeamManager", () => {
 
 			await team.completeTeam("goal-1");
 
-			// All agents and team lead should be cleaned up
-			assert.equal(sm._sessions.size, 0);
-			assert.equal(team.getTeamState("goal-1"), undefined);
+			// Role agents should be terminated, but team lead remains
+			assert.equal(sm._sessions.has("agent-1"), false);
+			assert.equal(sm._sessions.has("agent-2"), false);
+			assert.equal(sm._sessions.has("session-0"), true); // team lead alive
+			assert.ok(team.getTeamState("goal-1"), "team state should still exist");
 			assert.equal(goal.state, "complete");
 		});
 	});
@@ -596,8 +665,8 @@ describe("TeamManager", () => {
 
 			// Completing one team should not affect the other
 			await team.completeTeam("goal-1");
-			assert.equal(team.getTeamState("goal-1"), undefined);
-			assert.ok(team.getTeamState("goal-2"));
+			assert.ok(team.getTeamState("goal-1"), "completed team still has state");
+			assert.ok(team.getTeamState("goal-2"), "other team unaffected");
 		});
 	});
 
@@ -642,7 +711,7 @@ describe("TeamManager", () => {
 			assert.equal(state!.agents[0].task, "build something");
 		});
 
-		it("should remove persisted state on completeTeam", async () => {
+		it("should persist state on completeTeam (team lead remains)", async () => {
 			const goals = new Map<string, MockGoal>();
 			const goal = createMockGoal();
 			goals.set(goal.id, goal);
@@ -653,9 +722,11 @@ describe("TeamManager", () => {
 			await team1.startTeam("goal-1");
 			await team1.completeTeam("goal-1");
 
-			// New manager should not see the team
+			// New manager should still see the team (team lead stays alive)
 			const team2 = new TeamManager(sm, DEFAULT_CONFIG);
-			assert.equal(team2.getTeamState("goal-1"), undefined);
+			const state = team2.getTeamState("goal-1");
+			assert.ok(state, "completed team should be persisted");
+			assert.equal(state!.agents.length, 0, "role agents should be cleared");
 		});
 	});
 
@@ -760,8 +831,7 @@ describe("TeamManager", () => {
 			const result = await team.spawnRole("goal-1", "reviewer", "Review PR #42");
 			const session = sm.getSession(result.sessionId);
 			assert.ok(session);
-			assert.ok(session.title.includes("🔍"), `reviewer should have 🔍 emoji, got: ${session.title}`);
-			assert.ok(session.title.includes("Reviewer"), `title should include Reviewer, got: ${session.title}`);
+			assert.ok(session.title.startsWith("Reviewer:"), `title should start with "Reviewer:", got: ${session.title}`);
 		});
 
 		it("should dismiss a role agent and clean up the worktree", async () => {
@@ -852,7 +922,8 @@ describe("TeamManager", () => {
 			// Worktree should be cleaned up
 			assert.equal(fs.existsSync(r1.worktreePath), false, "worktree should be gone after completeTeam");
 			assert.equal(goal.state, "complete");
-			assert.equal(team.getTeamState("goal-1"), undefined);
+			// Team state persists (team lead stays alive for reporting)
+			assert.ok(team.getTeamState("goal-1"), "team state should still exist");
 		});
 
 		it("should handle all valid roles: coder, reviewer, tester", async () => {
