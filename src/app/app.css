@@ -408,7 +408,7 @@
 /* Sidebar "active" shimmer — mexican wave of brightness across letters */
 .sidebar-shimmer-letter {
 	display: inline-block;
-	animation: sidebar-shimmer 2.4s ease-in-out infinite;
+	animation: sidebar-shimmer 2.88s ease-in-out infinite;
 }
 
 @keyframes sidebar-shimmer {
