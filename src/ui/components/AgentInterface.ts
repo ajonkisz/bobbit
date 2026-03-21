@@ -2,7 +2,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Select, type SelectOption } from "@mariozechner/mini-lit/dist/Select.js";
 import { streamSimple, type ToolResultMessage, type Usage } from "@mariozechner/pi-ai";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 import { Brain, Sparkles } from "lucide";
 import { ModelSelector } from "../dialogs/ModelSelector.js";
@@ -10,6 +10,8 @@ import type { MessageEditor } from "./MessageEditor.js";
 import "./MessageEditor.js";
 import "./MessageList.js";
 import "./GitStatusWidget.js";
+import "./BgProcessPill.js";
+import type { BgProcessInfo } from "./BgProcessPill.js";
 import "./Messages.js"; // Import for side effects to register the custom elements
 import { getAppStorage } from "../storage/app-storage.js";
 import "./StreamingMessageContainer.js";
@@ -50,6 +52,9 @@ export class AgentInterface extends LitElement {
 		status: Array<{ file: string; status: string }>;
 	};
 	@property({ type: Boolean }) gitStatusLoading = false;
+	// Background processes for this session
+	@property({ attribute: false }) bgProcesses: BgProcessInfo[] = [];
+	@property({ attribute: false }) onBgProcessKill?: (id: string) => void;
 	// Optional custom API key prompt handler - if not provided, uses default dialog
 	@property({ attribute: false }) onApiKeyRequired?: (provider: string) => Promise<boolean>;
 	// Optional callback called before sending a message
@@ -628,9 +633,16 @@ export class AgentInterface extends LitElement {
 				<!-- Input Area -->
 				<div class="shrink-0 pt-0 pb-1">
 					<div class="max-w-5xl mx-auto px-2 relative">
-						${this.gitStatus || this.gitStatusLoading ? html`
-						<div class="absolute right-2 bottom-full mb-1.5 z-10 pointer-events-auto" style="max-width:calc(100% - 1rem)">
-							<git-status-widget
+						${this.bgProcesses.length > 0 || this.gitStatus || this.gitStatusLoading ? html`
+						<div class="absolute right-2 bottom-full mb-1.5 z-10 pointer-events-auto flex items-center gap-1.5 flex-wrap justify-end" style="max-width:calc(100% - 1rem)">
+							${this.bgProcesses.map((p) => html`
+								<bg-process-pill
+									.process=${p}
+									.sessionId=${this.session?.sessionId ?? ''}
+									.onKill=${this.onBgProcessKill}
+								></bg-process-pill>
+							`)}
+							${this.gitStatus || this.gitStatusLoading ? html`<git-status-widget
 								.branch=${this.gitStatus?.branch ?? ''}
 								.primaryBranch=${this.gitStatus?.primaryBranch ?? 'master'}
 								.isOnPrimary=${this.gitStatus?.isOnPrimary ?? true}
@@ -645,7 +657,7 @@ export class AgentInterface extends LitElement {
 								.unpushed=${this.gitStatus?.unpushed ?? false}
 								.statusFiles=${this.gitStatus?.status ?? []}
 								.loading=${this.gitStatusLoading}
-							></git-status-widget>
+							></git-status-widget>` : nothing}
 						</div>
 						` : ''}
 						<message-editor

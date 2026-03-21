@@ -91,6 +91,8 @@ export class RemoteAgent {
 	onWorkflowUpdate?: () => void;
 	/** Callback fired when the server-side prompt queue changes. */
 	onQueueUpdate?: (queue: QueuedMessage[]) => void;
+	/** Callback fired when background process state changes. */
+	onBgProcessUpdate?: () => void;
 	private _title = "New session";
 
 	constructor() {
@@ -649,6 +651,12 @@ export class RemoteAgent {
 			case "queue_update":
 				this._serverQueue = Array.isArray(msg.queue) ? msg.queue : [];
 				this.onQueueUpdate?.(this._serverQueue);
+				break;
+
+			case "bg_process_created":
+			case "bg_process_output":
+			case "bg_process_exited":
+				this.onBgProcessUpdate?.();
 				break;
 
 			case "error":

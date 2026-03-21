@@ -1373,6 +1373,11 @@ export class SessionManager {
 		await session.rpcClient.stop();
 		session.status = "terminated";
 
+		// Clean up background processes
+		if ((this as any).bgProcessManager) {
+			(this as any).bgProcessManager.cleanup(id);
+		}
+
 		for (const client of session.clients) {
 			client.close(1000, "Session terminated");
 		}

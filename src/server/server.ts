@@ -21,6 +21,7 @@ import { TraitStore } from "./agent/trait-store.js";
 import { TraitManager } from "./agent/trait-manager.js";
 
 import type { TaskState } from "./agent/task-store.js";
+import { BgProcessManager } from "./agent/bg-process-manager.js";
 import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
 import { ArtifactSpecStore } from "./agent/artifact-spec-store.js";
 import { ArtifactSpecManager } from "./agent/artifact-spec-manager.js";
@@ -76,6 +77,12 @@ export function createGateway(config: GatewayConfig) {
 		goalArtifactStore,
 		traitManager,
 	});
+	const bgProcessManager = new BgProcessManager((sessionId: string) => {
+		const session = sessionManager.getSession(sessionId);
+		return session?.clients;
+	});
+	// Expose bg process manager for API routes and session cleanup
+	(sessionManager as any).bgProcessManager = bgProcessManager;
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
 
@@ -115,7 +122,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, traitManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, traitManager, bgProcessManager);
 			return;
 		}
 
@@ -194,6 +201,7 @@ async function handleApiRoute(
 	goalArtifactStore: GoalArtifactStore,
 	artifactSpecManager: ArtifactSpecManager,
 	traitManager: TraitManager,
+	bgProcessManager: BgProcessManager,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -1685,6 +1693,53 @@ async function handleApiRoute(
 			? path.join(piDir(), `preview-${sessionId}.html`)
 			: path.join(piDir(), "preview.html");
 		fs.writeFileSync(previewPath, body?.html || "", "utf-8");
+		json({ ok: true });
+		return;
+	}
+
+	// ── Background process endpoints ──────────────────────────────
+
+	// POST /api/sessions/:id/bg-processes — create a background process
+	const bgCreateMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/bg-processes$/);
+	if (bgCreateMatch && req.method === "POST") {
+		const id = bgCreateMatch[1];
+		const session = sessionManager.getSession(id);
+		if (!session) { json({ error: "Session not found" }, 404); return; }
+		const body = await readBody(req);
+		if (!body?.command) { json({ error: "command is required" }, 400); return; }
+		const info = bgProcessManager.create(id, body.command, session.cwd);
+		json(info, 201);
+		return;
+	}
+
+	// GET /api/sessions/:id/bg-processes — list background processes
+	if (bgCreateMatch && req.method === "GET") {
+		const id = bgCreateMatch[1];
+		json({ processes: bgProcessManager.list(id) });
+		return;
+	}
+
+	// GET /api/sessions/:id/bg-processes/:pid/logs — get logs
+	const bgLogsMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/bg-processes\/([^/]+)\/logs$/);
+	if (bgLogsMatch && req.method === "GET") {
+		const [, sessionId, processId] = bgLogsMatch;
+		const logs = bgProcessManager.getLogs(sessionId, processId);
+		if (!logs) { json({ error: "Process not found" }, 404); return; }
+		const tail = parseInt(url.searchParams.get("tail") || "200", 10);
+		json({
+			log: logs.log.slice(-tail),
+			stdout: logs.stdout.slice(-tail),
+			stderr: logs.stderr.slice(-tail),
+		});
+		return;
+	}
+
+	// DELETE /api/sessions/:id/bg-processes/:pid — kill a background process
+	const bgKillMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/bg-processes\/([^/]+)$/);
+	if (bgKillMatch && req.method === "DELETE") {
+		const [, sessionId, processId] = bgKillMatch;
+		const killed = bgProcessManager.kill(sessionId, processId);
+		if (!killed) { json({ error: "Process not found or already exited" }, 404); return; }
 		json({ ok: true });
 		return;
 	}

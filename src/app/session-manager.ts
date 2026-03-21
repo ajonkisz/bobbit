@@ -355,6 +355,10 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		remote.onWorkflowUpdate = () => renderApp();
 
+		remote.onBgProcessUpdate = () => {
+			refreshBgProcessesForSession(sessionId);
+		};
+
 		remote.onGoalProposal = (proposal) => {
 			state.activeGoalProposal = proposal;
 			if (state.assistantType === "goal") {
@@ -522,8 +526,16 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			}
 		}
 
-		// Initial git status fetch
+		// Set up bg process kill handler
+		if (state.chatPanel.agentInterface) {
+			state.chatPanel.agentInterface.onBgProcessKill = (processId: string) => {
+				killBgProcess(sessionId, processId);
+			};
+		}
+
+		// Initial git status and bg process fetch
 		refreshGitStatusForSession(sessionId);
+		refreshBgProcessesForSession(sessionId);
 
 		if (isExisting) {
 			remote.requestMessages();
@@ -764,6 +776,26 @@ export function disconnectGateway(): void {
 // ============================================================================
 // GIT STATUS
 // ============================================================================
+
+async function refreshBgProcessesForSession(sessionId: string): Promise<void> {
+	const ai = state.chatPanel?.agentInterface;
+	if (!ai) return;
+	try {
+		const res = await gatewayFetch(`/api/sessions/${sessionId}/bg-processes`);
+		if (res.ok && activeSessionId() === sessionId) {
+			const data = await res.json();
+			ai.bgProcesses = data.processes || [];
+		}
+	} catch { /* ignore */ }
+}
+
+async function killBgProcess(sessionId: string, processId: string): Promise<void> {
+	try {
+		await gatewayFetch(`/api/sessions/${sessionId}/bg-processes/${processId}`, { method: "DELETE" });
+		// Refresh the list after kill
+		refreshBgProcessesForSession(sessionId);
+	} catch { /* ignore */ }
+}
 
 async function refreshGitStatusForSession(sessionId: string): Promise<void> {
 	const ai = state.chatPanel?.agentInterface;

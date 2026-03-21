@@ -53,6 +53,8 @@ export function computeToolActivationArgs(allowedTools?: string[], toolManager?:
 
 		for (const [, provider] of providers) {
 			if (provider.type === "builtin" && provider.tool) {
+				// Skip bash — provided by custom bash-tool.ts extension (loaded by rpc-bridge)
+				if (provider.tool === "bash") continue;
 				builtins.push(provider.tool);
 			} else if (provider.type === "user-extension" && provider.extension) {
 				extensionPaths.add(path.join(extDir, provider.extension));
@@ -82,7 +84,8 @@ export function computeToolActivationArgs(allowedTools?: string[], toolManager?:
 			continue;
 		}
 		if (provider.type === "builtin" && provider.tool) {
-			activeBaseTools.push(provider.tool);
+			// Skip bash — provided by custom bash-tool.ts extension (loaded by rpc-bridge)
+			if (provider.tool !== "bash") activeBaseTools.push(provider.tool);
 		} else if (provider.type === "user-extension" && provider.extension) {
 			neededExtensions.add(path.join(extDir, provider.extension));
 		}
