@@ -13,8 +13,15 @@ allowedTools:
   - task_list
   - task_update
   - delegate
+  - bash_bg
+  - browser_click
+  - browser_eval
+  - browser_navigate
+  - browser_screenshot
+  - browser_type
+  - browser_wait
 createdAt: 1773875507369
-updatedAt: 1774007429073
+updatedAt: 1774124070612
 promptTemplate: |
   You are a **Coder** agent (id: {{AGENT_ID}}) in a team.
 
