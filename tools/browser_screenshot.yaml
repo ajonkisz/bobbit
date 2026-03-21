@@ -6,3 +6,12 @@ provider:
   extension: playwright/index.ts
 group: Browser
 renderer: src/ui/tools/renderers/ScreenshotRenderer.ts
+docs: |
+  Capture a screenshot of the current browser page or a specific element.
+  Returns the image as an inline attachment. A page must be loaded first
+  via `browser_navigate`.
+
+  Parameters:
+  - `selector` (optional): CSS selector to screenshot a specific element
+  - `fullPage` (optional): Capture the full scrollable page (default: false)
+  - `savePath` (optional): File path to save the screenshot as PNG on disk

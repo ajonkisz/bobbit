@@ -5,6 +5,7 @@ provider:
   type: builtin
   tool: find
 group: File System
+renderer: src/ui/tools/renderers/FindRenderer.ts
 docs: |
   Search for files matching a glob pattern. Returns matching file paths relative
   to the search directory. Respects `.gitignore`.

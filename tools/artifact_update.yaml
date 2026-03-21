@@ -6,3 +6,12 @@ provider:
   extension: goal-tools.ts
 group: Artifacts
 renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts
+docs: |
+  Update an existing artifact's content. Automatically increments the version
+  number. The full content is replaced — there is no partial update.
+
+  Parameters:
+  - `artifact_id` (required): ID of the artifact to update
+  - `content` (required): New full content (markdown)
+
+  Returns the updated artifact with its new version number.

@@ -5,6 +5,7 @@ provider:
   type: bobbit-extension
   extension: bash-tool.ts
 group: Shell
+renderer: src/ui/tools/renderers/BgProcessRenderer.ts
 docs: |
   Manage background shell processes that don't block the agent.
 

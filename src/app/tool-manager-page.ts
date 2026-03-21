@@ -21,10 +21,16 @@ function mockResult(text: string): any {
 
 /** Sample params and results for renderer preview. */
 const TOOL_MOCK_DATA: Record<string, { params: any; result: any }> = {
+	// Shell
 	bash: {
 		params: { command: "npm run check" },
 		result: mockResult("No errors found.\n"),
 	},
+	bash_bg: {
+		params: { action: "create", command: "npm run dev" },
+		result: mockResult('{"id":"bg-1","status":"running"}'),
+	},
+	// File System
 	read: {
 		params: { path: "src/app/main.ts", limit: 20 },
 		result: mockResult("import { html } from 'lit';\nimport { state } from './state.js';\n// ...(18 more lines)"),
@@ -37,18 +43,6 @@ const TOOL_MOCK_DATA: Record<string, { params: any; result: any }> = {
 		params: { path: "src/app/main.ts", oldText: "const x = 1;", newText: "const x = 2;" },
 		result: mockResult("Successfully replaced text in src/app/main.ts."),
 	},
-	web_search: {
-		params: { query: "lit html template best practices" },
-		result: mockResult("1. Lit — Best Practices (lit.dev)\n2. Web Components Guide (MDN)\n3. Template Rendering Patterns"),
-	},
-	web_fetch: {
-		params: { url: "https://lit.dev/docs/" },
-		result: mockResult("Lit is a simple library for building fast, lightweight web components..."),
-	},
-	delegate: {
-		params: { instructions: "Review the auth module for security issues" },
-		result: mockResult("No critical issues found. 2 minor suggestions."),
-	},
 	ls: {
 		params: { path: "src/app" },
 		result: mockResult("main.ts\nrender.ts\nrouting.ts\nstate.ts\napi.ts\nsidebar.ts"),
@@ -58,8 +52,119 @@ const TOOL_MOCK_DATA: Record<string, { params: any; result: any }> = {
 		result: mockResult("src/ui/tools/index.ts:74: export function renderTool(\nsrc/app/tool-manager-page.ts:10: import { renderTool } from '../ui/tools/index.js';"),
 	},
 	find: {
-		params: { glob: "src/**/*.css" },
+		params: { pattern: "**/*.css", path: "src/" },
 		result: mockResult("src/app/app.css\nsrc/app/role-manager.css\nsrc/app/tool-manager.css"),
+	},
+	// Web
+	web_search: {
+		params: { query: "lit html template best practices" },
+		result: mockResult("1. Lit — Best Practices\n   https://lit.dev/docs/components/best-practices/\n   Guidelines for building efficient Lit components.\n\n2. Web Components Guide\n   https://developer.mozilla.org/en-US/docs/Web/API/Web_Components\n   MDN reference for Web Components APIs."),
+	},
+	web_fetch: {
+		params: { url: "https://lit.dev/docs/" },
+		result: mockResult("Lit is a simple library for building fast, lightweight web components. It provides reactive state, declarative templates, and a small footprint..."),
+	},
+	// Browser
+	browser_navigate: {
+		params: { url: "https://localhost:5173/dashboard" },
+		result: mockResult("Navigated to https://localhost:5173/dashboard"),
+	},
+	browser_click: {
+		params: { selector: "button[type='submit']" },
+		result: mockResult("Clicked element matching button[type='submit']"),
+	},
+	browser_type: {
+		params: { selector: "#username", text: "admin@example.com" },
+		result: mockResult("Typed into #username"),
+	},
+	browser_eval: {
+		params: { expression: "document.querySelectorAll('.todo-item').length" },
+		result: mockResult("12"),
+	},
+	browser_wait: {
+		params: { selector: ".dashboard-content", timeout: 5000 },
+		result: mockResult("Element .dashboard-content is visible"),
+	},
+	browser_screenshot: {
+		params: { selector: ".main-content" },
+		result: mockResult("Screenshot captured"),
+	},
+	// Agent
+	delegate: {
+		params: { instructions: "Review the auth module for security issues" },
+		result: mockResult("No critical issues found. 2 minor suggestions:\n1. Add rate limiting to login endpoint\n2. Use constant-time comparison for tokens"),
+	},
+	workflow: {
+		params: { action: "status" },
+		result: mockResult('{"workflow_id":"code-review","phase":"analysis","status":"in-progress","artifacts_collected":2}'),
+	},
+	// Team
+	team_spawn: {
+		params: { role: "coder", task: "Implement user authentication module" },
+		result: mockResult('{"sessionId":"sess-abc123","role":"coder","status":"idle"}'),
+	},
+	team_list: {
+		params: {},
+		result: mockResult('{"agents":[{"role":"coder","status":"working","sessionId":"sess-abc123","task":"Implement auth"},{"role":"reviewer","status":"idle","sessionId":"sess-def456","task":"Awaiting code review"}]}'),
+	},
+	team_dismiss: {
+		params: { session_id: "sess-abc123" },
+		result: mockResult('{"status":"dismissed","sessionId":"sess-abc123"}'),
+	},
+	team_complete: {
+		params: {},
+		result: mockResult('{"status":"completed","agents_dismissed":3}'),
+	},
+	team_steer: {
+		params: { session_id: "sess-abc123", message: "Focus on error handling first" },
+		result: mockResult('{"status":"steered"}'),
+	},
+	team_prompt: {
+		params: { session_id: "sess-abc123", message: "Run the test suite and fix any failures" },
+		result: mockResult('{"status":"queued","position":1}'),
+	},
+	team_abort: {
+		params: { session_id: "sess-abc123" },
+		result: mockResult('{"status":"aborted"}'),
+	},
+	// Tasks
+	task_list: {
+		params: {},
+		result: mockResult('{"tasks":[{"id":"task-001","title":"Implement login endpoint","type":"implementation","state":"complete"},{"id":"task-002","title":"Review auth module","type":"code-review","state":"in-progress"},{"id":"task-003","title":"Write integration tests","type":"testing","state":"todo"}]}'),
+	},
+	task_create: {
+		params: { title: "Add rate limiting middleware", type: "implementation" },
+		result: mockResult('{"id":"task-004","title":"Add rate limiting middleware","type":"implementation","state":"todo"}'),
+	},
+	task_update: {
+		params: { task_id: "task-002abcd", state: "complete", result_summary: "No issues found" },
+		result: mockResult('{"id":"task-002abcd","title":"Review auth module","type":"code-review","state":"complete"}'),
+	},
+	// Artifacts
+	artifact_list: {
+		params: {},
+		result: mockResult('{"artifacts":[{"id":"art-001","name":"Auth Design Doc","type":"design-doc","version":2},{"id":"art-002","name":"Security Review","type":"review-findings","version":1}]}'),
+	},
+	artifact_create: {
+		params: { name: "Test Plan", type: "test-plan", content: "# Test Plan\n\n## Scope\nAuthentication module..." },
+		result: mockResult('{"id":"art-003","name":"Test Plan","type":"test-plan","version":1}'),
+	},
+	artifact_get: {
+		params: { artifact_id: "art-001abc" },
+		result: mockResult('{"id":"art-001abc","name":"Auth Design Doc","type":"design-doc","version":2,"content":"# Authentication Design\\n\\n## Overview\\nToken-based auth with refresh rotation..."}'),
+	},
+	artifact_update: {
+		params: { artifact_id: "art-001abc", content: "# Updated Design Doc\n\n## Changes\nAdded rate limiting section..." },
+		result: mockResult('{"id":"art-001abc","name":"Auth Design Doc","type":"design-doc","version":3}'),
+	},
+	// Personalities
+	personalities_list: {
+		params: {},
+		result: mockResult('[{"name":"thorough","description":"Extremely careful and detailed"},{"name":"fast","description":"Prioritizes speed over perfection"}]'),
+	},
+	personalities_create: {
+		params: { name: "cautious", description: "Risk-averse, prefers safe approaches", prompt: "Always consider edge cases..." },
+		result: mockResult('{"name":"cautious","description":"Risk-averse, prefers safe approaches"}'),
 	},
 };
 

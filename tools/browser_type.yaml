@@ -6,3 +6,14 @@ provider:
   extension: playwright/index.ts
 group: Browser
 renderer: src/ui/tools/renderers/BrowserTypeRenderer.ts
+docs: |
+  Type text into a form input, textarea, or contenteditable element. The field
+  is cleared first by default — existing content is replaced entirely.
+
+  Parameters:
+  - `selector` (required): CSS selector of the input element
+  - `text` (required): Text to type into the element
+  - `clear` (optional): Clear field before typing (default: true). Set false to append.
+
+  Fires input, change, and key events. Use `browser_wait` first if the input
+  appears after an async load.

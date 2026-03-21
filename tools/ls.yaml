@@ -5,6 +5,7 @@ provider:
   type: builtin
   tool: ls
 group: File System
+renderer: src/ui/tools/renderers/LsRenderer.ts
 docs: |
   List the contents of a directory. Returns entries sorted alphabetically, with
   directories suffixed with `/`. Includes dotfiles. Respects `.gitignore`.

@@ -6,3 +6,8 @@ provider:
   extension: goal-tools.ts
 group: Artifacts
 renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts
+docs: |
+  List all artifacts for the current goal. Returns metadata only (name, type,
+  version, ID) — not the full content. Use `artifact_get` to read content.
+
+  No parameters required. Returns an array of artifact metadata objects.

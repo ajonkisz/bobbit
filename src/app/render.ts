@@ -79,7 +79,7 @@ function renderMobileLanding() {
 					</button>
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => showGoalDialog()}>
-						${icon(Crosshair, "xs")} Goal
+						${icon(Crosshair, "xs")} New Goal
 					</button>
 				</div>
 				${state.sessionsLoading
@@ -186,8 +186,8 @@ function goalPreviewPanel() {
 		state.activeGoalProposal = null;
 		const teamMode = state.previewTeamMode;
 		const worktree = state.previewWorktree;
-		state.previewTeamMode = false;
-		state.previewWorktree = false;
+		state.previewTeamMode = true;
+		state.previewWorktree = true;
 		// Clean up persisted draft
 		if (sessionId) {
 			deleteGoalDraft(sessionId);

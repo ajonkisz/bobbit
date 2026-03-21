@@ -6,3 +6,14 @@ provider:
   extension: goal-tools.ts
 group: Tasks
 renderer: src/ui/tools/renderers/TaskToolRenderers.ts
+docs: |
+  Create a new task for the current goal. Tasks track units of work with
+  type, state, assignment, and dependency information.
+
+  Parameters:
+  - `title` (required): Short task title
+  - `type` (required): Task type (implementation, code-review, testing, bug-fix, refactor, custom)
+  - `spec` (optional): Detailed task specification
+  - `depends_on` (optional): Array of task IDs this task depends on
+
+  Some task types require specific artifacts to exist first (returns 409 if missing).

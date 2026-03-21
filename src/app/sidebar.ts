@@ -306,7 +306,7 @@ export function renderSidebar() {
 						title="New goal"
 					>
 						${icon(Crosshair, "sm")}
-						<span>Goal</span>
+						<span>New Goal</span>
 					</button>
 				</div>
 			</div>

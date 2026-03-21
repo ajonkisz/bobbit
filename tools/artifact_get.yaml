@@ -6,3 +6,11 @@ provider:
   extension: goal-tools.ts
 group: Artifacts
 renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts
+docs: |
+  Retrieve an artifact's full content by ID. Returns the artifact with its
+  name, type, version, and complete markdown content.
+
+  Parameters:
+  - `artifact_id` (required): ID of the artifact to retrieve
+
+  Use `artifact_list` first to discover available artifact IDs.

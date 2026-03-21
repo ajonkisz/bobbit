@@ -6,3 +6,14 @@ provider:
   extension: web-research.ts
 group: Web
 renderer: src/ui/tools/renderers/WebFetchRenderer.ts
+docs: |
+  Fetch a web page and extract readable text content. Uses curl internally,
+  then strips HTML boilerplate to return clean text. Much faster than browser
+  tools for static pages.
+
+  Parameters:
+  - `url` (required): Full URL to fetch (must include protocol)
+  - `maxLength` (optional): Maximum characters to return (default: 20000)
+
+  Does not execute JavaScript — use browser tools for SPAs. Follows redirects
+  automatically. Increase `maxLength` for long documentation pages.

@@ -6,3 +6,13 @@ provider:
   extension: playwright/index.ts
 group: Browser
 renderer: src/ui/tools/renderers/BrowserWaitRenderer.ts
+docs: |
+  Wait for a DOM element matching a CSS selector to become visible on the page.
+  Essential for handling async content loading, page transitions, and dynamic UI.
+
+  Parameters:
+  - `selector` (required): CSS selector of the element to wait for
+  - `timeout` (optional): Maximum wait time in milliseconds (default: 10000)
+
+  Throws on timeout. Waits for visibility, not just DOM presence. Use before
+  `browser_click` on dynamic elements. Timeout is in milliseconds, not seconds.

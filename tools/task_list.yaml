@@ -6,3 +6,9 @@ provider:
   extension: goal-tools.ts
 group: Tasks
 renderer: src/ui/tools/renderers/TaskToolRenderers.ts
+docs: |
+  List all tasks for the current goal with their state, type, assignment,
+  and dependency information. No parameters required.
+
+  Returns tasks with fields: id, title, type, state (todo, in-progress,
+  complete, blocked, skipped), assignedTo (session ID), depends_on.

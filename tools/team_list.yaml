@@ -6,3 +6,8 @@ provider:
   extension: team-lead-tools.ts
 group: Team
 renderer: src/ui/tools/renderers/TeamToolRenderers.ts
+docs: |
+  List all agents currently in the team. Returns each agent's role, status
+  (idle, streaming, working), session ID, and current task.
+
+  No parameters required. Returns an array of agent objects.
