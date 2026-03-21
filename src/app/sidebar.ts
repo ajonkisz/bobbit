@@ -247,11 +247,16 @@ function renderStaffSidebarSection() {
 				const isAborting = session?.isAborting || false;
 				const accessory = session?.accessory;
 				return html`
-				<div class="flex items-center gap-1.5 px-2 ${SESSION_ROW_PY} rounded-md ${active ? "bg-secondary" : "hover:bg-secondary/50"} cursor-pointer transition-colors"
+				<div class="group relative flex items-center gap-1.5 px-2 ${SESSION_ROW_PY} rounded-md ${active ? "bg-secondary" : "hover:bg-secondary/50"} cursor-pointer transition-colors"
 					@click=${() => handleStaffClick(agent)}>
 					${statusBobbit(sessionStatus, isCompacting, agent.currentSessionId, active, isAborting, false, false, accessory)}
 					<span class="flex-1 text-xs truncate ${active ? "text-foreground font-medium" : "text-foreground"}">${agent.name}</span>
 					${agent.lastWakeAt ? html`<span class="text-[10px] text-muted-foreground shrink-0">${relativeTime(agent.lastWakeAt)}</span>` : ""}
+					<div class="absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-6 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
+						<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
+							@click=${(e: Event) => { e.stopPropagation(); window.location.hash = `#/staff/${agent.id}`; }}
+							title="Configure">${icon(Wrench, "xs")}</button>
+					</div>
 				</div>
 			`; }) : ""}
 	`;
