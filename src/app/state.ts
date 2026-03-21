@@ -20,6 +20,7 @@ export interface GatewaySession {
 	roleAssistant?: boolean;
 	toolAssistant?: boolean;
 	artifactSpecAssistant?: boolean;
+	assistantType?: string;
 	colorIndex?: number;
 	/** If this is a delegate session, the parent session ID */
 	delegateOf?: string;
@@ -81,9 +82,12 @@ export const state = {
 	/** Active goal proposal from a goal-assistant session */
 	activeGoalProposal: null as { title: string; spec: string; cwd?: string } | null,
 
+	// Unified assistant state
+	assistantType: null as string | null,
+	assistantTab: "chat" as "chat" | "preview",
+	assistantHasProposal: false,
+
 	// Goal assistant split-screen state
-	isGoalAssistantSession: false,
-	goalAssistantTab: "chat" as "chat" | "preview",
 	previewTitle: "",
 	previewCwd: "",
 	previewSpec: "",
