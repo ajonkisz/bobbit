@@ -24,13 +24,16 @@ export interface PersistedSession {
 	teamGoalId?: string;
 	/** Path to the git worktree for this session */
 	worktreePath?: string;
-	/** Whether this is a goal-creation assistant session */
+	/** Assistant type: "goal" | "role" | "tool" | "artifact-spec" */
+	assistantType?: string;
+	// Legacy boolean fields — kept for backward compat during migration
+	/** @deprecated Use assistantType instead */
 	goalAssistant?: boolean;
-	/** Whether this is a role-creation assistant session */
+	/** @deprecated Use assistantType instead */
 	roleAssistant?: boolean;
-	/** Whether this is a tool-management assistant session */
+	/** @deprecated Use assistantType instead */
 	toolAssistant?: boolean;
-	/** Whether this is an artifact-spec-creation assistant session */
+	/** @deprecated Use assistantType instead */
 	artifactSpecAssistant?: boolean;
 	/** Task ID this session is working on */
 	taskId?: string;
@@ -69,6 +72,13 @@ export class SessionStore {
 							if (s.swarmGoalId !== undefined && s.teamGoalId === undefined) {
 								s.teamGoalId = s.swarmGoalId;
 								delete s.swarmGoalId;
+							}
+							// Normalize legacy boolean flags to assistantType
+							if (!s.assistantType) {
+								if (s.goalAssistant) s.assistantType = "goal";
+								else if (s.roleAssistant) s.assistantType = "role";
+								else if (s.toolAssistant) s.assistantType = "tool";
+								else if (s.artifactSpecAssistant) s.assistantType = "artifact-spec";
 							}
 							this.sessions.set(s.id, s);
 						}
@@ -111,7 +121,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "goalAssistant" | "roleAssistant" | "toolAssistant" | "artifactSpecAssistant" | "taskId" | "accessory" | "preview" | "traits" | "messageQueue">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "assistantType" | "goalAssistant" | "roleAssistant" | "toolAssistant" | "artifactSpecAssistant" | "taskId" | "accessory" | "preview" | "traits" | "messageQueue">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);

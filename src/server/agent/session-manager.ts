@@ -10,10 +10,7 @@ import { TaskManager } from "./task-manager.js";
 import { PromptQueue } from "./prompt-queue.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
 import { SessionStore, type PersistedSession } from "./session-store.js";
-import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
-import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
-import { TOOL_ASSISTANT_PROMPT } from "./tool-assistant.js";
-import { ARTIFACT_SPEC_ASSISTANT_PROMPT } from "./artifact-spec-assistant.js";
+import { getAssistantDef } from "./assistant-registry.js";
 import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 import { CostTracker } from "./cost-tracker.js";
@@ -42,14 +39,8 @@ export interface SessionInfo {
 	isCompacting: boolean;
 	titleGenerated: boolean;
 	goalId?: string;
-	/** True if this is a goal-creation assistant session */
-	goalAssistant?: boolean;
-	/** True if this is a role-creation assistant session */
-	roleAssistant?: boolean;
-	/** True if this is a tool-management assistant session */
-	toolAssistant?: boolean;
-	/** True if this is an artifact-spec-creation assistant session */
-	artifactSpecAssistant?: boolean;
+	/** Assistant type: "goal" | "role" | "tool" | "artifact-spec" */
+	assistantType?: string;
 	/** Whether this session has a live HTML preview panel */
 	preview?: boolean;
 	/** If this is a delegate session, the parent session ID */
@@ -469,7 +460,7 @@ export class SessionManager {
 		}
 
 		// Restore extension args for goal/team sessions
-		if (ps.goalId && !ps.goalAssistant && !ps.roleAssistant && !ps.toolAssistant) {
+		if (ps.goalId && !ps.assistantType) {
 			const isTeamLead = ps.role === "team-lead";
 			const extensionPath = isTeamLead
 				? path.resolve(__dirname, "../../../extensions/team-lead-tools.ts")
@@ -478,13 +469,14 @@ export class SessionManager {
 		}
 
 		// Re-assemble system prompt (global + AGENTS.md + goal spec)
-		if (ps.goalAssistant) {
-			// Goal assistant sessions get the special goal assistant prompt
+		const assistantDef = ps.assistantType ? getAssistantDef(ps.assistantType) : undefined;
+		if (assistantDef) {
+			// Assistant sessions get their specialized prompt
 			const promptPath = assembleSystemPrompt(ps.id, {
 				baseSystemPromptPath: undefined,
 				cwd: ps.cwd,
-				goalSpec: GOAL_ASSISTANT_PROMPT,
-				goalTitle: "Goal Creation Assistant",
+				goalSpec: assistantDef.prompt,
+				goalTitle: assistantDef.promptTitle,
 				goalState: "active",
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
@@ -522,10 +514,7 @@ export class SessionManager {
 			isCompacting: false,
 			titleGenerated: ps.title !== "New session",
 			goalId: ps.goalId,
-			goalAssistant: ps.goalAssistant,
-			roleAssistant: ps.roleAssistant,
-			toolAssistant: ps.toolAssistant,
-			artifactSpecAssistant: ps.artifactSpecAssistant,
+			assistantType: ps.assistantType,
 			role: ps.role,
 			teamGoalId: ps.teamGoalId,
 			worktreePath: ps.worktreePath,
@@ -583,7 +572,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; toolAssistant?: boolean; artifactSpecAssistant?: boolean; allowedTools?: string[]; traits?: Array<{ label: string; promptFragment: string }>; traitNames?: string[] }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, assistantType?: string, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; allowedTools?: string[]; traits?: Array<{ label: string; promptFragment: string }>; traitNames?: string[] }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -598,7 +587,7 @@ export class SessionManager {
 		// Auto-load goal tools extension for any goal-associated session
 		// (unless it's a goal/role assistant, or already has an extension —
 		// team-lead-tools.ts imports goal-tools internally, so no double-load)
-		if (goalId && !goalAssistant && !opts?.roleAssistant && !opts?.toolAssistant && !opts?.artifactSpecAssistant) {
+		if (goalId && !assistantType) {
 			const alreadyHasExtension = bridgeOptions.args?.includes("--extension");
 			if (!alreadyHasExtension) {
 				bridgeOptions.args = bridgeOptions.args || [];
@@ -608,43 +597,14 @@ export class SessionManager {
 			bridgeOptions.env = { ...bridgeOptions.env, BOBBIT_GOAL_ID: goalId };
 		}
 
-		if (goalAssistant) {
-			// Goal assistant sessions get a special system prompt
+		const assistantDef = assistantType ? getAssistantDef(assistantType) : undefined;
+		if (assistantDef) {
+			// Assistant sessions get their specialized prompt
 			const promptPath = assembleSystemPrompt(id, {
 				baseSystemPromptPath: undefined,
 				cwd,
-				goalSpec: GOAL_ASSISTANT_PROMPT,
-				goalTitle: "Goal Creation Assistant",
-				goalState: "active",
-			});
-			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
-		} else if (opts?.roleAssistant) {
-			// Role assistant sessions get a special system prompt
-			const promptPath = assembleSystemPrompt(id, {
-				baseSystemPromptPath: undefined,
-				cwd,
-				goalSpec: ROLE_ASSISTANT_PROMPT,
-				goalTitle: "Role Creation Assistant",
-				goalState: "active",
-			});
-			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
-		} else if (opts?.toolAssistant) {
-			// Tool assistant sessions get a special system prompt
-			const promptPath = assembleSystemPrompt(id, {
-				baseSystemPromptPath: undefined,
-				cwd,
-				goalSpec: TOOL_ASSISTANT_PROMPT,
-				goalTitle: "Tool Management Assistant",
-				goalState: "active",
-			});
-			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
-		} else if (opts?.artifactSpecAssistant) {
-			// Artifact spec assistant sessions get a special system prompt
-			const promptPath = assembleSystemPrompt(id, {
-				baseSystemPromptPath: undefined,
-				cwd,
-				goalSpec: ARTIFACT_SPEC_ASSISTANT_PROMPT,
-				goalTitle: "Artifact Spec Assistant",
+				goalSpec: assistantDef.prompt,
+				goalTitle: assistantDef.promptTitle,
 				goalState: "active",
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
@@ -704,7 +664,7 @@ export class SessionManager {
 		const now = Date.now();
 		const session: SessionInfo = {
 			id,
-			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : opts?.toolAssistant ? "Tool Assistant" : opts?.artifactSpecAssistant ? "Spec Assistant" : "New session",
+			title: assistantDef?.title ?? "New session",
 			cwd,
 			status: "starting",
 			createdAt: now,
@@ -714,12 +674,9 @@ export class SessionManager {
 			eventBuffer,
 			unsubscribe: () => {},
 			isCompacting: false,
-			titleGenerated: (goalAssistant || opts?.roleAssistant || opts?.toolAssistant || opts?.artifactSpecAssistant) ? true : false,
+			titleGenerated: !!assistantDef,
 			goalId,
-			goalAssistant,
-			roleAssistant: opts?.roleAssistant,
-			toolAssistant: opts?.toolAssistant,
-			artifactSpecAssistant: opts?.artifactSpecAssistant,
+			assistantType,
 			taskId: opts?.taskId,
 			traits: opts?.traitNames,
 			allowedTools: opts?.allowedTools,
@@ -954,10 +911,7 @@ export class SessionManager {
 			createdAt: session.createdAt,
 			lastActivity: session.lastActivity,
 			goalId: session.goalId,
-			goalAssistant: session.goalAssistant,
-			roleAssistant: session.roleAssistant,
-			toolAssistant: session.toolAssistant,
-			artifactSpecAssistant: session.artifactSpecAssistant,
+			assistantType: session.assistantType,
 			role: session.role,
 			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
@@ -982,7 +936,11 @@ export class SessionManager {
 		clientCount: number;
 		isCompacting: boolean;
 		goalId?: string;
+		assistantType?: string;
 		goalAssistant?: boolean;
+		roleAssistant?: boolean;
+		toolAssistant?: boolean;
+		artifactSpecAssistant?: boolean;
 		delegateOf?: string;
 		role?: string;
 		teamGoalId?: string;
@@ -1002,10 +960,12 @@ export class SessionManager {
 			clientCount: s.clients.size,
 			isCompacting: s.isCompacting,
 			goalId: s.goalId,
-			goalAssistant: s.goalAssistant,
-			roleAssistant: s.roleAssistant,
-			toolAssistant: s.toolAssistant,
-			artifactSpecAssistant: s.artifactSpecAssistant,
+			assistantType: s.assistantType,
+			// Legacy boolean fields for backward compat
+			goalAssistant: s.assistantType === "goal",
+			roleAssistant: s.assistantType === "role",
+			toolAssistant: s.assistantType === "tool",
+			artifactSpecAssistant: s.assistantType === "artifact-spec",
 			delegateOf: s.delegateOf,
 			role: s.role,
 			teamGoalId: s.teamGoalId,
