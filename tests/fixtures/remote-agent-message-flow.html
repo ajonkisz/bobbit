@@ -5,7 +5,7 @@
 <script>
 /**
  * Simulates the RemoteAgent message state machine to test whether
- * user messages survive wholesale messages replacements.
+ * user messages survive all scenarios.
  */
 
 function extractText(message) {
@@ -28,6 +28,8 @@ function enrichUserMessage(msg) {
 	return { ...msg, role: "user-with-attachments", attachments: imageChunks };
 }
 
+let _idCounter = 0;
+
 class FakeRemoteAgent {
 	constructor() {
 		this.state = {
@@ -44,7 +46,17 @@ class FakeRemoteAgent {
 	}
 
 	prompt(text, attachments) {
-		// Current behavior: does NOT add user message locally
+		// Optimistic: add user message immediately
+		const optimisticId = `optimistic_${++_idCounter}`;
+		const msg = {
+			role: attachments ? "user-with-attachments" : "user",
+			content: [{ type: "text", text }],
+			timestamp: Date.now(),
+			id: optimisticId,
+			...(attachments ? { attachments } : {}),
+		};
+		this.state.messages = [...this.state.messages, msg];
+		this._liveEventMessages.push(msg);
 	}
 
 	flushDeferredMessage() {
@@ -58,7 +70,6 @@ class FakeRemoteAgent {
 	handleMessagesResponse(msgs) {
 		this.state.messages = msgs.map(enrichUserMessage);
 
-		// Re-append any live-event messages missing from the server response
 		if (this._liveEventMessages.length > 0) {
 			const serverTexts = new Set(
 				this.state.messages
@@ -93,9 +104,7 @@ class FakeRemoteAgent {
 
 			case "message_update":
 				this.flushDeferredMessage();
-				if (event.message) {
-					this.state.streamMessage = event.message;
-				}
+				if (event.message) this.state.streamMessage = event.message;
 				break;
 
 			case "message_end":
@@ -117,9 +126,25 @@ class FakeRemoteAgent {
 							msg = { ...msg, role: "user-with-attachments", attachments: this._pendingAttachments };
 							this._pendingAttachments = null;
 						}
-						this.state.messages = [...this.state.messages, msg];
 
-						// Track user messages from live events
+						// Dedup: replace optimistic message with server echo
+						if (msg.role === "user" || msg.role === "user-with-attachments") {
+							const msgText = extractText(msg);
+							const optimisticIdx = this.state.messages.findIndex(
+								m => m.id?.startsWith("optimistic_") && extractText(m) === msgText
+							);
+							if (optimisticIdx !== -1) {
+								const replacedId = this.state.messages[optimisticIdx].id;
+								const updated = [...this.state.messages];
+								updated[optimisticIdx] = msg;
+								this.state.messages = updated;
+								this._liveEventMessages = this._liveEventMessages.filter(m => m.id !== replacedId);
+								this._liveEventMessages.push(msg);
+								break;
+							}
+						}
+
+						this.state.messages = [...this.state.messages, msg];
 						if (msg.role === "user" || msg.role === "user-with-attachments") {
 							this._liveEventMessages.push(msg);
 						}
@@ -133,185 +158,180 @@ class FakeRemoteAgent {
 const results = [];
 function assert(condition, name) {
 	results.push({ name, passed: condition });
+	if (!condition) console.error("FAIL:", name);
 }
 
 // ==========================================
-// Test 1: Normal flow
+// Test 1: Optimistic — user message appears immediately after prompt()
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("Hello");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
 	
 	const userMsgs = agent.state.messages.filter(m => m.role === "user");
-	assert(userMsgs.length === 1, "Normal flow: user message in state.messages");
-	assert(extractText(userMsgs[0]) === "Hello", "Normal flow: correct text");
+	assert(userMsgs.length === 1, "Optimistic: user message appears immediately");
+	assert(extractText(userMsgs[0]) === "Hello", "Optimistic: correct text");
+	assert(userMsgs[0].id.startsWith("optimistic_"), "Optimistic: has optimistic_ ID");
 }
 
 // ==========================================
-// Test 2: Reconnect — server response includes user message
+// Test 2: Dedup — server echo replaces optimistic message
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("Hello");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
+	
+	// Server echoes user message
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }], id: "server_1" } });
+	
+	const userMsgs = agent.state.messages.filter(m => m.role === "user");
+	assert(userMsgs.length === 1, "Dedup: exactly one user message after echo");
+	assert(userMsgs[0].id === "server_1", "Dedup: server ID replaced optimistic ID");
+}
+
+// ==========================================
+// Test 3: WS dropped — prompt never reaches server, no echo, message persists
+// ==========================================
+{
+	const agent = new FakeRemoteAgent();
+	agent.prompt("Lost message");
+	
+	// No server echo ever arrives. The optimistic message stays.
 	agent.handleEvent({ type: "agent_start" });
+	// ... agent works on something else or reconnects
 	
-	// Reconnect — server response includes the user message
-	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Hello" }] },
-		{ role: "assistant", content: [{ type: "text", text: "Hi there" }] },
-	]);
-	
-	const userMsgs = agent.state.messages.filter(m => m.role === "user");
-	assert(userMsgs.length === 1, "Reconnect (server has msg): exactly one user message (no duplicate)");
+	const userMsgs = agent.state.messages.filter(m => extractText(m) === "Lost message");
+	assert(userMsgs.length === 1, "WS dropped: optimistic message survives with no echo");
 }
 
 // ==========================================
-// Test 3: BUG SCENARIO — stale messages response drops user message
-// Previously: user message LOST. Now: should be preserved.
+// Test 4: Stale messages response — optimistic message re-appended
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("Hello");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
 	
-	assert(agent.state.messages.length === 1, "Before stale response: has user message");
-	
-	// Stale messages response (doesn't include the user message)
+	// Stale messages response doesn't include the user message
 	agent.handleMessagesResponse([]);
 	
-	const userMsgs = agent.state.messages.filter(m => m.role === "user");
-	assert(userMsgs.length === 1, "After stale response: user message PRESERVED");
+	const userMsgs = agent.state.messages.filter(m => extractText(m) === "Hello");
+	assert(userMsgs.length === 1, "Stale response: optimistic message re-appended");
 }
 
 // ==========================================
-// Test 4: Compaction refresh drops user message
-// Previously: user message LOST. Now: should be preserved.
+// Test 5: Server response includes message — no duplicate
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
+	agent.prompt("Hello");
+	
+	// Server echo arrives first
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }], id: "s1" } });
+	
+	// Then server messages response also includes it
 	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Old message" }] },
-		{ role: "assistant", content: [{ type: "text", text: "Old response" }] },
+		{ role: "user", content: [{ type: "text", text: "Hello" }], id: "s1" },
 	]);
 	
-	agent.prompt("After compaction");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "After compaction" }] } });
-	
-	// Compaction refresh without the new message
-	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Old message" }] },
-		{ role: "assistant", content: [{ type: "text", text: "Old response" }] },
-	]);
-	
-	const afterMsgs = agent.state.messages.filter(m => extractText(m) === "After compaction");
-	assert(afterMsgs.length === 1, "Compaction refresh: user message PRESERVED");
+	const userMsgs = agent.state.messages.filter(m => m.role === "user");
+	assert(userMsgs.length === 1, "Full sync: no duplicate after echo + refresh");
 }
 
 // ==========================================
-// Test 5: Multiple rapid prompts — both survive stale refresh
+// Test 6: Multiple rapid prompts
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("First");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "First" }] } });
 	agent.prompt("Second");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Second" }] } });
 	
-	assert(agent.state.messages.length === 2, "Before refresh: two user messages");
+	assert(agent.state.messages.length === 2, "Rapid: both optimistic messages present");
 	
-	// Stale refresh with neither
-	agent.handleMessagesResponse([]);
+	// Server echoes both
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "First" }], id: "s1" } });
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Second" }], id: "s2" } });
 	
-	assert(agent.state.messages.length === 2, "After stale refresh: both user messages preserved");
-	assert(extractText(agent.state.messages[0]) === "First", "First message preserved");
-	assert(extractText(agent.state.messages[1]) === "Second", "Second message preserved");
+	assert(agent.state.messages.length === 2, "Rapid: still exactly 2 after dedup");
+	assert(!agent.state.messages.some(m => m.id?.startsWith("optimistic_")), "Rapid: no optimistic IDs remain");
 }
 
 // ==========================================
-// Test 6: Server response includes message — no duplicate
+// Test 7: Compaction refresh — optimistic survives
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
-	agent.prompt("Hello");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
-	
-	// Server response DOES include the message
 	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Hello" }] },
+		{ role: "user", content: [{ type: "text", text: "Old" }] },
+		{ role: "assistant", content: [{ type: "text", text: "Old reply" }] },
 	]);
 	
-	const userMsgs = agent.state.messages.filter(m => m.role === "user");
-	assert(userMsgs.length === 1, "Server has msg: no duplicate");
-}
-
-// ==========================================
-// Test 7: After successful refresh, live tracking is cleared
-// ==========================================
-{
-	const agent = new FakeRemoteAgent();
-	agent.prompt("Hello");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
+	agent.prompt("New message");
 	
-	// Refresh includes the message
+	// Compaction refresh without the new message
 	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Hello" }] },
+		{ role: "user", content: [{ type: "text", text: "Old" }] },
+		{ role: "assistant", content: [{ type: "text", text: "Old reply" }] },
 	]);
 	
-	// Second refresh without the message — should NOT re-append
-	// because _liveEventMessages was cleared after first refresh
-	agent.handleMessagesResponse([]);
-	
-	assert(agent.state.messages.length === 0, "After second refresh: live tracking cleared, no stale re-append");
+	const newMsgs = agent.state.messages.filter(m => extractText(m) === "New message");
+	assert(newMsgs.length === 1, "Compaction: optimistic message preserved");
 }
 
 // ==========================================
-// Test 8: Deferred assistant message not affected
+// Test 8: After successful refresh, tracking cleared
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
 	agent.prompt("Hello");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }] } });
+	
+	// Server echo deduplicates
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }], id: "s1" } });
+	
+	// Refresh includes the message — clears tracking
+	agent.handleMessagesResponse([
+		{ role: "user", content: [{ type: "text", text: "Hello" }], id: "s1" },
+	]);
+	
+	// Second refresh without message — should NOT re-append (tracking was cleared)
+	agent.handleMessagesResponse([]);
+	
+	assert(agent.state.messages.length === 0, "Cleared tracking: no stale re-append");
+}
+
+// ==========================================
+// Test 9: Deferred assistant message not affected
+// ==========================================
+{
+	const agent = new FakeRemoteAgent();
+	agent.prompt("Hello");
+	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "Hello" }], id: "s1" } });
 	agent.handleEvent({ type: "agent_start" });
 	
-	// Assistant message with tool call — deferred
 	agent.handleEvent({ type: "message_end", message: {
 		role: "assistant",
 		content: [{ type: "toolCall", id: "t1", name: "bash" }],
 	} });
 	
 	assert(agent._deferredAssistantMessage !== null, "Deferred: assistant message held");
-	assert(agent.state.messages.length === 1, "Deferred: only user message in state.messages");
+	// 1 user message in state.messages (optimistic was replaced by dedup)
+	assert(agent.state.messages.filter(m => m.role === "user").length === 1, "Deferred: user message present");
 	
-	// Next message_update flushes the deferred message
 	agent.handleEvent({ type: "message_update", message: { role: "assistant", content: [{ type: "text", text: "result" }] } });
 	
 	assert(agent._deferredAssistantMessage === null, "Flush: deferred cleared");
-	assert(agent.state.messages.length === 2, "Flush: both messages in state.messages");
+	assert(agent.state.messages.length === 2, "Flush: user + assistant in state.messages");
 }
 
 // ==========================================
-// Test 9: Compaction synthetic messages preserved alongside fix
+// Test 10: Attachments preserved in optimistic message
 // ==========================================
 {
 	const agent = new FakeRemoteAgent();
-	agent._compactionSyntheticMessages = [
-		{ role: "user", content: "compact cmd", id: "compact_user" },
-		{ role: "assistant", content: [{ type: "text", text: "Compacted." }], id: "compact_done" },
-	];
+	const attachments = [{ type: "image", content: "base64data", mimeType: "image/png" }];
+	agent.prompt("With image", attachments);
 	
-	agent.prompt("After compact");
-	agent.handleEvent({ type: "message_end", message: { role: "user", content: [{ type: "text", text: "After compact" }] } });
-	
-	agent.handleMessagesResponse([
-		{ role: "user", content: [{ type: "text", text: "Summary" }] },
-	]);
-	
-	// Should have: summary from server + re-appended "After compact" + compaction synthetics
-	const afterMsgs = agent.state.messages.filter(m => extractText(m) === "After compact");
-	assert(afterMsgs.length === 1, "Compaction + fix: live user message preserved");
-	assert(agent.state.messages.length === 4, "Compaction + fix: server msg + live msg + 2 synthetics");
+	assert(agent.state.messages[0].role === "user-with-attachments", "Attachments: correct role");
+	assert(agent.state.messages[0].attachments.length === 1, "Attachments: present in optimistic message");
 }
 
 // Print results

@@ -404,8 +404,20 @@ export class RemoteAgent {
 		this._compactionSyntheticMessages = [];
 		this._usageStaleAfterCompaction = false;
 
-		// Don't add the user message locally — the server will echo it back
-		// as message_start/message_end events, keeping a single source of truth.
+		// Add the user message optimistically so it renders immediately.
+		// The server will echo it back via message_end; we deduplicate there.
+		const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+		const optimisticMsg: any = {
+			role: attachments?.length ? "user-with-attachments" : "user",
+			content: [{ type: "text", text }],
+			timestamp: Date.now(),
+			id: optimisticId,
+			...(attachments?.length ? { attachments } : {}),
+		};
+		this._state.messages = [...this._state.messages, optimisticMsg];
+		this._liveEventMessages.push(optimisticMsg);
+		this.emit({ type: "message_end", message: optimisticMsg });
+
 		this.send({
 			type: "prompt",
 			text,
@@ -903,6 +915,26 @@ export class RemoteAgent {
 								attachments: this._pendingAttachments,
 							};
 							this._pendingAttachments = null;
+						}
+
+						// Deduplicate: if this is a server echo of an optimistic user
+						// message, replace the optimistic one instead of appending.
+						if (msg.role === "user" || msg.role === "user-with-attachments") {
+							const msgText = extractText(msg);
+							const optimisticIdx = this._state.messages.findIndex(
+								(m: any) => m.id?.startsWith("optimistic_") && extractText(m) === msgText
+							);
+							if (optimisticIdx !== -1) {
+								const replacedId = this._state.messages[optimisticIdx].id;
+								const updated = [...this._state.messages];
+								updated[optimisticIdx] = msg;
+								this._state.messages = updated;
+								// Update live tracking: swap optimistic for server-authoritative
+								this._liveEventMessages = this._liveEventMessages
+									.filter((m: any) => m.id !== replacedId);
+								this._liveEventMessages.push(msg);
+								break;
+							}
 						}
 
 						this._state.messages = [...this._state.messages, msg];
