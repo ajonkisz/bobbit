@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { ChevronDown, Crosshair, Layers, MessageSquare, PanelLeftClose, PanelLeftOpen, Plus, Sparkles, UserCheck, Users, Wrench } from "lucide";
+import { Bot, ChevronDown, Crosshair, Layers, MessagesSquare, PanelLeftClose, PanelLeftOpen, Plus, Sparkles, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -229,7 +229,7 @@ export function renderStaffSidebarSection() {
 				<div class="flex-1 flex items-center gap-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
 					@click=${() => { setStaffSectionExpanded(!staffSectionExpanded); renderApp(); }}>
 					<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${staffSectionExpanded ? "▾" : "▸"}</span>
-					<span class="shrink-0 text-muted-foreground">${icon(UserCheck, "xs")}</span>
+					<span class="shrink-0 text-muted-foreground">${icon(Bot, "xs")}</span>
 					<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Staff</span>
 				</div>
 				<button
@@ -346,7 +346,7 @@ export function renderSidebar() {
 										<div class="flex-1 flex items-center gap-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
 											@click=${() => { setUngroupedExpanded(!ungroupedExpanded); renderApp(); }}>
 											<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
-											<span class="shrink-0 text-muted-foreground">${icon(MessageSquare, "xs")}</span>
+											<span class="shrink-0 text-muted-foreground">${icon(MessagesSquare, "xs")}</span>
 											<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
 										</div>
 										<div class="flex items-center relative">
@@ -373,7 +373,7 @@ export function renderSidebar() {
 							` : html`
 								<div class="flex flex-col gap-0.5">
 									<div class="flex items-center gap-1 px-1 py-0.5">
-										<span class="flex-1 flex items-center gap-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:13px;"><span class="shrink-0">${icon(MessageSquare, "xs")}</span> Sessions</span>
+										<span class="flex-1 flex items-center gap-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:13px;"><span class="shrink-0">${icon(MessagesSquare, "xs")}</span> Sessions</span>
 										<div class="flex items-center relative">
 											<button
 												class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"

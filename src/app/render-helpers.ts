@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html, svg } from "lit";
-import { Crosshair, LayoutDashboard, Pencil, Shield, Trash2 } from "lucide";
+import { Goal as GoalIcon, LayoutDashboard, Pencil, Shield, Trash2 } from "lucide";
 import {
 	state,
 	renderApp,
@@ -316,7 +316,7 @@ export function renderGoalGroup(goal: Goal) {
 				@click=${toggleExpand}
 				@dblclick=${!mobile ? () => { if (goal.team) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } } : null}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
-				<span class="shrink-0 text-muted-foreground">${icon(Crosshair, "xs")}</span>
+				<span class="shrink-0 text-muted-foreground">${icon(GoalIcon, "xs")}</span>
 				<span class="flex-1 min-w-0 truncate ${mobile ? "text-sm" : "text-[10px]"} text-muted-foreground uppercase tracking-wider font-medium">${goal.title}</span>
 				${mobile
 					? dashboardBtn
