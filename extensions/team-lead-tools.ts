@@ -148,6 +148,21 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "team_abort",
+		label: "Abort Team Agent",
+		description: "Force-abort a stuck team agent that won't respond to steering. Use this when an agent is stuck in a long-running tool call and team_steer has no effect. The agent's process will be killed and restarted, and it will be ready for new prompts.",
+		promptSnippet: "Force-abort a stuck team agent by session ID.",
+		parameters: Type.Object({
+			session_id: Type.String({ description: "The session ID of the agent to abort" }),
+		}),
+		async execute(_id, params) {
+			try {
+				return ok(await api("POST", `/api/goals/${goalId}/team/abort`, { sessionId: params.session_id }));
+			} catch (e: any) { return err(e.message); }
+		},
+	});
+
+	pi.registerTool({
 		name: "team_prompt",
 		label: "Prompt Team Agent",
 		description: "Send a prompt to a team agent. If the agent is idle, it starts working immediately. If the agent is busy, the message is queued and dispatched when the current turn ends. Use this to assign follow-up work, nudge idle agents, or queue instructions.",
@@ -163,5 +178,5 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	console.log(`[team-lead-tools] Registered 6 team tools for session ${sessionId}, goal ${goalId}`);
+	console.log(`[team-lead-tools] Registered 7 team tools for session ${sessionId}, goal ${goalId}`);
 }

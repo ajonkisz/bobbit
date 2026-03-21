@@ -5,7 +5,7 @@
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import { html, type TemplateResult } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
-import { Users, UserPlus, UserMinus, Trophy, Zap, MessageSquare } from "lucide";
+import { Users, UserPlus, UserMinus, Trophy, Zap, MessageSquare, AlertTriangle } from "lucide";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
 import { renderSessionLink } from "./delegate-cards.js";
@@ -252,6 +252,37 @@ export class TeamPromptRenderer implements ToolRenderer {
 		const statusLabel = status === "queued" ? "queued" : "dispatched";
 		return {
 			content: html`<div>${renderHeader(state, MessageSquare, html`Prompted ${sid ? renderSessionLink(sid) : "agent"} <span class="text-xs text-muted-foreground">(${statusLabel})</span> ${msg ? html`— <span class="text-xs text-muted-foreground">${msg}</span>` : ""}`)}</div>`,
+			isCustom: false,
+		};
+	}
+}
+
+// ── team_abort ───────────────────────────────────────────────────────
+
+export class TeamAbortRenderer implements ToolRenderer {
+	render(params: any, result: ToolResultMessage | undefined, isStreaming?: boolean): ToolRenderResult {
+		const state = result ? (result.isError ? "error" : "complete") : isStreaming ? "inprogress" : "complete";
+		const sid = params?.session_id;
+
+		if (!result) {
+			return { content: html`<div>${renderHeader(state, AlertTriangle, html`Aborting ${sid ? renderSessionLink(sid) : "agent"}`)}</div>`, isCustom: false };
+		}
+
+		if (result.isError) {
+			const { text } = getResult(result);
+			return {
+				content: html`<div>
+					${renderHeader(state, AlertTriangle, html`Abort failed ${sid ? renderSessionLink(sid) : ""}`)}
+					<div class="mt-1 text-xs text-destructive">${text}</div>
+				</div>`,
+				isCustom: false,
+			};
+		}
+
+		const { data } = getResult(result);
+		const status = data?.status || "aborted";
+		return {
+			content: html`<div>${renderHeader(state, AlertTriangle, html`Aborted ${sid ? renderSessionLink(sid) : "agent"} — <span class="text-xs text-muted-foreground">${status}</span>`)}</div>`,
 			isCustom: false,
 		};
 	}

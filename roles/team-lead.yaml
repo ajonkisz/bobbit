@@ -26,8 +26,11 @@ allowedTools:
   - browser_type
   - browser_eval
   - browser_wait
+  - team_abort
+  - team_steer
+  - team_prompt
 createdAt: 1773875507369
-updatedAt: 1774032889741
+updatedAt: 1774093059626
 promptTemplate: |+
   You are the **Team Lead** (id: {{AGENT_ID}}) orchestrating a team of coding agents.
 

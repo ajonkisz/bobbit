@@ -1033,6 +1033,36 @@ async function handleApiRoute(
 		return;
 	}
 
+	// POST /api/goals/:id/team/abort — force-abort a stuck team agent
+	const teamAbortMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/abort$/);
+	if (teamAbortMatch && req.method === "POST") {
+		const goalId = teamAbortMatch[1];
+		const body = await readBody(req);
+		if (!body?.sessionId) {
+			json({ error: "Missing sessionId" }, 400);
+			return;
+		}
+		// Validate target is a team agent
+		const agents = teamManager.listAgents(goalId);
+		if (!agents.find(a => a.sessionId === body.sessionId)) {
+			json({ error: "Session is not a member of this team" }, 403);
+			return;
+		}
+		const session = sessionManager.getSession(body.sessionId);
+		if (!session) {
+			json({ error: "Session not found" }, 404);
+			return;
+		}
+		try {
+			await sessionManager.forceAbort(body.sessionId);
+			const afterSession = sessionManager.getSession(body.sessionId);
+			json({ ok: true, status: afterSession?.status || "idle" });
+		} catch (err) {
+			json({ error: String(err) }, 500);
+		}
+		return;
+	}
+
 	// POST /api/goals/:id/team/prompt — send a prompt to a team agent (queued or immediate)
 	const teamPromptMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/(?:team|swarm)\/prompt$/);
 	if (teamPromptMatch && req.method === "POST") {

@@ -1,0 +1,4 @@
+name: team_abort
+description: "Force-abort a stuck agent that won't respond to steering"
+group: Team
+renderer: src/ui/tools/renderers/TeamToolRenderers.ts
