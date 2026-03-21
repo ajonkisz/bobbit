@@ -2,6 +2,7 @@ import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
 import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
 import { TOOL_ASSISTANT_PROMPT } from "./tool-assistant.js";
 import { ARTIFACT_SPEC_ASSISTANT_PROMPT } from "./artifact-spec-assistant.js";
+import { PERSONALITY_ASSISTANT_PROMPT } from "./personality-assistant.js";
 
 export interface AssistantDef {
 	type: string;
@@ -34,6 +35,12 @@ export const ASSISTANT_REGISTRY: Record<string, AssistantDef> = {
 		title: "Spec Assistant",
 		promptTitle: "Artifact Spec Assistant",
 		prompt: ARTIFACT_SPEC_ASSISTANT_PROMPT,
+	},
+	personality: {
+		type: "personality",
+		title: "Personality Assistant",
+		promptTitle: "Personality Creation Assistant",
+		prompt: PERSONALITY_ASSISTANT_PROMPT,
 	},
 };
 

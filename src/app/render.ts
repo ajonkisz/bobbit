@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, Layers, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug, Users, Wrench } from "lucide";
+import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, Layers, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -37,6 +37,8 @@ import { renderToolManagerPage } from "./tool-manager-page.js";
 import "./tool-manager.css";
 import { renderArtifactSpecPage } from "./artifact-spec-page.js";
 import "./artifact-spec.css";
+import { renderPersonalityManagerPage } from "./personality-manager-page.js";
+import "./personality-manager.css";
 
 // ============================================================================
 // MOBILE LANDING PAGE
@@ -65,6 +67,10 @@ function renderMobileLanding() {
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); setHashRoute("artifact-specs"); }}>
 						${icon(Layers, "xs")} Specs
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
+						${icon(Sparkles, "xs")} Personalities
 					</button>
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => showGoalDialog()}>
@@ -722,12 +728,140 @@ function artifactSpecPreviewPanel() {
 // ASSISTANT PREVIEW DISPATCH
 // ============================================================================
 
+function personalityPreviewPanel() {
+	const handleCreatePersonality = async () => {
+		const trimmedName = state.personalityPreviewName.trim();
+		const trimmedLabel = state.personalityPreviewLabel.trim();
+		if (!trimmedName || !trimmedLabel) return;
+		const sessionId = activeSessionId();
+		if (state.remoteAgent) {
+			state.remoteAgent.disconnect();
+			state.remoteAgent = null;
+			state.connectionStatus = "disconnected";
+		}
+		state.assistantType = null;
+		state.activePersonalityProposal = null;
+		if (sessionId) {
+			const { deletePersonalityDraft } = await import("./session-manager.js");
+			deletePersonalityDraft(sessionId);
+		}
+		localStorage.removeItem("gateway.sessionId");
+
+		const { createPersonality } = await import("./api.js");
+		await createPersonality({
+			name: trimmedName,
+			label: trimmedLabel,
+			description: state.personalityPreviewDescription,
+			promptFragment: state.personalityPreviewPromptFragment,
+		});
+
+		if (sessionId) {
+			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+			clearSessionModel(sessionId);
+		}
+
+		const { loadPersonalityPageData } = await import("./personality-manager-page.js");
+		await loadPersonalityPageData();
+		setHashRoute("personalities");
+		renderApp();
+	};
+
+	const handleCancel = () => {
+		backToSessions();
+	};
+
+	return html`
+		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
+			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Name</label>
+					${Input({
+						type: "text",
+						value: state.personalityPreviewName,
+						placeholder: "personality-name (lowercase, hyphens)",
+						onInput: (e: Event) => {
+							state.personalityPreviewName = (e.target as HTMLInputElement).value;
+							state.personalityPreviewNameEdited = true;
+							const sid = activeSessionId();
+							if (sid) { import("./session-manager.js").then((m) => m.savePersonalityDraft(sid)); }
+						},
+					})}
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Label</label>
+					${Input({
+						type: "text",
+						value: state.personalityPreviewLabel,
+						placeholder: "Display Label",
+						onInput: (e: Event) => {
+							state.personalityPreviewLabel = (e.target as HTMLInputElement).value;
+							state.personalityPreviewLabelEdited = true;
+							const sid = activeSessionId();
+							if (sid) { import("./session-manager.js").then((m) => m.savePersonalityDraft(sid)); }
+						},
+					})}
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Description</label>
+					${Input({
+						type: "text",
+						value: state.personalityPreviewDescription,
+						placeholder: "One-line tooltip description",
+						onInput: (e: Event) => {
+							state.personalityPreviewDescription = (e.target as HTMLInputElement).value;
+							state.personalityPreviewDescriptionEdited = true;
+							const sid = activeSessionId();
+							if (sid) { import("./session-manager.js").then((m) => m.savePersonalityDraft(sid)); }
+						},
+					})}
+				</div>
+				<div class="flex-1 flex flex-col min-h-0">
+					<div class="flex items-center justify-between mb-1.5">
+						<label class="text-xs text-muted-foreground font-medium">Prompt Fragment</label>
+						<button
+							class="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+							@click=${() => { state.personalityPreviewPromptFragmentEditMode = !state.personalityPreviewPromptFragmentEditMode; renderApp(); }}
+						>
+							${state.personalityPreviewPromptFragmentEditMode ? "Preview" : "Edit"}
+						</button>
+					</div>
+					${state.personalityPreviewPromptFragmentEditMode
+						? html`<textarea
+								class="flex-1 min-h-[120px] p-3 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+								.value=${state.personalityPreviewPromptFragment}
+								@input=${(e: Event) => {
+									state.personalityPreviewPromptFragment = (e.target as HTMLTextAreaElement).value;
+									state.personalityPreviewPromptFragmentEdited = true;
+									const sid = activeSessionId();
+									if (sid) { import("./session-manager.js").then((m) => m.savePersonalityDraft(sid)); }
+								}}
+							></textarea>`
+						: html`<div class="flex-1 min-h-[120px] p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm">
+								<markdown-block .content=${state.personalityPreviewPromptFragment || "_No prompt fragment yet_"}></markdown-block>
+							</div>`
+					}
+				</div>
+			</div>
+			<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+				${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
+				${Button({
+					variant: "default",
+					onClick: handleCreatePersonality,
+					disabled: !state.personalityPreviewName.trim() || !state.personalityPreviewLabel.trim(),
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(Sparkles, "sm")} Create Personality</span>`,
+				})}
+			</div>
+		</div>
+	`;
+}
+
 function getAssistantPreviewPanel(type: string) {
 	switch (type) {
 		case "goal": return goalPreviewPanel();
 		case "role": return rolePreviewPanel();
 		case "tool": return toolPreviewPanel();
 		case "artifact-spec": return artifactSpecPreviewPanel();
+		case "personality": return personalityPreviewPanel();
 		default: return "";
 	}
 }
@@ -1118,6 +1252,9 @@ export function doRenderApp(): void {
 		}
 		if (route.view === "artifact-specs" || route.view === "artifact-spec-edit") {
 			return renderArtifactSpecPage();
+		}
+		if (route.view === "personalities" || route.view === "personality-edit") {
+			return renderPersonalityManagerPage();
 		}
 
 		if (connected && state.assistantType) {

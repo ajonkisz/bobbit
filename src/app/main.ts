@@ -160,6 +160,32 @@ async function handleHashChange(): Promise<void> {
 			await loadArtifactSpecPageData();
 			navigateToArtifactSpecEdit(route.artifactSpecId);
 			await refreshSessions();
+		} else if (route.view === "personalities") {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadPersonalityPageData } = await import("./personality-manager-page.js");
+			loadPersonalityPageData();
+			renderApp();
+			await refreshSessions();
+		} else if (route.view === "personality-edit" && route.personalityName) {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadPersonalityPageData, navigateToPersonalityEdit } = await import("./personality-manager-page.js");
+			await loadPersonalityPageData();
+			navigateToPersonalityEdit(route.personalityName);
+			await refreshSessions();
 		} else {
 			clearDashboardState();
 			if (state.remoteAgent) {
@@ -232,6 +258,13 @@ async function initApp() {
 				const { loadToolPageData, navigateToToolEdit } = await import("./tool-manager-page.js");
 				await loadToolPageData();
 				navigateToToolEdit(route.toolName);
+			} else if (route.view === "personalities") {
+				const { loadPersonalityPageData } = await import("./personality-manager-page.js");
+				loadPersonalityPageData();
+			} else if (route.view === "personality-edit" && route.personalityName) {
+				const { loadPersonalityPageData, navigateToPersonalityEdit } = await import("./personality-manager-page.js");
+				await loadPersonalityPageData();
+				navigateToPersonalityEdit(route.personalityName);
 			}
 		} catch {
 			renderApp();

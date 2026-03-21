@@ -2,9 +2,9 @@
 // URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected, #/goal/{id} = dashboard)
 // ============================================================================
 
-export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles" | "role-edit" | "tools" | "tool-edit" | "artifact-specs" | "artifact-spec-edit";
+export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles" | "role-edit" | "tools" | "tool-edit" | "artifact-specs" | "artifact-spec-edit" | "personalities" | "personality-edit";
 
-export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string; roleName?: string; toolName?: string; artifactSpecId?: string } {
+export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string; roleName?: string; toolName?: string; artifactSpecId?: string; personalityName?: string } {
 	const hash = window.location.hash || "";
 	const sessionMatch = hash.match(/^#\/session\/([a-f0-9-]+)$/i);
 	if (sessionMatch) {
@@ -35,6 +35,13 @@ export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalI
 	if (hash === "#/artifact-specs") {
 		return { view: "artifact-specs" };
 	}
+	const personalityEditMatch = hash.match(/^#\/personalities\/([a-zA-Z0-9_-]+)$/);
+	if (personalityEditMatch) {
+		return { view: "personality-edit", personalityName: personalityEditMatch[1] };
+	}
+	if (hash === "#/personalities") {
+		return { view: "personalities" };
+	}
 	return { view: "landing" };
 }
 
@@ -56,6 +63,10 @@ export function setHashRoute(view: RouteView, id?: string, replace?: boolean): v
 		newHash = `#/artifact-specs/${id}`;
 	} else if (view === "artifact-specs") {
 		newHash = "#/artifact-specs";
+	} else if (view === "personality-edit" && id) {
+		newHash = `#/personalities/${id}`;
+	} else if (view === "personalities") {
+		newHash = "#/personalities";
 	} else {
 		newHash = "#/";
 	}

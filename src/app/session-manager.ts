@@ -3,6 +3,7 @@ import { startPreviewPolling, stopPreviewPolling } from "./preview-panel.js";
 import type { GoalDraft } from "../ui/storage/stores/goal-draft-store.js";
 import type { RoleDraft } from "../ui/storage/stores/role-draft-store.js";
 import type { SpecDraft } from "../ui/storage/stores/spec-draft-store.js";
+import type { PersonalityDraft } from "../ui/storage/stores/personality-draft-store.js";
 import type { ConnectionStatus } from "./remote-agent.js";
 import { RemoteAgent } from "./remote-agent.js";
 import {
@@ -239,6 +240,65 @@ export function deleteSpecDraft(sessionId: string): void {
 }
 
 // ============================================================================
+// PERSONALITY DRAFT PERSISTENCE HELPERS
+// ============================================================================
+
+let _personalityDraftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function savePersonalityDraft(sessionId: string): void {
+	if (_personalityDraftSaveTimer) clearTimeout(_personalityDraftSaveTimer);
+	_personalityDraftSaveTimer = setTimeout(() => {
+		_personalityDraftSaveTimer = null;
+		const draft: PersonalityDraft = {
+			sessionId,
+			activePersonalityProposal: state.activePersonalityProposal ?? undefined,
+			previewName: state.personalityPreviewName,
+			previewLabel: state.personalityPreviewLabel,
+			previewDescription: state.personalityPreviewDescription,
+			previewPromptFragment: state.personalityPreviewPromptFragment,
+			previewNameEdited: state.personalityPreviewNameEdited,
+			previewLabelEdited: state.personalityPreviewLabelEdited,
+			previewDescriptionEdited: state.personalityPreviewDescriptionEdited,
+			previewPromptFragmentEdited: state.personalityPreviewPromptFragmentEdited,
+			hasReceivedPersonalityProposal: state.assistantHasProposal,
+			personalityAssistantTab: state.assistantTab,
+		};
+		storage.personalityDrafts.saveDraft(draft).catch((err) => {
+			console.error("[personality-draft] Failed to save draft:", err);
+		});
+	}, 300);
+}
+
+async function restorePersonalityDraft(sessionId: string): Promise<boolean> {
+	try {
+		const draft = await storage.personalityDrafts.getDraft(sessionId);
+		if (!draft) return false;
+
+		state.activePersonalityProposal = draft.activePersonalityProposal ?? null;
+		state.personalityPreviewName = draft.previewName ?? "";
+		state.personalityPreviewLabel = draft.previewLabel ?? "";
+		state.personalityPreviewDescription = draft.previewDescription ?? "";
+		state.personalityPreviewPromptFragment = draft.previewPromptFragment ?? "";
+		state.personalityPreviewNameEdited = draft.previewNameEdited ?? false;
+		state.personalityPreviewLabelEdited = draft.previewLabelEdited ?? false;
+		state.personalityPreviewDescriptionEdited = draft.previewDescriptionEdited ?? false;
+		state.personalityPreviewPromptFragmentEdited = draft.previewPromptFragmentEdited ?? false;
+		state.assistantHasProposal = draft.hasReceivedPersonalityProposal ?? false;
+		state.assistantTab = draft.personalityAssistantTab ?? "chat";
+		return true;
+	} catch (err) {
+		console.error("[personality-draft] Failed to restore draft:", err);
+		return false;
+	}
+}
+
+export function deletePersonalityDraft(sessionId: string): void {
+	storage.personalityDrafts.deleteDraft(sessionId).catch((err) => {
+		console.error("[personality-draft] Failed to delete draft:", err);
+	});
+}
+
+// ============================================================================
 // AUTHENTICATE GATEWAY
 // ============================================================================
 
@@ -417,6 +477,20 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			if (state.assistantTab === "chat" && !isDesktop()) {
 				state.assistantTab = "preview";
 			}
+			renderApp();
+		};
+
+		remote.onPersonalityProposal = (proposal: { name: string; label: string; description: string; prompt_fragment: string }) => {
+			state.activePersonalityProposal = proposal;
+			if (!state.personalityPreviewNameEdited) state.personalityPreviewName = proposal.name;
+			if (!state.personalityPreviewLabelEdited) state.personalityPreviewLabel = proposal.label;
+			if (!state.personalityPreviewDescriptionEdited) state.personalityPreviewDescription = proposal.description;
+			if (!state.personalityPreviewPromptFragmentEdited) state.personalityPreviewPromptFragment = proposal.prompt_fragment;
+			state.assistantHasProposal = true;
+			if (state.assistantTab === "chat" && !isDesktop()) {
+				state.assistantTab = "preview";
+			}
+			savePersonalityDraft(sessionId);
 			renderApp();
 		};
 
@@ -617,12 +691,34 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			}
 		}
 
+		// Clear personality proposal when connecting to a non-personality-assistant session
+		if (state.assistantType !== "personality") {
+			state.activePersonalityProposal = null;
+		}
+
+		if (state.assistantType === "personality") {
+			const restored = await restorePersonalityDraft(sessionId);
+			if (!restored) {
+				state.assistantTab = "chat";
+				state.personalityPreviewName = "";
+				state.personalityPreviewLabel = "";
+				state.personalityPreviewDescription = "";
+				state.personalityPreviewPromptFragment = "";
+				state.personalityPreviewNameEdited = false;
+				state.personalityPreviewLabelEdited = false;
+				state.personalityPreviewDescriptionEdited = false;
+				state.personalityPreviewPromptFragmentEdited = false;
+				state.assistantHasProposal = false;
+			}
+		}
+
 		// Auto-prompt for new assistant sessions
 		const AUTO_PROMPTS: Record<string, string> = {
 			goal: "Start the goal creation session.",
 			role: "Start the role creation session.",
 			tool: "Start the tool assistant session. Help me document, improve, or create tools.",
 			"artifact-spec": "Start the artifact spec creation session.",
+			personality: "Start the personality creation session.",
 		};
 		if (state.assistantType && !isExisting) {
 			const autoPrompt = AUTO_PROMPTS[state.assistantType];
@@ -718,6 +814,7 @@ export async function terminateSession(sessionId: string): Promise<void> {
 	deleteGoalDraft(sessionId);
 	deleteRoleDraft(sessionId);
 	deleteSpecDraft(sessionId);
+	deletePersonalityDraft(sessionId);
 	await refreshSessions();
 }
 

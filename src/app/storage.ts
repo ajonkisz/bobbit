@@ -11,6 +11,7 @@ import { CommandHistoryStore } from "../ui/storage/stores/command-history-store.
 import { GoalDraftStore } from "../ui/storage/stores/goal-draft-store.js";
 import { RoleDraftStore } from "../ui/storage/stores/role-draft-store.js";
 import { SpecDraftStore } from "../ui/storage/stores/spec-draft-store.js";
+import { PersonalityDraftStore } from "../ui/storage/stores/personality-draft-store.js";
 
 const settings = new SettingsStore();
 const providerKeys = new ProviderKeysStore();
@@ -19,6 +20,7 @@ const customProviders = new CustomProvidersStore();
 const goalDrafts = new GoalDraftStore();
 const roleDrafts = new RoleDraftStore();
 const specDrafts = new SpecDraftStore();
+const personalityDrafts = new PersonalityDraftStore();
 const commandHistory = new CommandHistoryStore();
 
 const backend = new IndexedDBStorageBackend({
@@ -33,6 +35,7 @@ const backend = new IndexedDBStorageBackend({
 		goalDrafts.getConfig(),
 		roleDrafts.getConfig(),
 		specDrafts.getConfig(),
+		personalityDrafts.getConfig(),
 		commandHistory.getConfig(),
 	],
 });
@@ -44,7 +47,8 @@ sessions.setBackend(backend);
 goalDrafts.setBackend(backend);
 roleDrafts.setBackend(backend);
 specDrafts.setBackend(backend);
+personalityDrafts.setBackend(backend);
 commandHistory.setBackend(backend);
 
-export const storage = new AppStorage(settings, providerKeys, sessions, customProviders, goalDrafts, roleDrafts, specDrafts, commandHistory, backend);
+export const storage = new AppStorage(settings, providerKeys, sessions, customProviders, goalDrafts, roleDrafts, specDrafts, personalityDrafts, commandHistory, backend);
 setAppStorage(storage);

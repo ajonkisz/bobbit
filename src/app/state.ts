@@ -132,6 +132,18 @@ export const state = {
 	hasReceivedRoleProposal: false,
 	rolePreviewPromptEditMode: false,
 
+	// Personality assistant split-screen state
+	activePersonalityProposal: null as { name: string; label: string; description: string; prompt_fragment: string } | null,
+	personalityPreviewName: "",
+	personalityPreviewLabel: "",
+	personalityPreviewDescription: "",
+	personalityPreviewPromptFragment: "",
+	personalityPreviewNameEdited: false,
+	personalityPreviewLabelEdited: false,
+	personalityPreviewDescriptionEdited: false,
+	personalityPreviewPromptFragmentEdited: false,
+	personalityPreviewPromptFragmentEditMode: false,
+
 	// Artifact spec assistant split-screen state
 	isArtifactSpecAssistantSession: false,
 	artifactSpecAssistantTab: "chat" as "chat" | "preview",
