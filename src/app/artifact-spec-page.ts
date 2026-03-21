@@ -141,12 +141,12 @@ async function createAssistantSession(): Promise<void> {
 	try {
 		const res = await gatewayFetch("/api/sessions", {
 			method: "POST",
-			body: JSON.stringify({ artifactSpecAssistant: true }),
+			body: JSON.stringify({ assistantType: "artifact-spec" }),
 		});
 		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
 		const { id } = await res.json();
 		const { connectToSession } = await import("./session-manager.js");
-		await connectToSession(id, false, { isArtifactSpecAssistant: true });
+		await connectToSession(id, false, { assistantType: "artifact-spec" });
 	} catch (err) {
 		const { showConnectionError } = await import("./dialogs.js");
 		showConnectionError("Failed to create artifact spec assistant", err instanceof Error ? err.message : String(err));

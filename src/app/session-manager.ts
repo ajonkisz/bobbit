@@ -2,6 +2,7 @@ import { ChatPanel } from "../ui/index.js";
 import { startPreviewPolling, stopPreviewPolling } from "./preview-panel.js";
 import type { GoalDraft } from "../ui/storage/stores/goal-draft-store.js";
 import type { RoleDraft } from "../ui/storage/stores/role-draft-store.js";
+import type { SpecDraft } from "../ui/storage/stores/spec-draft-store.js";
 import type { ConnectionStatus } from "./remote-agent.js";
 import { RemoteAgent } from "./remote-agent.js";
 import {
@@ -41,8 +42,8 @@ export function saveGoalDraft(sessionId: string): void {
 			previewTitleEdited: state.previewTitleEdited,
 			previewSpecEdited: state.previewSpecEdited,
 			previewCwdEdited: state.previewCwdEdited,
-			hasReceivedProposal: state.hasReceivedProposal,
-			goalAssistantTab: state.goalAssistantTab,
+			hasReceivedProposal: state.assistantHasProposal,
+			goalAssistantTab: state.assistantTab,
 			previewTeamMode: state.previewTeamMode,
 			previewWorktree: state.previewWorktree,
 		};
@@ -65,8 +66,8 @@ async function restoreGoalDraft(sessionId: string): Promise<boolean> {
 		state.previewTitleEdited = draft.previewTitleEdited ?? false;
 		state.previewSpecEdited = draft.previewSpecEdited ?? false;
 		state.previewCwdEdited = draft.previewCwdEdited ?? false;
-		state.hasReceivedProposal = draft.hasReceivedProposal ?? false;
-		state.goalAssistantTab = draft.goalAssistantTab ?? "chat";
+		state.assistantHasProposal = draft.hasReceivedProposal ?? false;
+		state.assistantTab = draft.goalAssistantTab ?? "chat";
 		state.previewTeamMode = draft.previewTeamMode ?? false;
 		state.previewWorktree = draft.previewWorktree ?? false;
 		return true;
@@ -108,8 +109,8 @@ export function saveRoleDraft(sessionId: string): void {
 			previewPromptEdited: state.rolePreviewPromptEdited,
 			previewToolsEdited: state.rolePreviewToolsEdited,
 			previewAccessoryEdited: state.rolePreviewAccessoryEdited,
-			hasReceivedRoleProposal: state.hasReceivedRoleProposal,
-			roleAssistantTab: state.roleAssistantTab,
+			hasReceivedRoleProposal: state.assistantHasProposal,
+			roleAssistantTab: state.assistantTab,
 		};
 		storage.roleDrafts.saveDraft(draft).catch((err) => {
 			console.error("[role-draft] Failed to save draft:", err);
@@ -134,8 +135,8 @@ async function restoreRoleDraft(sessionId: string): Promise<boolean> {
 		state.rolePreviewPromptEdited = draft.previewPromptEdited ?? false;
 		state.rolePreviewToolsEdited = draft.previewToolsEdited ?? false;
 		state.rolePreviewAccessoryEdited = draft.previewAccessoryEdited ?? false;
-		state.hasReceivedRoleProposal = draft.hasReceivedRoleProposal ?? false;
-		state.roleAssistantTab = draft.roleAssistantTab ?? "chat";
+		state.assistantHasProposal = draft.hasReceivedRoleProposal ?? false;
+		state.assistantTab = draft.roleAssistantTab ?? "chat";
 		return true;
 	} catch (err) {
 		console.error("[role-draft] Failed to restore draft:", err);
@@ -147,6 +148,93 @@ async function restoreRoleDraft(sessionId: string): Promise<boolean> {
 export function deleteRoleDraft(sessionId: string): void {
 	storage.roleDrafts.deleteDraft(sessionId).catch((err) => {
 		console.error("[role-draft] Failed to delete draft:", err);
+	});
+}
+
+// ============================================================================
+// SPEC DRAFT PERSISTENCE HELPERS
+// ============================================================================
+
+/** Debounce timer for spec draft saves. */
+let _specDraftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Save the current spec assistant preview state to IndexedDB (debounced 300ms). */
+export function saveSpecDraft(sessionId: string): void {
+	if (_specDraftSaveTimer) clearTimeout(_specDraftSaveTimer);
+	_specDraftSaveTimer = setTimeout(() => {
+		_specDraftSaveTimer = null;
+		const draft: SpecDraft = {
+			sessionId,
+			activeArtifactSpecProposal: state.activeArtifactSpecProposal ?? undefined,
+			specPreviewId: state.specPreviewId,
+			specPreviewName: state.specPreviewName,
+			specPreviewDescription: state.specPreviewDescription,
+			specPreviewKind: state.specPreviewKind,
+			specPreviewFormat: state.specPreviewFormat,
+			specPreviewMustHave: state.specPreviewMustHave,
+			specPreviewShouldHave: state.specPreviewShouldHave,
+			specPreviewMustNotHave: state.specPreviewMustNotHave,
+			specPreviewRequires: state.specPreviewRequires,
+			specPreviewSuggestedRole: state.specPreviewSuggestedRole,
+			specPreviewIdEdited: state.specPreviewIdEdited,
+			specPreviewNameEdited: state.specPreviewNameEdited,
+			specPreviewDescriptionEdited: state.specPreviewDescriptionEdited,
+			specPreviewKindEdited: state.specPreviewKindEdited,
+			specPreviewFormatEdited: state.specPreviewFormatEdited,
+			specPreviewMustHaveEdited: state.specPreviewMustHaveEdited,
+			specPreviewShouldHaveEdited: state.specPreviewShouldHaveEdited,
+			specPreviewMustNotHaveEdited: state.specPreviewMustNotHaveEdited,
+			specPreviewRequiresEdited: state.specPreviewRequiresEdited,
+			specPreviewSuggestedRoleEdited: state.specPreviewSuggestedRoleEdited,
+			hasReceivedSpecProposal: state.assistantHasProposal,
+			assistantTab: state.assistantTab,
+		};
+		storage.specDrafts.saveDraft(draft).catch((err) => {
+			console.error("[spec-draft] Failed to save draft:", err);
+		});
+	}, 300);
+}
+
+/** Restore spec assistant preview state from IndexedDB. Returns true if a draft was found. */
+async function restoreSpecDraft(sessionId: string): Promise<boolean> {
+	try {
+		const draft = await storage.specDrafts.getDraft(sessionId);
+		if (!draft) return false;
+
+		state.activeArtifactSpecProposal = draft.activeArtifactSpecProposal ?? null;
+		state.specPreviewId = draft.specPreviewId ?? "";
+		state.specPreviewName = draft.specPreviewName ?? "";
+		state.specPreviewDescription = draft.specPreviewDescription ?? "";
+		state.specPreviewKind = draft.specPreviewKind ?? "analysis";
+		state.specPreviewFormat = draft.specPreviewFormat ?? "markdown";
+		state.specPreviewMustHave = draft.specPreviewMustHave ?? "";
+		state.specPreviewShouldHave = draft.specPreviewShouldHave ?? "";
+		state.specPreviewMustNotHave = draft.specPreviewMustNotHave ?? "";
+		state.specPreviewRequires = draft.specPreviewRequires ?? "";
+		state.specPreviewSuggestedRole = draft.specPreviewSuggestedRole ?? "";
+		state.specPreviewIdEdited = draft.specPreviewIdEdited ?? false;
+		state.specPreviewNameEdited = draft.specPreviewNameEdited ?? false;
+		state.specPreviewDescriptionEdited = draft.specPreviewDescriptionEdited ?? false;
+		state.specPreviewKindEdited = draft.specPreviewKindEdited ?? false;
+		state.specPreviewFormatEdited = draft.specPreviewFormatEdited ?? false;
+		state.specPreviewMustHaveEdited = draft.specPreviewMustHaveEdited ?? false;
+		state.specPreviewShouldHaveEdited = draft.specPreviewShouldHaveEdited ?? false;
+		state.specPreviewMustNotHaveEdited = draft.specPreviewMustNotHaveEdited ?? false;
+		state.specPreviewRequiresEdited = draft.specPreviewRequiresEdited ?? false;
+		state.specPreviewSuggestedRoleEdited = draft.specPreviewSuggestedRoleEdited ?? false;
+		state.assistantHasProposal = draft.hasReceivedSpecProposal ?? false;
+		state.assistantTab = draft.assistantTab ?? "chat";
+		return true;
+	} catch (err) {
+		console.error("[spec-draft] Failed to restore draft:", err);
+		return false;
+	}
+}
+
+/** Delete spec draft from IndexedDB. */
+export function deleteSpecDraft(sessionId: string): void {
+	storage.specDrafts.deleteDraft(sessionId).catch((err) => {
+		console.error("[spec-draft] Failed to delete draft:", err);
 	});
 }
 
@@ -186,7 +274,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 // CONNECT TO SESSION
 // ============================================================================
 
-export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isArtifactSpecAssistant?: boolean; isPreview?: boolean }): Promise<void> {
+export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isArtifactSpecAssistant?: boolean; isPreview?: boolean; assistantType?: string }): Promise<void> {
 	if (state.connectingSessionId) return;
 	state.connectingSessionId = sessionId;
 
@@ -269,13 +357,13 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		remote.onGoalProposal = (proposal) => {
 			state.activeGoalProposal = proposal;
-			if (state.isGoalAssistantSession) {
+			if (state.assistantType === "goal") {
 				if (!state.previewTitleEdited) state.previewTitle = proposal.title;
 				if (!state.previewCwdEdited) state.previewCwd = proposal.cwd || "";
 				if (!state.previewSpecEdited) state.previewSpec = proposal.spec;
-				state.hasReceivedProposal = true;
-				if (state.goalAssistantTab === "chat" && !isDesktop()) {
-					state.goalAssistantTab = "preview";
+				state.assistantHasProposal = true;
+				if (state.assistantTab === "chat" && !isDesktop()) {
+					state.assistantTab = "preview";
 				}
 				// Persist draft to IndexedDB
 				saveGoalDraft(sessionId);
@@ -293,9 +381,9 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			if (!state.rolePreviewPromptEdited) state.rolePreviewPrompt = proposal.prompt;
 			if (!state.rolePreviewToolsEdited) state.rolePreviewTools = proposal.tools;
 			if (!state.rolePreviewAccessoryEdited) state.rolePreviewAccessory = proposal.accessory;
-			state.hasReceivedRoleProposal = true;
-			if (state.roleAssistantTab === "chat" && !isDesktop()) {
-				state.roleAssistantTab = "preview";
+			state.assistantHasProposal = true;
+			if (state.assistantTab === "chat" && !isDesktop()) {
+				state.assistantTab = "preview";
 			}
 			// Persist draft to IndexedDB
 			saveRoleDraft(sessionId);
@@ -325,9 +413,9 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			if (proposal.action === "renderer") {
 				state.toolPreviewRendererHtml = proposal.content;
 			}
-			state.hasReceivedToolProposal = true;
-			if (state.toolAssistantTab === "chat" && !isDesktop()) {
-				state.toolAssistantTab = "preview";
+			state.assistantHasProposal = true;
+			if (state.assistantTab === "chat" && !isDesktop()) {
+				state.assistantTab = "preview";
 			}
 			renderApp();
 		};
@@ -344,10 +432,12 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			if (!state.specPreviewMustNotHaveEdited) state.specPreviewMustNotHave = proposal.mustNotHave;
 			if (!state.specPreviewRequiresEdited) state.specPreviewRequires = proposal.requires;
 			if (!state.specPreviewSuggestedRoleEdited) state.specPreviewSuggestedRole = proposal.suggestedRole;
-			state.hasReceivedSpecProposal = true;
-			if (state.artifactSpecAssistantTab === "chat" && !isDesktop()) {
-				state.artifactSpecAssistantTab = "preview";
+			state.assistantHasProposal = true;
+			if (state.assistantTab === "chat" && !isDesktop()) {
+				state.assistantTab = "preview";
 			}
+			// Persist draft to IndexedDB
+			saveSpecDraft(sessionId);
 			renderApp();
 		};
 
@@ -375,10 +465,16 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		// the first renderApp() — so the mobile header (which depends on
 		// isGoalAssistantSession) renders correctly on the first pass.
 		const sessionData = state.gatewaySessions.find((s) => s.id === sessionId);
-		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
-		state.isRoleAssistantSession = options?.isRoleAssistant || sessionData?.roleAssistant || false;
-		state.isToolAssistantSession = options?.isToolAssistant || sessionData?.toolAssistant || false;
-		state.isArtifactSpecAssistantSession = options?.isArtifactSpecAssistant || sessionData?.artifactSpecAssistant || false;
+		// Unified assistant type detection — prefer assistantType from server, fall back to legacy booleans
+		state.assistantType = options?.assistantType
+			|| sessionData?.assistantType
+			|| (options?.isGoalAssistant || sessionData?.goalAssistant ? "goal"
+			: options?.isRoleAssistant || sessionData?.roleAssistant ? "role"
+			: options?.isToolAssistant || sessionData?.toolAssistant ? "tool"
+			: options?.isArtifactSpecAssistant || sessionData?.artifactSpecAssistant ? "artifact-spec"
+			: null);
+		state.assistantTab = "chat";
+		state.assistantHasProposal = false;
 		state.isPreviewSession = options?.isPreview || sessionData?.preview || false;
 		state.previewPanelHtml = ""; // Clear stale preview from previous session
 		if (state.isPreviewSession) startPreviewPolling();
@@ -435,40 +531,36 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		// Clear goal proposal when connecting to a non-goal-assistant session
 		// to prevent stale proposals from showing in unrelated sessions
-		if (!state.isGoalAssistantSession) {
+		if (state.assistantType !== "goal") {
 			state.activeGoalProposal = null;
 		}
 
-		if (state.isGoalAssistantSession) {
+		if (state.assistantType === "goal") {
 			// Try to restore persisted draft state; fall back to fresh defaults
 			const restored = await restoreGoalDraft(sessionId);
 			if (!restored) {
-				state.goalAssistantTab = "chat";
+				state.assistantTab = "chat";
 				state.previewTitle = "";
 				state.previewCwd = "";
 				state.previewSpec = "";
 				state.previewTitleEdited = false;
 				state.previewCwdEdited = false;
 				state.previewSpecEdited = false;
-				state.hasReceivedProposal = false;
+				state.assistantHasProposal = false;
 				state.previewTeamMode = false;
 			}
 			state.previewSpecEditMode = false;
 		}
 
-		if (options?.isGoalAssistant && !isExisting) {
-			remote.prompt("Start the goal creation session.");
-		}
-
 		// Clear role proposal when connecting to a non-role-assistant session
-		if (!state.isRoleAssistantSession) {
+		if (state.assistantType !== "role") {
 			state.activeRoleProposal = null;
 		}
 
-		if (state.isRoleAssistantSession) {
+		if (state.assistantType === "role") {
 			const restored = await restoreRoleDraft(sessionId);
 			if (!restored) {
-				state.roleAssistantTab = "chat";
+				state.assistantTab = "chat";
 				state.rolePreviewName = "";
 				state.rolePreviewLabel = "";
 				state.rolePreviewPrompt = "";
@@ -479,66 +571,62 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 				state.rolePreviewPromptEdited = false;
 				state.rolePreviewToolsEdited = false;
 				state.rolePreviewAccessoryEdited = false;
-				state.hasReceivedRoleProposal = false;
+				state.assistantHasProposal = false;
 			}
 			state.rolePreviewPromptEditMode = false;
 		}
 
-		if (options?.isRoleAssistant && !isExisting) {
-			remote.prompt("Start the role creation session.");
-		}
-
-		// Clear tool proposal when connecting to a non-tool-assistant session
-		if (!state.isToolAssistantSession) {
-			state.hasReceivedToolProposal = false;
-		}
-
-		if (state.isToolAssistantSession) {
-			state.toolAssistantTab = "chat";
+		if (state.assistantType === "tool") {
+			state.assistantTab = "chat";
 			state.toolPreviewName = "";
 			state.toolPreviewChecklist = { docs: "pending", renderer: "pending", tests: "pending", config: "pending" };
 			state.toolPreviewDocs = "";
 			state.toolPreviewRendererHtml = "";
-			state.hasReceivedToolProposal = false;
-		}
-
-		if (options?.isToolAssistant && !isExisting) {
-			remote.prompt("Start the tool assistant session. Help me document, improve, or create tools.");
 		}
 
 		// Clear spec proposal when connecting to a non-spec-assistant session
-		if (!state.isArtifactSpecAssistantSession) {
+		if (state.assistantType !== "artifact-spec") {
 			state.activeArtifactSpecProposal = null;
-			state.hasReceivedSpecProposal = false;
 		}
 
-		if (state.isArtifactSpecAssistantSession) {
-			state.artifactSpecAssistantTab = "chat";
-			state.specPreviewId = "";
-			state.specPreviewName = "";
-			state.specPreviewDescription = "";
-			state.specPreviewKind = "analysis";
-			state.specPreviewFormat = "markdown";
-			state.specPreviewMustHave = "";
-			state.specPreviewShouldHave = "";
-			state.specPreviewMustNotHave = "";
-			state.specPreviewRequires = "";
-			state.specPreviewSuggestedRole = "";
-			state.specPreviewIdEdited = false;
-			state.specPreviewNameEdited = false;
-			state.specPreviewDescriptionEdited = false;
-			state.specPreviewKindEdited = false;
-			state.specPreviewFormatEdited = false;
-			state.specPreviewMustHaveEdited = false;
-			state.specPreviewShouldHaveEdited = false;
-			state.specPreviewMustNotHaveEdited = false;
-			state.specPreviewRequiresEdited = false;
-			state.specPreviewSuggestedRoleEdited = false;
-			state.hasReceivedSpecProposal = false;
+		if (state.assistantType === "artifact-spec") {
+			const restored = await restoreSpecDraft(sessionId);
+			if (!restored) {
+				state.assistantTab = "chat";
+				state.specPreviewId = "";
+				state.specPreviewName = "";
+				state.specPreviewDescription = "";
+				state.specPreviewKind = "analysis";
+				state.specPreviewFormat = "markdown";
+				state.specPreviewMustHave = "";
+				state.specPreviewShouldHave = "";
+				state.specPreviewMustNotHave = "";
+				state.specPreviewRequires = "";
+				state.specPreviewSuggestedRole = "";
+				state.specPreviewIdEdited = false;
+				state.specPreviewNameEdited = false;
+				state.specPreviewDescriptionEdited = false;
+				state.specPreviewKindEdited = false;
+				state.specPreviewFormatEdited = false;
+				state.specPreviewMustHaveEdited = false;
+				state.specPreviewShouldHaveEdited = false;
+				state.specPreviewMustNotHaveEdited = false;
+				state.specPreviewRequiresEdited = false;
+				state.specPreviewSuggestedRoleEdited = false;
+				state.assistantHasProposal = false;
+			}
 		}
 
-		if (options?.isArtifactSpecAssistant && !isExisting) {
-			remote.prompt("Start the artifact spec creation session.");
+		// Auto-prompt for new assistant sessions
+		const AUTO_PROMPTS: Record<string, string> = {
+			goal: "Start the goal creation session.",
+			role: "Start the role creation session.",
+			tool: "Start the tool assistant session. Help me document, improve, or create tools.",
+			"artifact-spec": "Start the artifact spec creation session.",
+		};
+		if (state.assistantType && !isExisting) {
+			const autoPrompt = AUTO_PROMPTS[state.assistantType];
+			if (autoPrompt) remote.prompt(autoPrompt);
 		}
 
 		// Restore draft and set up auto-save
@@ -629,6 +717,7 @@ export async function terminateSession(sessionId: string): Promise<void> {
 	clearSessionModel(sessionId);
 	deleteGoalDraft(sessionId);
 	deleteRoleDraft(sessionId);
+	deleteSpecDraft(sessionId);
 	await refreshSessions();
 }
 
@@ -641,11 +730,10 @@ export function backToSessions(): void {
 	state.remoteAgent = null;
 	state.connectionStatus = "disconnected";
 	state.activeGoalProposal = null;
-	state.isGoalAssistantSession = false;
 	state.activeRoleProposal = null;
-	state.isRoleAssistantSession = false;
-	state.isToolAssistantSession = false;
-	state.isArtifactSpecAssistantSession = false;
+	state.assistantType = null;
+	state.assistantTab = "chat";
+	state.assistantHasProposal = false;
 	state.isPreviewSession = false;
 	stopPreviewPolling();
 	state.cwdDropdownOpen = false;
@@ -661,10 +749,9 @@ export function disconnectGateway(): void {
 	state.remoteAgent?.disconnect();
 	state.remoteAgent = null;
 	state.connectionStatus = "disconnected";
-	state.isGoalAssistantSession = false;
-	state.isRoleAssistantSession = false;
-	state.isToolAssistantSession = false;
-	state.isArtifactSpecAssistantSession = false;
+	state.assistantType = null;
+	state.assistantTab = "chat";
+	state.assistantHasProposal = false;
 	state.isPreviewSession = false;
 	stopPreviewPolling();
 	state.appView = "disconnected";

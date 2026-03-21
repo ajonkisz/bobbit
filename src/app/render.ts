@@ -171,7 +171,7 @@ function goalPreviewPanel() {
 			state.remoteAgent = null;
 			state.connectionStatus = "disconnected";
 		}
-		state.isGoalAssistantSession = false;
+		state.assistantType = null;
 		state.activeGoalProposal = null;
 		const teamMode = state.previewTeamMode;
 		const worktree = state.previewWorktree;
@@ -323,7 +323,7 @@ function rolePreviewPanel() {
 			state.remoteAgent = null;
 			state.connectionStatus = "disconnected";
 		}
-		state.isRoleAssistantSession = false;
+		state.assistantType = null;
 		state.activeRoleProposal = null;
 		// Clean up persisted draft
 		if (sessionId) {
@@ -613,7 +613,7 @@ function artifactSpecPreviewPanel() {
 			state.remoteAgent = null;
 			state.connectionStatus = "disconnected";
 		}
-		state.isArtifactSpecAssistantSession = false;
+		state.assistantType = null;
 		state.activeArtifactSpecProposal = null;
 		localStorage.removeItem("gateway.sessionId");
 		setHashRoute("landing");
@@ -684,7 +684,7 @@ function artifactSpecPreviewPanel() {
 		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
 			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-3">
 				<div class="text-sm font-semibold mb-1">Artifact Spec Preview</div>
-				${!state.hasReceivedSpecProposal ? html`<div class="text-sm text-muted-foreground italic">Waiting for assistant to propose a spec...</div>` : ""}
+				${!state.assistantHasProposal ? html`<div class="text-sm text-muted-foreground italic">Waiting for assistant to propose a spec...</div>` : ""}
 				${field("ID", "specPreviewId", "specPreviewIdEdited")}
 				${field("Name", "specPreviewName", "specPreviewNameEdited")}
 				${field("Description", "specPreviewDescription", "specPreviewDescriptionEdited", "textarea")}
@@ -716,6 +716,20 @@ function artifactSpecPreviewPanel() {
 			</div>
 		</div>
 	`;
+}
+
+// ============================================================================
+// ASSISTANT PREVIEW DISPATCH
+// ============================================================================
+
+function getAssistantPreviewPanel(type: string) {
+	switch (type) {
+		case "goal": return goalPreviewPanel();
+		case "role": return rolePreviewPanel();
+		case "tool": return toolPreviewPanel();
+		case "artifact-spec": return artifactSpecPreviewPanel();
+		default: return "";
+	}
 }
 
 // ============================================================================
@@ -1021,69 +1035,19 @@ export function doRenderApp(): void {
 		`;
 	};
 
-	const goalAssistantTabBar = () => {
+	const assistantTabBar = () => {
+		if (!state.assistantType) return "";
 		return html`
 			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
 				<button
-					class="goal-tab-pill ${state.goalAssistantTab === "chat" ? "goal-tab-pill--active" : ""}"
-					@click=${() => { state.goalAssistantTab = "chat"; renderApp(); }}
+					class="goal-tab-pill ${state.assistantTab === "chat" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.assistantTab = "chat"; renderApp(); }}
 				>Chat</button>
 				<button
-					class="goal-tab-pill ${state.goalAssistantTab === "preview" ? "goal-tab-pill--active" : ""}"
-					@click=${() => { state.goalAssistantTab = "preview"; renderApp(); }}
+					class="goal-tab-pill ${state.assistantTab === "preview" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.assistantTab = "preview"; renderApp(); }}
 				>
-					Preview${state.hasReceivedProposal ? html` <span class="goal-tab-dot"></span>` : ""}
-				</button>
-			</div>
-		`;
-	};
-
-	const roleAssistantTabBar = () => {
-		return html`
-			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
-				<button
-					class="goal-tab-pill ${state.roleAssistantTab === "chat" ? "goal-tab-pill--active" : ""}"
-					@click=${() => { state.roleAssistantTab = "chat"; renderApp(); }}
-				>Chat</button>
-				<button
-					class="goal-tab-pill ${state.roleAssistantTab === "preview" ? "goal-tab-pill--active" : ""}"
-					@click=${() => { state.roleAssistantTab = "preview"; renderApp(); }}
-				>
-					Preview${state.hasReceivedRoleProposal ? html` <span class="goal-tab-dot"></span>` : ""}
-				</button>
-			</div>
-		`;
-	};
-
-	const toolAssistantTabBar = () => {
-		return html`
-			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
-				<button
-					class="goal-tab-pill ${state.toolAssistantTab === "chat" ? "goal-tab-pill--active" : ""}"
-					@click=${() => { state.toolAssistantTab = "chat"; renderApp(); }}
-				>Chat</button>
-				<button
-					class="goal-tab-pill ${state.toolAssistantTab === "preview" ? "goal-tab-pill--active" : ""}"
-					@click=${() => { state.toolAssistantTab = "preview"; renderApp(); }}
-				>
-					Preview${state.hasReceivedToolProposal ? html` <span class="goal-tab-dot"></span>` : ""}
-				</button>
-			</div>
-		`;
-	};
-
-	const artifactSpecAssistantTabBar = () => {
-		return html`
-			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
-				<button
-					class="goal-tab-pill ${state.artifactSpecAssistantTab === "chat" ? "goal-tab-pill--active" : ""}"
-					@click=${() => { state.artifactSpecAssistantTab = "chat"; renderApp(); }}
-				>Chat</button>
-				<button
-					class="goal-tab-pill ${state.artifactSpecAssistantTab === "preview" ? "goal-tab-pill--active" : ""}"
-					@click=${() => { state.artifactSpecAssistantTab = "preview"; renderApp(); }}
-				>
-					Preview${state.hasReceivedSpecProposal ? html` <span class="goal-tab-dot"></span>` : ""}
+					Preview${state.assistantHasProposal ? html` <span class="goal-tab-dot"></span>` : ""}
 				</button>
 			</div>
 		`;
@@ -1156,75 +1120,22 @@ export function doRenderApp(): void {
 			return renderArtifactSpecPage();
 		}
 
-		if (connected && state.isGoalAssistantSession) {
+		if (connected && state.assistantType) {
+			const previewPanel = getAssistantPreviewPanel(state.assistantType);
 			if (desktop) {
 				return html`
 					${reconnectBanner()}
 					<div class="flex-1 flex min-h-0 overflow-hidden">
 						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
-						${goalPreviewPanel()}
+						${previewPanel}
 					</div>
 				`;
 			}
 			return html`
 				${reconnectBanner()}
-				${state.goalAssistantTab === "chat"
+				${state.assistantTab === "chat"
 					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
-					: html`<div class="flex-1 min-h-0 flex flex-col">${goalPreviewPanel()}</div>`
-				}
-			`;
-		}
-		if (connected && state.isRoleAssistantSession) {
-			if (desktop) {
-				return html`
-					${reconnectBanner()}
-					<div class="flex-1 flex min-h-0 overflow-hidden">
-						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
-						${rolePreviewPanel()}
-					</div>
-				`;
-			}
-			return html`
-				${reconnectBanner()}
-				${state.roleAssistantTab === "chat"
-					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
-					: html`<div class="flex-1 min-h-0 flex flex-col">${rolePreviewPanel()}</div>`
-				}
-			`;
-		}
-		if (connected && state.isToolAssistantSession) {
-			if (desktop) {
-				return html`
-					${reconnectBanner()}
-					<div class="flex-1 flex min-h-0 overflow-hidden">
-						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
-						${toolPreviewPanel()}
-					</div>
-				`;
-			}
-			return html`
-				${reconnectBanner()}
-				${state.toolAssistantTab === "chat"
-					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
-					: html`<div class="flex-1 min-h-0 flex flex-col">${toolPreviewPanel()}</div>`
-				}
-			`;
-		}
-		if (connected && state.isArtifactSpecAssistantSession) {
-			if (desktop) {
-				return html`
-					${reconnectBanner()}
-					<div class="flex-1 flex min-h-0 overflow-hidden">
-						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
-						${artifactSpecPreviewPanel()}
-					</div>
-				`;
-			}
-			return html`
-				${reconnectBanner()}
-				${state.artifactSpecAssistantTab === "chat"
-					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
-					: html`<div class="flex-1 min-h-0 flex flex-col">${artifactSpecPreviewPanel()}</div>`
+					: html`<div class="flex-1 min-h-0 flex flex-col">${previewPanel}</div>`
 				}
 			`;
 		}
@@ -1313,11 +1224,8 @@ export function doRenderApp(): void {
 						${headerLeft()}
 						${headerRight()}
 					</div>
-					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
-					${state.isRoleAssistantSession ? roleAssistantTabBar() : ""}
-					${state.isToolAssistantSession ? toolAssistantTabBar() : ""}
-					${state.isArtifactSpecAssistantSession ? artifactSpecAssistantTabBar() : ""}
-					${state.isPreviewSession && !state.isGoalAssistantSession && !state.isRoleAssistantSession && !state.isToolAssistantSession && !state.isArtifactSpecAssistantSession ? previewTabBar() : ""}
+					${state.assistantType ? assistantTabBar() : ""}
+					${state.isPreviewSession && !state.assistantType ? previewTabBar() : ""}
 				</div>
 				<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>

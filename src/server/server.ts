@@ -19,8 +19,7 @@ import { ToolStore } from "./agent/tool-store.js";
 import { ToolManager } from "./agent/tool-manager.js";
 import { TraitStore } from "./agent/trait-store.js";
 import { TraitManager } from "./agent/trait-manager.js";
-import { TOOL_ASSISTANT_PROMPT } from "./agent/tool-assistant.js";
-import { ARTIFACT_SPEC_ASSISTANT_PROMPT } from "./agent/artifact-spec-assistant.js";
+
 import type { TaskState } from "./agent/task-store.js";
 import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
 import { ArtifactSpecStore } from "./agent/artifact-spec-store.js";
@@ -254,7 +253,12 @@ async function handleApiRoute(
 			clientCount: session.clients.size,
 			isCompacting: session.isCompacting,
 			goalId: session.goalId,
-			goalAssistant: session.goalAssistant,
+			assistantType: session.assistantType,
+			// Legacy boolean fields for backward compat
+			goalAssistant: session.assistantType === "goal",
+			roleAssistant: session.assistantType === "role",
+			toolAssistant: session.assistantType === "tool",
+			artifactSpecAssistant: session.assistantType === "artifact-spec",
 			delegateOf: session.delegateOf,
 			role: session.role,
 			teamGoalId: session.teamGoalId,
@@ -295,10 +299,15 @@ async function handleApiRoute(
 
 		// ── Normal session creation ──
 		const goalId = body?.goalId;
-		const goalAssistant = body?.goalAssistant === true;
-		const roleAssistant = body?.roleAssistant === true;
-		const toolAssistant = body?.toolAssistant === true;
-		const artifactSpecAssistant = body?.artifactSpecAssistant === true;
+
+		// Accept both new assistantType and legacy boolean fields
+		let assistantType = body?.assistantType as string | undefined;
+		if (!assistantType) {
+			if (body?.goalAssistant) assistantType = "goal";
+			else if (body?.roleAssistant) assistantType = "role";
+			else if (body?.toolAssistant) assistantType = "tool";
+			else if (body?.artifactSpecAssistant) assistantType = "artifact-spec";
+		}
 
 		// If creating under a goal, use the goal's cwd as default
 		let cwd = body?.cwd || config.defaultCwd;
@@ -317,16 +326,10 @@ async function handleApiRoute(
 
 		// If a roleId is provided, look up the role and pass its prompt/tools/accessory
 		const roleId = body?.roleId;
-		let createOpts: { rolePrompt?: string; allowedTools?: string[]; roleAssistant?: boolean; toolAssistant?: boolean; artifactSpecAssistant?: boolean; traits?: Array<{ label: string; promptFragment: string }>; traitNames?: string[] } | undefined;
+		let createOpts: { rolePrompt?: string; allowedTools?: string[]; traits?: Array<{ label: string; promptFragment: string }>; traitNames?: string[] } | undefined;
 		let roleForMeta: { name: string; accessory: string } | undefined;
 
-		if (toolAssistant) {
-			createOpts = { toolAssistant: true };
-		} else if (roleAssistant) {
-			createOpts = { roleAssistant: true };
-		} else if (artifactSpecAssistant) {
-			createOpts = { artifactSpecAssistant: true };
-		} else if (roleId && typeof roleId === "string") {
+		if (roleId && typeof roleId === "string") {
 			const role = roleManager.getRole(roleId);
 			if (!role) {
 				json({ error: `Role "${roleId}" not found` }, 404);
@@ -364,7 +367,7 @@ async function handleApiRoute(
 		}
 
 		try {
-			const session = await sessionManager.createSession(cwd, args, goalId, goalAssistant, createOpts);
+			const session = await sessionManager.createSession(cwd, args, goalId, assistantType, createOpts);
 
 			// Set role metadata if a role was specified
 			if (roleForMeta) {
@@ -378,10 +381,12 @@ async function handleApiRoute(
 				cwd: session.cwd,
 				status: session.status,
 				goalId: session.goalId,
-				goalAssistant: session.goalAssistant,
-				roleAssistant: session.roleAssistant,
-				toolAssistant: session.toolAssistant,
-				artifactSpecAssistant: session.artifactSpecAssistant,
+				assistantType: session.assistantType,
+				// Legacy boolean fields for backward compat
+				goalAssistant: session.assistantType === "goal",
+				roleAssistant: session.assistantType === "role",
+				toolAssistant: session.assistantType === "tool",
+				artifactSpecAssistant: session.assistantType === "artifact-spec",
 				role: session.role,
 				accessory: session.accessory,
 				traits: session.traits,
@@ -1258,10 +1263,11 @@ async function handleApiRoute(
 			}
 		}
 
-		if (typeof body.goalAssistant === "boolean" || typeof body.goalId === "string") {
+		if (typeof body.assistantType === "string" || typeof body.goalAssistant === "boolean" || typeof body.goalId === "string") {
 			const session = sessionManager.getSession(id);
 			if (!session) { json({ error: "Session not found" }, 404); return; }
-			if (typeof body.goalAssistant === "boolean") session.goalAssistant = body.goalAssistant;
+			if (typeof body.assistantType === "string") session.assistantType = body.assistantType || undefined;
+			else if (typeof body.goalAssistant === "boolean") session.assistantType = body.goalAssistant ? "goal" : undefined;
 			if (typeof body.goalId === "string") session.goalId = body.goalId;
 			sessionManager.persistSessionMetadata(session).catch(() => {});
 		}

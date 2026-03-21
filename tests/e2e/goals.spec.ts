@@ -2,24 +2,18 @@ import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { readE2EToken, E2E_PI_DIR } from "./e2e-setup.js";
 
 /**
  * End-to-end tests for creating, editing, and using goals.
  *
  * Run with:
- *   npx playwright test tests/goals.spec.ts --config tests/playwright-e2e.config.ts
+ *   npx playwright test tests/e2e/goals.spec.ts --config playwright-e2e.config.ts
  */
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function readGatewayToken(): string {
-	const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
-	const token = fs.readFileSync(tokenPath, "utf-8").trim();
-	if (!token || token.length < 64) throw new Error("No valid gateway token found");
-	return token;
-}
 
 /** Navigate to the app with the auth token so it auto-authenticates. */
 async function openApp(page: Page, token: string) {
@@ -135,7 +129,7 @@ async function apiDeleteSession(baseUrl: string, token: string, id: string): Pro
 // REST API tests
 // ---------------------------------------------------------------------------
 
-const GW_URL = "http://localhost:3001";
+const GW_URL = "http://127.0.0.1:3099";
 
 test.describe("Goals — REST API", () => {
 	let token: string;
@@ -143,7 +137,7 @@ test.describe("Goals — REST API", () => {
 	const createdSessionIds: string[] = [];
 
 	test.beforeAll(() => {
-		token = readGatewayToken();
+		token = readE2EToken();
 	});
 
 	test.afterAll(async () => {
@@ -297,12 +291,13 @@ test.describe("Goals — REST API", () => {
 		});
 		createdGoalIds.push(goal.id);
 
-		// Verify the combined prompt file was generated
-		const promptPath = path.join(os.homedir(), ".pi", "goal-prompts", `${goal.id}.md`);
 		// The file is created lazily when a session requests it, so trigger it
 		// by creating a session
 		const session = await apiCreateSession(GW_URL, token, goal.id);
 		createdSessionIds.push(session.id);
+
+		// Verify the combined prompt file was generated
+		const promptPath = path.join(E2E_PI_DIR, "session-prompts", `${session.id}.md`);
 
 		// Give it a moment to start
 		await new Promise((r) => setTimeout(r, 2000));
@@ -363,7 +358,7 @@ test.describe("Goals — UI", () => {
 	const cleanupSessionIds: string[] = [];
 
 	test.beforeAll(() => {
-		token = readGatewayToken();
+		token = readE2EToken();
 	});
 
 	test.afterAll(async () => {
@@ -389,7 +384,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up: terminate the goal assistant session
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -468,7 +463,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up: terminate the goal assistant session
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -493,7 +488,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -526,7 +521,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -568,7 +563,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -608,7 +603,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -646,7 +641,7 @@ test.describe("Goals — UI", () => {
 
 		// The assistant session should have been terminated
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		expect(assistantSession).toBeUndefined();
 	});
 
@@ -669,7 +664,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up any leftover assistant session
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -714,7 +709,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -757,7 +752,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -818,7 +813,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -853,7 +848,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -900,7 +895,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up sessions
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 

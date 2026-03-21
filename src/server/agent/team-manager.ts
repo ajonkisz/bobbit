@@ -342,7 +342,7 @@ export class TeamManager {
 			cwd,
 			["--extension", TEAM_LEAD_EXTENSION_PATH],
 			goalId,
-			false,
+			undefined,
 			{
 				rolePrompt: teamLeadPrompt,
 				env: { BOBBIT_GOAL_ID: goalId },
@@ -465,7 +465,7 @@ export class TeamManager {
 				worktreeResult.worktreePath,
 				undefined,
 				goalId,
-				false,
+				undefined,
 				{ rolePrompt, allowedTools, traits: resolvedTraits, traitNames },
 			);
 

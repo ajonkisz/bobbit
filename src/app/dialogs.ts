@@ -589,7 +589,7 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 		// Split 14 colours into 2 equal rows of 7
 		const ROW_SIZE = Math.ceil(BOBBIT_HUE_ROTATIONS.length / 2);
 
-		const roleLabel = session?.goalAssistant ? "Goal Assistant" : displayRoleObj?.label || displayRole || "None";
+		const roleLabel = session?.assistantType === "goal" ? "Goal Assistant" : displayRoleObj?.label || displayRole || "None";
 		const hasRoleChange = pendingRole !== null;
 		const hasColorChange = pendingColorIndex !== null;
 		const hasTraitChange = pendingTraits !== null;
@@ -680,7 +680,7 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 								<!-- Role picker -->
 								<div>
 									<div class="text-xs text-muted-foreground mb-1.5">Role</div>
-									${session?.goalAssistant
+									${session?.assistantType === "goal"
 										? html`<div class="text-sm text-foreground/80 px-3 py-1.5 rounded-md bg-secondary/50">Goal Assistant</div>`
 										: html`
 											<div class="relative" id="role-picker-container">
@@ -815,12 +815,12 @@ async function createGoalAssistantSession(): Promise<void> {
 	try {
 		const res = await gatewayFetch("/api/sessions", {
 			method: "POST",
-			body: JSON.stringify({ goalAssistant: true }),
+			body: JSON.stringify({ assistantType: "goal" }),
 		});
 		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
 		const { id } = await res.json();
 		const { connectToSession } = await import("./session-manager.js");
-		await connectToSession(id, false, { isGoalAssistant: true });
+		await connectToSession(id, false, { assistantType: "goal" });
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		showConnectionError("Failed to create goal assistant", msg);
@@ -858,7 +858,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 		await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, team: teamValue, worktree: worktreeValue });
 		state.activeGoalProposal = null;
 		// Only terminate goal-assistant sessions — regular sessions that suggested a goal should keep running.
-		if (sessionId && state.isGoalAssistantSession) {
+		if (sessionId && state.assistantType === "goal") {
 			const { terminateSession } = await import("./session-manager.js");
 			await terminateSession(sessionId);
 		}
