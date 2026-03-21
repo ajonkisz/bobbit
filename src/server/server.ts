@@ -1755,11 +1755,12 @@ async function handleApiRoute(
 			return;
 		}
 		const cwd = body.cwd || config.defaultCwd;
-		const staff = staffManager.createStaff(
+		const staff = await staffManager.createStaff(
 			body.name,
 			body.description || "",
 			body.systemPrompt,
 			cwd,
+			sessionManager,
 			{ triggers: body.triggers, roleId: body.roleId },
 		);
 		json(staff, 201);
@@ -1797,7 +1798,7 @@ async function handleApiRoute(
 		}
 
 		if (req.method === "DELETE") {
-			const ok = staffManager.deleteStaff(id);
+			const ok = await staffManager.deleteStaff(id, sessionManager);
 			if (!ok) { json({ error: "Staff agent not found" }, 404); return; }
 			json({ ok: true });
 			return;
@@ -1820,14 +1821,10 @@ async function handleApiRoute(
 		return;
 	}
 
-	// GET /api/staff/:id/sessions — list sessions for a staff agent
+	// GET /api/staff/:id/sessions — DEPRECATED (staff agents have a single permanent session)
 	const staffSessionsMatch = url.pathname.match(/^\/api\/staff\/([^/]+)\/sessions$/);
 	if (staffSessionsMatch && req.method === "GET") {
-		const id = staffSessionsMatch[1];
-		const staff = staffManager.getStaff(id);
-		if (!staff) { json({ error: "Staff agent not found" }, 404); return; }
-		const sessions = staffManager.getSessionsByStaffId(id, sessionManager);
-		json({ sessions });
+		json({ error: "Deprecated. Staff agents have a single permanent session. Use GET /api/staff/:id." }, 410);
 		return;
 	}
 

@@ -126,12 +126,10 @@ export class TriggerEngine {
 			// Skip if a wake is already in-flight for this staff (async race guard)
 			if (this.wakingInProgress.has(staff.id)) continue;
 
-			// Skip if staff already has a live session (prevent concurrent wakes)
+			// Skip if the staff's permanent session is currently busy (streaming or starting)
 			if (staff.currentSessionId) {
 				const session = this.sessionManager.getSession(staff.currentSessionId);
-				if (session && session.status !== "terminated") continue;
-				// Clear stale reference — use null (not undefined) so the store deletes the key
-				this.staffManager.updateStaff(staff.id, { currentSessionId: null as unknown as string });
+				if (session && (session.status === "streaming" || session.status === "starting")) continue;
 			}
 
 			for (const trigger of staff.triggers) {
