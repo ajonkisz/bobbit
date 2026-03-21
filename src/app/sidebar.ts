@@ -5,6 +5,7 @@ import {
 	state,
 	renderApp,
 	activeSessionId,
+	isDesktop,
 	expandedGoals,
 	ungroupedExpanded,
 	setUngroupedExpanded,
@@ -249,6 +250,7 @@ export function renderStaffSidebarSection() {
 				</div>
 			</div>
 			${staffSectionExpanded ? list.map((agent) => {
+				const mobile = !isDesktop();
 				const session = agent.currentSessionId
 					? state.gatewaySessions.find((s) => s.id === agent.currentSessionId)
 					: undefined;
@@ -257,17 +259,22 @@ export function renderStaffSidebarSection() {
 				const isCompacting = session?.isCompacting || false;
 				const isAborting = session?.isAborting || false;
 				const accessory = session?.accessory;
+				const rowPy = mobile ? "py-1" : SESSION_ROW_PY;
+				const btnPad = mobile ? "p-1.5" : "p-0.5";
+				const editBtn = html`<button class="${btnPad} rounded ${mobile ? "text-muted-foreground active:bg-secondary/80" : "hover:bg-secondary/80 text-muted-foreground hover:text-foreground"}"
+					@click=${(e: Event) => { e.stopPropagation(); window.location.hash = `#/staff/${agent.id}`; }}
+					title="Edit">${icon(Pencil, "xs")}</button>`;
 				return html`
-				<div class="group relative flex items-center gap-1.5 px-2 ${SESSION_ROW_PY} rounded-md ${active ? "bg-secondary" : "hover:bg-secondary/50"} cursor-pointer transition-colors"
+				<div class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-3 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors
+					${active ? "bg-secondary text-foreground" : mobile ? "text-muted-foreground active:bg-secondary/50" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
 					@click=${() => handleStaffClick(agent)}>
 					${statusBobbit(sessionStatus, isCompacting, agent.currentSessionId, active, isAborting, false, false, accessory)}
-					<span class="flex-1 text-xs truncate ${active ? "text-foreground font-medium" : "text-muted-foreground"}">${agent.name}</span>
-					${agent.lastWakeAt ? html`<span class="text-[10px] text-muted-foreground shrink-0">${relativeTime(agent.lastWakeAt)}</span>` : ""}
-					<div class="absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-6 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
-						<button class="p-0.5 rounded hover:bg-secondary/80 text-muted-foreground hover:text-foreground"
-							@click=${(e: Event) => { e.stopPropagation(); window.location.hash = `#/staff/${agent.id}`; }}
-							title="Edit">${icon(Pencil, "xs")}</button>
-					</div>
+					<span class="flex-1 truncate ${mobile ? "text-base" : "text-xs"} ${active ? "font-medium" : "font-normal"}">${agent.name}</span>
+					${mobile
+						? editBtn
+						: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">
+							${editBtn}
+						</div>`}
 				</div>
 			`; }) : ""}
 	`;
