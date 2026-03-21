@@ -147,6 +147,9 @@ async function createAssistantSession(): Promise<void> {
 		const { id } = await res.json();
 		const { connectToSession } = await import("./session-manager.js");
 		await connectToSession(id, false);
+		// Auto-prompt to trigger the assistant's greeting
+		const { state: appState } = await import("./state.js");
+		appState.remoteAgent?.prompt("Start the artifact spec creation session.");
 	} catch (err) {
 		const { showConnectionError } = await import("./dialogs.js");
 		showConnectionError("Failed to create artifact spec assistant", err instanceof Error ? err.message : String(err));
