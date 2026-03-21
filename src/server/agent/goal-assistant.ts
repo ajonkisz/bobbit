@@ -26,7 +26,7 @@ Keep it to 1-2 sentences. Don't explain the full process — just ask what they 
 When ready, output a structured proposal block in EXACTLY this format:
 
 <goal_proposal>
-<title>Short 2-5 word title</title>
+<title>Short 2-5 word title (must be under 29 characters)</title>
 <spec>
 Markdown spec content. Include:
 - Brief description of what needs to be done
