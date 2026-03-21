@@ -146,7 +146,7 @@ export class HtmlRenderer implements ToolRenderer<HtmlWriteParams, any> {
 						${isStreaming ? html`
 							<div style="
 								position: absolute; inset: 0; z-index: 10;
-								background: rgba(10, 10, 20, 0.4);
+								background: rgba(10, 10, 20, 0.2);
 								display: flex; align-items: center; justify-content: center;
 								pointer-events: none;
 							">
