@@ -20,8 +20,12 @@ allowedTools:
   - browser_eval
   - browser_wait
   - artifact_update
+  - find
+  - grep
+  - ls
+  - bash_bg
 createdAt: 1774022789112
-updatedAt: 1774022789112
+updatedAt: 1774134297033
 promptTemplate: |-
   You are a **Test Engineer** agent (id: {{AGENT_ID}}) in a team.
 

@@ -24,8 +24,11 @@ allowedTools:
   - browser_screenshot
   - browser_type
   - browser_wait
+  - find
+  - grep
+  - ls
 createdAt: 1773948781652
-updatedAt: 1774035700703
+updatedAt: 1774134276466
 promptTemplate: |-
   # Docs Writer
 
