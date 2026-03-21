@@ -1,7 +1,8 @@
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
 import { html } from "lit";
 import { createRef, ref } from "lit/directives/ref.js";
-import { AppWindow } from "lucide";
+import { AppWindow, Loader2 } from "lucide";
+import { icon } from "@mariozechner/mini-lit";
 import { renderCollapsibleHeader, renderHeader } from "../renderer-registry.js";
 import type { ToolRenderer, ToolRenderResult } from "../types.js";
 
@@ -13,6 +14,10 @@ interface HtmlWriteParams {
 /**
  * Renders HTML files written via the `write` tool inline in the chat.
  * Shows a sandboxed iframe preview with the source code collapsible underneath.
+ *
+ * During streaming, we show a static placeholder instead of a live iframe to
+ * avoid the white flash caused by repeatedly replacing iframe srcdoc. The full
+ * interactive preview appears once the write completes.
  */
 export class HtmlRenderer implements ToolRenderer<HtmlWriteParams, any> {
 	render(
@@ -50,12 +55,43 @@ export class HtmlRenderer implements ToolRenderer<HtmlWriteParams, any> {
 			return { content: renderHeader(state, AppWindow, headerText), isCustom: false };
 		}
 
-		// Create a blob URL for the iframe src.
-		// We use srcdoc via a data URI to keep it self-contained.
 		const contentRef = createRef<HTMLDivElement>();
 		const chevronRef = createRef<HTMLSpanElement>();
 
-		// Auto-resize iframe to fit content
+		// During streaming, show a placeholder instead of a live iframe to avoid flashing
+		if (isStreaming) {
+			return {
+				content: html`
+					<div>
+						${renderCollapsibleHeader(state, AppWindow, headerText, contentRef, chevronRef, false)}
+						<div class="mt-3 rounded-lg border border-border overflow-hidden"
+							style="height: 200px; display: flex; align-items: center; justify-content: center; background: rgba(15, 15, 25, 0.85);">
+							<div style="display: flex; flex-direction: column; align-items: center; gap: 10px; color: rgba(255,255,255,0.5);">
+								<style>
+									@keyframes html-renderer-spin {
+										to { transform: rotate(360deg); }
+									}
+								</style>
+								<div style="
+									width: 22px; height: 22px;
+									border: 2px solid rgba(255,255,255,0.12);
+									border-top-color: rgba(255,255,255,0.5);
+									border-radius: 50%;
+									animation: html-renderer-spin 0.8s linear infinite;
+								"></div>
+								<span style="font-size: 12px; letter-spacing: 0.5px;">Rendering preview…</span>
+							</div>
+						</div>
+						<div ${ref(contentRef)} class="max-h-0 overflow-hidden transition-all duration-300">
+							<code-block .code=${htmlContent} language="html"></code-block>
+						</div>
+					</div>
+				`,
+				isCustom: false,
+			};
+		}
+
+		// Complete — show the live iframe preview
 		const iframeRef = createRef<HTMLIFrameElement>();
 
 		const resizeIframe = () => {
