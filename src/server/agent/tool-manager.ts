@@ -114,36 +114,59 @@ export class ToolManager {
 
 	/**
 	 * Returns formatted tool documentation for inclusion in system prompts.
-	 * Groups tools by category and includes docs for any tool that has them.
+	 *
+	 * Generates two sections:
+	 * 1. **Tool Overview** — grouped by `group`, one-line `summary` per tool
+	 * 2. **Tool Documentation** — grouped by `group`, full `docs` per tool
+	 *
 	 * If `toolNames` is provided, only includes those tools; otherwise includes all.
 	 */
 	getToolDocsForPrompt(toolNames?: string[]): string {
 		const tools = loadToolDefinitions();
-		const grouped = new Map<string, Array<{ name: string; description: string; docs: string }>>();
+
+		// Build grouped data: group → [{ name, summary, docs }]
+		const grouped = new Map<string, Array<{ name: string; summary: string; docs?: string }>>();
 
 		for (const tool of tools) {
 			if (toolNames && !toolNames.includes(tool.name)) continue;
 			const override = this.store.get(tool.name);
-			const docs = override?.docs ?? tool.docs;
-			if (!docs) continue;
-
 			const group = override?.group ?? tool.group;
+			const summary = tool.summary ?? override?.description ?? tool.description;
+			const docs = override?.docs ?? tool.docs;
+
 			if (!grouped.has(group)) grouped.set(group, []);
 			grouped.get(group)!.push({
 				name: tool.name,
-				description: override?.description ?? tool.description,
-				docs: docs.trim(),
+				summary,
+				docs: docs?.trim(),
 			});
 		}
 
 		if (grouped.size === 0) return "";
 
-		const sections: string[] = ["# Tool Documentation"];
+		// Part 1: Tool Overview
+		const sections: string[] = ["# Tools"];
 		for (const [group, entries] of grouped) {
 			sections.push(`\n## ${group}\n`);
 			for (const entry of entries) {
-				sections.push(`### ${entry.name}\n\n${entry.docs}\n`);
+				sections.push(`- **${entry.name}**: ${entry.summary}`);
 			}
+		}
+
+		// Part 2: Tool Documentation (only tools that have docs)
+		const docSections: string[] = [];
+		for (const [group, entries] of grouped) {
+			const withDocs = entries.filter((e) => e.docs);
+			if (withDocs.length === 0) continue;
+			docSections.push(`\n## ${group}\n`);
+			for (const entry of withDocs) {
+				docSections.push(`### ${entry.name}\n\n${entry.docs}\n`);
+			}
+		}
+
+		if (docSections.length > 0) {
+			sections.push("\n# Tool Documentation");
+			sections.push(...docSections);
 		}
 
 		return sections.join("\n");

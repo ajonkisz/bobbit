@@ -128,7 +128,7 @@ export class SessionManager {
 	/** Generate tool docs and inject into prompt parts before assembly. */
 	private assemblePrompt(sessionId: string, parts: Parameters<typeof assembleSystemPrompt>[1]): string | undefined {
 		if (this.toolManager && !parts.toolDocs) {
-			parts.toolDocs = this.toolManager.getToolDocsForPrompt();
+			parts.toolDocs = this.toolManager.getToolDocsForPrompt(parts.allowedTools);
 		}
 		return assembleSystemPrompt(sessionId, parts);
 	}
@@ -686,6 +686,7 @@ export class SessionManager {
 				taskSpec,
 				taskDependsOn,
 				traits: opts?.traits,
+				allowedTools: effectiveAllowedTools,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
