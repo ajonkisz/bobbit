@@ -68,7 +68,7 @@ function renderMobileLanding() {
 					</button>
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => showGoalDialog()}>
-						${icon(Plus, "xs")} Goal
+						${icon(Crosshair, "xs")} Goal
 					</button>
 				</div>
 				${state.sessionsLoading
