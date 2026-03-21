@@ -33,6 +33,8 @@ export interface GatewaySession {
 	accessory?: string;
 	/** Whether this session has a live HTML preview panel */
 	preview?: boolean;
+	/** Personality trait names assigned to this session */
+	traits?: string[];
 }
 
 export type GoalState = "todo" | "in-progress" | "complete" | "shelved";

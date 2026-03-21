@@ -38,6 +38,8 @@ export interface PersistedSession {
 	accessory?: string;
 	/** Whether this session has a live HTML preview panel */
 	preview?: boolean;
+	/** Personality trait names */
+	traits?: string[];
 	/** Persisted prompt queue */
 	messageQueue?: QueuedMessage[];
 }
@@ -109,7 +111,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "goalAssistant" | "roleAssistant" | "toolAssistant" | "artifactSpecAssistant" | "taskId" | "accessory" | "preview" | "messageQueue">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "goalAssistant" | "roleAssistant" | "toolAssistant" | "artifactSpecAssistant" | "taskId" | "accessory" | "preview" | "traits" | "messageQueue">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);

@@ -21,6 +21,7 @@ import { updateLocalSessionTitle } from "./api.js";
 import { refreshSessions } from "./api.js";
 import { BOBBIT_HUE_ROTATIONS, sessionColorMap, setSessionColor, statusBobbit, getAccessory } from "./session-colors.js";
 import { clearSessionModel } from "./routing.js";
+import { fetchTraits, type TraitData } from "./api.js";
 // NOTE: session-manager imports from dialogs, so we use dynamic imports to break the cycle
 
 
@@ -473,10 +474,18 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 	const initialColorIndex: number = sessionColorMap.get(sessionId) ?? -1;
 	let pendingRole: string | null = null;
 	let pendingColorIndex: number | null = null;
+	// Track pending trait changes
+	const initialTraits: string[] = session0?.traits || [];
+	let pendingTraits: string[] | null = null;
+	let availableTraits: TraitData[] = [];
 
-	// Load roles for the picker
+	// Load roles and traits for the picker
 	import("./api.js").then(({ fetchRoles }) => {
 		if (state.roles.length === 0) fetchRoles().then(() => renderDialog());
+	});
+	fetchTraits().then((traits) => {
+		availableTraits = traits;
+		renderDialog();
 	});
 
 	const cleanup = () => {
@@ -506,18 +515,21 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 			setSessionColor(sessionId, pendingColorIndex);
 		}
 
-		// Apply role change if pending (this restarts the agent — do last)
-		if (pendingRole !== null) {
+		// Apply role/trait changes (these restart the agent — do last)
+		if (pendingRole !== null || pendingTraits !== null) {
 			saving = true;
 			renderDialog();
 			try {
+				const patchBody: any = {};
+				if (pendingRole !== null) patchBody.roleId = pendingRole;
+				if (pendingTraits !== null) patchBody.traits = pendingTraits;
 				await gatewayFetch(`/api/sessions/${sessionId}`, {
 					method: "PATCH",
-					body: JSON.stringify({ roleId: pendingRole }),
+					body: JSON.stringify(patchBody),
 				});
 				await refreshSessions();
 			} catch (err) {
-				console.error("[assign-role] Failed:", err);
+				console.error("[assign-role/traits] Failed:", err);
 			}
 		}
 
@@ -580,9 +592,10 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 		const roleLabel = session?.goalAssistant ? "Goal Assistant" : displayRoleObj?.label || displayRole || "None";
 		const hasRoleChange = pendingRole !== null;
 		const hasColorChange = pendingColorIndex !== null;
+		const hasTraitChange = pendingTraits !== null;
 		const hasTitleChange = titleValue.trim() !== "" && titleValue.trim() !== currentTitle;
-		const hasAnyChange = hasTitleChange || hasColorChange || hasRoleChange;
-		const saveLabel = saving ? "Saving…" : hasRoleChange ? "Save & Assign Role" : "Save";
+		const hasAnyChange = hasTitleChange || hasColorChange || hasRoleChange || hasTraitChange;
+		const saveLabel = saving ? "Saving…" : (hasRoleChange || hasTraitChange) ? "Save & Restart" : "Save";
 		const displayColorIndex = pendingColorIndex !== null ? pendingColorIndex : initialColorIndex;
 
 		render(
@@ -703,6 +716,38 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 											</div>
 										`}
 								</div>
+								<!-- Traits -->
+								${availableTraits.length > 0 ? html`
+									<div>
+										<div class="text-xs text-muted-foreground mb-1.5">Traits</div>
+										<div class="flex flex-wrap gap-1">
+											${availableTraits.map((trait) => {
+												const displayTraits = pendingTraits !== null ? pendingTraits : initialTraits;
+												const selected = displayTraits.includes(trait.name);
+												return html`<button
+													class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer"
+													style="${selected
+														? "background: hsl(var(--primary) / 0.15); color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.3);"
+														: "background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); border-color: transparent;"}"
+													title=${trait.description}
+													@click=${() => {
+														const current = pendingTraits !== null ? [...pendingTraits] : [...initialTraits];
+														if (selected) {
+															pendingTraits = current.filter((t) => t !== trait.name);
+														} else {
+															pendingTraits = [...current, trait.name];
+														}
+														// Reset to null if same as initial
+														if (pendingTraits.length === initialTraits.length && pendingTraits.every((t) => initialTraits.includes(t))) {
+															pendingTraits = null;
+														}
+														renderDialog();
+													}}
+												>${trait.label}</button>`;
+											})}
+										</div>
+									</div>
+								` : ""}
 							</div>
 						`,
 					})}
