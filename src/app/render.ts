@@ -56,27 +56,31 @@ function renderMobileLanding() {
 	return html`
 		<div class="flex-1 flex flex-col overflow-y-auto">
 			<div class="w-full max-w-xl mx-auto px-2 py-4 flex flex-col gap-1">
-				<div class="flex items-center gap-1 px-1 pb-2 mb-1 border-b border-border/30">
-					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-						@click=${() => { import("./role-manager-page.js").then((m) => m.loadRolePageData()); setHashRoute("roles"); }}>
-						${icon(Users, "xs")} Roles
-					</button>
-					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-						@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); setHashRoute("tools"); }}>
-						${icon(Wrench, "xs")} Tools
-					</button>
-					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-						@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); setHashRoute("artifact-specs"); }}>
-						${icon(Layers, "xs")} Specs
-					</button>
-					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-						@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
-						${icon(Sparkles, "xs")} Personalities
-					</button>
-					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-						@click=${() => showGoalDialog()}>
-						${icon(GoalIcon, "xs")} New Goal
-					</button>
+				<div class="flex flex-col gap-1 px-1 pb-2 mb-1 border-b border-border/30">
+					<div class="flex items-center gap-1">
+						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+							@click=${() => { import("./role-manager-page.js").then((m) => m.loadRolePageData()); setHashRoute("roles"); }}>
+							${icon(Users, "xs")} Roles
+						</button>
+						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+							@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); setHashRoute("tools"); }}>
+							${icon(Wrench, "xs")} Tools
+						</button>
+						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+							@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); setHashRoute("artifact-specs"); }}>
+							${icon(Layers, "xs")} Specs
+						</button>
+					</div>
+					<div class="flex items-center gap-1">
+						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+							@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
+							${icon(Sparkles, "xs")} Personalities
+						</button>
+						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+							@click=${() => showGoalDialog()}>
+							${icon(GoalIcon, "xs")} New Goal
+						</button>
+					</div>
 				</div>
 				${state.sessionsLoading
 					? html`<div class="text-center py-12 text-muted-foreground text-xs">Loading…</div>`
