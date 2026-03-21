@@ -228,20 +228,24 @@ export function renderStaffSidebarSection() {
 	// Always show the Staff section so users can create their first staff agent
 
 	return html`
-		<div class="border-t border-border/50 my-1.5 mx-1"></div>
+		<div class="border-t border-border/30 my-1 mx-2"></div>
 		<div class="flex flex-col gap-0.5">
-			<div class="flex items-center gap-1 px-1 py-0.5">
-				<div class="flex-1 flex items-center gap-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
-					@click=${() => { setStaffSectionExpanded(!staffSectionExpanded); renderApp(); }}>
-					<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${staffSectionExpanded ? "▾" : "▸"}</span>
-					<span class="shrink-0 text-muted-foreground">${icon(Bot, "xs")}</span>
-					<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Staff</span>
+			<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer active:bg-secondary/50 transition-colors"
+				@click=${() => { setStaffSectionExpanded(!staffSectionExpanded); renderApp(); }}>
+				<span class="text-sm text-muted-foreground shrink-0 select-none" style="width:14px;text-align:center;">${staffSectionExpanded ? "▾" : "▸"}</span>
+				<span class="flex-1 text-sm text-muted-foreground uppercase tracking-wider font-medium">Staff</span>
+				<div class="flex items-center" @click=${(e: Event) => e.stopPropagation()}>
+					<button
+						class="p-1.5 rounded text-muted-foreground active:bg-secondary/50 hover:bg-secondary/50 transition-colors"
+						@click=${() => { import("./staff-page.js").then((m) => m.loadStaffPageData()); import("./routing.js").then((m) => m.setHashRoute("staff")); }}
+						title="Manage staff agents"
+					>${icon(List, "sm")}</button>
+					<button
+						class="p-1.5 rounded text-muted-foreground active:bg-secondary/50 hover:bg-secondary/50 transition-colors"
+						@click=${createStaffAssistantSession}
+						title="New staff agent"
+					>${icon(Plus, "sm")}</button>
 				</div>
-				<button
-					class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-					@click=${createStaffAssistantSession}
-					title="New staff agent"
-				>${icon(Plus, "xs")}</button>
 			</div>
 			${staffSectionExpanded ? list.map((agent) => {
 				const session = agent.currentSessionId
