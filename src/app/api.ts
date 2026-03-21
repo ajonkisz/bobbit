@@ -449,10 +449,10 @@ export async function fetchGoalArtifact(goalId: string, artifactId: string): Pro
 }
 
 // ============================================================================
-// TRAIT API
+// PERSONALITY API
 // ============================================================================
 
-export interface TraitData {
+export interface PersonalityData {
 	name: string;
 	label: string;
 	description: string;
@@ -461,15 +461,65 @@ export interface TraitData {
 	updatedAt: number;
 }
 
-export async function fetchTraits(): Promise<TraitData[]> {
+export async function fetchPersonalities(): Promise<PersonalityData[]> {
 	try {
-		const res = await gatewayFetch("/api/traits");
-		if (!res.ok) throw new Error(`Failed to fetch traits: ${res.status}`);
+		const res = await gatewayFetch("/api/personalities");
+		if (!res.ok) throw new Error(`Failed to fetch personalities: ${res.status}`);
 		const data = await res.json();
-		return data.traits || [];
+		return data.personalities || [];
 	} catch (err) {
-		console.error("[trait-api] fetchTraits failed:", err);
+		console.error("[personality-api] fetchPersonalities failed:", err);
 		return [];
+	}
+}
+
+export async function createPersonality(data: { name: string; label: string; description?: string; promptFragment: string }): Promise<PersonalityData | null> {
+	try {
+		const res = await gatewayFetch("/api/personalities", {
+			method: "POST",
+			body: JSON.stringify(data),
+		});
+		if (!res.ok) {
+			const resp = await res.json().catch(() => ({}));
+			throw new Error(resp.error || `Failed: ${res.status}`);
+		}
+		return await res.json();
+	} catch (err) {
+		showConnectionError("Failed to create personality", err instanceof Error ? err.message : String(err));
+		return null;
+	}
+}
+
+export async function updatePersonality(name: string, updates: Partial<Pick<PersonalityData, "label" | "description" | "promptFragment">>): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/personalities/${encodeURIComponent(name)}`, {
+			method: "PUT",
+			body: JSON.stringify(updates),
+		});
+		if (!res.ok) {
+			const resp = await res.json().catch(() => ({}));
+			throw new Error(resp.error || `Failed: ${res.status}`);
+		}
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to update personality", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
+
+export async function deletePersonality(name: string): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/personalities/${encodeURIComponent(name)}`, {
+			method: "DELETE",
+		});
+		if (!res.ok) {
+			const resp = await res.json().catch(() => ({}));
+			throw new Error(resp.error || `Failed: ${res.status}`);
+		}
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to delete personality", err instanceof Error ? err.message : String(err));
+		return false;
 	}
 }
 

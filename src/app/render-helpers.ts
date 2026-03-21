@@ -140,9 +140,9 @@ export function renderSessionRow(session: GatewaySession) {
 			</div>
 			<div class="flex-1 min-w-0 flex flex-col">
 				<div class="truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
-				${session.traits && session.traits.length > 0 ? html`
+				${session.personalities && session.personalities.length > 0 ? html`
 					<div class="flex flex-wrap gap-0.5 mt-0.5">
-						${session.traits.map((t) => html`<span
+						${session.personalities.map((t) => html`<span
 							class="text-[9px] leading-none px-1 py-px rounded-md"
 							class="bg-primary/15 text-primary"
 							title=${t}

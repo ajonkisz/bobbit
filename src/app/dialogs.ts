@@ -21,7 +21,7 @@ import { updateLocalSessionTitle } from "./api.js";
 import { refreshSessions } from "./api.js";
 import { BOBBIT_HUE_ROTATIONS, sessionColorMap, setSessionColor, statusBobbit, getAccessory } from "./session-colors.js";
 import { clearSessionModel } from "./routing.js";
-import { fetchTraits, type TraitData } from "./api.js";
+import { fetchPersonalities, type PersonalityData } from "./api.js";
 // NOTE: session-manager imports from dialogs, so we use dynamic imports to break the cycle
 
 
@@ -474,17 +474,17 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 	const initialColorIndex: number = sessionColorMap.get(sessionId) ?? -1;
 	let pendingRole: string | null = null;
 	let pendingColorIndex: number | null = null;
-	// Track pending trait changes
-	const initialTraits: string[] = session0?.traits || [];
-	let pendingTraits: string[] | null = null;
-	let availableTraits: TraitData[] = [];
+	// Track pending personality changes
+	const initialPersonalities: string[] = session0?.personalities || [];
+	let pendingPersonalities: string[] | null = null;
+	let availablePersonalities: PersonalityData[] = [];
 
-	// Load roles and traits for the picker
+	// Load roles and personalities for the picker
 	import("./api.js").then(({ fetchRoles }) => {
 		if (state.roles.length === 0) fetchRoles().then(() => renderDialog());
 	});
-	fetchTraits().then((traits) => {
-		availableTraits = traits;
+	fetchPersonalities().then((personalities) => {
+		availablePersonalities = personalities;
 		renderDialog();
 	});
 
@@ -515,21 +515,21 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 			setSessionColor(sessionId, pendingColorIndex);
 		}
 
-		// Apply role/trait changes (these restart the agent — do last)
-		if (pendingRole !== null || pendingTraits !== null) {
+		// Apply role/personality changes (these restart the agent — do last)
+		if (pendingRole !== null || pendingPersonalities !== null) {
 			saving = true;
 			renderDialog();
 			try {
 				const patchBody: any = {};
 				if (pendingRole !== null) patchBody.roleId = pendingRole;
-				if (pendingTraits !== null) patchBody.traits = pendingTraits;
+				if (pendingPersonalities !== null) patchBody.personalities = pendingPersonalities;
 				await gatewayFetch(`/api/sessions/${sessionId}`, {
 					method: "PATCH",
 					body: JSON.stringify(patchBody),
 				});
 				await refreshSessions();
 			} catch (err) {
-				console.error("[assign-role/traits] Failed:", err);
+				console.error("[assign-role/personalities] Failed:", err);
 			}
 		}
 
@@ -592,10 +592,10 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 		const roleLabel = session?.assistantType === "goal" ? "Goal Assistant" : displayRoleObj?.label || displayRole || "None";
 		const hasRoleChange = pendingRole !== null;
 		const hasColorChange = pendingColorIndex !== null;
-		const hasTraitChange = pendingTraits !== null;
+		const hasPersonalityChange = pendingPersonalities !== null;
 		const hasTitleChange = titleValue.trim() !== "" && titleValue.trim() !== currentTitle;
-		const hasAnyChange = hasTitleChange || hasColorChange || hasRoleChange || hasTraitChange;
-		const saveLabel = saving ? "Saving…" : (hasRoleChange || hasTraitChange) ? "Save & Restart" : "Save";
+		const hasAnyChange = hasTitleChange || hasColorChange || hasRoleChange || hasPersonalityChange;
+		const saveLabel = saving ? "Saving…" : (hasRoleChange || hasPersonalityChange) ? "Save & Restart" : "Save";
 		const displayColorIndex = pendingColorIndex !== null ? pendingColorIndex : initialColorIndex;
 
 		render(
@@ -716,33 +716,33 @@ export function showRenameDialog(sessionId: string, currentTitle: string): void 
 											</div>
 										`}
 								</div>
-								<!-- Traits -->
-								${availableTraits.length > 0 ? html`
+								<!-- Personalities -->
+								${availablePersonalities.length > 0 ? html`
 									<div>
-										<div class="text-xs text-muted-foreground mb-1.5">Traits</div>
+										<div class="text-xs text-muted-foreground mb-1.5">Personalities</div>
 										<div class="flex flex-wrap gap-1">
-											${availableTraits.map((trait) => {
-												const displayTraits = pendingTraits !== null ? pendingTraits : initialTraits;
-												const selected = displayTraits.includes(trait.name);
+											${availablePersonalities.map((personality) => {
+												const displayPersonalities = pendingPersonalities !== null ? pendingPersonalities : initialPersonalities;
+												const selected = displayPersonalities.includes(personality.name);
 												return html`<button
 													class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer ${selected
 														? "bg-primary/15 text-primary border-primary/30"
 														: "bg-muted/60 text-foreground/70 border-border"}"
-													title=${trait.description}
+													title=${personality.description}
 													@click=${() => {
-														const current = pendingTraits !== null ? [...pendingTraits] : [...initialTraits];
+														const current = pendingPersonalities !== null ? [...pendingPersonalities] : [...initialPersonalities];
 														if (selected) {
-															pendingTraits = current.filter((t) => t !== trait.name);
+															pendingPersonalities = current.filter((t) => t !== personality.name);
 														} else {
-															pendingTraits = [...current, trait.name];
+															pendingPersonalities = [...current, personality.name];
 														}
 														// Reset to null if same as initial
-														if (pendingTraits.length === initialTraits.length && pendingTraits.every((t) => initialTraits.includes(t))) {
-															pendingTraits = null;
+														if (pendingPersonalities.length === initialPersonalities.length && pendingPersonalities.every((t) => initialPersonalities.includes(t))) {
+															pendingPersonalities = null;
 														}
 														renderDialog();
 													}}
-												>${trait.label}</button>`;
+												>${personality.label}</button>`;
 											})}
 										</div>
 									</div>

@@ -16,32 +16,32 @@ import {
 } from "./state.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
-import { refreshSessions, fetchRoles, fetchTraits, type TraitData } from "./api.js";
+import { refreshSessions, fetchRoles, fetchPersonalities, type PersonalityData } from "./api.js";
 import { statusBobbit, sessionAcronym } from "./session-colors.js";
 import { renderGoalGroup, renderSessionRow, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
 
 // ============================================================================
-// ROLE + TRAIT PICKER
+// ROLE + PERSONALITY PICKER
 // ============================================================================
 
-/** Cached trait definitions. */
-let _cachedTraits: TraitData[] = [];
-let _traitsLoaded = false;
+/** Cached personality definitions. */
+let _cachedPersonalities: PersonalityData[] = [];
+let _personalitiesLoaded = false;
 /** Currently selected role in the picker. */
 let _pickerRole = "";
-/** Currently selected traits in the picker. */
-let _pickerTraits = new Set<string>();
+/** Currently selected personalities in the picker. */
+let _pickerPersonalities = new Set<string>();
 /** Goal ID context for the picker (if launched from a goal). */
 let _pickerGoalId: string | undefined;
 
-async function ensureTraitsLoaded(): Promise<void> {
-	if (_traitsLoaded) return;
-	_traitsLoaded = true;
-	_cachedTraits = await fetchTraits();
+async function ensurePersonalitiesLoaded(): Promise<void> {
+	if (_personalitiesLoaded) return;
+	_personalitiesLoaded = true;
+	_cachedPersonalities = await fetchPersonalities();
 }
 
-/** Toggle role picker dropdown, fetching roles and traits if needed. */
+/** Toggle role picker dropdown, fetching roles and personalities if needed. */
 export async function toggleRolePicker(e: Event, goalId?: string): Promise<void> {
 	e.stopPropagation();
 	if (state.rolePickerOpen) {
@@ -50,16 +50,16 @@ export async function toggleRolePicker(e: Event, goalId?: string): Promise<void>
 		return;
 	}
 	_pickerRole = "";
-	_pickerTraits = new Set();
+	_pickerPersonalities = new Set();
 	_pickerGoalId = goalId;
 	if (state.roles.length === 0) await fetchRoles();
-	await ensureTraitsLoaded();
+	await ensurePersonalitiesLoaded();
 	state.rolePickerOpen = true;
 	renderApp();
 }
 
 /** Exported for use in edit-session dialog and other places. */
-export { _cachedTraits as cachedTraits, ensureTraitsLoaded };
+export { _cachedPersonalities as cachedPersonalities, ensurePersonalitiesLoaded };
 
 export function renderRolePickerDropdown() {
 	if (!state.rolePickerOpen) return "";
@@ -68,39 +68,39 @@ export function renderRolePickerDropdown() {
 		_pickerRole = _pickerRole === roleName ? "" : roleName;
 		renderApp();
 	};
-	const toggleTrait = (traitName: string) => {
-		if (_pickerTraits.has(traitName)) _pickerTraits.delete(traitName);
-		else _pickerTraits.add(traitName);
+	const togglePersonality = (personalityName: string) => {
+		if (_pickerPersonalities.has(personalityName)) _pickerPersonalities.delete(personalityName);
+		else _pickerPersonalities.add(personalityName);
 		renderApp();
 	};
 	const doCreate = () => {
 		state.rolePickerOpen = false;
-		const traits = [..._pickerTraits];
-		createAndConnectSession(_pickerGoalId, _pickerRole || undefined, traits.length > 0 ? traits : undefined);
+		const personalities = [..._pickerPersonalities];
+		createAndConnectSession(_pickerGoalId, _pickerRole || undefined, personalities.length > 0 ? personalities : undefined);
 	};
 
 	return html`
 		<div class="absolute right-0 top-full mt-1 z-50 rounded-md shadow-lg py-1 min-w-[200px] max-w-[280px]"
 			style="background: var(--popover); border: 1px solid var(--border);"
 			@click=${(e: Event) => e.stopPropagation()}>
-			<!-- Traits -->
-			${_cachedTraits.length > 0 ? html`
-				<div class="px-3 pt-1 pb-1.5 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Traits</div>
+			<!-- Personalities -->
+			${_cachedPersonalities.length > 0 ? html`
+				<div class="px-3 pt-1 pb-1.5 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Personalities</div>
 				<div class="px-3 pb-2 flex flex-wrap gap-1">
-					${_cachedTraits.map(trait => {
-						const selected = _pickerTraits.has(trait.name);
+					${_cachedPersonalities.map(personality => {
+						const selected = _pickerPersonalities.has(personality.name);
 						return html`<button
 							class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer ${selected
 								? "bg-primary/15 text-primary border-primary/30"
 								: "bg-muted/60 text-foreground/70 border-border"}"
-							title=${trait.description}
-							@click=${() => toggleTrait(trait.name)}
-						>${trait.label}</button>`;
+							title=${personality.description}
+							@click=${() => togglePersonality(personality.name)}
+						>${personality.label}</button>`;
 					})}
 				</div>
 			` : ""}
 			<!-- Roles -->
-			<div class="${_cachedTraits.length > 0 ? "border-t border-border/50 mt-1 pt-1" : ""}">
+			<div class="${_cachedPersonalities.length > 0 ? "border-t border-border/50 mt-1 pt-1" : ""}">
 				<div class="px-3 pt-1 pb-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Role</div>
 				${state.roles.filter(r => r.name !== "general").length === 0
 					? html`<div class="px-3 py-1 text-xs text-muted-foreground">No roles defined</div>`
