@@ -164,7 +164,8 @@ export function stopTimeRefresh(): void {
 
 /** Render terse relative time with optional unseen indicator dot. */
 function renderSessionTime(session: GatewaySession) {
-	const time = terseRelativeTime(session.lastActivity);
+	const isActive = session.status === "streaming" || session.status === "busy" || session.isCompacting;
+	const time = isActive ? "active" : terseRelativeTime(session.lastActivity);
 	if (!time) return "";
 	const unseen = hasUnseenActivity(session);
 	return html`<span
