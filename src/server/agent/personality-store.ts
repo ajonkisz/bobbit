@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { stringify, parse } from "yaml";
 
-export interface Trait {
+export interface Personality {
 	/** Unique identifier — lowercase alphanumeric + hyphens */
 	name: string;
 	/** Human-readable display label */
@@ -16,28 +16,28 @@ export interface Trait {
 	updatedAt: number;
 }
 
-/** traits/ directory at the repo root — version controlled */
+/** personalities/ directory at the repo root — version controlled */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TRAITS_DIR = path.resolve(__dirname, "../../../traits");
+const PERSONALITIES_DIR = path.resolve(__dirname, "../../../personalities");
 
 /**
- * File-backed trait store. Each trait is a YAML file in traits/<name>.yaml
+ * File-backed personality store. Each personality is a YAML file in personalities/<name>.yaml
  * at the repo root. Version controlled — edits via the UI write back
  * to the same files so they can be committed.
  */
-export class TraitStore {
-	private traits: Map<string, Trait> = new Map();
+export class PersonalityStore {
+	private personalities: Map<string, Personality> = new Map();
 
 	constructor() {
-		fs.mkdirSync(TRAITS_DIR, { recursive: true });
+		fs.mkdirSync(PERSONALITIES_DIR, { recursive: true });
 		this.loadAll();
 	}
 
-	private traitFilePath(name: string): string {
-		const filePath = path.join(TRAITS_DIR, `${name}.yaml`);
+	private personalityFilePath(name: string): string {
+		const filePath = path.join(PERSONALITIES_DIR, `${name}.yaml`);
 		const resolved = path.resolve(filePath);
-		if (!resolved.startsWith(path.resolve(TRAITS_DIR))) {
-			throw new Error(`Invalid trait name: path traversal detected`);
+		if (!resolved.startsWith(path.resolve(PERSONALITIES_DIR))) {
+			throw new Error(`Invalid personality name: path traversal detected`);
 		}
 		return filePath;
 	}
@@ -45,18 +45,18 @@ export class TraitStore {
 	private loadAll(): void {
 		let entries: fs.Dirent[];
 		try {
-			entries = fs.readdirSync(TRAITS_DIR, { withFileTypes: true });
+			entries = fs.readdirSync(PERSONALITIES_DIR, { withFileTypes: true });
 		} catch {
 			return;
 		}
 		for (const entry of entries) {
 			if (!entry.isFile() || !entry.name.endsWith(".yaml")) continue;
-			const filePath = path.join(TRAITS_DIR, entry.name);
+			const filePath = path.join(PERSONALITIES_DIR, entry.name);
 			try {
 				const raw = fs.readFileSync(filePath, "utf-8");
 				const data = parse(raw);
 				if (data && typeof data === "object" && data.name) {
-					this.traits.set(data.name, {
+					this.personalities.set(data.name, {
 						name: data.name,
 						label: data.label ?? data.name,
 						description: data.description ?? "",
@@ -66,56 +66,56 @@ export class TraitStore {
 					});
 				}
 			} catch (err) {
-				console.error(`[trait-store] Failed to load ${filePath}:`, err);
+				console.error(`[personality-store] Failed to load ${filePath}:`, err);
 			}
 		}
 	}
 
-	private saveOne(trait: Trait): void {
-		const filePath = this.traitFilePath(trait.name);
+	private saveOne(personality: Personality): void {
+		const filePath = this.personalityFilePath(personality.name);
 		try {
 			const content = stringify({
-				name: trait.name,
-				label: trait.label,
-				description: trait.description,
-				promptFragment: trait.promptFragment,
-				createdAt: trait.createdAt,
-				updatedAt: trait.updatedAt,
+				name: personality.name,
+				label: personality.label,
+				description: personality.description,
+				promptFragment: personality.promptFragment,
+				createdAt: personality.createdAt,
+				updatedAt: personality.updatedAt,
 			}, { lineWidth: 0 });
 			fs.writeFileSync(filePath, content, "utf-8");
 		} catch (err) {
-			console.error(`[trait-store] Failed to save ${filePath}:`, err);
+			console.error(`[personality-store] Failed to save ${filePath}:`, err);
 		}
 	}
 
-	put(trait: Trait): void {
-		this.traits.set(trait.name, trait);
-		this.saveOne(trait);
+	put(personality: Personality): void {
+		this.personalities.set(personality.name, personality);
+		this.saveOne(personality);
 	}
 
-	get(name: string): Trait | undefined {
-		return this.traits.get(name);
+	get(name: string): Personality | undefined {
+		return this.personalities.get(name);
 	}
 
 	remove(name: string): void {
-		this.traits.delete(name);
-		const filePath = this.traitFilePath(name);
+		this.personalities.delete(name);
+		const filePath = this.personalityFilePath(name);
 		try { fs.unlinkSync(filePath); } catch { /* ignore */ }
 	}
 
 	/** Re-read all YAML files from disk, picking up external changes */
 	reload(): void {
-		this.traits.clear();
+		this.personalities.clear();
 		this.loadAll();
 	}
 
-	getAll(): Trait[] {
+	getAll(): Personality[] {
 		this.reload();
-		return Array.from(this.traits.values());
+		return Array.from(this.personalities.values());
 	}
 
-	update(name: string, updates: Partial<Omit<Trait, "name" | "createdAt">>): boolean {
-		const existing = this.traits.get(name);
+	update(name: string, updates: Partial<Omit<Personality, "name" | "createdAt">>): boolean {
+		const existing = this.personalities.get(name);
 		if (!existing) return false;
 		const cleaned: Record<string, unknown> = {};
 		for (const [k, v] of Object.entries(updates)) {

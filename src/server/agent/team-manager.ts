@@ -10,7 +10,7 @@ import type { PersistedTeamEntry } from "./team-store.js";
 import { generateTeamName } from "./team-names.js";
 import type { ColorStore } from "./color-store.js";
 import type { GoalArtifactStore } from "./goal-artifact-store.js";
-import type { TraitManager } from "./trait-manager.js";
+import type { PersonalityManager } from "./personality-manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -84,8 +84,8 @@ export interface TeamManagerConfig {
 	roleStore?: RoleStore;
 	/** Goal artifact store for checking artifact requirements on completion */
 	goalArtifactStore?: GoalArtifactStore;
-	/** Trait manager for resolving trait names to prompt fragments */
-	traitManager?: TraitManager;
+	/** Personality manager for resolving personality names to prompt fragments */
+	personalityManager?: PersonalityManager;
 }
 
 export class TeamManager {
@@ -399,7 +399,7 @@ export class TeamManager {
 		goalId: string,
 		role: string,
 		task: string,
-		opts?: { traits?: string[] },
+		opts?: { personalities?: string[] },
 	): Promise<{ sessionId: string; worktreePath: string }> {
 		const roleStore = this.config.roleStore;
 		const storedRoleDef = roleStore?.get(role);
@@ -453,11 +453,11 @@ export class TeamManager {
 			// Read allowed tools from role definition
 			const allowedTools = storedRoleDef.allowedTools;
 
-			// Resolve personality traits: explicit > role defaults
-			const traitNames = opts?.traits ?? storedRoleDef.defaultTraits;
-			let resolvedTraits: Array<{ label: string; promptFragment: string }> | undefined;
-			if (traitNames && traitNames.length > 0 && this.config.traitManager) {
-				resolvedTraits = this.config.traitManager.resolveTraits(traitNames);
+			// Resolve personalities: explicit > role defaults
+			const personalityNames = opts?.personalities ?? storedRoleDef.defaultTraits;
+			let resolvedPersonalities: Array<{ label: string; promptFragment: string }> | undefined;
+			if (personalityNames && personalityNames.length > 0 && this.config.personalityManager) {
+				resolvedPersonalities = this.config.personalityManager.resolvePersonalities(personalityNames);
 			}
 
 			// Create the session with the role's worktree as cwd, role prompt appended to goal spec
@@ -466,7 +466,7 @@ export class TeamManager {
 				undefined,
 				goalId,
 				undefined,
-				{ rolePrompt, allowedTools, traits: resolvedTraits, traitNames },
+				{ rolePrompt, allowedTools, personalities: resolvedPersonalities, personalityNames },
 			);
 
 			// Assign a unique color and title

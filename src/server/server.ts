@@ -17,8 +17,8 @@ import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
 import { ToolStore } from "./agent/tool-store.js";
 import { ToolManager } from "./agent/tool-manager.js";
-import { TraitStore } from "./agent/trait-store.js";
-import { TraitManager } from "./agent/trait-manager.js";
+import { PersonalityStore } from "./agent/personality-store.js";
+import { PersonalityManager } from "./agent/personality-manager.js";
 
 import type { TaskState } from "./agent/task-store.js";
 import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
@@ -49,8 +49,8 @@ export function createGateway(config: GatewayConfig) {
 	exportSkillDefinitions();
 
 	const colorStore = new ColorStore();
-	const traitStore = new TraitStore();
-	const traitManager = new TraitManager(traitStore);
+	const personalityStore = new PersonalityStore();
+	const personalityManager = new PersonalityManager(personalityStore);
 	fs.mkdirSync(piDir(), { recursive: true });
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
@@ -60,7 +60,7 @@ export function createGateway(config: GatewayConfig) {
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
 		colorStore,
-		traitManager,
+		personalityManager,
 		roleManager,
 		toolManager,
 	});
@@ -74,7 +74,7 @@ export function createGateway(config: GatewayConfig) {
 		taskManager: sessionManager.taskManager,
 		roleStore,
 		goalArtifactStore,
-		traitManager,
+		personalityManager,
 	});
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
@@ -115,7 +115,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, traitManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, personalityManager);
 			return;
 		}
 
@@ -193,7 +193,7 @@ async function handleApiRoute(
 	toolManager: ToolManager,
 	goalArtifactStore: GoalArtifactStore,
 	artifactSpecManager: ArtifactSpecManager,
-	traitManager: TraitManager,
+	personalityManager: PersonalityManager,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -266,7 +266,7 @@ async function handleApiRoute(
 			taskId: session.taskId,
 			colorIndex: colorStore.get(session.id),
 			preview: session.preview,
-			traits: session.traits,
+			personalities: session.personalities,
 		});
 		return;
 	}
@@ -326,7 +326,7 @@ async function handleApiRoute(
 
 		// If a roleId is provided, look up the role and pass its prompt/tools/accessory
 		const roleId = body?.roleId;
-		let createOpts: { rolePrompt?: string; allowedTools?: string[]; traits?: Array<{ label: string; promptFragment: string }>; traitNames?: string[] } | undefined;
+		let createOpts: { rolePrompt?: string; allowedTools?: string[]; personalities?: Array<{ label: string; promptFragment: string }>; personalityNames?: string[] } | undefined;
 		let roleForMeta: { name: string; accessory: string } | undefined;
 
 		if (roleId && typeof roleId === "string") {
@@ -342,28 +342,28 @@ async function handleApiRoute(
 			roleForMeta = { name: role.name, accessory: role.accessory };
 		}
 
-		// Resolve personality traits
-		const bodyTraits = Array.isArray(body?.traits) ? body.traits as string[] : undefined;
-		let traitNames: string[] | undefined;
-		if (bodyTraits && bodyTraits.length > 0) {
-			// Validate trait names
-			const invalid = bodyTraits.filter(t => !traitManager.getTrait(t));
+		// Resolve personalities
+		const bodyPersonalities = Array.isArray(body?.personalities) ? body.personalities as string[] : undefined;
+		let personalityNames: string[] | undefined;
+		if (bodyPersonalities && bodyPersonalities.length > 0) {
+			// Validate personality names
+			const invalid = bodyPersonalities.filter(t => !personalityManager.getPersonality(t));
 			if (invalid.length > 0) {
-				json({ error: `Unknown traits: ${invalid.join(", ")}` }, 400);
+				json({ error: `Unknown personalities: ${invalid.join(", ")}` }, 400);
 				return;
 			}
-			traitNames = bodyTraits;
+			personalityNames = bodyPersonalities;
 		} else if (roleForMeta) {
-			// Use role's default traits if no explicit traits provided
+			// Use role's default personalities if no explicit personalities provided
 			const role = roleManager.getRole(roleForMeta.name);
 			if (role?.defaultTraits && role.defaultTraits.length > 0) {
-				traitNames = role.defaultTraits;
+				personalityNames = role.defaultTraits;
 			}
 		}
 
-		if (traitNames && traitNames.length > 0) {
-			const resolved = traitManager.resolveTraits(traitNames);
-			createOpts = { ...createOpts, traits: resolved, traitNames };
+		if (personalityNames && personalityNames.length > 0) {
+			const resolved = personalityManager.resolvePersonalities(personalityNames);
+			createOpts = { ...createOpts, personalities: resolved, personalityNames };
 		}
 
 		try {
@@ -389,7 +389,7 @@ async function handleApiRoute(
 				artifactSpecAssistant: session.assistantType === "artifact-spec",
 				role: session.role,
 				accessory: session.accessory,
-				traits: session.traits,
+				personalities: session.personalities,
 			}, 201);
 		} catch (err) {
 			json({ error: String(err) }, 500);
@@ -572,59 +572,59 @@ async function handleApiRoute(
 		}
 	}
 
-	// ── Trait endpoints ────────────────────────────────────────────
+	// ── Personality endpoints ──────────────────────────────────────
 
-	// GET /api/traits
-	if (url.pathname === "/api/traits" && req.method === "GET") {
-		json({ traits: traitManager.listTraits() });
+	// GET /api/personalities
+	if (url.pathname === "/api/personalities" && req.method === "GET") {
+		json({ personalities: personalityManager.listPersonalities() });
 		return;
 	}
 
-	// POST /api/traits
-	if (url.pathname === "/api/traits" && req.method === "POST") {
+	// POST /api/personalities
+	if (url.pathname === "/api/personalities" && req.method === "POST") {
 		const body = await readBody(req);
 		try {
-			const trait = traitManager.createTrait({
+			const personality = personalityManager.createPersonality({
 				name: body?.name,
 				label: body?.label,
 				description: body?.description || "",
 				promptFragment: body?.promptFragment || "",
 			});
-			json(trait, 201);
+			json(personality, 201);
 		} catch (err: any) {
 			json({ error: err.message }, 400);
 		}
 		return;
 	}
 
-	// Routes with trait :name parameter
-	const traitMatch = url.pathname.match(/^\/api\/traits\/([^/]+)$/);
-	if (traitMatch) {
-		const name = decodeURIComponent(traitMatch[1]);
+	// Routes with personality :name parameter
+	const personalityMatch = url.pathname.match(/^\/api\/personalities\/([^/]+)$/);
+	if (personalityMatch) {
+		const name = decodeURIComponent(personalityMatch[1]);
 
 		if (req.method === "GET") {
-			const trait = traitManager.getTrait(name);
-			if (!trait) { json({ error: "Trait not found" }, 404); return; }
-			json(trait);
+			const personality = personalityManager.getPersonality(name);
+			if (!personality) { json({ error: "Personality not found" }, 404); return; }
+			json(personality);
 			return;
 		}
 
 		if (req.method === "PUT") {
 			const body = await readBody(req);
 			if (!body) { json({ error: "Missing body" }, 400); return; }
-			const ok = traitManager.updateTrait(name, {
+			const ok = personalityManager.updatePersonality(name, {
 				label: body.label,
 				description: body.description,
 				promptFragment: body.promptFragment,
 			});
-			if (!ok) { json({ error: "Trait not found" }, 404); return; }
+			if (!ok) { json({ error: "Personality not found" }, 404); return; }
 			json({ ok: true });
 			return;
 		}
 
 		if (req.method === "DELETE") {
-			const ok = traitManager.deleteTrait(name);
-			if (!ok) { json({ error: "Trait not found" }, 404); return; }
+			const ok = personalityManager.deletePersonality(name);
+			if (!ok) { json({ error: "Personality not found" }, 404); return; }
 			json({ ok: true });
 			return;
 		}
@@ -887,7 +887,7 @@ async function handleApiRoute(
 			return;
 		}
 		try {
-			const spawnOpts = Array.isArray(body.traits) ? { traits: body.traits as string[] } : undefined;
+			const spawnOpts = Array.isArray(body.personalities) ? { personalities: body.personalities as string[] } : undefined;
 			const result = await teamManager.spawnRole(goalId, body.role, body.task, spawnOpts);
 			json(result, 201);
 		} catch (err) {
@@ -1249,23 +1249,23 @@ async function handleApiRoute(
 			sessionManager.persistSessionMetadata(session).catch(() => {});
 		}
 
-		// Track whether roleId handling already took care of traits
-		let roleHandledTraits = false;
+		// Track whether roleId handling already took care of personalities
+		let roleHandledPersonalities = false;
 
 		if (typeof body.roleId === "string" && body.roleId !== "") {
 			const role = roleManager.getRole(body.roleId);
 			if (!role) { json({ error: `Role "${body.roleId}" not found` }, 404); return; }
-			// If traits are also present, validate and pass them to assignRole to avoid double restart
-			let assignOpts: { traits?: string[] } | undefined;
-			if (Array.isArray(body.traits)) {
-				const newTraits = body.traits as string[];
-				const invalid = newTraits.filter((t: string) => !traitManager.getTrait(t));
+			// If personalities are also present, validate and pass them to assignRole to avoid double restart
+			let assignOpts: { personalities?: string[] } | undefined;
+			if (Array.isArray(body.personalities)) {
+				const newPersonalities = body.personalities as string[];
+				const invalid = newPersonalities.filter((t: string) => !personalityManager.getPersonality(t));
 				if (invalid.length > 0) {
-					json({ error: `Unknown traits: ${invalid.join(", ")}` }, 400);
+					json({ error: `Unknown personalities: ${invalid.join(", ")}` }, 400);
 					return;
 				}
-				assignOpts = { traits: newTraits };
-				roleHandledTraits = true;
+				assignOpts = { personalities: newPersonalities };
+				roleHandledPersonalities = true;
 			}
 			try {
 				const ok = await sessionManager.assignRole(id, role, assignOpts);
@@ -1293,16 +1293,16 @@ async function handleApiRoute(
 			sessionManager.persistSessionMetadata(session).catch(() => {});
 		}
 
-		if (Array.isArray(body.traits) && !roleHandledTraits) {
-			const newTraits = body.traits as string[];
-			// Validate trait names
-			const invalid = newTraits.filter((t: string) => !traitManager.getTrait(t));
+		if (Array.isArray(body.personalities) && !roleHandledPersonalities) {
+			const newPersonalities = body.personalities as string[];
+			// Validate personality names
+			const invalid = newPersonalities.filter((t: string) => !personalityManager.getPersonality(t));
 			if (invalid.length > 0) {
-				json({ error: `Unknown traits: ${invalid.join(", ")}` }, 400);
+				json({ error: `Unknown personalities: ${invalid.join(", ")}` }, 400);
 				return;
 			}
 			try {
-				const ok = await sessionManager.updateTraits(id, newTraits);
+				const ok = await sessionManager.updatePersonalities(id, newPersonalities);
 				if (!ok) { json({ error: "Session not found" }, 404); return; }
 			} catch (err) {
 				json({ error: String(err) }, 400);

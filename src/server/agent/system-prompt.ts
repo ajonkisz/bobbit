@@ -86,8 +86,8 @@ export interface PromptParts {
 	taskSpec?: string;
 	/** Human-readable descriptions of dependency tasks */
 	taskDependsOn?: string[];
-	/** Personality traits to inject into the system prompt */
-	traits?: Array<{ label: string; promptFragment: string }>;
+	/** Personalities to inject into the system prompt */
+	personalities?: Array<{ label: string; promptFragment: string }>;
 	/** Pre-formatted tool documentation section to append */
 	toolDocs?: string;
 	/** Allowed tool names for this session — used to filter tool docs */
@@ -128,11 +128,11 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 		sections.push(header + "\n\n" + parts.goalSpec.trim());
 	}
 
-	// 3.5. Personality traits
-	if (parts.traits && parts.traits.length > 0) {
+	// 3.5. Personalities
+	if (parts.personalities && parts.personalities.length > 0) {
 		const lines = ["## Personality\n", "You should embody these traits in how you work:"];
-		for (const trait of parts.traits) {
-			lines.push(`- **${trait.label}**: ${trait.promptFragment}`);
+		for (const personality of parts.personalities) {
+			lines.push(`- **${personality.label}**: ${personality.promptFragment}`);
 		}
 		sections.push(lines.join("\n"));
 	}
