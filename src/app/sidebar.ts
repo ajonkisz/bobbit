@@ -233,6 +233,7 @@ export function renderStaffSidebarSection() {
 			<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer active:bg-secondary/50 transition-colors"
 				@click=${() => { setStaffSectionExpanded(!staffSectionExpanded); renderApp(); }}>
 				<span class="text-sm text-muted-foreground shrink-0 select-none" style="width:14px;text-align:center;">${staffSectionExpanded ? "▾" : "▸"}</span>
+				<span class="shrink-0 text-muted-foreground">${icon(Bot, "sm")}</span>
 				<span class="flex-1 text-sm text-muted-foreground uppercase tracking-wider font-medium">Staff</span>
 				<div class="flex items-center" @click=${(e: Event) => e.stopPropagation()}>
 					<button
@@ -344,36 +345,34 @@ export function renderSidebar() {
 							</div>`
 						: html`
 							${sortedGoals.map((goal, i) => html`
-								${i > 0 ? html`<div class="border-t border-border/50 my-1.5 mx-1"></div>` : ""}
+								${i > 0 ? html`<div class="border-t border-border/30 my-1 mx-2"></div>` : ""}
 								${renderGoalGroup(goal)}
 							`)}
 							${renderStaffSidebarSection()}
 							${sortedGoals.length > 0 ? html`
-								<div class="border-t border-border/50 my-1.5 mx-1"></div>
+								<div class="border-t border-border/30 my-1 mx-2"></div>
 								<div class="flex flex-col gap-0.5">
-									<div class="flex items-center gap-1 px-1 py-0.5">
-										<div class="flex-1 flex items-center gap-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
-											@click=${() => { setUngroupedExpanded(!ungroupedExpanded); renderApp(); }}>
-											<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
-											<span class="shrink-0 text-muted-foreground">${icon(MessagesSquare, "xs")}</span>
-											<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
-										</div>
+									<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer hover:bg-secondary/30 transition-colors"
+										@click=${() => { setUngroupedExpanded(!ungroupedExpanded); renderApp(); }}>
+										<span class="text-sm text-muted-foreground shrink-0 select-none" style="width:14px;text-align:center;">${ungroupedExpanded ? "▾" : "▸"}</span>
+										<span class="shrink-0 text-muted-foreground">${icon(MessagesSquare, "sm")}</span>
+										<span class="flex-1 text-sm text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
 										<div class="flex items-center relative">
 											<button
-												class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"
+												class="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"
 												@click=${(e: Event) => { e.stopPropagation(); createAndConnectSession(); }}
 												title="New session"
 												?disabled=${state.creatingSession}
 											>
 												${state.creatingSession && !state.creatingSessionForGoalId
 													? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-													: icon(Plus, "xs")}
+													: icon(Plus, "sm")}
 											</button>
 											<button
-												class="p-0 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+												class="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
 												@click=${toggleRolePicker}
 												title="New session with role"
-											>${icon(ChevronDown, "xs")}</button>
+											>${icon(ChevronDown, "sm")}</button>
 											${renderRolePickerDropdown()}
 										</div>
 									</div>
@@ -381,24 +380,24 @@ export function renderSidebar() {
 								</div>
 							` : html`
 								<div class="flex flex-col gap-0.5">
-									<div class="flex items-center gap-1 px-1 py-0.5">
-										<span class="flex-1 flex items-center gap-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:13px;"><span class="shrink-0">${icon(MessagesSquare, "xs")}</span> Sessions</span>
+									<div class="flex items-center gap-1.5 px-2 py-1.5">
+										<span class="flex-1 flex items-center gap-1.5 text-sm text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:15px;"><span class="shrink-0">${icon(MessagesSquare, "sm")}</span> Sessions</span>
 										<div class="flex items-center relative">
 											<button
-												class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"
+												class="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ${state.creatingSession ? "opacity-50 pointer-events-none" : ""}"
 												@click=${() => createAndConnectSession()}
 												title="New session"
 												?disabled=${state.creatingSession}
 											>
 												${state.creatingSession && !state.creatingSessionForGoalId
 													? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
-													: icon(Plus, "xs")}
+													: icon(Plus, "sm")}
 											</button>
 											<button
-												class="p-0 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+												class="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
 												@click=${toggleRolePicker}
 												title="New session with role"
-											>${icon(ChevronDown, "xs")}</button>
+											>${icon(ChevronDown, "sm")}</button>
 											${renderRolePickerDropdown()}
 										</div>
 									</div>

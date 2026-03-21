@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, ChevronDown, ChevronRight, Goal as GoalIcon, Layers, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, UserCheck, Users, Wrench } from "lucide";
+import { ArrowLeft, MessagesSquare, ChevronDown, ChevronRight, Goal as GoalIcon, Layers, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, UserCheck, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -115,7 +115,8 @@ function renderMobileLanding() {
 										<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer active:bg-secondary/50 transition-colors"
 											@click=${() => { setUngroupedExpanded(!ungroupedExpanded); renderApp(); }}>
 											<span class="text-sm text-muted-foreground shrink-0 select-none" style="width:14px;text-align:center;">${isUngroupedExpanded ? "▾" : "▸"}</span>
-											<span class="flex-1 text-sm text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
+											<span class="shrink-0 text-muted-foreground">${icon(MessagesSquare, "sm")}</span>
+										<span class="flex-1 text-sm text-muted-foreground uppercase tracking-wider font-medium">Sessions</span>
 											<div class="flex items-center relative">
 												<button
 													class="p-2 rounded text-muted-foreground active:bg-secondary/50 transition-colors"
@@ -137,7 +138,7 @@ function renderMobileLanding() {
 								` : ungroupedSessions.length > 0 ? html`
 									<div class="flex flex-col gap-0.5">
 										<div class="flex items-center gap-1.5 px-2 py-1.5">
-											<span class="flex-1 text-sm text-muted-foreground uppercase tracking-wider font-medium" style="padding-left:15px;">Sessions</span>
+											<span class="flex-1 text-sm text-muted-foreground uppercase tracking-wider font-medium flex items-center gap-1.5" style="padding-left:15px;"><span class="shrink-0">${icon(MessagesSquare, "sm")}</span> Sessions</span>
 											<div class="flex items-center relative">
 												<button
 													class="p-2 rounded text-muted-foreground active:bg-secondary/50 transition-colors"
