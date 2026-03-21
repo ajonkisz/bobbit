@@ -32,6 +32,10 @@ export interface GatewaySession {
 	worktreePath?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory?: string;
+	/** If this session was created by a staff agent wake */
+	staffId?: string;
+	/** If this is a staff assistant session */
+	staffAssistant?: boolean;
 	/** Whether this session has a live HTML preview panel */
 	preview?: boolean;
 	/** Personality trait names assigned to this session */
@@ -170,6 +174,23 @@ export const state = {
 	/** Currently viewed goal dashboard (null = not on dashboard) */
 	goalDashboardId: null as string | null,
 
+	/** Staff agents list */
+	staffList: [] as Array<{ id: string; name: string; description: string; state: string; lastWakeAt?: number; currentSessionId?: string; triggers: any[] }>,
+
+	// Staff assistant split-screen state
+	activeStaffProposal: null as { name: string; description: string; prompt: string; triggers: string; cwd: string } | null,
+	staffPreviewName: "",
+	staffPreviewDescription: "",
+	staffPreviewPrompt: "",
+	staffPreviewTriggers: "[]",
+	staffPreviewCwd: "",
+	staffPreviewNameEdited: false,
+	staffPreviewDescriptionEdited: false,
+	staffPreviewPromptEdited: false,
+	staffPreviewTriggersEdited: false,
+	staffPreviewCwdEdited: false,
+	staffPreviewPromptEditMode: false,
+
 	/** Cached roles for the role picker menu */
 	roles: [] as Array<{ name: string; label: string; accessory: string }>,
 	/** Whether the new-session role picker dropdown is open */
@@ -188,6 +209,15 @@ export let expandedGoals: Set<string> = new Set(
 );
 export let ungroupedExpanded =
 	localStorage.getItem(UNGROUPED_EXPANDED_KEY) !== "false";
+
+const STAFF_EXPANDED_KEY = "bobbit-staff-expanded";
+export let staffSectionExpanded =
+	localStorage.getItem(STAFF_EXPANDED_KEY) !== "false";
+
+export function setStaffSectionExpanded(value: boolean): void {
+	staffSectionExpanded = value;
+	localStorage.setItem(STAFF_EXPANDED_KEY, String(value));
+}
 
 const COLLAPSED_TEAM_LEADS_KEY = "bobbit-collapsed-team-leads";
 export let collapsedTeamLeadSessions: Set<string> = new Set(
