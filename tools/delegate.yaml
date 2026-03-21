@@ -2,3 +2,12 @@ name: delegate
 description: "Run a task in a separate agent process"
 group: Agent
 renderer: src/ui/tools/renderers/DelegateRenderer.ts
+docs: |
+  Run a task in a separate agent process. The delegate has full tool access but receives
+  only the instructions you provide — it does not see this conversation. Blocks until
+  the delegate finishes and returns its output.
+
+  Supports `parallel` parameter to run multiple delegates concurrently.
+
+  **Only delegate when you need context isolation or mass parallelism (3+ tasks).**
+  Never delegate just to read files or for single tasks you could do yourself.

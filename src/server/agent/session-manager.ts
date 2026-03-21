@@ -17,6 +17,7 @@ import { CostTracker } from "./cost-tracker.js";
 import type { ColorStore } from "./color-store.js";
 import type { TraitManager } from "./trait-manager.js";
 import type { RoleManager } from "./role-manager.js";
+import type { ToolManager } from "./tool-manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -91,6 +92,8 @@ export interface SessionManagerOptions {
 	traitManager?: TraitManager;
 	/** Role manager for looking up role definitions (needed by updateTraits) */
 	roleManager?: RoleManager;
+	/** Tool manager for generating tool documentation in system prompts */
+	toolManager?: ToolManager;
 }
 
 export class SessionManager {
@@ -102,6 +105,7 @@ export class SessionManager {
 	private colorStore?: ColorStore;
 	private traitManager?: TraitManager;
 	private roleManager?: RoleManager;
+	private toolManager?: ToolManager;
 	goalManager: GoalManager;
 	taskManager: TaskManager;
 
@@ -111,12 +115,21 @@ export class SessionManager {
 		this.colorStore = options?.colorStore;
 		this.traitManager = options?.traitManager;
 		this.roleManager = options?.roleManager;
+		this.toolManager = options?.toolManager;
 		this.goalManager = new GoalManager();
 		this.taskManager = new TaskManager();
 	}
 
 	getCostTracker(): CostTracker {
 		return this.costTracker;
+	}
+
+	/** Generate tool docs and inject into prompt parts before assembly. */
+	private assemblePrompt(sessionId: string, parts: Parameters<typeof assembleSystemPrompt>[1]): string | undefined {
+		if (this.toolManager && !parts.toolDocs) {
+			parts.toolDocs = this.toolManager.getToolDocsForPrompt();
+		}
+		return assembleSystemPrompt(sessionId, parts);
 	}
 
 	// ── Prompt queue helpers ──────────────────────────────────────────
@@ -472,7 +485,7 @@ export class SessionManager {
 		const assistantDef = ps.assistantType ? getAssistantDef(ps.assistantType) : undefined;
 		if (assistantDef) {
 			// Assistant sessions get their specialized prompt
-			const promptPath = assembleSystemPrompt(ps.id, {
+			const promptPath = this.assemblePrompt(ps.id, {
 				baseSystemPromptPath: undefined,
 				cwd: ps.cwd,
 				goalSpec: assistantDef.prompt,
@@ -486,7 +499,7 @@ export class SessionManager {
 			const resolvedTraits = (ps.traits && ps.traits.length > 0 && this.traitManager)
 				? this.traitManager.resolveTraits(ps.traits)
 				: undefined;
-			const promptPath = assembleSystemPrompt(ps.id, {
+			const promptPath = this.assemblePrompt(ps.id, {
 				baseSystemPromptPath: this.systemPromptPath,
 				cwd: ps.cwd,
 				goalTitle: goal?.title,
@@ -600,7 +613,7 @@ export class SessionManager {
 		const assistantDef = assistantType ? getAssistantDef(assistantType) : undefined;
 		if (assistantDef) {
 			// Assistant sessions get their specialized prompt
-			const promptPath = assembleSystemPrompt(id, {
+			const promptPath = this.assemblePrompt(id, {
 				baseSystemPromptPath: undefined,
 				cwd,
 				goalSpec: assistantDef.prompt,
@@ -643,7 +656,7 @@ export class SessionManager {
 				}
 			}
 
-			const promptPath = assembleSystemPrompt(id, {
+			const promptPath = this.assemblePrompt(id, {
 				baseSystemPromptPath: this.systemPromptPath,
 				cwd,
 				goalTitle: goal?.title,
@@ -743,7 +756,7 @@ export class SessionManager {
 		}
 
 		// assembleSystemPrompt handles AGENTS.md from cwd automatically
-		const promptPath = assembleSystemPrompt(id, {
+		const promptPath = this.assemblePrompt(id, {
 			baseSystemPromptPath: undefined, // No global prompt — delegate gets AGENTS.md only
 			cwd: opts.cwd,
 			goalSpec: taskSpec,
@@ -1053,7 +1066,7 @@ export class SessionManager {
 			? this.traitManager.resolveTraits(traitNames)
 			: undefined;
 
-		const promptPath = assembleSystemPrompt(id, {
+		const promptPath = this.assemblePrompt(id, {
 			baseSystemPromptPath: this.systemPromptPath,
 			cwd: session.cwd,
 			goalTitle: goal?.title,
@@ -1169,7 +1182,7 @@ export class SessionManager {
 			? this.traitManager.resolveTraits(traitNames)
 			: undefined;
 
-		const promptPath = assembleSystemPrompt(id, {
+		const promptPath = this.assemblePrompt(id, {
 			baseSystemPromptPath: this.systemPromptPath,
 			cwd: session.cwd,
 			goalTitle: goal?.title,

@@ -54,18 +54,18 @@ export function createGateway(config: GatewayConfig) {
 	fs.mkdirSync(piDir(), { recursive: true });
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
+	const toolStore = new ToolStore();
+	const toolManager = new ToolManager(toolStore);
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
 		colorStore,
 		traitManager,
 		roleManager,
+		toolManager,
 	});
 	const protocol = config.tls ? "https" : "http";
 	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
-
-	const toolStore = new ToolStore();
-	const toolManager = new ToolManager(toolStore);
 	const goalArtifactStore = new GoalArtifactStore();
 	const artifactSpecStore = new ArtifactSpecStore();
 	const artifactSpecManager = new ArtifactSpecManager(artifactSpecStore);
