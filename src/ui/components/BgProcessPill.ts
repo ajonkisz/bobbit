@@ -19,6 +19,7 @@ export class BgProcessPill extends LitElement {
 	@property({ attribute: false }) process!: BgProcessInfo;
 	@property() sessionId = "";
 	@property({ attribute: false }) onKill?: (id: string) => void;
+	@property({ attribute: false }) onDismiss?: (id: string) => void;
 
 	@state() private expanded = false;
 	@state() private logs: string[] = [];
@@ -75,6 +76,11 @@ export class BgProcessPill extends LitElement {
 		if (this.onKill) this.onKill(this.process.id);
 	}
 
+	private _dismiss(e: MouseEvent) {
+		e.stopPropagation();
+		if (this.onDismiss) this.onDismiss(this.process.id);
+	}
+
 	private _shortCommand(): string {
 		const cmd = this.process.command;
 		// Show first 30 chars
@@ -103,6 +109,11 @@ export class BgProcessPill extends LitElement {
 				${!isRunning && p.exitCode !== null
 					? html`<span class="${p.exitCode === 0 ? "text-muted-foreground" : "text-red-400"} shrink-0">${p.exitCode}</span>`
 					: nothing}
+				${!isRunning ? html`<span
+					class="ml-0.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+					@click=${this._dismiss}
+					title="Dismiss"
+				>&times;</span>` : nothing}
 			</button>
 
 			${this.expanded

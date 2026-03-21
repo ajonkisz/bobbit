@@ -526,10 +526,16 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			}
 		}
 
-		// Set up bg process kill handler
+		// Set up bg process kill/dismiss handlers
 		if (state.chatPanel.agentInterface) {
 			state.chatPanel.agentInterface.onBgProcessKill = (processId: string) => {
 				killBgProcess(sessionId, processId);
+			};
+			state.chatPanel.agentInterface.onBgProcessDismiss = (processId: string) => {
+				const ai = state.chatPanel?.agentInterface;
+				if (ai) {
+					ai.bgProcesses = ai.bgProcesses.filter((p) => p.id !== processId);
+				}
 			};
 		}
 

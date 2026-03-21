@@ -55,6 +55,7 @@ export class AgentInterface extends LitElement {
 	// Background processes for this session
 	@property({ attribute: false }) bgProcesses: BgProcessInfo[] = [];
 	@property({ attribute: false }) onBgProcessKill?: (id: string) => void;
+	@property({ attribute: false }) onBgProcessDismiss?: (id: string) => void;
 	// Optional custom API key prompt handler - if not provided, uses default dialog
 	@property({ attribute: false }) onApiKeyRequired?: (provider: string) => Promise<boolean>;
 	// Optional callback called before sending a message
@@ -640,6 +641,7 @@ export class AgentInterface extends LitElement {
 									.process=${p}
 									.sessionId=${this.session?.sessionId ?? ''}
 									.onKill=${this.onBgProcessKill}
+									.onDismiss=${this.onBgProcessDismiss}
 								></bg-process-pill>
 							`)}
 							${this.gitStatus || this.gitStatusLoading ? html`<git-status-widget
