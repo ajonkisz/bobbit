@@ -77,56 +77,56 @@ src/
 ├── server/          # Node.js gateway (HTTP + WebSocket + child process management)
 │   ├── cli.ts       # Entry point, arg parsing, NordLynx detection, TLS setup, system prompt resolution
 │   ├── server.ts    # HTTP server, REST API, static serving, WS upgrade
-│   ├── index.ts     # Barrel export for server public API
-│   ├── pi-dir.ts    # Central ~/.pi state directory resolution (overridable via BOBBIT_PI_DIR)
 │   ├── harness.ts   # Dev server wrapper (watches sentinel file, auto-restarts)
 │   ├── harness-signal.ts  # Touches sentinel to trigger harness restart
+│   ├── index.ts     # Server barrel export
+│   ├── pi-dir.ts    # Resolves ~/.pi directory path (respects BOBBIT_PI_DIR env var)
 │   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, teams, title generation
-│   │   ├── session-manager.ts      # Create/destroy/restore sessions, broadcast events, force abort
-│   │   ├── session-store.ts        # Disk persistence (~/.pi/gateway-sessions.json)
-│   │   ├── rpc-bridge.ts           # JSONL stdin/stdout bridge to agent subprocess
-│   │   ├── event-buffer.ts         # Circular buffer for tool_execution_update replay on reconnect
-│   │   ├── title-generator.ts      # Auto-generate session titles via Claude Haiku
-│   │   ├── system-prompt.ts        # Assemble system prompt from global + AGENTS.md + goal spec
-│   │   ├── goal-manager.ts         # Goal CRUD, worktree creation, state transitions
-│   │   ├── goal-store.ts           # Goal disk persistence (~/.pi/gateway-goals.json)
-│   │   ├── goal-artifact-store.ts  # Goal artifact storage (~/.pi/gateway-goal-artifacts.json)
-│   │   ├── goal-assistant.ts       # System prompt for goal creation assistant
-│   │   ├── task-manager.ts         # Task CRUD, state machine, assignment, dependencies
-│   │   ├── task-store.ts           # Task disk persistence (~/.pi/gateway-tasks.json)
-│   │   ├── team-manager.ts         # Team lifecycle (spawn/dismiss agents, start/complete/teardown)
-│   │   ├── team-store.ts           # Team state persistence (~/.pi/gateway-team-state.json)
-│   │   ├── team-names.ts           # Fun name pool generator for team agents (per-role)
-│   │   ├── name-generator.ts       # Generates role-themed names via Claude Haiku
-│   │   ├── role-manager.ts         # Role definitions CRUD, built-in tool registry
-│   │   ├── role-store.ts           # Role persistence (YAML, ~/.pi/roles/)
-│   │   ├── role-assistant.ts       # System prompt for role creation assistant
-│   │   ├── tool-store.ts           # Tool metadata persistence (~/.pi/gateway-tools.json)
-│   │   ├── tool-manager.ts         # Tool listing with renderer detection and metadata overlay
-│   │   ├── tool-assistant.ts       # System prompt for tool management assistant
-│   │   ├── trait-manager.ts        # Personality trait CRUD and resolution
-│   │   ├── trait-store.ts          # Trait persistence (YAML)
-│   │   ├── cost-tracker.ts         # Per-session/goal/task token and cost tracking
-│   │   ├── prompt-queue.ts         # Server-side prompt queue with priority steering
-│   │   ├── color-store.ts          # Per-session color index persistence
-│   │   ├── artifact-spec-manager.ts  # Artifact spec CRUD and validation
-│   │   ├── artifact-spec-store.ts    # Artifact spec persistence (YAML)
-│   │   ├── artifact-spec-assistant.ts # System prompt for artifact spec assistant
-│   │   └── assistant-registry.ts     # Unified registry of assistant types (goal, role, tool, artifact-spec)
+│   │   ├── artifact-spec-assistant.ts  # System prompt for artifact spec assistant
+│   │   ├── artifact-spec-manager.ts    # Artifact spec CRUD operations
+│   │   ├── artifact-spec-store.ts      # Artifact spec persistence (YAML files in artifact-specs/)
+│   │   ├── assistant-registry.ts       # Registry of assistant types (goal, role, tool, artifact-spec)
+│   │   ├── color-store.ts              # Per-session color index persistence (~/.pi/gateway-session-colors.json)
+│   │   ├── cost-tracker.ts             # Per-session token/cost tracking
+│   │   ├── event-buffer.ts             # Circular buffer for tool_execution_update replay on reconnect
+│   │   ├── goal-artifact-store.ts      # Goal artifact storage (~/.pi/gateway-goal-artifacts.json)
+│   │   ├── goal-assistant.ts           # System prompt for the goal creation assistant
+│   │   ├── goal-manager.ts             # Goal CRUD operations
+│   │   ├── goal-store.ts               # Disk persistence (~/.pi/gateway-goals.json)
+│   │   ├── name-generator.ts           # Random name generator for team agents
+│   │   ├── prompt-queue.ts             # Server-side prompt queue with priority sorting
+│   │   ├── role-assistant.ts           # System prompt for role assistant
+│   │   ├── role-manager.ts             # Role definitions, tool access, and management
+│   │   ├── role-store.ts               # Role persistence (YAML files in roles/)
+│   │   ├── rpc-bridge.ts               # JSONL stdin/stdout bridge to agent subprocess
+│   │   ├── session-manager.ts          # Create/destroy/restore sessions, broadcast events, force abort
+│   │   ├── session-store.ts            # Disk persistence (~/.pi/gateway-sessions.json)
+│   │   ├── system-prompt.ts            # Assemble system prompt from global + AGENTS.md + goal spec
+│   │   ├── task-manager.ts             # Task CRUD and state transitions
+│   │   ├── task-store.ts               # Disk persistence (~/.pi/gateway-tasks.json)
+│   │   ├── team-manager.ts             # Team lifecycle (spawn/dismiss agents, start/complete/teardown)
+│   │   ├── team-names.ts               # Themed name lists for team agents
+│   │   ├── team-store.ts               # Disk persistence (~/.pi/gateway-team-state.json)
+│   │   ├── title-generator.ts          # Auto-generate session titles via Claude Haiku
+│   │   ├── tool-assistant.ts           # System prompt for tool management assistant
+│   │   ├── tool-manager.ts             # Tool CRUD with renderer discovery
+│   │   ├── tool-store.ts               # Tool metadata persistence (~/.pi/gateway-tools.json)
+│   │   ├── trait-manager.ts            # Trait definitions and management
+│   │   └── trait-store.ts              # Trait persistence (~/.pi/gateway-traits.json)
 │   ├── auth/        # Token auth, rate limiting, TLS, OAuth, DNS
-│   │   ├── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
+│   │   ├── desec.ts       # deSEC dynamic DNS updates on startup
+│   │   ├── oauth.ts       # OAuth flow (start, complete, status)
 │   │   ├── rate-limit.ts  # IP-based rate limiting for auth failures
-│   │   ├── tls.ts         # TLS certificate generation (mkcert CA or openssl fallback)
-│   │   ├── oauth.ts       # OAuth PKCE flow (start, complete, status)
-│   │   └── desec.ts       # deSEC dynamic DNS A record updates
+│   │   ├── tls.ts         # Self-signed TLS certificate generation (~/.pi/gateway-tls/)
+│   │   └── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
 │   ├── ws/          # WebSocket protocol types and message handler
 │   │   ├── protocol.ts   # ClientMessage / ServerMessage type unions
 │   │   └── handler.ts    # Auth handshake, command routing, skill dispatch
 │   └── skills/      # Reusable skill definitions with isolated sub-agent execution
-│       ├── types.ts           # Skill interface definition
+│       ├── types.ts           # Skill interface
 │       ├── registry.ts        # In-memory skill definition registry
 │       ├── sub-agent.ts       # Spawn isolated agent subprocesses for skill execution
-│       ├── git.ts             # Git worktree create/cleanup helpers
+│       ├── git.ts             # Git worktree helpers
 │       ├── definitions-sync.ts  # Export definitions to ~/.pi/skill-definitions.json
 │       ├── index.ts           # Barrel export + auto-registration of built-in skills
 │       └── definitions/       # Built-in skill templates
@@ -134,157 +134,157 @@ src/
 │           └── test-suite-report.ts # Test suite analysis skill
 ├── ui/              # Lit web components (forked from pi-web-ui, NOT an npm dep)
 │   ├── ChatPanel.ts # Top-level UI orchestrator
-│   ├── app.css      # Global styles and CSS custom properties
-│   ├── index.ts     # Barrel export for all UI components
+│   ├── app.css      # Global application styles
+│   ├── index.ts     # UI barrel export
 │   ├── speech-recognition.d.ts  # Web Speech API type declarations
+│   ├── components/  # MessageList, StreamingMessageContainer, AgentInterface, etc.
+│   │   ├── AgentInterface.ts              # Bridges agent events to UI state
+│   │   ├── AttachmentTile.ts              # File attachment preview tile
+│   │   ├── ConsoleBlock.ts                # Console output display block
+│   │   ├── CustomProviderCard.ts          # Custom AI provider card
+│   │   ├── DiffBlock.ts                   # Diff visualization component
+│   │   ├── ErrorMessage.ts                # Error display component
+│   │   ├── ExpandableSection.ts           # Collapsible content section
+│   │   ├── GitStatusWidget.ts             # Git status display widget
+│   │   ├── Input.ts                       # Chat input with attachments
+│   │   ├── LiveTimer.ts                   # Live elapsed-time timer
+│   │   ├── MessageEditor.ts               # Inline message editing
+│   │   ├── MessageList.ts                 # Renders state.messages (completed messages)
+│   │   ├── Messages.ts                    # User, Assistant, Tool message renderers
+│   │   ├── ProviderKeyInput.ts            # API key input field
+│   │   ├── SandboxedIframe.ts             # Sandboxed iframe container
+│   │   ├── StreamingMessageContainer.ts   # Renders state.streamMessage (in-progress)
+│   │   ├── ThinkingBlock.ts               # AI thinking/reasoning display
+│   │   ├── ToolGroup.ts                   # Groups related tool calls
+│   │   ├── message-renderer-registry.ts   # Custom message type renderers
+│   │   └── sandbox/                       # Sandboxed iframe runtime providers
+│   │       ├── ArtifactsRuntimeProvider.ts    # Artifact rendering in sandbox
+│   │       ├── AttachmentsRuntimeProvider.ts  # Attachment handling in sandbox
+│   │       ├── ConsoleRuntimeProvider.ts      # Console capture in sandbox
+│   │       ├── FileDownloadRuntimeProvider.ts # File download from sandbox
+│   │       ├── RuntimeMessageBridge.ts        # Parent-iframe message bridge
+│   │       ├── RuntimeMessageRouter.ts        # Routes messages between providers
+│   │       └── SandboxRuntimeProvider.ts      # Base sandbox runtime provider
+│   ├── dialogs/     # ModelSelector, Settings, Sessions, AttachmentOverlay
+│   │   ├── ApiKeyPromptDialog.ts      # API key entry dialog
+│   │   ├── AttachmentOverlay.ts       # Full-screen attachment viewer
+│   │   ├── CustomProviderDialog.ts    # Custom provider configuration
+│   │   ├── ModelSelector.ts           # AI model selection dropdown
+│   │   ├── PersistentStorageDialog.ts # Storage permission dialog
+│   │   ├── ProvidersModelsTab.ts      # Provider/model settings tab
+│   │   ├── SessionListDialog.ts       # Session list/management dialog
+│   │   └── SettingsDialog.ts          # App settings dialog
 │   ├── prompts/
-│   │   └── prompts.ts          # Built-in prompt templates
-│   ├── components/  # Core UI components
-│   │   ├── AgentInterface.ts    # Bridges agent events to UI state
-│   │   ├── MessageList.ts       # Renders state.messages (completed messages)
-│   │   ├── StreamingMessageContainer.ts  # Renders state.streamMessage (in-progress)
-│   │   ├── Messages.ts          # Message rendering by role (user, assistant, tool)
-│   │   ├── Input.ts             # Chat input with attachments and voice
-│   │   ├── MessageEditor.ts     # Inline message editing
-│   │   ├── AttachmentTile.ts    # Attachment preview tiles
-│   │   ├── ConsoleBlock.ts      # Console output rendering
-│   │   ├── CustomProviderCard.ts  # Custom AI provider display card
-│   │   ├── DiffBlock.ts         # Diff rendering component
-│   │   ├── ErrorMessage.ts      # Error display component
-│   │   ├── ExpandableSection.ts # Collapsible content sections
-│   │   ├── GitStatusWidget.ts   # Git branch/status display
-│   │   ├── LiveTimer.ts         # Real-time elapsed timer
-│   │   ├── SandboxedIframe.ts   # Sandboxed iframe container
-│   │   ├── ThinkingBlock.ts     # Agent thinking indicator
-│   │   ├── ToolGroup.ts         # Groups consecutive tool calls
-│   │   ├── ProviderKeyInput.ts  # API key input field
-│   │   ├── message-renderer-registry.ts  # Custom message type renderers
-│   │   └── sandbox/             # Sandboxed iframe runtime providers
-│   │       ├── ArtifactsRuntimeProvider.ts
-│   │       ├── AttachmentsRuntimeProvider.ts
-│   │       ├── ConsoleRuntimeProvider.ts
-│   │       ├── FileDownloadRuntimeProvider.ts
-│   │       ├── RuntimeMessageBridge.ts
-│   │       ├── RuntimeMessageRouter.ts
-│   │       └── SandboxRuntimeProvider.ts
-│   ├── dialogs/     # Modal dialogs
-│   │   ├── ApiKeyPromptDialog.ts
-│   │   ├── AttachmentOverlay.ts
-│   │   ├── CustomProviderDialog.ts
-│   │   ├── ModelSelector.ts
-│   │   ├── PersistentStorageDialog.ts
-│   │   ├── ProvidersModelsTab.ts
-│   │   ├── SessionListDialog.ts
-│   │   └── SettingsDialog.ts
+│   │   └── prompts.ts    # Default prompt templates
 │   ├── tools/       # Tool call renderers
-│   │   ├── index.ts             # Barrel export + renderer registration
-│   │   ├── renderer-registry.ts # Tool name → renderer mapping
-│   │   ├── types.ts             # Renderer type definitions
-│   │   ├── extract-document.ts  # Document extraction utilities
-│   │   ├── javascript-repl.ts   # JavaScript REPL renderer
-│   │   ├── renderers/           # Per-tool renderers
-│   │   │   ├── ArtifactToolRenderers.ts
-│   │   │   ├── BashRenderer.ts
-│   │   │   ├── BrowserClickRenderer.ts
-│   │   │   ├── BrowserEvalRenderer.ts
-│   │   │   ├── BrowserNavigateRenderer.ts
-│   │   │   ├── BrowserTypeRenderer.ts
-│   │   │   ├── BrowserWaitRenderer.ts
-│   │   │   ├── CalculateRenderer.ts
-│   │   │   ├── DefaultRenderer.ts
-│   │   │   ├── DelegateRenderer.ts
-│   │   │   ├── EditRenderer.ts
-│   │   │   ├── FindRenderer.ts
-│   │   │   ├── GetCurrentTimeRenderer.ts
-│   │   │   ├── GrepRenderer.ts
-│   │   │   ├── HtmlRenderer.ts
-│   │   │   ├── LsRenderer.ts
-│   │   │   ├── ReadRenderer.ts
-│   │   │   ├── ScreenshotRenderer.ts
-│   │   │   ├── SvgRenderer.ts
-│   │   │   ├── TaskToolRenderers.ts
-│   │   │   ├── TeamToolRenderers.ts
-│   │   │   ├── WebFetchRenderer.ts
-│   │   │   ├── WebSearchRenderer.ts
-│   │   │   ├── WriteRenderer.ts
-│   │   │   ├── delegate-cards.ts
-│   │   │   └── image-utils.ts
-│   │   └── artifacts/           # Artifact display components
-│   │       ├── ArtifactElement.ts
-│   │       ├── ArtifactPill.ts
-│   │       ├── Console.ts
-│   │       ├── DocxArtifact.ts
-│   │       ├── ExcelArtifact.ts
-│   │       ├── GenericArtifact.ts
-│   │       ├── HtmlArtifact.ts
-│   │       ├── ImageArtifact.ts
-│   │       ├── MarkdownArtifact.ts
-│   │       ├── PdfArtifact.ts
-│   │       ├── SvgArtifact.ts
-│   │       ├── TextArtifact.ts
-│   │       ├── artifacts-tool-renderer.ts
-│   │       ├── artifacts.ts
-│   │       └── index.ts
-│   ├── storage/     # IndexedDB persistence
-│   │   ├── app-storage.ts
-│   │   ├── store.ts
-│   │   ├── types.ts
-│   │   └── backends/
-│   │   │   └── indexeddb-storage-backend.ts
+│   │   ├── extract-document.ts    # Document text extraction
+│   │   ├── index.ts               # Tool renderer registration
+│   │   ├── javascript-repl.ts     # JavaScript REPL support
+│   │   ├── renderer-registry.ts   # Tool name → renderer mapping
+│   │   ├── types.ts               # Tool renderer type definitions
+│   │   ├── renderers/             # Per-tool renderers
+│   │   │   ├── ArtifactToolRenderers.ts   # Artifact tool renderers
+│   │   │   ├── BashRenderer.ts            # Shell command renderer
+│   │   │   ├── BrowserClickRenderer.ts    # Browser click tool renderer
+│   │   │   ├── BrowserEvalRenderer.ts     # Browser eval tool renderer
+│   │   │   ├── BrowserNavigateRenderer.ts # Browser navigate tool renderer
+│   │   │   ├── BrowserTypeRenderer.ts     # Browser type tool renderer
+│   │   │   ├── BrowserWaitRenderer.ts     # Browser wait tool renderer
+│   │   │   ├── CalculateRenderer.ts       # Calculator tool renderer
+│   │   │   ├── DefaultRenderer.ts         # Fallback tool renderer
+│   │   │   ├── DelegateRenderer.ts        # Delegate/sub-agent renderer
+│   │   │   ├── EditRenderer.ts            # File edit renderer with diff
+│   │   │   ├── FindRenderer.ts            # File find renderer
+│   │   │   ├── GetCurrentTimeRenderer.ts  # Time tool renderer
+│   │   │   ├── GrepRenderer.ts            # Grep results renderer
+│   │   │   ├── HtmlRenderer.ts            # HTML preview renderer
+│   │   │   ├── LsRenderer.ts             # Directory listing renderer
+│   │   │   ├── ReadRenderer.ts            # File read renderer
+│   │   │   ├── ScreenshotRenderer.ts      # Screenshot display renderer
+│   │   │   ├── SvgRenderer.ts             # SVG preview renderer
+│   │   │   ├── TaskToolRenderers.ts       # Task management tool renderers
+│   │   │   ├── TeamToolRenderers.ts       # Team management tool renderers
+│   │   │   ├── WebFetchRenderer.ts        # Web fetch results renderer
+│   │   │   ├── WebSearchRenderer.ts       # Web search results renderer
+│   │   │   ├── WriteRenderer.ts           # File write renderer
+│   │   │   ├── delegate-cards.ts          # Delegate status card components
+│   │   │   └── image-utils.ts             # Image processing utilities
+│   │   └── artifacts/             # Artifact display components
+│   │       ├── ArtifactElement.ts         # Base artifact element
+│   │       ├── ArtifactPill.ts            # Compact artifact indicator
+│   │       ├── Console.ts                 # Console artifact display
+│   │       ├── DocxArtifact.ts            # Word document artifact
+│   │       ├── ExcelArtifact.ts           # Excel spreadsheet artifact
+│   │       ├── GenericArtifact.ts         # Generic file artifact
+│   │       ├── HtmlArtifact.ts            # HTML artifact with live preview
+│   │       ├── ImageArtifact.ts           # Image artifact display
+│   │       ├── MarkdownArtifact.ts        # Markdown artifact renderer
+│   │       ├── PdfArtifact.ts             # PDF document artifact
+│   │       ├── SvgArtifact.ts             # SVG artifact display
+│   │       ├── TextArtifact.ts            # Plain text artifact
+│   │       ├── artifacts-tool-renderer.ts # Artifact tool integration
+│   │       ├── artifacts.ts               # Artifact type definitions
+│   │       └── index.ts                   # Artifact exports
+│   ├── storage/     # IndexedDB persistence (settings, provider keys, sessions)
+│   │   ├── app-storage.ts                       # App-level storage manager
+│   │   ├── store.ts                             # Generic store base class
+│   │   ├── types.ts                             # Storage type definitions
+│   │   ├── backends/
+│   │   │   └── indexeddb-storage-backend.ts      # IndexedDB storage backend
 │   │   └── stores/
-│   │       ├── command-history-store.ts
-│   │       ├── custom-providers-store.ts
-│   │       ├── goal-draft-store.ts
-│   │       ├── provider-keys-store.ts
-│   │       ├── role-draft-store.ts
-│   │       ├── sessions-store.ts
-│   │       ├── settings-store.ts
-│   │       └── spec-draft-store.ts
-│   └── utils/       # Shared utilities
-│       ├── ansi.ts            # ANSI escape code handling
-│       ├── attachment-utils.ts  # Attachment processing
-│       ├── auth-token.ts      # Auth token retrieval
-│       ├── format.ts          # Text formatting helpers
-│       ├── i18n.ts            # Internationalisation strings
-│       ├── model-discovery.ts # AI model detection and listing
-│       ├── proxy-utils.ts     # Proxy URL utilities
-│       └── test-sessions.ts   # Test session fixtures
+│   │       ├── command-history-store.ts          # Command history persistence
+│   │       ├── custom-providers-store.ts         # Custom AI provider persistence
+│   │       ├── goal-draft-store.ts              # Goal draft persistence
+│   │       ├── provider-keys-store.ts           # API key persistence
+│   │       ├── role-draft-store.ts              # Role draft persistence
+│   │       ├── sessions-store.ts                # Session metadata persistence
+│   │       ├── settings-store.ts                # App settings persistence
+│   │       └── spec-draft-store.ts              # Spec draft persistence
+│   └── utils/       # Formatting, auth token, model discovery, i18n
+│       ├── ansi.ts              # ANSI escape code processing
+│       ├── attachment-utils.ts  # File attachment helpers
+│       ├── auth-token.ts        # Auth token management
+│       ├── format.ts            # Text formatting utilities
+│       ├── i18n.ts              # Internationalization helpers
+│       ├── model-discovery.ts   # AI model discovery and listing
+│       ├── proxy-utils.ts       # Proxy configuration helpers
+│       └── test-sessions.ts     # Test session utilities
 ├── app/             # Browser entry point (connects to gateway)
-│   ├── main.ts              # Bootstrap, routing, session sidebar, QR code, OAuth
-│   ├── remote-agent.ts      # WebSocket ↔ Agent interface adapter
-│   ├── state.ts             # Global app state (sessions, goals, connection status)
-│   ├── api.ts               # Gateway REST API client helpers
-│   ├── routing.ts           # Hash-based URL routing (#/, #/session/{id}, #/goal/{id}, etc.)
-│   ├── render.ts            # Top-level render function, header bar, layout
-│   ├── render-helpers.ts    # Shared rendering utilities (icons, badges)
-│   ├── sidebar.ts           # Desktop session/goal sidebar
-│   ├── session-manager.ts   # Session create/connect/disconnect lifecycle
-│   ├── session-colors.ts    # Session color picker UI
-│   ├── storage.ts           # IndexedDB store initialisation
-│   ├── dialogs.ts           # Confirmation and prompt dialogs
-│   ├── goal-dashboard.ts    # Goal detail page with tabs (overview, tasks, artifacts, team)
-│   ├── goal-dashboard.css   # Goal dashboard styles
-│   ├── role-manager-page.ts # Role list and detail page
-│   ├── role-manager-dialog.ts # Role creation/edit dialog
-│   ├── role-manager.css     # Role manager styles
-│   ├── tool-manager-page.ts # Tool list and detail page
-│   ├── tool-manager.css     # Tool manager styles
-│   ├── artifact-spec-page.ts  # Artifact spec list and detail page
-│   ├── artifact-spec.css      # Artifact spec page styles
-│   ├── preview-panel.ts     # Live HTML preview split-pane
-│   ├── mobile-header.ts     # Mobile top header bar
-│   ├── proposal-parsers.ts  # Parses structured proposals from assistant messages
-│   ├── cwd-combobox.ts      # Working directory selector combobox
-│   ├── custom-messages.ts   # Custom message type registration
-│   ├── oauth.ts             # Browser-side OAuth flow
-│   ├── qrcode.d.ts          # QR code library type declarations
-│   └── app.css              # App-level styles (imports ui/app.css)
+│   ├── api.ts                   # REST API client helpers
+│   ├── app.css                  # Global app styles
+│   ├── artifact-spec-page.ts    # Artifact spec management page
+│   ├── artifact-spec.css        # Artifact spec page styles
+│   ├── custom-messages.ts       # Custom message type definitions
+│   ├── cwd-combobox.ts          # Working directory combobox component
+│   ├── dialogs.ts               # App-level dialog helpers
+│   ├── goal-dashboard.css       # Goal dashboard styles
+│   ├── goal-dashboard.ts        # Goal dashboard page
+│   ├── main.ts                  # Bootstrap, routing, session sidebar, QR code, OAuth
+│   ├── mobile-header.ts         # Mobile responsive header
+│   ├── oauth.ts                 # Browser-side OAuth flow
+│   ├── preview-panel.ts         # Live preview panel (split-pane HTML preview)
+│   ├── proposal-parsers.ts      # Parse assistant proposals (goal, role, tool, artifact-spec)
+│   ├── qrcode.d.ts              # QR code library type declarations
+│   ├── remote-agent.ts          # WebSocket ↔ Agent interface adapter (critical file)
+│   ├── render-helpers.ts        # Shared rendering helpers
+│   ├── render.ts                # App-level render functions
+│   ├── role-manager-dialog.ts   # Role creation/edit dialog
+│   ├── role-manager-page.ts     # Role management page
+│   ├── role-manager.css         # Role manager page styles
+│   ├── routing.ts               # Hash-based routing
+│   ├── session-colors.ts        # Session color assignment
+│   ├── session-manager.ts       # Client-side session management
+│   ├── sidebar.ts               # Desktop session sidebar
+│   ├── state.ts                 # App-level state management
+│   ├── storage.ts               # Client-side storage helpers
+│   ├── tool-manager-page.ts     # Tool management UI (list + detail views)
+│   └── tool-manager.css         # Tool management page styles
 ├── config/
-│   └── system-prompt.md     # Custom system prompt for agent sessions
+│   └── system-prompt.md  # Custom system prompt for agent sessions
 └── docs/
     ├── dev-workflow.md      # Development workflow guide
-    ├── bobbit-sprites.md    # Bobbit pixel art, animation & accessory system reference
-    └── prompt-queue.md      # Prompt queue architecture
+    ├── prompt-queue.md      # Prompt queue architecture
+    └── bobbit-sprites.md    # Bobbit pixel art, animation & accessory system reference
 ```
 
 ## Architecture — Server
@@ -328,7 +328,7 @@ src/
 | `tool-assistant.ts` | System prompt for tool management assistant sessions. |
 | `trait-manager.ts` | Personality trait CRUD and resolution (maps trait names to prompt fragments). |
 | `trait-store.ts` | Persists traits as YAML files. |
-| `cost-tracker.ts` | Tracks per-session token usage and cost. Aggregates to goal and task level. Persists to `~/.pi/gateway-costs.json`. |
+| `cost-tracker.ts` | Tracks per-session token usage and cost. Aggregates to goal and task level. Persists to `~/.pi/gateway-session-costs.json`. |
 | `prompt-queue.ts` | Server-side prompt queue. Steered messages sort before non-steered. Auto-drains when agent becomes idle. |
 | `color-store.ts` | Maps session IDs to color indices (0–13). Persists to `~/.pi/gateway-session-colors.json`. |
 | `artifact-spec-manager.ts` | Artifact spec CRUD and validation. Enforces ID pattern (lowercase alphanumeric + hyphens). |

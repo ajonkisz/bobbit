@@ -20,7 +20,7 @@ src/
 │   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, teams, title generation
 │   │   ├── artifact-spec-assistant.ts  # System prompt for artifact spec assistant
 │   │   ├── artifact-spec-manager.ts    # Artifact spec CRUD operations
-│   │   ├── artifact-spec-store.ts      # Artifact spec persistence (~/.pi/gateway-artifact-specs.json)
+│   │   ├── artifact-spec-store.ts      # Artifact spec persistence (YAML files in artifact-specs/)
 │   │   ├── assistant-registry.ts       # Registry of assistant types (goal, role, tool, artifact-spec)
 │   │   ├── color-store.ts              # Per-session color index persistence (~/.pi/gateway-session-colors.json)
 │   │   ├── cost-tracker.ts             # Per-session token/cost tracking
@@ -33,7 +33,7 @@ src/
 │   │   ├── prompt-queue.ts             # Server-side prompt queue with priority sorting
 │   │   ├── role-assistant.ts           # System prompt for role assistant
 │   │   ├── role-manager.ts             # Role definitions, tool access, and management
-│   │   ├── role-store.ts               # Role persistence (~/.pi/gateway-roles.json)
+│   │   ├── role-store.ts               # Role persistence (YAML files in roles/)
 │   │   ├── rpc-bridge.ts               # JSONL stdin/stdout bridge to agent subprocess
 │   │   ├── session-manager.ts          # Create/destroy/restore sessions, broadcast events, force abort
 │   │   ├── session-store.ts            # Disk persistence (~/.pi/gateway-sessions.json)
@@ -329,7 +329,7 @@ All persistent state lives under `~/.pi/`:
 | `gateway-token` | `token.ts` | Auth token (mode 0600) |
 | `gateway-sessions.json` | `SessionStore` | Session metadata (id, title, cwd, agentSessionFile, wasStreaming) |
 | `gateway-goals.json` | `GoalStore` | Goal definitions (title, spec, cwd, state) |
-| `gateway-session-colors.json` | `ColorStore` | Session → color index (0-19) mapping |
+| `gateway-session-colors.json` | `ColorStore` | Session → color index (0-13) mapping |
 | `gateway-tls/` | `tls.ts` | Self-signed TLS cert + key |
 | `session-prompts/{sessionId}.md` | `system-prompt.ts` | Assembled system prompts (cleaned up on session terminate) |
 | `gateway-goal-artifacts.json` | `GoalArtifactStore` | Goal artifact content and metadata |
