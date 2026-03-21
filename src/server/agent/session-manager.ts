@@ -685,7 +685,7 @@ export class SessionManager {
 		const now = Date.now();
 		const session: SessionInfo = {
 			id,
-			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : opts?.toolAssistant ? "Tool Assistant" : opts?.artifactSpecAssistant ? "Artifact Spec Assistant" : "New session",
+			title: goalAssistant ? "Goal Assistant" : opts?.roleAssistant ? "Role Assistant" : opts?.toolAssistant ? "Tool Assistant" : opts?.artifactSpecAssistant ? "Spec Assistant" : "New session",
 			cwd,
 			status: "starting",
 			createdAt: now,
