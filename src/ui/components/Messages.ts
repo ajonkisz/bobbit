@@ -63,7 +63,7 @@ export class UserMessage extends LitElement {
 		const content =
 			typeof this.message.content === "string"
 				? this.message.content
-				: this.message.content.find((c) => c.type === "text")?.text || "";
+				: (this.message.content ?? []).find((c) => c.type === "text")?.text || "";
 
 		return html`
 			<div class="flex justify-start mx-2 sm:mx-4">
@@ -116,7 +116,7 @@ export class AssistantMessage extends LitElement {
 		const orderedParts: TemplateResult[] = [];
 
 		// Detect <suggest_goal/> tag in text content
-		const content = this.message.content;
+		const content = this.message.content ?? [];
 		const hasSuggestGoal = content.some(
 			c => c.type === 'text' && /<suggest_goal\s*\/?>/.test(c.text)
 		);

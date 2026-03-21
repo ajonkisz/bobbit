@@ -114,11 +114,14 @@ export class BgProcessPill extends LitElement {
 		if (!this.process) return nothing;
 		const p = this.process;
 		const isRunning = p.status === "running";
-		const statusDot = isRunning
-			? html`<span class="inline-block w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse"></span>`
+		const dotClass = isRunning
+			? "bg-blue-400 animate-pulse"
 			: p.exitCode === 0
-				? html`<span class="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground shrink-0"></span>`
-				: html`<span class="inline-block w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span>`;
+				? "bg-green-400"
+				: p.exitCode !== null
+					? "bg-red-400"
+					: "bg-muted-foreground"; // scheduled / unknown
+		const statusDot = html`<span class="inline-block w-1.5 h-1.5 rounded-full ${dotClass} shrink-0"></span>`;
 
 		return html`
 			<button
