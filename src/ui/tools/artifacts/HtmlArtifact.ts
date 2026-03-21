@@ -32,6 +32,8 @@ export class HtmlArtifact extends ArtifactElement {
 	private consoleRef: Ref<Console> = createRef();
 
 	@state() private viewMode: "preview" | "code" = "preview";
+	@state() private _loading = false;
+	private _loadingFallbackTimer?: ReturnType<typeof setTimeout>;
 
 	private setViewMode(mode: "preview" | "code") {
 		this.viewMode = mode;
@@ -86,6 +88,8 @@ export class HtmlArtifact extends ArtifactElement {
 			this.requestUpdate();
 			// Execute content in sandbox if it exists
 			if (this.sandboxIframeRef.value && value) {
+				// Show loading overlay during iframe reload to prevent flashing
+				this._loading = true;
 				this.executeContent(value);
 			}
 		}
@@ -102,7 +106,12 @@ export class HtmlArtifact extends ArtifactElement {
 
 		const sandboxId = `artifact-${this.filename}`;
 
-		// Create consumer for console messages
+		// Clear any previous fallback timer
+		if (this._loadingFallbackTimer) {
+			clearTimeout(this._loadingFallbackTimer);
+		}
+
+		// Create consumer for console messages and load completion
 		const consumer: MessageConsumer = {
 			handleMessage: async (message: any): Promise<void> => {
 				if (message.type === "console") {
@@ -115,9 +124,17 @@ export class HtmlArtifact extends ArtifactElement {
 						},
 					];
 					this.requestUpdate(); // Re-render to show console
+				} else if (message.type === "execution-complete" || message.type === "execution-error") {
+					// Content has finished loading, hide overlay
+					this._loading = false;
 				}
 			},
 		};
+
+		// Fallback: hide overlay after 5s even if complete() never fires
+		this._loadingFallbackTimer = setTimeout(() => {
+			this._loading = false;
+		}, 5000);
 
 		// Inject window.complete() call at the end of the HTML to signal when page is loaded
 		// HTML artifacts don't time out - they call complete() when ready
@@ -138,13 +155,6 @@ export class HtmlArtifact extends ArtifactElement {
 
 	override get content(): string {
 		return this._content;
-	}
-
-	override disconnectedCallback() {
-		super.disconnectedCallback();
-		// Unregister sandbox when element is removed from DOM
-		const sandboxId = `artifact-${this.filename}`;
-		RUNTIME_MESSAGE_ROUTER.unregisterSandbox(sandboxId);
 	}
 
 	override firstUpdated() {
@@ -168,6 +178,16 @@ export class HtmlArtifact extends ArtifactElement {
 		return this.logs.map((l) => `[${l.type}] ${l.text}`).join("\n");
 	}
 
+	override disconnectedCallback() {
+		super.disconnectedCallback();
+		if (this._loadingFallbackTimer) {
+			clearTimeout(this._loadingFallbackTimer);
+		}
+		// Unregister sandbox when element is removed from DOM
+		const sandboxId = `artifact-${this.filename}`;
+		RUNTIME_MESSAGE_ROUTER.unregisterSandbox(sandboxId);
+	}
+
 	override render() {
 		return html`
 			<div class="h-full flex flex-col">
@@ -175,6 +195,29 @@ export class HtmlArtifact extends ArtifactElement {
 					<!-- Preview container - always in DOM, just hidden when not active -->
 					<div class="absolute inset-0 flex flex-col" style="display: ${this.viewMode === "preview" ? "flex" : "none"}">
 						<sandbox-iframe class="flex-1" ${ref(this.sandboxIframeRef)}></sandbox-iframe>
+						${this._loading
+							? html`<div style="
+								position: absolute; inset: 0; z-index: 10;
+								background: var(--background, #1a1a2e);
+								opacity: 0.7;
+								display: flex; align-items: center; justify-content: center;
+								pointer-events: none;
+								transition: opacity 0.2s ease;
+							">
+								<div style="
+									width: 24px; height: 24px;
+									border: 2.5px solid rgba(255,255,255,0.18);
+									border-top-color: rgba(255,255,255,0.7);
+									border-radius: 50%;
+									animation: html-artifact-spin 0.7s linear infinite;
+								"></div>
+							</div>
+							<style>
+								@keyframes html-artifact-spin {
+									to { transform: rotate(360deg); }
+								}
+							</style>`
+							: ""}
 						${
 							this.logs.length > 0
 								? html`<artifact-console .logs=${this.logs} ${ref(this.consoleRef)}></artifact-console>`
