@@ -22,6 +22,7 @@ import { WriteRenderer } from "./renderers/WriteRenderer.js";
 import { TeamSpawnRenderer, TeamListRenderer, TeamDismissRenderer, TeamCompleteRenderer, TeamSteerRenderer, TeamPromptRenderer, TeamAbortRenderer } from "./renderers/TeamToolRenderers.js";
 import { TaskListRenderer, TaskCreateRenderer, TaskUpdateRenderer } from "./renderers/TaskToolRenderers.js";
 import { ArtifactListRenderer, ArtifactCreateRenderer, ArtifactGetRenderer, ArtifactUpdateRenderer } from "./renderers/ArtifactToolRenderers.js";
+import { BgProcessRenderer } from "./renderers/BgProcessRenderer.js";
 import type { ToolRenderResult } from "./types.js";
 
 // Register all built-in tool renderers
@@ -57,6 +58,7 @@ registerToolRenderer("artifact_list", new ArtifactListRenderer());
 registerToolRenderer("artifact_create", new ArtifactCreateRenderer());
 registerToolRenderer("artifact_get", new ArtifactGetRenderer());
 registerToolRenderer("artifact_update", new ArtifactUpdateRenderer());
+registerToolRenderer("bash_bg", new BgProcessRenderer());
 
 const defaultRenderer = new DefaultRenderer();
 

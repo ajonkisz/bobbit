@@ -449,6 +449,114 @@ export async function fetchGoalArtifact(goalId: string, artifactId: string): Pro
 }
 
 // ============================================================================
+// STAFF API
+// ============================================================================
+
+export interface StaffAgent {
+	id: string;
+	name: string;
+	description: string;
+	systemPrompt: string;
+	cwd: string;
+	state: "active" | "paused" | "retired";
+	triggers: any[];
+	memory: string;
+	roleId?: string;
+	createdAt: number;
+	updatedAt: number;
+	lastWakeAt?: number;
+	currentSessionId?: string;
+}
+
+export async function fetchStaff(): Promise<StaffAgent[]> {
+	try {
+		const res = await gatewayFetch("/api/staff");
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.staff || data || [];
+	} catch {
+		return [];
+	}
+}
+
+export async function fetchStaffAgent(id: string): Promise<StaffAgent | null> {
+	try {
+		const res = await gatewayFetch(`/api/staff/${id}`);
+		if (!res.ok) return null;
+		return await res.json();
+	} catch {
+		return null;
+	}
+}
+
+export async function createStaffAgent(data: { name: string; description: string; systemPrompt: string; cwd: string; triggers?: any[] }): Promise<StaffAgent | null> {
+	try {
+		const res = await gatewayFetch("/api/staff", {
+			method: "POST",
+			body: JSON.stringify(data),
+		});
+		if (!res.ok) {
+			const d = await res.json().catch(() => ({}));
+			throw new Error(d.error || `Failed: ${res.status}`);
+		}
+		return await res.json();
+	} catch (err) {
+		showConnectionError("Failed to create staff agent", err instanceof Error ? err.message : String(err));
+		return null;
+	}
+}
+
+export async function updateStaffAgent(id: string, updates: Partial<Pick<StaffAgent, "name" | "description" | "systemPrompt" | "cwd" | "state" | "triggers" | "memory">>): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/staff/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(updates),
+		});
+		if (!res.ok) throw new Error(`Failed: ${res.status}`);
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to update staff agent", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
+
+export async function deleteStaffAgent(id: string): Promise<boolean> {
+	try {
+		const res = await gatewayFetch(`/api/staff/${id}`, { method: "DELETE" });
+		if (!res.ok) throw new Error(`Failed: ${res.status}`);
+		return true;
+	} catch (err) {
+		showConnectionError("Failed to delete staff agent", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
+
+export async function wakeStaffAgent(id: string, prompt?: string): Promise<{ sessionId: string } | null> {
+	try {
+		const res = await gatewayFetch(`/api/staff/${id}/wake`, {
+			method: "POST",
+			body: JSON.stringify({ prompt }),
+		});
+		if (!res.ok) throw new Error(`Failed: ${res.status}`);
+		return await res.json();
+	} catch (err) {
+		showConnectionError("Failed to wake staff agent", err instanceof Error ? err.message : String(err));
+		return null;
+	}
+}
+
+export async function fetchStaffSessions(id: string): Promise<GatewaySession[]> {
+	try {
+		const res = await gatewayFetch(`/api/staff/${id}/sessions`);
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.sessions || data || [];
+	} catch {
+		return [];
+	}
+}
+
+// ============================================================================
 // PERSONALITY API
 // ============================================================================
 
@@ -565,40 +673,20 @@ export interface ToolInfo {
 	rendererFile?: string;
 }
 
-export interface FetchToolsResult {
-	tools: ToolInfo[];
-	defaultAllowedTools: string[] | null;
-}
-
-export async function fetchTools(): Promise<FetchToolsResult> {
+export async function fetchTools(): Promise<ToolInfo[]> {
 	try {
 		const res = await gatewayFetch("/api/tools");
 		if (!res.ok) throw new Error(`Failed to fetch tools: ${res.status}`);
 		const data = await res.json();
-		let tools = data.tools || data || [];
+		const tools = data.tools || data || [];
 		// Handle legacy string[] format
 		if (tools.length > 0 && typeof tools[0] === "string") {
-			tools = tools.map((name: string) => ({ name, description: "", group: "Other" }));
+			return tools.map((name: string) => ({ name, description: "", group: "Other" }));
 		}
-		return {
-			tools,
-			defaultAllowedTools: data.defaultAllowedTools ?? null,
-		};
+		return tools;
 	} catch (err) {
 		console.error("[role-api] fetchTools failed:", err);
-		return { tools: [], defaultAllowedTools: null };
-	}
-}
-
-export async function updateDefaultAllowedTools(tools: string[] | null): Promise<boolean> {
-	try {
-		const res = await gatewayFetch("/api/tools/defaults", {
-			method: "PUT",
-			body: JSON.stringify({ defaultAllowedTools: tools }),
-		});
-		return res.ok;
-	} catch {
-		return false;
+		return [];
 	}
 }
 

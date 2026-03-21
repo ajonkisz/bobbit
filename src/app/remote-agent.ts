@@ -88,10 +88,14 @@ export class RemoteAgent {
 	onToolProposal?: (proposal: { tool: string; action: string; content: string }) => void;
 	onPersonalityProposal?: (proposal: { name: string; label: string; description: string; prompt_fragment: string }) => void;
 	onArtifactSpecProposal?: (proposal: { id: string; name: string; description: string; kind: string; format: string; mustHave: string; shouldHave: string; mustNotHave: string; requires: string; suggestedRole: string }) => void;
+	/** Callback fired when a staff proposal is detected in an assistant message. */
+	onStaffProposal?: (proposal: { name: string; description: string; prompt: string; triggers: string; cwd: string }) => void;
 	/** Callback fired when tool execution updates (for real-time progress). */
 	onWorkflowUpdate?: () => void;
 	/** Callback fired when the server-side prompt queue changes. */
 	onQueueUpdate?: (queue: QueuedMessage[]) => void;
+	/** Callback fired when background process state changes. */
+	onBgProcessEvent?: (msg: { type: string; processId?: string; stream?: string; text?: string; ts?: number; exitCode?: number | null; process?: any }) => void;
 	private _title = "New session";
 
 	constructor() {
@@ -650,6 +654,12 @@ export class RemoteAgent {
 			case "queue_update":
 				this._serverQueue = Array.isArray(msg.queue) ? msg.queue : [];
 				this.onQueueUpdate?.(this._serverQueue);
+				break;
+
+			case "bg_process_created":
+			case "bg_process_output":
+			case "bg_process_exited":
+				this.onBgProcessEvent?.(msg as any);
 				break;
 
 			case "error":

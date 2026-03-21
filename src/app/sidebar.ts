@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { ChevronDown, Crosshair, Layers, PanelLeftClose, PanelLeftOpen, Plus, Sparkles, Users, Wrench } from "lucide";
+import { ChevronDown, Crosshair, Layers, PanelLeftClose, PanelLeftOpen, Plus, Sparkles, UserCheck, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -8,6 +8,8 @@ import {
 	expandedGoals,
 	ungroupedExpanded,
 	setUngroupedExpanded,
+	staffSectionExpanded,
+	setStaffSectionExpanded,
 	saveExpandedGoals,
 	toggleTeamLeadExpanded,
 	isTeamLeadExpanded,
@@ -16,7 +18,7 @@ import {
 } from "./state.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
-import { refreshSessions, fetchRoles, fetchPersonalities, type PersonalityData } from "./api.js";
+import { refreshSessions, fetchRoles, fetchPersonalities, fetchStaff, wakeStaffAgent, type PersonalityData } from "./api.js";
 import { statusBobbit, sessionAcronym } from "./session-colors.js";
 import { renderGoalGroup, renderSessionRow, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
@@ -147,6 +149,110 @@ export function toggleSidebar(): void {
 // ============================================================================
 
 // ============================================================================
+// STAFF SIDEBAR
+// ============================================================================
+
+/** Ensure staff list is loaded (called once). */
+let _staffLoaded = false;
+function ensureStaffLoaded(): void {
+	if (_staffLoaded) return;
+	_staffLoaded = true;
+	fetchStaff().then((list) => {
+		state.staffList = list.map((s) => ({
+			id: s.id, name: s.name, description: s.description, state: s.state,
+			lastWakeAt: s.lastWakeAt, currentSessionId: s.currentSessionId, triggers: s.triggers,
+		}));
+		renderApp();
+	});
+}
+
+/** Reload staff list (e.g. after creating one). */
+export function reloadStaffList(): void {
+	fetchStaff().then((list) => {
+		state.staffList = list.map((s) => ({
+			id: s.id, name: s.name, description: s.description, state: s.state,
+			lastWakeAt: s.lastWakeAt, currentSessionId: s.currentSessionId, triggers: s.triggers,
+		}));
+		renderApp();
+	});
+}
+
+function relativeTime(ts?: number): string {
+	if (!ts) return "";
+	const diff = Date.now() - ts;
+	if (diff < 60_000) return "now";
+	if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
+	if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
+	return `${Math.floor(diff / 86_400_000)}d`;
+}
+
+async function createStaffAssistantSession(e: Event): Promise<void> {
+	e.stopPropagation();
+	const { gatewayFetch } = await import("./api.js");
+	try {
+		const res = await gatewayFetch("/api/sessions", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ assistantType: "staff" }),
+		});
+		if (!res.ok) throw new Error(`Failed: ${res.status}`);
+		const { id } = await res.json();
+		await connectToSession(id, false, { isStaffAssistant: true, assistantType: "staff" });
+	} catch (err) {
+		console.error("[staff] Failed to create staff assistant session:", err);
+	}
+}
+
+async function handleStaffClick(agent: typeof state.staffList[0]): Promise<void> {
+	// If the staff agent has a current session, connect to it
+	if (agent.currentSessionId) {
+		const existing = state.gatewaySessions.find((s) => s.id === agent.currentSessionId);
+		if (existing) {
+			await connectToSession(agent.currentSessionId, true);
+			return;
+		}
+	}
+	// Otherwise do a manual wake
+	const result = await wakeStaffAgent(agent.id, "Manual wake from sidebar");
+	if (result?.sessionId) {
+		await refreshSessions();
+		await connectToSession(result.sessionId, false);
+	}
+}
+
+function renderStaffSidebarSection() {
+	ensureStaffLoaded();
+	const list = state.staffList.filter((s) => s.state !== "retired");
+	if (list.length === 0 && !staffSectionExpanded) return "";
+
+	return html`
+		${list.length > 0 || staffSectionExpanded ? html`<div class="border-t border-border/50 my-1.5 mx-1"></div>` : ""}
+		<div class="flex flex-col gap-0.5">
+			<div class="flex items-center gap-1 px-1 py-0.5">
+				<div class="flex-1 flex items-center gap-1 cursor-pointer hover:bg-secondary/30 rounded-md transition-colors"
+					@click=${() => { setStaffSectionExpanded(!staffSectionExpanded); renderApp(); }}>
+					<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${staffSectionExpanded ? "▾" : "▸"}</span>
+					<span class="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Staff</span>
+				</div>
+				<button
+					class="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+					@click=${createStaffAssistantSession}
+					title="New staff agent"
+				>${icon(Plus, "xs")}</button>
+			</div>
+			${staffSectionExpanded ? list.map((agent) => html`
+				<div class="flex items-center gap-1.5 px-2 ${SESSION_ROW_PY} rounded-md hover:bg-secondary/50 cursor-pointer transition-colors"
+					@click=${() => handleStaffClick(agent)}>
+					<span class="w-1.5 h-1.5 rounded-full shrink-0 ${agent.state === "active" ? "bg-green-500" : "bg-yellow-500"}"></span>
+					<span class="flex-1 text-xs truncate text-foreground">${agent.name}</span>
+					${agent.lastWakeAt ? html`<span class="text-[10px] text-muted-foreground shrink-0">${relativeTime(agent.lastWakeAt)}</span>` : ""}
+				</div>
+			`) : ""}
+		</div>
+	`;
+}
+
+// ============================================================================
 // RENDER SIDEBAR
 // ============================================================================
 
@@ -220,6 +326,7 @@ export function renderSidebar() {
 								${i > 0 ? html`<div class="border-t border-border/50 my-1.5 mx-1"></div>` : ""}
 								${renderGoalGroup(goal)}
 							`)}
+							${renderStaffSidebarSection()}
 							${sortedGoals.length > 0 ? html`
 								<div class="border-t border-border/50 my-1.5 mx-1"></div>
 								<div class="flex flex-col gap-0.5">

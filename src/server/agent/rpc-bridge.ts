@@ -39,9 +39,16 @@ export class RpcBridge {
 		if (this.options.systemPromptPath) args.push("--system-prompt", this.options.systemPromptPath);
 		if (this.options.args) args.push(...this.options.args);
 
-		// Enable all built-in tools (including grep, find, ls) unless --tools was explicitly passed
-		if (!args.includes("--tools")) {
-			args.push("--tools", "read,bash,edit,write,grep,find,ls");
+		// Enable all built-in tools EXCEPT bash (which is provided by our custom extension)
+		// unless --tools was explicitly passed (e.g. by role-based tool activation).
+		if (!args.includes("--tools") && !args.includes("--no-tools")) {
+			args.push("--tools", "read,edit,write,grep,find,ls");
+		}
+
+		// Always load the custom bash tool extension (FD-safe bash + bash_bg)
+		const bashExtPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../extensions/bash-tool.ts");
+		if (!args.includes(bashExtPath)) {
+			args.push("--extension", bashExtPath);
 		}
 
 		this.process = spawn("node", [cliPath, ...args], {

@@ -11,4 +11,7 @@ bobbit-screenshot.png
 *-report.html
 nul
 .pi/
-.e2e-pi
+.e2e-pi*
+.e2e-real-pi
+.e2e-ui-pi
+concept/

@@ -215,12 +215,12 @@ src/
 │   ├── storage.ts               # Client-side storage helpers
 │   ├── tool-manager-page.ts     # Tool management UI (list + detail views)
 │   └── tool-manager.css         # Tool management page styles
-├── config/
-│   └── system-prompt.md  # Custom system prompt for agent sessions
-└── docs/
-    ├── dev-workflow.md      # Development workflow guide
-    ├── prompt-queue.md      # Prompt queue architecture
-    └── bobbit-sprites.md    # Bobbit pixel art, animation & accessory system reference
+config/
+└── system-prompt.md  # Custom system prompt for agent sessions
+docs/
+├── dev-workflow.md      # Development workflow guide
+├── prompt-queue.md      # Prompt queue architecture
+└── bobbit-sprites.md    # Bobbit pixel art, animation & accessory system reference
 ```
 
 ## Commands

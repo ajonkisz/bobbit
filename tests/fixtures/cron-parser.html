@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head><title>Cron Parser Tests</title></head>
+<body>
+<script>
+/**
+ * Inline copy of fieldMatches and cronMatches from staff-trigger-engine.ts
+ * for testing in a file:// fixture without a build step.
+ */
+
+function fieldMatches(field, value) {
+	const parts = field.split(",");
+	for (const part of parts) {
+		if (partMatches(part.trim(), value)) return true;
+	}
+	return false;
+}
+
+function partMatches(part, value) {
+	if (part === "*") return true;
+
+	if (part.includes("/")) {
+		const [rangePart, stepStr] = part.split("/");
+		const step = parseInt(stepStr, 10);
+		if (isNaN(step) || step <= 0) return false;
+
+		if (rangePart === "*") {
+			return value % step === 0;
+		}
+
+		if (rangePart.includes("-")) {
+			const [loStr, hiStr] = rangePart.split("-");
+			const lo = parseInt(loStr, 10);
+			const hi = parseInt(hiStr, 10);
+			return value >= lo && value <= hi && (value - lo) % step === 0;
+		}
+
+		// Single value with step — treat like */step
+		return value % step === 0;
+	}
+
+	if (part.includes("-")) {
+		const [loStr, hiStr] = part.split("-");
+		const lo = parseInt(loStr, 10);
+		const hi = parseInt(hiStr, 10);
+		return value >= lo && value <= hi;
+	}
+
+	return parseInt(part, 10) === value;
+}
+
+function cronMatches(expr, date) {
+	const fields = expr.trim().split(/\s+/);
+	if (fields.length !== 5) return false;
+
+	const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+
+	if (!fieldMatches(minute, date.getMinutes())) return false;
+	if (!fieldMatches(hour, date.getHours())) return false;
+	if (!fieldMatches(dayOfMonth, date.getDate())) return false;
+	if (!fieldMatches(month, date.getMonth() + 1)) return false;
+
+	// Day of week: normalize 7 → 0 (both mean Sunday)
+	const dow = date.getDay(); // 0=Sun
+	if (dayOfWeek !== "*") {
+		const normalized = dayOfWeek.replace(/\b7\b/g, "0");
+		if (!fieldMatches(normalized, dow)) return false;
+	}
+
+	return true;
+}
+
+// Expose for Playwright
+window.fieldMatches = fieldMatches;
+window.cronMatches = cronMatches;
+</script>
+</body>
+</html>

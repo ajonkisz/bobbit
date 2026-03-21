@@ -51,14 +51,14 @@ export class BashRenderer implements ToolRenderer<BashParams, undefined> {
 
 		// With result: collapsible command + output
 		if (result && params?.command) {
-			const output =
-				result.content
-					?.filter((c) => c.type === "text")
-					.map((c: any) => c.text)
-					.join("\n") || "";
+			const output = typeof result.content === "string"
+				? result.content
+				: Array.isArray(result.content)
+					? result.content.filter((c) => c.type === "text").map((c: any) => c.text).join("\n")
+					: "";
 			const combined = output ? `> ${params.command}\n\n${output}` : `> ${params.command}`;
-			const images = renderInlineImages(result.content);
-			const hasImages = result.content?.some((c: any) => c.type === "image");
+			const images = Array.isArray(result.content) ? renderInlineImages(result.content) : "";
+			const hasImages = Array.isArray(result.content) && result.content.some((c: any) => c.type === "image");
 			const isDiff = !result.isError && isGitDiff(output);
 
 			const contentRef = createRef<HTMLDivElement>();

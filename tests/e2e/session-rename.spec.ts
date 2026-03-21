@@ -1,19 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
-import { execSync } from "node:child_process";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { readRealE2EToken } from "./e2e-real-setup.js";
 
 /**
  * End-to-end tests for session auto-rename and manual rename with
  * the magic "generate title" wand button.
  *
- * Requires the gateway + vite dev server to be running:
- *   VITE_HOST=localhost node dist/server/cli.js --host localhost --cwd . --no-ui &
- *   VITE_HOST=localhost npx vite --port 5174
- *
- * Or simply:
- *   npx playwright test tests/session-rename.spec.ts --config tests/playwright-e2e.config.ts
+ * Run with:
+ *   npx playwright test tests/e2e/session-rename.spec.ts --config tests/playwright-e2e.config.ts
  */
 
 // ---------------------------------------------------------------------------
@@ -21,10 +14,7 @@ import path from "node:path";
 // ---------------------------------------------------------------------------
 
 function readGatewayToken(): string {
-	const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
-	const token = fs.readFileSync(tokenPath, "utf-8").trim();
-	if (!token || token.length < 64) throw new Error("No valid gateway token found");
-	return token;
+	return readRealE2EToken();
 }
 
 /** Navigate to the app with the auth token so it auto-authenticates. */

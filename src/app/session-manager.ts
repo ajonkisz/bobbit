@@ -322,7 +322,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 
 	state.appView = "authenticated";
 	const route = getRouteFromHash();
-	if (route.view !== "session" && route.view !== "goal-dashboard" && route.view !== "roles" && route.view !== "role-edit") {
+	if (route.view !== "session" && route.view !== "goal-dashboard" && route.view !== "roles" && route.view !== "role-edit" && route.view !== "staff" && route.view !== "staff-edit") {
 		setHashRoute("landing");
 	}
 	renderApp();
@@ -334,7 +334,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 // CONNECT TO SESSION
 // ============================================================================
 
-export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isArtifactSpecAssistant?: boolean; isPreview?: boolean; assistantType?: string }): Promise<void> {
+export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isArtifactSpecAssistant?: boolean; isStaffAssistant?: boolean; isPreview?: boolean; assistantType?: string }): Promise<void> {
 	if (state.connectingSessionId) return;
 	state.connectingSessionId = sessionId;
 
@@ -414,6 +414,25 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		};
 
 		remote.onWorkflowUpdate = () => renderApp();
+
+		remote.onBgProcessEvent = (msg) => {
+			const ai = state.chatPanel?.agentInterface;
+			if (!ai || activeSessionId() !== sessionId) return;
+
+			if (msg.type === "bg_process_created" && msg.process) {
+				// Add the new process to the list
+				ai.bgProcesses = [...ai.bgProcesses, msg.process];
+			} else if (msg.type === "bg_process_output" && msg.processId && msg.text) {
+				// Stream output to the pill
+				const pill = ai.querySelector(`bg-process-pill[data-id="${msg.processId}"]`) as any;
+				if (pill?.appendOutput) pill.appendOutput(msg.text, msg.ts);
+			} else if (msg.type === "bg_process_exited" && msg.processId) {
+				// Update status in the process list
+				ai.bgProcesses = ai.bgProcesses.map((p) =>
+					p.id === msg.processId ? { ...p, status: "exited" as const, exitCode: msg.exitCode ?? null } : p
+				);
+			}
+		};
 
 		remote.onGoalProposal = (proposal) => {
 			state.activeGoalProposal = proposal;
@@ -546,6 +565,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			: options?.isRoleAssistant || sessionData?.roleAssistant ? "role"
 			: options?.isToolAssistant || sessionData?.toolAssistant ? "tool"
 			: options?.isArtifactSpecAssistant || sessionData?.artifactSpecAssistant ? "artifact-spec"
+			: options?.isStaffAssistant || sessionData?.staffAssistant ? "staff"
 			: null);
 		state.assistantTab = "chat";
 		state.assistantHasProposal = false;
@@ -596,8 +616,19 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			}
 		}
 
-		// Initial git status fetch
+		// Set up bg process kill/dismiss handlers
+		if (state.chatPanel.agentInterface) {
+			state.chatPanel.agentInterface.onBgProcessKill = (processId: string) => {
+				killBgProcess(sessionId, processId);
+			};
+			state.chatPanel.agentInterface.onBgProcessDismiss = (processId: string) => {
+				dismissBgProcess(sessionId, processId);
+			};
+		}
+
+		// Initial git status and bg process fetch
 		refreshGitStatusForSession(sessionId);
+		refreshBgProcessesForSession(sessionId);
 
 		if (isExisting) {
 			remote.requestMessages();
@@ -712,6 +743,26 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			}
 		}
 
+		// Clear staff proposal when connecting to a non-staff-assistant session
+		if (state.assistantType !== "staff") {
+			state.activeStaffProposal = null;
+		}
+
+		if (state.assistantType === "staff") {
+			state.assistantTab = "chat";
+			state.staffPreviewName = "";
+			state.staffPreviewDescription = "";
+			state.staffPreviewPrompt = "";
+			state.staffPreviewTriggers = "[]";
+			state.staffPreviewCwd = "";
+			state.staffPreviewNameEdited = false;
+			state.staffPreviewDescriptionEdited = false;
+			state.staffPreviewPromptEdited = false;
+			state.staffPreviewTriggersEdited = false;
+			state.staffPreviewCwdEdited = false;
+			state.assistantHasProposal = false;
+		}
+
 		// Auto-prompt for new assistant sessions
 		const AUTO_PROMPTS: Record<string, string> = {
 			goal: "Start the goal creation session.",
@@ -719,6 +770,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			tool: "Start the tool assistant session. Help me document, improve, or create tools.",
 			"artifact-spec": "Start the artifact spec creation session.",
 			personality: "Start the personality creation session.",
+			staff: "Start the staff agent creation session.",
 		};
 		if (state.assistantType && !isExisting) {
 			const autoPrompt = AUTO_PROMPTS[state.assistantType];
@@ -861,6 +913,37 @@ export function disconnectGateway(): void {
 // ============================================================================
 // GIT STATUS
 // ============================================================================
+
+async function refreshBgProcessesForSession(sessionId: string): Promise<void> {
+	const ai = state.chatPanel?.agentInterface;
+	if (!ai) return;
+	try {
+		const res = await gatewayFetch(`/api/sessions/${sessionId}/bg-processes`);
+		if (res.ok && activeSessionId() === sessionId) {
+			const data = await res.json();
+			ai.bgProcesses = data.processes || [];
+		}
+	} catch { /* ignore */ }
+}
+
+async function killBgProcess(sessionId: string, processId: string): Promise<void> {
+	try {
+		await gatewayFetch(`/api/sessions/${sessionId}/bg-processes/${processId}`, { method: "DELETE" });
+		// Refresh the list after kill
+		refreshBgProcessesForSession(sessionId);
+	} catch { /* ignore */ }
+}
+
+async function dismissBgProcess(sessionId: string, processId: string): Promise<void> {
+	// Optimistically remove from UI
+	const ai = state.chatPanel?.agentInterface;
+	if (ai) {
+		ai.bgProcesses = ai.bgProcesses.filter((p) => p.id !== processId);
+	}
+	try {
+		await gatewayFetch(`/api/sessions/${sessionId}/bg-processes/${processId}`, { method: "DELETE" });
+	} catch { /* ignore */ }
+}
 
 async function refreshGitStatusForSession(sessionId: string): Promise<void> {
 	const ai = state.chatPanel?.agentInterface;

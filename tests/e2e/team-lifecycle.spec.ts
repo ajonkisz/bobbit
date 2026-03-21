@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test";
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { readE2EToken, BASE as GW_URL } from "./e2e-setup.js";
 
 /**
  * End-to-end tests for team and goal session lifecycle.
@@ -18,14 +17,6 @@ import path from "node:path";
 // Helpers
 // ---------------------------------------------------------------------------
 
-const GW_URL = "http://localhost:3001";
-
-function readGatewayToken(): string {
-	const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
-	const token = fs.readFileSync(tokenPath, "utf-8").trim();
-	if (!token || token.length < 64) throw new Error("No valid gateway token found");
-	return token;
-}
 
 function headers(token: string): Record<string, string> {
 	return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -171,7 +162,7 @@ test.describe("Team & Goal Session Lifecycle", () => {
 	const cleanupSessionIds: string[] = [];
 
 	test.beforeAll(() => {
-		token = readGatewayToken();
+		token = readE2EToken();
 	});
 
 	test.afterAll(async () => {

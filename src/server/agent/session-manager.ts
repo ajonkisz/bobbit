@@ -55,6 +55,8 @@ export interface SessionInfo {
 	worktreePath?: string;
 	/** Task ID this session is working on */
 	taskId?: string;
+	/** Staff agent ID this session belongs to */
+	staffId?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory?: string;
 	/** Personality names */
@@ -552,6 +554,7 @@ export class SessionManager {
 			teamGoalId: ps.teamGoalId,
 			worktreePath: ps.worktreePath,
 			taskId: ps.taskId,
+			staffId: ps.staffId,
 			accessory: ps.accessory,
 			preview: ps.preview,
 			personalities: ps.personalities,
@@ -631,14 +634,8 @@ export class SessionManager {
 			bridgeOptions.env = { ...bridgeOptions.env, BOBBIT_GOAL_ID: goalId };
 		}
 
-		// Determine tool restrictions: explicit role tools > default allowed tools > General role > no restriction
+		// Determine tool restrictions: explicit role tools > General role > no restriction
 		let effectiveAllowedTools = opts?.allowedTools;
-		if (!effectiveAllowedTools && this.toolManager) {
-			const defaults = this.toolManager.getDefaultAllowedTools();
-			if (defaults && defaults.length > 0) {
-				effectiveAllowedTools = defaults;
-			}
-		}
 		if (!effectiveAllowedTools && this.roleManager) {
 			const generalRole = this.roleManager.getRole("general");
 			if (generalRole && generalRole.allowedTools.length > 0) {
@@ -972,6 +969,7 @@ export class SessionManager {
 			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
+			staffId: session.staffId,
 			accessory: session.accessory,
 			preview: session.preview,
 			personalities: session.personalities,
@@ -1002,6 +1000,7 @@ export class SessionManager {
 		teamGoalId?: string;
 		worktreePath?: string;
 		taskId?: string;
+		staffId?: string;
 		accessory?: string;
 		preview?: boolean;
 		personalities?: string[];
@@ -1027,6 +1026,7 @@ export class SessionManager {
 			teamGoalId: s.teamGoalId,
 			worktreePath: s.worktreePath,
 			taskId: s.taskId,
+			staffId: s.staffId,
 			accessory: s.accessory,
 			preview: s.preview,
 			personalities: s.personalities,
@@ -1372,6 +1372,11 @@ export class SessionManager {
 		session.unsubscribe();
 		await session.rpcClient.stop();
 		session.status = "terminated";
+
+		// Clean up background processes
+		if ((this as any).bgProcessManager) {
+			(this as any).bgProcessManager.cleanup(id);
+		}
 
 		for (const client of session.clients) {
 			client.close(1000, "Session terminated");

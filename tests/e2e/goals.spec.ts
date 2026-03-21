@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { readE2EToken, E2E_PI_DIR } from "./e2e-setup.js";
+import { readE2EToken, E2E_PI_DIR, BASE } from "./e2e-setup.js";
 
 /**
  * End-to-end tests for creating, editing, and using goals.
@@ -129,7 +129,7 @@ async function apiDeleteSession(baseUrl: string, token: string, id: string): Pro
 // REST API tests
 // ---------------------------------------------------------------------------
 
-const GW_URL = "http://127.0.0.1:3099";
+const GW_URL = BASE;
 
 test.describe("Goals — REST API", () => {
 	let token: string;

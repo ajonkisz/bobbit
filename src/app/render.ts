@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, Layers, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, Users, Wrench } from "lucide";
+import { ArrowLeft, ChevronDown, ChevronRight, Crosshair, Layers, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, UserCheck, Users, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -39,6 +39,7 @@ import { renderArtifactSpecPage } from "./artifact-spec-page.js";
 import "./artifact-spec.css";
 import { renderPersonalityManagerPage } from "./personality-manager-page.js";
 import "./personality-manager.css";
+import { renderStaffPage } from "./staff-page.js";
 
 // ============================================================================
 // MOBILE LANDING PAGE
@@ -71,6 +72,10 @@ function renderMobileLanding() {
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
 						${icon(Sparkles, "xs")} Personalities
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./staff-page.js").then((m) => m.loadStaffPageData()); setHashRoute("staff"); }}>
+						${icon(UserCheck, "xs")} Staff
 					</button>
 					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 						@click=${() => showGoalDialog()}>
@@ -313,7 +318,7 @@ let _toolsLoaded = false;
 function ensureToolsLoaded(): void {
 	if (_toolsLoaded) return;
 	_toolsLoaded = true;
-	fetchTools().then((result) => { _availableTools = result.tools; renderApp(); });
+	fetchTools().then((tools) => { _availableTools = tools; renderApp(); });
 }
 
 function rolePreviewPanel() {
@@ -725,6 +730,144 @@ function artifactSpecPreviewPanel() {
 }
 
 // ============================================================================
+// STAFF PREVIEW PANEL (staff assistant split-screen)
+// ============================================================================
+
+import { createStaffAgent } from "./api.js";
+import { reloadStaffList } from "./sidebar.js";
+
+function staffPreviewPanel() {
+	const handleCreateStaff = async () => {
+		const trimmedName = state.staffPreviewName.trim();
+		if (!trimmedName) return;
+		const sessionId = activeSessionId();
+		if (state.remoteAgent) {
+			state.remoteAgent.disconnect();
+			state.remoteAgent = null;
+			state.connectionStatus = "disconnected";
+		}
+		state.assistantType = null;
+		state.activeStaffProposal = null;
+		localStorage.removeItem("gateway.sessionId");
+		setHashRoute("landing");
+		state.appView = "authenticated";
+
+		let triggers: any[] = [];
+		try {
+			triggers = JSON.parse(state.staffPreviewTriggers);
+		} catch { /* keep empty */ }
+
+		await createStaffAgent({
+			name: trimmedName,
+			description: state.staffPreviewDescription,
+			systemPrompt: state.staffPreviewPrompt,
+			cwd: state.staffPreviewCwd,
+			triggers,
+		});
+		if (sessionId) {
+			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+			clearSessionModel(sessionId);
+		}
+		reloadStaffList();
+		await refreshSessions();
+		renderApp();
+	};
+
+	const handleCancel = () => {
+		backToSessions();
+	};
+
+	return html`
+		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
+			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Name</label>
+					${Input({
+						type: "text",
+						value: state.staffPreviewName,
+						placeholder: "Staff agent name",
+						onInput: (e: Event) => {
+							state.staffPreviewName = (e.target as HTMLInputElement).value;
+							state.staffPreviewNameEdited = true;
+						},
+					})}
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Description</label>
+					<textarea
+						class="w-full p-2 text-sm rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+						rows="2"
+						placeholder="What does this staff agent do?"
+						.value=${state.staffPreviewDescription}
+						@input=${(e: Event) => {
+							state.staffPreviewDescription = (e.target as HTMLTextAreaElement).value;
+							state.staffPreviewDescriptionEdited = true;
+						}}
+					></textarea>
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Working Directory</label>
+					${Input({
+						type: "text",
+						value: state.staffPreviewCwd,
+						placeholder: "(server default)",
+						onInput: (e: Event) => {
+							state.staffPreviewCwd = (e.target as HTMLInputElement).value;
+							state.staffPreviewCwdEdited = true;
+						},
+					})}
+				</div>
+				<div class="flex-1 flex flex-col min-h-0">
+					<div class="flex items-center justify-between mb-1.5">
+						<label class="text-xs text-muted-foreground font-medium">System Prompt</label>
+						<button
+							class="text-[10px] px-2 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+							@click=${() => { state.staffPreviewPromptEditMode = !state.staffPreviewPromptEditMode; renderApp(); }}
+						>
+							${state.staffPreviewPromptEditMode ? "Preview" : "Edit"}
+						</button>
+					</div>
+					${state.staffPreviewPromptEditMode
+						? html`<textarea
+								class="flex-1 min-h-[150px] p-3 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+								.value=${state.staffPreviewPrompt}
+								@input=${(e: Event) => {
+									state.staffPreviewPrompt = (e.target as HTMLTextAreaElement).value;
+									state.staffPreviewPromptEdited = true;
+								}}
+							></textarea>`
+						: html`<div class="flex-1 min-h-[150px] p-3 rounded-md border border-border bg-secondary/30 overflow-y-auto text-sm">
+								<markdown-block .content=${state.staffPreviewPrompt || "_No prompt content yet_"}></markdown-block>
+							</div>`
+					}
+				</div>
+				<div>
+					<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Triggers (JSON)</label>
+					<textarea
+						class="w-full p-2 text-sm font-mono rounded-md border border-border bg-background text-foreground resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+						rows="4"
+						.value=${state.staffPreviewTriggers}
+						@input=${(e: Event) => {
+							state.staffPreviewTriggers = (e.target as HTMLTextAreaElement).value;
+							state.staffPreviewTriggersEdited = true;
+						}}
+					></textarea>
+				</div>
+			</div>
+			<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+				${Button({ variant: "ghost", onClick: handleCancel, children: "Cancel" })}
+				${Button({
+					variant: "default",
+					onClick: handleCreateStaff,
+					disabled: !state.staffPreviewName.trim(),
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(UserCheck, "sm")} Create Staff</span>`,
+				})}
+			</div>
+		</div>
+	`;
+}
+
+// ============================================================================
 // ASSISTANT PREVIEW DISPATCH
 // ============================================================================
 
@@ -862,6 +1005,7 @@ function getAssistantPreviewPanel(type: string) {
 		case "tool": return toolPreviewPanel();
 		case "artifact-spec": return artifactSpecPreviewPanel();
 		case "personality": return personalityPreviewPanel();
+		case "staff": return staffPreviewPanel();
 		default: return "";
 	}
 }
@@ -1255,6 +1399,10 @@ export function doRenderApp(): void {
 		}
 		if (route.view === "personalities" || route.view === "personality-edit") {
 			return renderPersonalityManagerPage();
+		}
+
+		if (route.view === "staff" || route.view === "staff-edit") {
+			return renderStaffPage();
 		}
 
 		if (connected && state.assistantType) {

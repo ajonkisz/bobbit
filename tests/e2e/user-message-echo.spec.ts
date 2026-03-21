@@ -9,10 +9,7 @@
  */
 import { test, expect } from "@playwright/test";
 import WebSocket from "ws";
-import { readE2EToken } from "./e2e-setup.js";
-
-const BASE = "http://127.0.0.1:3099";
-const WS_BASE = "ws://127.0.0.1:3099";
+import { readE2EToken, BASE, WS_BASE } from "./e2e-setup.js";
 const TOKEN = readE2EToken();
 
 async function createSession(): Promise<string> {

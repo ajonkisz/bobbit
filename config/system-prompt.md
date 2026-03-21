@@ -176,6 +176,8 @@ The filter outputs just pass/fail counts + failure details. Use `--verbose` to s
 
 There are no flaky tests. Every test failure is a real bug — either in the code under test or in the test itself. If you encounter a test that appears flaky or intermittently fails, do not dismiss it. Stop, investigate the root cause, and fix it before moving on.
 
+Even if a test fails due to infrastructure reasons (timeouts, network issues, port conflicts, missing dependencies), it is our job to resolve it. Keeping the tests green is critical. Fix the infrastructure, adjust timeouts, add retries for network-dependent tests, or restructure the test to be more resilient — whatever it takes to make the suite reliably pass.
+
 If you add a new feature or fix a bug, add or update tests. E2E tests go in `tests/e2e/`. Unit-style tests go in `tests/`.
 
 ## Goal suggestions

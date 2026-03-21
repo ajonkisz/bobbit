@@ -21,9 +21,12 @@ import { PersonalityStore } from "./agent/personality-store.js";
 import { PersonalityManager } from "./agent/personality-manager.js";
 
 import type { TaskState } from "./agent/task-store.js";
+import { BgProcessManager } from "./agent/bg-process-manager.js";
 import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
 import { ArtifactSpecStore } from "./agent/artifact-spec-store.js";
 import { ArtifactSpecManager } from "./agent/artifact-spec-manager.js";
+import { StaffManager } from "./agent/staff-manager.js";
+import { TriggerEngine } from "./agent/staff-trigger-engine.js";
 
 const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
 
@@ -69,6 +72,9 @@ export function createGateway(config: GatewayConfig) {
 	const goalArtifactStore = new GoalArtifactStore();
 	const artifactSpecStore = new ArtifactSpecStore();
 	const artifactSpecManager = new ArtifactSpecManager(artifactSpecStore);
+	const staffManager = new StaffManager();
+	const triggerEngine = new TriggerEngine(staffManager, sessionManager);
+	triggerEngine.start();
 	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
@@ -76,6 +82,12 @@ export function createGateway(config: GatewayConfig) {
 		goalArtifactStore,
 		personalityManager,
 	});
+	const bgProcessManager = new BgProcessManager((sessionId: string) => {
+		const session = sessionManager.getSession(sessionId);
+		return session?.clients;
+	});
+	// Expose bg process manager for API routes and session cleanup
+	(sessionManager as any).bgProcessManager = bgProcessManager;
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
 
@@ -115,7 +127,8 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, personalityManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, personalityManager, bgProcessManager, staffManager);
+
 			return;
 		}
 
@@ -174,6 +187,7 @@ export function createGateway(config: GatewayConfig) {
 		},
 		async shutdown() {
 			clearInterval(cleanupInterval);
+			triggerEngine.stop();
 			wss.close();
 			await sessionManager.shutdown();
 			server.close();
@@ -194,6 +208,8 @@ async function handleApiRoute(
 	goalArtifactStore: GoalArtifactStore,
 	artifactSpecManager: ArtifactSpecManager,
 	personalityManager: PersonalityManager,
+	bgProcessManager: BgProcessManager,
+	staffManager: StaffManager,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -264,6 +280,7 @@ async function handleApiRoute(
 			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
+			staffId: session.staffId,
 			colorIndex: colorStore.get(session.id),
 			preview: session.preview,
 			personalities: session.personalities,
@@ -463,29 +480,8 @@ async function handleApiRoute(
 
 	// GET /api/tools — list available agent tools
 	if (url.pathname === "/api/tools" && req.method === "GET") {
-		json({ tools: toolManager.getAvailableTools(), defaultAllowedTools: toolManager.getDefaultAllowedTools() });
+		json({ tools: toolManager.getAvailableTools() });
 		return;
-	}
-
-	// GET/PUT /api/tools/defaults — manage default allowed tools for no-role sessions
-	if (url.pathname === "/api/tools/defaults") {
-		if (req.method === "GET") {
-			json({ defaultAllowedTools: toolManager.getDefaultAllowedTools() });
-			return;
-		}
-		if (req.method === "PUT") {
-			const body = await readBody(req);
-			if (!body) { json({ error: "Missing body" }, 400); return; }
-			// body.defaultAllowedTools: string[] | null
-			const tools = body.defaultAllowedTools;
-			if (tools !== null && !Array.isArray(tools)) {
-				json({ error: "defaultAllowedTools must be an array of tool names or null" }, 400);
-				return;
-			}
-			toolManager.setDefaultAllowedTools(tools);
-			json({ ok: true, defaultAllowedTools: tools });
-			return;
-		}
 	}
 
 	// Routes with tool :name parameter
@@ -1686,6 +1682,152 @@ async function handleApiRoute(
 			: path.join(piDir(), "preview.html");
 		fs.writeFileSync(previewPath, body?.html || "", "utf-8");
 		json({ ok: true });
+		return;
+	}
+
+	// ── Background process endpoints ──────────────────────────────
+
+	// POST /api/sessions/:id/bg-processes — create a background process
+	const bgCreateMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/bg-processes$/);
+	if (bgCreateMatch && req.method === "POST") {
+		const id = bgCreateMatch[1];
+		const session = sessionManager.getSession(id);
+		if (!session) { json({ error: "Session not found" }, 404); return; }
+		const body = await readBody(req);
+		if (!body?.command) { json({ error: "command is required" }, 400); return; }
+		const info = bgProcessManager.create(id, body.command, session.cwd);
+		json(info, 201);
+		return;
+	}
+
+	// GET /api/sessions/:id/bg-processes — list background processes
+	if (bgCreateMatch && req.method === "GET") {
+		const id = bgCreateMatch[1];
+		json({ processes: bgProcessManager.list(id) });
+		return;
+	}
+
+	// GET /api/sessions/:id/bg-processes/:pid/logs — get logs
+	const bgLogsMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/bg-processes\/([^/]+)\/logs$/);
+	if (bgLogsMatch && req.method === "GET") {
+		const [, sessionId, processId] = bgLogsMatch;
+		const logs = bgProcessManager.getLogs(sessionId, processId);
+		if (!logs) { json({ error: "Process not found" }, 404); return; }
+		const tail = parseInt(url.searchParams.get("tail") || "200", 10);
+		json({
+			log: logs.log.slice(-tail),
+			stdout: logs.stdout.slice(-tail),
+			stderr: logs.stderr.slice(-tail),
+		});
+		return;
+	}
+
+	// DELETE /api/sessions/:id/bg-processes/:pid — kill or remove a background process
+	const bgKillMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/bg-processes\/([^/]+)$/);
+	if (bgKillMatch && req.method === "DELETE") {
+		const [, sessionId, processId] = bgKillMatch;
+		// Try kill first (running), then remove (exited)
+		const killed = bgProcessManager.kill(sessionId, processId);
+		if (!killed) {
+			const removed = bgProcessManager.remove(sessionId, processId);
+			if (!removed) { json({ error: "Process not found" }, 404); return; }
+		}
+		json({ ok: true });
+		return;
+	}
+	// ── Staff endpoints ────────────────────────────────────────────
+
+	// GET /api/staff
+	if (url.pathname === "/api/staff" && req.method === "GET") {
+		json({ staff: staffManager.listStaff() });
+		return;
+	}
+
+	// POST /api/staff
+	if (url.pathname === "/api/staff" && req.method === "POST") {
+		const body = await readBody(req);
+		if (!body?.name || typeof body.name !== "string") {
+			json({ error: "Missing name" }, 400);
+			return;
+		}
+		if (!body?.systemPrompt || typeof body.systemPrompt !== "string") {
+			json({ error: "Missing systemPrompt" }, 400);
+			return;
+		}
+		const cwd = body.cwd || config.defaultCwd;
+		const staff = staffManager.createStaff(
+			body.name,
+			body.description || "",
+			body.systemPrompt,
+			cwd,
+			{ triggers: body.triggers, roleId: body.roleId },
+		);
+		json(staff, 201);
+		return;
+	}
+
+	// Routes with staff :id parameter
+	const staffMatch = url.pathname.match(/^\/api\/staff\/([^/]+)$/);
+	if (staffMatch) {
+		const id = staffMatch[1];
+
+		if (req.method === "GET") {
+			const staff = staffManager.getStaff(id);
+			if (!staff) { json({ error: "Staff agent not found" }, 404); return; }
+			json(staff);
+			return;
+		}
+
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			const ok = staffManager.updateStaff(id, {
+				name: body.name,
+				description: body.description,
+				systemPrompt: body.systemPrompt,
+				cwd: body.cwd,
+				state: body.state,
+				triggers: body.triggers,
+				memory: body.memory,
+				roleId: body.roleId,
+			});
+			if (!ok) { json({ error: "Staff agent not found" }, 404); return; }
+			json(staffManager.getStaff(id));
+			return;
+		}
+
+		if (req.method === "DELETE") {
+			const ok = staffManager.deleteStaff(id);
+			if (!ok) { json({ error: "Staff agent not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
+	}
+
+	// POST /api/staff/:id/wake — manually trigger a wake cycle
+	const staffWakeMatch = url.pathname.match(/^\/api\/staff\/([^/]+)\/wake$/);
+	if (staffWakeMatch && req.method === "POST") {
+		const id = staffWakeMatch[1];
+		const staff = staffManager.getStaff(id);
+		if (!staff) { json({ error: "Staff agent not found" }, 404); return; }
+		const body = await readBody(req);
+		try {
+			const sessionId = await staffManager.wake(id, body?.prompt, sessionManager);
+			json({ sessionId }, 201);
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
+		return;
+	}
+
+	// GET /api/staff/:id/sessions — list sessions for a staff agent
+	const staffSessionsMatch = url.pathname.match(/^\/api\/staff\/([^/]+)\/sessions$/);
+	if (staffSessionsMatch && req.method === "GET") {
+		const id = staffSessionsMatch[1];
+		const staff = staffManager.getStaff(id);
+		if (!staff) { json({ error: "Staff agent not found" }, 404); return; }
+		const sessions = staffManager.getSessionsByStaffId(id, sessionManager);
+		json({ sessions });
 		return;
 	}
 

@@ -34,7 +34,7 @@ function getGroupableToolName(msg: AssistantMessageType): string | null {
 
 /** Extract all ToolCall objects from an assistant message */
 function getToolCalls(msg: AssistantMessageType): ToolCall[] {
-	return msg.content.filter((c): c is ToolCall => c.type === "toolCall");
+	return (msg.content ?? []).filter((c): c is ToolCall => c.type === "toolCall");
 }
 
 export class MessageList extends LitElement {

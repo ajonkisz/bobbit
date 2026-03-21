@@ -14,7 +14,7 @@ import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import WebSocket from "ws";
-import { readE2EToken } from "./e2e-setup.js";
+import { readE2EToken, BASE, WS_BASE } from "./e2e-setup.js";
 
 // ---------------------------------------------------------------------------
 // Config — agent tool tests need much longer timeouts
@@ -25,8 +25,6 @@ test.setTimeout(120_000);
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BASE = "http://127.0.0.1:3099";
-const WS_BASE = "ws://127.0.0.1:3099";
 const TOKEN = readE2EToken();
 
 /** Authenticated REST helper */
@@ -753,21 +751,25 @@ test.describe.serial("Agent tools", () => {
 		}
 	});
 
-	test("web_search tool", async () => {
+	// web_search, web_fetch, and delegate come from user extensions (~/.pi/extensions/)
+	// which are not present in the sandboxed E2E test environment (BOBBIT_PI_DIR).
+	// These tests are skipped here; they can be run manually against a full dev server.
+
+	test.skip("web_search tool — requires user extensions", async () => {
 		await verifyToolUsed(
 			'Use the web_search tool to search for "Playwright test framework". Just do the search and briefly report results.',
 			"web_search",
 		);
 	});
 
-	test("web_fetch tool", async () => {
+	test.skip("web_fetch tool — requires user extensions", async () => {
 		await verifyToolUsed(
 			"Use the web_fetch tool to fetch the URL https://httpbin.org/get and show me the response.",
 			"web_fetch",
 		);
 	});
 
-	test("delegate tool", async () => {
+	test.skip("delegate tool — requires user extensions", async () => {
 		await verifyToolUsed(
 			'Use the delegate tool to run this task in a separate agent process: "Run echo DELEGATE_OK using bash and report the output." You must use the delegate tool.',
 			"delegate",

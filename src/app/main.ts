@@ -160,6 +160,32 @@ async function handleHashChange(): Promise<void> {
 			await loadArtifactSpecPageData();
 			navigateToArtifactSpecEdit(route.artifactSpecId);
 			await refreshSessions();
+		} else if (route.view === "staff") {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadStaffPageData } = await import("./staff-page.js");
+			loadStaffPageData();
+			renderApp();
+			await refreshSessions();
+		} else if (route.view === "staff-edit" && route.staffId) {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadStaffPageData, navigateToStaffEdit } = await import("./staff-page.js");
+			await loadStaffPageData();
+			navigateToStaffEdit(route.staffId);
+			await refreshSessions();
 		} else if (route.view === "personalities") {
 			clearDashboardState();
 			if (state.remoteAgent) {
@@ -258,6 +284,13 @@ async function initApp() {
 				const { loadToolPageData, navigateToToolEdit } = await import("./tool-manager-page.js");
 				await loadToolPageData();
 				navigateToToolEdit(route.toolName);
+			} else if (route.view === "staff") {
+				const { loadStaffPageData } = await import("./staff-page.js");
+				loadStaffPageData();
+			} else if (route.view === "staff-edit" && route.staffId) {
+				const { loadStaffPageData, navigateToStaffEdit } = await import("./staff-page.js");
+				await loadStaffPageData();
+				navigateToStaffEdit(route.staffId);
 			} else if (route.view === "personalities") {
 				const { loadPersonalityPageData } = await import("./personality-manager-page.js");
 				loadPersonalityPageData();

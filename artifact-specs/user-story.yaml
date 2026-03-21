@@ -1,0 +1,21 @@
+id: user-story
+name: User Story Document
+description: Expanded analysis of user needs, behaviours, and acceptance criteria for a feature or change area.
+kind: analysis
+format: markdown
+mustHave:
+  - User persona or role identification (who is affected by this change)
+  - User story statements in "As a [role], I want [capability] so that [benefit]" format for each distinct need
+  - Acceptance criteria for each story (specific, testable conditions)
+  - Current behaviour vs expected behaviour for affected workflows
+  - Edge cases and error states from the user's perspective
+shouldHave:
+  - Priority ranking of stories (must-have vs nice-to-have)
+  - User journey or workflow description showing how stories connect
+  - Impact assessment on existing users and workflows
+mustNotHave:
+  - Implementation details or technical architecture (that belongs in a design doc)
+  - Stories without acceptance criteria
+  - Generic or untestable acceptance criteria like "it should work well"
+createdAt: 1774108374636
+updatedAt: 1774108374636
