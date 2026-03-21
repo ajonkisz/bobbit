@@ -10,6 +10,7 @@ import {
 import { CommandHistoryStore } from "../ui/storage/stores/command-history-store.js";
 import { GoalDraftStore } from "../ui/storage/stores/goal-draft-store.js";
 import { RoleDraftStore } from "../ui/storage/stores/role-draft-store.js";
+import { SpecDraftStore } from "../ui/storage/stores/spec-draft-store.js";
 
 const settings = new SettingsStore();
 const providerKeys = new ProviderKeysStore();
@@ -17,11 +18,12 @@ const sessions = new SessionsStore();
 const customProviders = new CustomProvidersStore();
 const goalDrafts = new GoalDraftStore();
 const roleDrafts = new RoleDraftStore();
+const specDrafts = new SpecDraftStore();
 const commandHistory = new CommandHistoryStore();
 
 const backend = new IndexedDBStorageBackend({
 	dbName: "pi-gateway-ui",
-	version: 4,
+	version: 5,
 	stores: [
 		settings.getConfig(),
 		SessionsStore.getMetadataConfig(),
@@ -30,6 +32,7 @@ const backend = new IndexedDBStorageBackend({
 		sessions.getConfig(),
 		goalDrafts.getConfig(),
 		roleDrafts.getConfig(),
+		specDrafts.getConfig(),
 		commandHistory.getConfig(),
 	],
 });
@@ -40,7 +43,8 @@ customProviders.setBackend(backend);
 sessions.setBackend(backend);
 goalDrafts.setBackend(backend);
 roleDrafts.setBackend(backend);
+specDrafts.setBackend(backend);
 commandHistory.setBackend(backend);
 
-export const storage = new AppStorage(settings, providerKeys, sessions, customProviders, goalDrafts, roleDrafts, commandHistory, backend);
+export const storage = new AppStorage(settings, providerKeys, sessions, customProviders, goalDrafts, roleDrafts, specDrafts, commandHistory, backend);
 setAppStorage(storage);

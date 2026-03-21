@@ -2,6 +2,7 @@ import { ChatPanel } from "../ui/index.js";
 import { startPreviewPolling, stopPreviewPolling } from "./preview-panel.js";
 import type { GoalDraft } from "../ui/storage/stores/goal-draft-store.js";
 import type { RoleDraft } from "../ui/storage/stores/role-draft-store.js";
+import type { SpecDraft } from "../ui/storage/stores/spec-draft-store.js";
 import type { ConnectionStatus } from "./remote-agent.js";
 import { RemoteAgent } from "./remote-agent.js";
 import {
@@ -147,6 +148,93 @@ async function restoreRoleDraft(sessionId: string): Promise<boolean> {
 export function deleteRoleDraft(sessionId: string): void {
 	storage.roleDrafts.deleteDraft(sessionId).catch((err) => {
 		console.error("[role-draft] Failed to delete draft:", err);
+	});
+}
+
+// ============================================================================
+// SPEC DRAFT PERSISTENCE HELPERS
+// ============================================================================
+
+/** Debounce timer for spec draft saves. */
+let _specDraftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Save the current spec assistant preview state to IndexedDB (debounced 300ms). */
+export function saveSpecDraft(sessionId: string): void {
+	if (_specDraftSaveTimer) clearTimeout(_specDraftSaveTimer);
+	_specDraftSaveTimer = setTimeout(() => {
+		_specDraftSaveTimer = null;
+		const draft: SpecDraft = {
+			sessionId,
+			activeArtifactSpecProposal: state.activeArtifactSpecProposal ?? undefined,
+			specPreviewId: state.specPreviewId,
+			specPreviewName: state.specPreviewName,
+			specPreviewDescription: state.specPreviewDescription,
+			specPreviewKind: state.specPreviewKind,
+			specPreviewFormat: state.specPreviewFormat,
+			specPreviewMustHave: state.specPreviewMustHave,
+			specPreviewShouldHave: state.specPreviewShouldHave,
+			specPreviewMustNotHave: state.specPreviewMustNotHave,
+			specPreviewRequires: state.specPreviewRequires,
+			specPreviewSuggestedRole: state.specPreviewSuggestedRole,
+			specPreviewIdEdited: state.specPreviewIdEdited,
+			specPreviewNameEdited: state.specPreviewNameEdited,
+			specPreviewDescriptionEdited: state.specPreviewDescriptionEdited,
+			specPreviewKindEdited: state.specPreviewKindEdited,
+			specPreviewFormatEdited: state.specPreviewFormatEdited,
+			specPreviewMustHaveEdited: state.specPreviewMustHaveEdited,
+			specPreviewShouldHaveEdited: state.specPreviewShouldHaveEdited,
+			specPreviewMustNotHaveEdited: state.specPreviewMustNotHaveEdited,
+			specPreviewRequiresEdited: state.specPreviewRequiresEdited,
+			specPreviewSuggestedRoleEdited: state.specPreviewSuggestedRoleEdited,
+			hasReceivedSpecProposal: state.assistantHasProposal,
+			assistantTab: state.assistantTab,
+		};
+		storage.specDrafts.saveDraft(draft).catch((err) => {
+			console.error("[spec-draft] Failed to save draft:", err);
+		});
+	}, 300);
+}
+
+/** Restore spec assistant preview state from IndexedDB. Returns true if a draft was found. */
+async function restoreSpecDraft(sessionId: string): Promise<boolean> {
+	try {
+		const draft = await storage.specDrafts.getDraft(sessionId);
+		if (!draft) return false;
+
+		state.activeArtifactSpecProposal = draft.activeArtifactSpecProposal ?? null;
+		state.specPreviewId = draft.specPreviewId ?? "";
+		state.specPreviewName = draft.specPreviewName ?? "";
+		state.specPreviewDescription = draft.specPreviewDescription ?? "";
+		state.specPreviewKind = draft.specPreviewKind ?? "analysis";
+		state.specPreviewFormat = draft.specPreviewFormat ?? "markdown";
+		state.specPreviewMustHave = draft.specPreviewMustHave ?? "";
+		state.specPreviewShouldHave = draft.specPreviewShouldHave ?? "";
+		state.specPreviewMustNotHave = draft.specPreviewMustNotHave ?? "";
+		state.specPreviewRequires = draft.specPreviewRequires ?? "";
+		state.specPreviewSuggestedRole = draft.specPreviewSuggestedRole ?? "";
+		state.specPreviewIdEdited = draft.specPreviewIdEdited ?? false;
+		state.specPreviewNameEdited = draft.specPreviewNameEdited ?? false;
+		state.specPreviewDescriptionEdited = draft.specPreviewDescriptionEdited ?? false;
+		state.specPreviewKindEdited = draft.specPreviewKindEdited ?? false;
+		state.specPreviewFormatEdited = draft.specPreviewFormatEdited ?? false;
+		state.specPreviewMustHaveEdited = draft.specPreviewMustHaveEdited ?? false;
+		state.specPreviewShouldHaveEdited = draft.specPreviewShouldHaveEdited ?? false;
+		state.specPreviewMustNotHaveEdited = draft.specPreviewMustNotHaveEdited ?? false;
+		state.specPreviewRequiresEdited = draft.specPreviewRequiresEdited ?? false;
+		state.specPreviewSuggestedRoleEdited = draft.specPreviewSuggestedRoleEdited ?? false;
+		state.assistantHasProposal = draft.hasReceivedSpecProposal ?? false;
+		state.assistantTab = draft.assistantTab ?? "chat";
+		return true;
+	} catch (err) {
+		console.error("[spec-draft] Failed to restore draft:", err);
+		return false;
+	}
+}
+
+/** Delete spec draft from IndexedDB. */
+export function deleteSpecDraft(sessionId: string): void {
+	storage.specDrafts.deleteDraft(sessionId).catch((err) => {
+		console.error("[spec-draft] Failed to delete draft:", err);
 	});
 }
 
@@ -348,6 +436,8 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			if (state.assistantTab === "chat" && !isDesktop()) {
 				state.assistantTab = "preview";
 			}
+			// Persist draft to IndexedDB
+			saveSpecDraft(sessionId);
 			renderApp();
 		};
 
@@ -500,27 +590,31 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		}
 
 		if (state.assistantType === "artifact-spec") {
-			state.assistantTab = "chat";
-			state.specPreviewId = "";
-			state.specPreviewName = "";
-			state.specPreviewDescription = "";
-			state.specPreviewKind = "analysis";
-			state.specPreviewFormat = "markdown";
-			state.specPreviewMustHave = "";
-			state.specPreviewShouldHave = "";
-			state.specPreviewMustNotHave = "";
-			state.specPreviewRequires = "";
-			state.specPreviewSuggestedRole = "";
-			state.specPreviewIdEdited = false;
-			state.specPreviewNameEdited = false;
-			state.specPreviewDescriptionEdited = false;
-			state.specPreviewKindEdited = false;
-			state.specPreviewFormatEdited = false;
-			state.specPreviewMustHaveEdited = false;
-			state.specPreviewShouldHaveEdited = false;
-			state.specPreviewMustNotHaveEdited = false;
-			state.specPreviewRequiresEdited = false;
-			state.specPreviewSuggestedRoleEdited = false;
+			const restored = await restoreSpecDraft(sessionId);
+			if (!restored) {
+				state.assistantTab = "chat";
+				state.specPreviewId = "";
+				state.specPreviewName = "";
+				state.specPreviewDescription = "";
+				state.specPreviewKind = "analysis";
+				state.specPreviewFormat = "markdown";
+				state.specPreviewMustHave = "";
+				state.specPreviewShouldHave = "";
+				state.specPreviewMustNotHave = "";
+				state.specPreviewRequires = "";
+				state.specPreviewSuggestedRole = "";
+				state.specPreviewIdEdited = false;
+				state.specPreviewNameEdited = false;
+				state.specPreviewDescriptionEdited = false;
+				state.specPreviewKindEdited = false;
+				state.specPreviewFormatEdited = false;
+				state.specPreviewMustHaveEdited = false;
+				state.specPreviewShouldHaveEdited = false;
+				state.specPreviewMustNotHaveEdited = false;
+				state.specPreviewRequiresEdited = false;
+				state.specPreviewSuggestedRoleEdited = false;
+				state.assistantHasProposal = false;
+			}
 		}
 
 		// Auto-prompt for new assistant sessions
@@ -623,6 +717,7 @@ export async function terminateSession(sessionId: string): Promise<void> {
 	clearSessionModel(sessionId);
 	deleteGoalDraft(sessionId);
 	deleteRoleDraft(sessionId);
+	deleteSpecDraft(sessionId);
 	await refreshSessions();
 }
 

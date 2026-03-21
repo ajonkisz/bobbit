@@ -389,7 +389,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up: terminate the goal assistant session
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -468,7 +468,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up: terminate the goal assistant session
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -493,7 +493,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -526,7 +526,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -568,7 +568,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -608,7 +608,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -646,7 +646,7 @@ test.describe("Goals — UI", () => {
 
 		// The assistant session should have been terminated
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		expect(assistantSession).toBeUndefined();
 	});
 
@@ -669,7 +669,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up any leftover assistant session
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -714,7 +714,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -757,7 +757,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -818,7 +818,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -853,7 +853,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
@@ -900,7 +900,7 @@ test.describe("Goals — UI", () => {
 
 		// Clean up sessions
 		const sessions = await apiListSessions(GW_URL, token);
-		const assistantSession = sessions.find((s: any) => s.goalAssistant);
+		const assistantSession = sessions.find((s: any) => s.assistantType === "goal" || s.goalAssistant);
 		if (assistantSession) cleanupSessionIds.push(assistantSession.id);
 	});
 
