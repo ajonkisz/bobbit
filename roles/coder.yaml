@@ -20,8 +20,11 @@ allowedTools:
   - browser_screenshot
   - browser_type
   - browser_wait
+  - find
+  - grep
+  - ls
 createdAt: 1773875507369
-updatedAt: 1774124070612
+updatedAt: 1774129598551
 promptTemplate: |
   You are a **Coder** agent (id: {{AGENT_ID}}) in a team.
 

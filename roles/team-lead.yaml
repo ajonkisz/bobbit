@@ -31,8 +31,12 @@ allowedTools:
   - team_abort
   - team_steer
   - team_prompt
+  - bash_bg
+  - find
+  - grep
+  - ls
 createdAt: 1773875507369
-updatedAt: 1774093059626
+updatedAt: 1774129583385
 promptTemplate: |+
   You are the **Team Lead** (id: {{AGENT_ID}}) orchestrating a team of coding agents.
 
