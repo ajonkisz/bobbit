@@ -186,7 +186,7 @@ export async function authenticateGateway(url: string, token: string): Promise<v
 // CONNECT TO SESSION
 // ============================================================================
 
-export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isPreview?: boolean }): Promise<void> {
+export async function connectToSession(sessionId: string, isExisting: boolean, options?: { isGoalAssistant?: boolean; isRoleAssistant?: boolean; isToolAssistant?: boolean; isArtifactSpecAssistant?: boolean; isPreview?: boolean }): Promise<void> {
 	if (state.connectingSessionId) return;
 	state.connectingSessionId = sessionId;
 
@@ -327,6 +327,25 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			renderApp();
 		};
 
+		remote.onArtifactSpecProposal = (proposal) => {
+			state.activeArtifactSpecProposal = proposal;
+			if (!state.specPreviewIdEdited) state.specPreviewId = proposal.id;
+			if (!state.specPreviewNameEdited) state.specPreviewName = proposal.name;
+			if (!state.specPreviewDescriptionEdited) state.specPreviewDescription = proposal.description;
+			if (!state.specPreviewKindEdited) state.specPreviewKind = proposal.kind;
+			if (!state.specPreviewFormatEdited) state.specPreviewFormat = proposal.format;
+			if (!state.specPreviewMustHaveEdited) state.specPreviewMustHave = proposal.mustHave;
+			if (!state.specPreviewShouldHaveEdited) state.specPreviewShouldHave = proposal.shouldHave;
+			if (!state.specPreviewMustNotHaveEdited) state.specPreviewMustNotHave = proposal.mustNotHave;
+			if (!state.specPreviewRequiresEdited) state.specPreviewRequires = proposal.requires;
+			if (!state.specPreviewSuggestedRoleEdited) state.specPreviewSuggestedRole = proposal.suggestedRole;
+			state.hasReceivedSpecProposal = true;
+			if (state.artifactSpecAssistantTab === "chat" && !isDesktop()) {
+				state.artifactSpecAssistantTab = "preview";
+			}
+			renderApp();
+		};
+
 		state.connectionStatus = "connected";
 		state.remoteAgent = remote;
 		state.appView = "authenticated";
@@ -354,6 +373,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		state.isGoalAssistantSession = options?.isGoalAssistant || sessionData?.goalAssistant || false;
 		state.isRoleAssistantSession = options?.isRoleAssistant || sessionData?.roleAssistant || false;
 		state.isToolAssistantSession = options?.isToolAssistant || sessionData?.toolAssistant || false;
+		state.isArtifactSpecAssistantSession = options?.isArtifactSpecAssistant || sessionData?.artifactSpecAssistant || false;
 		state.isPreviewSession = options?.isPreview || sessionData?.preview || false;
 		state.previewPanelHtml = ""; // Clear stale preview from previous session
 		if (state.isPreviewSession) startPreviewPolling();
@@ -474,6 +494,41 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 			remote.prompt("Start the tool assistant session. Help me document, improve, or create tools.");
 		}
 
+		// Clear spec proposal when connecting to a non-spec-assistant session
+		if (!state.isArtifactSpecAssistantSession) {
+			state.activeArtifactSpecProposal = null;
+			state.hasReceivedSpecProposal = false;
+		}
+
+		if (state.isArtifactSpecAssistantSession) {
+			state.artifactSpecAssistantTab = "chat";
+			state.specPreviewId = "";
+			state.specPreviewName = "";
+			state.specPreviewDescription = "";
+			state.specPreviewKind = "analysis";
+			state.specPreviewFormat = "markdown";
+			state.specPreviewMustHave = "";
+			state.specPreviewShouldHave = "";
+			state.specPreviewMustNotHave = "";
+			state.specPreviewRequires = "";
+			state.specPreviewSuggestedRole = "";
+			state.specPreviewIdEdited = false;
+			state.specPreviewNameEdited = false;
+			state.specPreviewDescriptionEdited = false;
+			state.specPreviewKindEdited = false;
+			state.specPreviewFormatEdited = false;
+			state.specPreviewMustHaveEdited = false;
+			state.specPreviewShouldHaveEdited = false;
+			state.specPreviewMustNotHaveEdited = false;
+			state.specPreviewRequiresEdited = false;
+			state.specPreviewSuggestedRoleEdited = false;
+			state.hasReceivedSpecProposal = false;
+		}
+
+		if (options?.isArtifactSpecAssistant && !isExisting) {
+			remote.prompt("Start the artifact spec creation session.");
+		}
+
 		// Restore draft and set up auto-save
 		requestAnimationFrame(() => {
 			const editor = document.querySelector("message-editor") as any;
@@ -577,6 +632,7 @@ export function backToSessions(): void {
 	state.activeRoleProposal = null;
 	state.isRoleAssistantSession = false;
 	state.isToolAssistantSession = false;
+	state.isArtifactSpecAssistantSession = false;
 	state.isPreviewSession = false;
 	stopPreviewPolling();
 	state.cwdDropdownOpen = false;
@@ -595,6 +651,7 @@ export function disconnectGateway(): void {
 	state.isGoalAssistantSession = false;
 	state.isRoleAssistantSession = false;
 	state.isToolAssistantSession = false;
+	state.isArtifactSpecAssistantSession = false;
 	state.isPreviewSession = false;
 	stopPreviewPolling();
 	state.appView = "disconnected";

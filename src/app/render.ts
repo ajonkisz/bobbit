@@ -601,6 +601,115 @@ function toolPreviewPanel() {
 	`;
 }
 
+function artifactSpecPreviewPanel() {
+	const handleCreateSpec = async () => {
+		const id = state.specPreviewId.trim();
+		const name = state.specPreviewName.trim();
+		if (!id || !name) return;
+
+		const sessionId = activeSessionId();
+		if (state.remoteAgent) {
+			state.remoteAgent.disconnect();
+			state.remoteAgent = null;
+			state.connectionStatus = "disconnected";
+		}
+		state.isArtifactSpecAssistantSession = false;
+		state.activeArtifactSpecProposal = null;
+		localStorage.removeItem("gateway.sessionId");
+
+		const { createArtifactSpec } = await import("./api.js");
+		await createArtifactSpec({
+			id,
+			name,
+			description: state.specPreviewDescription,
+			kind: state.specPreviewKind as any,
+			format: state.specPreviewFormat as any,
+			mustHave: state.specPreviewMustHave.split("\n").map((s) => s.replace(/^-\s*/, "").trim()).filter(Boolean),
+			shouldHave: state.specPreviewShouldHave.split("\n").map((s) => s.replace(/^-\s*/, "").trim()).filter(Boolean),
+			mustNotHave: state.specPreviewMustNotHave.split("\n").map((s) => s.replace(/^-\s*/, "").trim()).filter(Boolean),
+			requires: state.specPreviewRequires.split(",").map((s) => s.trim()).filter(Boolean),
+			suggestedRole: state.specPreviewSuggestedRole || undefined,
+		});
+
+		const { loadArtifactSpecPageData } = await import("./artifact-spec-page.js");
+		await loadArtifactSpecPageData();
+		setHashRoute("artifact-specs");
+		renderApp();
+	};
+
+	const field = (label: string, stateKey: string, editedKey: string, type: "input" | "textarea" | "select" = "input", options?: { value: string; label: string }[]) => {
+		const value = (state as any)[stateKey];
+		const onInput = (e: Event) => {
+			(state as any)[stateKey] = (e.target as HTMLInputElement).value;
+			(state as any)[editedKey] = true;
+			renderApp();
+		};
+		if (type === "select" && options) {
+			return html`
+				<div>
+					<div class="text-xs text-muted-foreground mb-1">${label}</div>
+					<select class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background" .value=${value} @change=${onInput}>
+						${options.map((o) => html`<option value=${o.value} ?selected=${value === o.value}>${o.label}</option>`)}
+					</select>
+				</div>
+			`;
+		}
+		if (type === "textarea") {
+			return html`
+				<div>
+					<div class="text-xs text-muted-foreground mb-1">${label}</div>
+					<textarea class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background resize-y" rows="3" .value=${value} @input=${onInput}></textarea>
+				</div>
+			`;
+		}
+		return html`
+			<div>
+				<div class="text-xs text-muted-foreground mb-1">${label}</div>
+				<input class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background" .value=${value} @input=${onInput} />
+			</div>
+		`;
+	};
+
+	const canCreate = state.specPreviewId.trim() && state.specPreviewName.trim();
+
+	return html`
+		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
+			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-3">
+				<div class="text-sm font-semibold mb-1">Artifact Spec Preview</div>
+				${!state.hasReceivedSpecProposal ? html`<div class="text-sm text-muted-foreground italic">Waiting for assistant to propose a spec...</div>` : ""}
+				${field("ID", "specPreviewId", "specPreviewIdEdited")}
+				${field("Name", "specPreviewName", "specPreviewNameEdited")}
+				${field("Description", "specPreviewDescription", "specPreviewDescriptionEdited", "textarea")}
+				${field("Kind", "specPreviewKind", "specPreviewKindEdited", "select", [
+					{ value: "analysis", label: "Analysis" },
+					{ value: "deliverable", label: "Deliverable" },
+					{ value: "review", label: "Review" },
+					{ value: "verification", label: "Verification" },
+				])}
+				${field("Format", "specPreviewFormat", "specPreviewFormatEdited", "select", [
+					{ value: "markdown", label: "Markdown" },
+					{ value: "html", label: "HTML" },
+					{ value: "diff", label: "Diff" },
+					{ value: "command", label: "Command" },
+				])}
+				${field("Must Have (one per line)", "specPreviewMustHave", "specPreviewMustHaveEdited", "textarea")}
+				${field("Should Have (one per line)", "specPreviewShouldHave", "specPreviewShouldHaveEdited", "textarea")}
+				${field("Must Not Have (one per line)", "specPreviewMustNotHave", "specPreviewMustNotHaveEdited", "textarea")}
+				${field("Requires (comma-separated spec IDs)", "specPreviewRequires", "specPreviewRequiresEdited")}
+				${field("Suggested Role", "specPreviewSuggestedRole", "specPreviewSuggestedRoleEdited")}
+			</div>
+			<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+				${Button({ variant: "ghost", onClick: backToSessions, children: "Close" })}
+				${canCreate ? Button({
+					variant: "default",
+					onClick: handleCreateSpec,
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(Layers, "sm")} Create Spec</span>`,
+				}) : ""}
+			</div>
+		</div>
+	`;
+}
+
 // ============================================================================
 // PREVIEW SWIPE (mobile)
 // ============================================================================
@@ -955,6 +1064,23 @@ export function doRenderApp(): void {
 		`;
 	};
 
+	const artifactSpecAssistantTabBar = () => {
+		return html`
+			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
+				<button
+					class="goal-tab-pill ${state.artifactSpecAssistantTab === "chat" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.artifactSpecAssistantTab = "chat"; renderApp(); }}
+				>Chat</button>
+				<button
+					class="goal-tab-pill ${state.artifactSpecAssistantTab === "preview" ? "goal-tab-pill--active" : ""}"
+					@click=${() => { state.artifactSpecAssistantTab = "preview"; renderApp(); }}
+				>
+					Preview${state.hasReceivedSpecProposal ? html` <span class="goal-tab-dot"></span>` : ""}
+				</button>
+			</div>
+		`;
+	};
+
 	const previewTabBar = () => {
 		return html`
 			<div class="goal-tab-bar shrink-0 flex items-center gap-1 px-3 py-2 border-b border-border bg-background">
@@ -1076,6 +1202,24 @@ export function doRenderApp(): void {
 				}
 			`;
 		}
+		if (connected && state.isArtifactSpecAssistantSession) {
+			if (desktop) {
+				return html`
+					${reconnectBanner()}
+					<div class="flex-1 flex min-h-0 overflow-hidden">
+						<div class="goal-chat-panel flex-1 min-w-0 flex flex-col">${state.chatPanel}</div>
+						${artifactSpecPreviewPanel()}
+					</div>
+				`;
+			}
+			return html`
+				${reconnectBanner()}
+				${state.artifactSpecAssistantTab === "chat"
+					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
+					: html`<div class="flex-1 min-h-0 flex flex-col">${artifactSpecPreviewPanel()}</div>`
+				}
+			`;
+		}
 		if (connected && state.isPreviewSession) {
 			if (desktop) {
 				const collapsed = isPreviewCollapsed();
@@ -1164,7 +1308,8 @@ export function doRenderApp(): void {
 					${state.isGoalAssistantSession ? goalAssistantTabBar() : ""}
 					${state.isRoleAssistantSession ? roleAssistantTabBar() : ""}
 					${state.isToolAssistantSession ? toolAssistantTabBar() : ""}
-					${state.isPreviewSession && !state.isGoalAssistantSession && !state.isRoleAssistantSession && !state.isToolAssistantSession ? previewTabBar() : ""}
+					${state.isArtifactSpecAssistantSession ? artifactSpecAssistantTabBar() : ""}
+					${state.isPreviewSession && !state.isGoalAssistantSession && !state.isRoleAssistantSession && !state.isToolAssistantSession && !state.isArtifactSpecAssistantSession ? previewTabBar() : ""}
 				</div>
 				<div id="app-main" class="flex-1 min-w-0 min-h-0 flex flex-col">${mainArea()}</div>
 			</div>

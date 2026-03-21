@@ -79,6 +79,7 @@ export class RemoteAgent {
 	onRoleProposal?: (proposal: { name: string; label: string; prompt: string; tools: string; accessory: string }) => void;
 	/** Callback fired when a tool proposal is detected in an assistant message. */
 	onToolProposal?: (proposal: { tool: string; action: string; content: string }) => void;
+	onArtifactSpecProposal?: (proposal: { id: string; name: string; description: string; kind: string; format: string; mustHave: string; shouldHave: string; mustNotHave: string; requires: string; suggestedRole: string }) => void;
 	/** Callback fired when tool execution updates (for real-time progress). */
 	onWorkflowUpdate?: () => void;
 	/** Callback fired when the server-side prompt queue changes. */
@@ -570,6 +571,7 @@ export class RemoteAgent {
 							this._checkForGoalProposal(m);
 							this._checkForRoleProposal(m);
 							this._checkForToolProposal(m);
+							this._checkForArtifactSpecProposal(m);
 						}
 					}
 					// Re-add compacting placeholder if compaction is still in progress
@@ -737,6 +739,44 @@ export class RemoteAgent {
 		});
 	}
 
+	/** Check an assistant message for an <artifact_spec_proposal> block and fire the callback. */
+	private _checkForArtifactSpecProposal(message: any): void {
+		if (!this.onArtifactSpecProposal) return;
+
+		let text = "";
+		if (typeof message.content === "string") {
+			text = message.content;
+		} else if (Array.isArray(message.content)) {
+			text = message.content
+				.filter((c: any) => c.type === "text")
+				.map((c: any) => c.text || "")
+				.join("");
+		}
+		if (!text) return;
+
+		const match = text.match(/<artifact_spec_proposal>([\s\S]*?)<\/artifact_spec_proposal>/);
+		if (!match) return;
+
+		const block = match[1];
+		const extract = (tag: string) => {
+			const m = block.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`));
+			return m ? m[1].trim() : "";
+		};
+
+		this.onArtifactSpecProposal({
+			id: extract("id"),
+			name: extract("name"),
+			description: extract("description"),
+			kind: extract("kind"),
+			format: extract("format"),
+			mustHave: extract("must-have"),
+			shouldHave: extract("should-have"),
+			mustNotHave: extract("must-not-have"),
+			requires: extract("requires"),
+			suggestedRole: extract("suggested-role"),
+		});
+	}
+
 	private flushDeferredMessage() {
 		if (this._deferredAssistantMessage) {
 			this._state.messages = [...this._state.messages, this._deferredAssistantMessage];
@@ -782,20 +822,22 @@ export class RemoteAgent {
 				this.flushDeferredMessage();
 				if (event.message) {
 					this._state.streamMessage = event.message;
-					// Check for goal/role/tool proposal during streaming so preview syncs live
+					// Check for goal/role/tool/spec proposal during streaming so preview syncs live
 					this._checkForGoalProposal(event.message);
 					this._checkForRoleProposal(event.message);
 					this._checkForToolProposal(event.message);
+					this._checkForArtifactSpecProposal(event.message);
 				}
 				break;
 
 			case "message_end":
 				if (event.message) {
 					if (event.message.role === "assistant") {
-						// Check for goal/role/tool proposal in assistant message
+						// Check for goal/role/tool/spec proposal in assistant message
 						this._checkForGoalProposal(event.message);
 						this._checkForRoleProposal(event.message);
 						this._checkForToolProposal(event.message);
+						this._checkForArtifactSpecProposal(event.message);
 
 						// Check whether this assistant message contains tool calls.
 						const hasToolCalls = Array.isArray(event.message.content) &&
