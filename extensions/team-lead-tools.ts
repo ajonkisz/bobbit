@@ -178,5 +178,41 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	console.log(`[team-lead-tools] Registered 7 team tools for session ${sessionId}, goal ${goalId}`);
+	pi.registerTool({
+		name: "traits_list",
+		label: "List Traits",
+		description: "List all available personality traits that can be applied to spawned agents. Each trait modifies how the agent approaches its work.",
+		promptSnippet: "List all available personality traits with descriptions.",
+		parameters: Type.Object({}),
+		async execute() {
+			try {
+				return ok(await api("GET", "/api/traits"));
+			} catch (e: any) { return err(e.message); }
+		},
+	});
+
+	pi.registerTool({
+		name: "traits_create",
+		label: "Create Trait",
+		description: "Define a new personality trait that can be applied to agents via team_spawn.",
+		promptSnippet: "Define a new personality trait for team agents.",
+		parameters: Type.Object({
+			name: Type.String({ description: "Lowercase alphanumeric + hyphens identifier" }),
+			label: Type.String({ description: "Human-readable display name" }),
+			description: Type.String({ description: "Short tooltip description" }),
+			prompt_fragment: Type.String({ description: "1-2 sentences injected into the agent's system prompt" }),
+		}),
+		async execute(_id, params) {
+			try {
+				return ok(await api("POST", "/api/traits", {
+					name: params.name,
+					label: params.label,
+					description: params.description,
+					promptFragment: params.prompt_fragment,
+				}));
+			} catch (e: any) { return err(e.message); }
+		},
+	});
+
+	console.log(`[team-lead-tools] Registered 9 team tools for session ${sessionId}, goal ${goalId}`);
 }
