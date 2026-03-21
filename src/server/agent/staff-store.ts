@@ -103,12 +103,18 @@ export class StaffStore {
 	update(id: string, updates: Partial<Omit<PersistedStaff, "id" | "createdAt">>): boolean {
 		const existing = this.staff.get(id);
 		if (!existing) return false;
-		// Strip undefined values to avoid overwriting existing fields
-		const cleaned: Record<string, unknown> = {};
+		// Strip undefined values to avoid overwriting existing fields.
+		// null is treated as "clear this field" (delete the key).
+		const rec = existing as unknown as Record<string, unknown>;
 		for (const [k, v] of Object.entries(updates)) {
-			if (v !== undefined) cleaned[k] = v;
+			if (v === undefined) continue;
+			if (v === null) {
+				delete rec[k];
+			} else {
+				rec[k] = v;
+			}
 		}
-		Object.assign(existing, cleaned, { updatedAt: Date.now() });
+		existing.updatedAt = Date.now();
 		this.save();
 		return true;
 	}

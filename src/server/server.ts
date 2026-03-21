@@ -179,6 +179,7 @@ export function createGateway(config: GatewayConfig) {
 		},
 		async shutdown() {
 			clearInterval(cleanupInterval);
+			triggerEngine.stop();
 			wss.close();
 			await sessionManager.shutdown();
 			server.close();

@@ -96,6 +96,8 @@ export function cronMatches(expr: string, date: Date): boolean {
  */
 export class TriggerEngine {
 	private intervalHandle: ReturnType<typeof setInterval> | null = null;
+	/** Staff IDs currently in the process of waking (prevents concurrent wake race) */
+	private wakingInProgress = new Set<string>();
 
 	constructor(
 		private staffManager: StaffManager,
@@ -121,39 +123,49 @@ export class TriggerEngine {
 		for (const staff of allStaff) {
 			if (staff.state !== "active") continue;
 
+			// Skip if a wake is already in-flight for this staff (async race guard)
+			if (this.wakingInProgress.has(staff.id)) continue;
+
 			// Skip if staff already has a live session (prevent concurrent wakes)
 			if (staff.currentSessionId) {
 				const session = this.sessionManager.getSession(staff.currentSessionId);
 				if (session && session.status !== "terminated") continue;
-				// Clear stale reference
-				this.staffManager.updateStaff(staff.id, { currentSessionId: undefined });
+				// Clear stale reference — use null (not undefined) so the store deletes the key
+				this.staffManager.updateStaff(staff.id, { currentSessionId: null as unknown as string });
 			}
 
 			for (const trigger of staff.triggers) {
 				if (!trigger.enabled) continue;
-				if (trigger.type === "schedule") this.checkScheduleTrigger(staff, trigger);
-				else if (trigger.type === "git") this.checkGitTrigger(staff, trigger);
+				let fired = false;
+				if (trigger.type === "schedule") fired = this.checkScheduleTrigger(staff, trigger);
+				else if (trigger.type === "git") fired = this.checkGitTrigger(staff, trigger);
 				// "manual" triggers are only fired via the API, never by the engine
+
+				// Once a trigger fires for this staff, skip remaining triggers this tick
+				if (fired) break;
 			}
 		}
 	}
 
-	private checkScheduleTrigger(staff: PersistedStaff, trigger: StaffTrigger): void {
-		if (!trigger.config.cron) return;
+	/** Returns true if the trigger was fired. */
+	private checkScheduleTrigger(staff: PersistedStaff, trigger: StaffTrigger): boolean {
+		if (!trigger.config.cron) return false;
 		const now = new Date();
-		if (!cronMatches(trigger.config.cron, now)) return;
+		if (!cronMatches(trigger.config.cron, now)) return false;
 
 		// Don't re-fire in the same minute
 		if (trigger.lastFired) {
 			const lastFiredMinute = Math.floor(trigger.lastFired / 60_000);
 			const currentMinute = Math.floor(now.getTime() / 60_000);
-			if (lastFiredMinute === currentMinute) return;
+			if (lastFiredMinute === currentMinute) return false;
 		}
 
 		void this.fireTrigger(staff, trigger);
+		return true;
 	}
 
-	private checkGitTrigger(staff: PersistedStaff, trigger: StaffTrigger): void {
+	/** Returns true if the trigger was fired. */
+	private checkGitTrigger(staff: PersistedStaff, trigger: StaffTrigger): boolean {
 		const repo = trigger.config.repo || staff.cwd;
 		const branch = trigger.config.branch || "HEAD";
 
@@ -168,10 +180,10 @@ export class TriggerEngine {
 				.trim();
 		} catch {
 			// Git command failed — repo may not exist or branch is invalid. Skip silently.
-			return;
+			return false;
 		}
 
-		if (!sha) return;
+		if (!sha) return false;
 
 		const previousSha = trigger.lastSeenSha;
 
@@ -191,16 +203,21 @@ export class TriggerEngine {
 				// Diff log failed — proceed with basic context
 			}
 
+			// Always update lastSeenSha before firing
+			this.staffManager.updateTriggerState(staff.id, trigger.id, { lastSeenSha: sha });
 			void this.fireTrigger(staff, trigger, context);
+			return true;
 		}
 
 		// Always update lastSeenSha (initializes on first tick, tracks on subsequent)
 		this.staffManager.updateTriggerState(staff.id, trigger.id, { lastSeenSha: sha });
+		return false;
 	}
 
 	private async fireTrigger(staff: PersistedStaff, trigger: StaffTrigger, extraContext?: string): Promise<void> {
 		console.log(`[trigger-engine] Firing ${trigger.type} trigger "${trigger.id}" for staff "${staff.name}"`);
 
+		this.wakingInProgress.add(staff.id);
 		this.staffManager.updateTriggerState(staff.id, trigger.id, { lastFired: Date.now() });
 
 		let prompt = trigger.prompt || `Trigger fired: ${trigger.type}`;
@@ -212,6 +229,8 @@ export class TriggerEngine {
 			await this.staffManager.wake(staff.id, prompt, this.sessionManager);
 		} catch (err) {
 			console.error(`[trigger-engine] Failed to wake staff "${staff.name}":`, err);
+		} finally {
+			this.wakingInProgress.delete(staff.id);
 		}
 	}
 }
