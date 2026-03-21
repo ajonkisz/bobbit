@@ -1,4 +1,5 @@
 import { getModel } from "@mariozechner/pi-ai";
+import { PROPOSAL_PARSERS } from "./proposal-parsers.js";
 import { state } from "./state.js";
 
 /**
@@ -611,10 +612,7 @@ export class RemoteAgent {
 					// Scan loaded messages for goal proposals (e.g. reconnecting to an existing session)
 					for (const m of this._state.messages) {
 						if (m.role === "assistant") {
-							this._checkForGoalProposal(m);
-							this._checkForRoleProposal(m);
-							this._checkForToolProposal(m);
-							this._checkForArtifactSpecProposal(m);
+							this._checkProposals(m);
 						}
 					}
 					// Re-add compacting placeholder if compaction is still in progress
@@ -681,143 +679,43 @@ export class RemoteAgent {
 	 * message_end of non-assistant clears it, agent_end clears it) so the
 	 * tool call never appears in both message-list and streaming-container.
 	 */
-	/** Check an assistant message for a <goal_proposal> block and fire the callback. */
-	private _checkForGoalProposal(message: any): void {
-		if (!this.onGoalProposal) return;
-
-		// Extract text content from the message
+	/** Check an assistant message for proposal blocks and fire the matching callback. */
+	private _checkProposals(message: any): void {
 		let text = "";
-		if (typeof message.content === "string") {
-			text = message.content;
-		} else if (Array.isArray(message.content)) {
-			text = message.content
-				.filter((c: any) => c.type === "text")
-				.map((c: any) => c.text || "")
-				.join("");
+		if (typeof message.content === "string") text = message.content;
+		else if (Array.isArray(message.content)) {
+			text = message.content.filter((c: any) => c.type === "text").map((c: any) => c.text || "").join("");
 		}
 		if (!text) return;
 
-		const match = text.match(/<goal_proposal>([\s\S]*?)<\/goal_proposal>/);
-		if (!match) return;
+		for (const parser of PROPOSAL_PARSERS) {
+			const callback = (this as any)[parser.callbackName];
+			if (!callback) continue;
 
-		const block = match[1];
-		const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/);
-		const specMatch = block.match(/<spec>([\s\S]*?)<\/spec>/);
-		const cwdMatch = block.match(/<cwd>([\s\S]*?)<\/cwd>/);
+			const match = text.match(new RegExp(`<${parser.tag}>([\\s\\S]*?)<\\/${parser.tag}>`));
+			if (!match) continue;
 
-		if (!titleMatch || !specMatch) return;
+			const block = match[1];
+			const result: Record<string, string> = {};
+			for (const field of parser.fields) {
+				const m = block.match(new RegExp(`<${field}>([\\s\\S]*?)<\\/${field}>`));
+				result[field] = m ? m[1].trim() : "";
+			}
 
-		this.onGoalProposal({
-			title: titleMatch[1].trim(),
-			spec: specMatch[1].trim(),
-			cwd: cwdMatch ? cwdMatch[1].trim() : undefined,
-		});
-	}
+			// Normalize hyphenated keys to camelCase
+			const normalized: Record<string, string> = {};
+			for (const [k, v] of Object.entries(result)) {
+				normalized[k.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v;
+			}
 
-	/** Check an assistant message for a <role_proposal> block and fire the callback. */
-	private _checkForRoleProposal(message: any): void {
-		if (!this.onRoleProposal) return;
+			const missing = parser.requiredFields.some(f => {
+				const key = f.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+				return !normalized[key];
+			});
+			if (missing) continue;
 
-		let text = "";
-		if (typeof message.content === "string") {
-			text = message.content;
-		} else if (Array.isArray(message.content)) {
-			text = message.content
-				.filter((c: any) => c.type === "text")
-				.map((c: any) => c.text || "")
-				.join("");
+			callback(normalized);
 		}
-		if (!text) return;
-
-		const match = text.match(/<role_proposal>([\s\S]*?)<\/role_proposal>/);
-		if (!match) return;
-
-		const block = match[1];
-		const nameMatch = block.match(/<name>([\s\S]*?)<\/name>/);
-		const labelMatch = block.match(/<label>([\s\S]*?)<\/label>/);
-		const promptMatch = block.match(/<prompt>([\s\S]*?)<\/prompt>/);
-		const toolsMatch = block.match(/<tools>([\s\S]*?)<\/tools>/);
-		const accessoryMatch = block.match(/<accessory>([\s\S]*?)<\/accessory>/);
-
-		if (!nameMatch || !labelMatch || !promptMatch) return;
-
-		this.onRoleProposal({
-			name: nameMatch[1].trim(),
-			label: labelMatch[1].trim(),
-			prompt: promptMatch[1].trim(),
-			tools: toolsMatch ? toolsMatch[1].trim() : "",
-			accessory: accessoryMatch ? accessoryMatch[1].trim() : "none",
-		});
-	}
-
-	/** Check an assistant message for a <tool_proposal> block and fire the callback. */
-	private _checkForToolProposal(message: any): void {
-		if (!this.onToolProposal) return;
-
-		let text = "";
-		if (typeof message.content === "string") {
-			text = message.content;
-		} else if (Array.isArray(message.content)) {
-			text = message.content
-				.filter((c: any) => c.type === "text")
-				.map((c: any) => c.text || "")
-				.join("");
-		}
-		if (!text) return;
-
-		const match = text.match(/<tool_proposal>([\s\S]*?)<\/tool_proposal>/);
-		if (!match) return;
-
-		const block = match[1];
-		const toolMatch = block.match(/<tool>([\s\S]*?)<\/tool>/);
-		const actionMatch = block.match(/<action>([\s\S]*?)<\/action>/);
-		const contentMatch = block.match(/<content>([\s\S]*?)<\/content>/);
-
-		if (!toolMatch || !actionMatch || !contentMatch) return;
-
-		this.onToolProposal({
-			tool: toolMatch[1].trim(),
-			action: actionMatch[1].trim(),
-			content: contentMatch[1].trim(),
-		});
-	}
-
-	/** Check an assistant message for an <artifact_spec_proposal> block and fire the callback. */
-	private _checkForArtifactSpecProposal(message: any): void {
-		if (!this.onArtifactSpecProposal) return;
-
-		let text = "";
-		if (typeof message.content === "string") {
-			text = message.content;
-		} else if (Array.isArray(message.content)) {
-			text = message.content
-				.filter((c: any) => c.type === "text")
-				.map((c: any) => c.text || "")
-				.join("");
-		}
-		if (!text) return;
-
-		const match = text.match(/<artifact_spec_proposal>([\s\S]*?)<\/artifact_spec_proposal>/);
-		if (!match) return;
-
-		const block = match[1];
-		const extract = (tag: string) => {
-			const m = block.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`));
-			return m ? m[1].trim() : "";
-		};
-
-		this.onArtifactSpecProposal({
-			id: extract("id"),
-			name: extract("name"),
-			description: extract("description"),
-			kind: extract("kind"),
-			format: extract("format"),
-			mustHave: extract("must-have"),
-			shouldHave: extract("should-have"),
-			mustNotHave: extract("must-not-have"),
-			requires: extract("requires"),
-			suggestedRole: extract("suggested-role"),
-		});
 	}
 
 	private flushDeferredMessage() {
@@ -865,22 +763,16 @@ export class RemoteAgent {
 				this.flushDeferredMessage();
 				if (event.message) {
 					this._state.streamMessage = event.message;
-					// Check for goal/role/tool/spec proposal during streaming so preview syncs live
-					this._checkForGoalProposal(event.message);
-					this._checkForRoleProposal(event.message);
-					this._checkForToolProposal(event.message);
-					this._checkForArtifactSpecProposal(event.message);
+					// Check for proposals during streaming so preview syncs live
+					this._checkProposals(event.message);
 				}
 				break;
 
 			case "message_end":
 				if (event.message) {
 					if (event.message.role === "assistant") {
-						// Check for goal/role/tool/spec proposal in assistant message
-						this._checkForGoalProposal(event.message);
-						this._checkForRoleProposal(event.message);
-						this._checkForToolProposal(event.message);
-						this._checkForArtifactSpecProposal(event.message);
+						// Check for proposals in assistant message
+						this._checkProposals(event.message);
 
 						// Check whether this assistant message contains tool calls.
 						const hasToolCalls = Array.isArray(event.message.content) &&
