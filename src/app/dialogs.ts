@@ -842,6 +842,13 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let worktreeValue = true;
 	let cwdDropdownOpen = false;
 	let cwdHighlightIndex = -1;
+	let workflowId = "";
+	let _proposalWorkflows: Array<{ id: string; name: string; artifacts: any[] }> = [];
+
+	// Load workflows for the selector
+	import("./api.js").then(({ fetchWorkflows }) => {
+		fetchWorkflows().then((wfs) => { _proposalWorkflows = wfs; renderProposalDialog(); });
+	});
 
 	const cleanup = () => {
 		render(html``, container);
@@ -856,7 +863,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 
 		try {
 			const sessionId = activeSessionId();
-			await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, team: teamValue, worktree: worktreeValue });
+			await createGoal(trimmedTitle, cwdValue.trim(), { spec: specValue, team: teamValue, worktree: worktreeValue, workflowId: workflowId || undefined });
 			state.activeGoalProposal = null;
 			// Only terminate goal-assistant sessions — regular sessions that suggested a goal should keep running.
 			if (sessionId && state.assistantType === "goal") {
@@ -920,6 +927,21 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 										@input=${(e: Event) => { specValue = (e.target as HTMLTextAreaElement).value; }}
 									></textarea>
 								</div>
+								${_proposalWorkflows.length > 0 ? html`
+									<div>
+										<label class="text-xs text-muted-foreground mb-1 block">Workflow (optional)</label>
+										<select
+											class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background text-foreground"
+											.value=${workflowId}
+											@change=${(e: Event) => { workflowId = (e.target as HTMLSelectElement).value; renderProposalDialog(); }}
+										>
+											<option value="">None</option>
+											${_proposalWorkflows.map((wf) => html`
+												<option value=${wf.id} ?selected=${workflowId === wf.id}>${wf.name} (${wf.artifacts.length} artifacts)</option>
+											`)}
+										</select>
+									</div>
+								` : ""}
 								<div class="flex items-center gap-2.5">
 									<input type="checkbox" id="team-toggle"
 										.checked=${teamValue}

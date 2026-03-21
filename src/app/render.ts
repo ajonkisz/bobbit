@@ -35,8 +35,8 @@ import { renderRoleManagerPage, loadRolePageData } from "./role-manager-page.js"
 import "./role-manager.css";
 import { renderToolManagerPage } from "./tool-manager-page.js";
 import "./tool-manager.css";
-import { renderArtifactSpecPage } from "./artifact-spec-page.js";
-import "./artifact-spec.css";
+import { renderWorkflowPage } from "./workflow-page.js";
+import "./workflow-page.css";
 import { renderPersonalityManagerPage } from "./personality-manager-page.js";
 import "./personality-manager.css";
 import { renderStaffPage } from "./staff-page.js";
@@ -56,31 +56,31 @@ function renderMobileLanding() {
 	return html`
 		<div class="flex-1 flex flex-col overflow-y-auto">
 			<div class="w-full max-w-xl mx-auto px-2 py-4 flex flex-col gap-1">
-				<div class="flex flex-col gap-1 px-1 pb-2 mb-1 border-b border-border/30">
-					<div class="flex items-center gap-1">
-						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-							@click=${() => { import("./role-manager-page.js").then((m) => m.loadRolePageData()); setHashRoute("roles"); }}>
-							${icon(Users, "xs")} Roles
-						</button>
-						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-							@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); setHashRoute("tools"); }}>
-							${icon(Wrench, "xs")} Tools
-						</button>
-						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-							@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); setHashRoute("artifact-specs"); }}>
-							${icon(Layers, "xs")} Specs
-						</button>
-					</div>
-					<div class="flex items-center gap-1">
-						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-							@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
-							${icon(Sparkles, "xs")} Personalities
-						</button>
-						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
-							@click=${() => showGoalDialog()}>
-							${icon(GoalIcon, "xs")} New Goal
-						</button>
-					</div>
+				<div class="flex items-center gap-1 px-1 pb-2 mb-1 border-b border-border/30">
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./role-manager-page.js").then((m) => m.loadRolePageData()); setHashRoute("roles"); }}>
+						${icon(Users, "xs")} Roles
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); setHashRoute("tools"); }}>
+						${icon(Wrench, "xs")} Tools
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./workflow-page.js").then((m) => m.loadWorkflowPageData()); setHashRoute("workflows"); }}>
+						${icon(Layers, "xs")} Workflows
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
+						${icon(Sparkles, "xs")} Personalities
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => { import("./staff-page.js").then((m) => m.loadStaffPageData()); setHashRoute("staff"); }}>
+						${icon(UserCheck, "xs")} Staff
+					</button>
+					<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
+						@click=${() => showGoalDialog()}>
+						${icon(GoalIcon, "xs")} New Goal
+					</button>
 				</div>
 				${state.sessionsLoading
 					? html`<div class="text-center py-12 text-muted-foreground text-xs">Loading…</div>`
@@ -174,7 +174,21 @@ function renderMobileLanding() {
 // GOAL PREVIEW PANEL (goal assistant split-screen)
 // ============================================================================
 
+/** Cached workflows for goal creation dropdown. */
+import { fetchWorkflows, type Workflow } from "./api.js";
+let _cachedWorkflows: Workflow[] = [];
+let _workflowsLoaded = false;
+let _selectedWorkflowId = "";
+
+function ensureWorkflowsLoaded(): void {
+	if (_workflowsLoaded) return;
+	_workflowsLoaded = true;
+	fetchWorkflows().then((wfs) => { _cachedWorkflows = wfs; renderApp(); });
+}
+
 function goalPreviewPanel() {
+	ensureWorkflowsLoaded();
+
 	const handleCreateGoal = async () => {
 		const trimmedTitle = state.previewTitle.trim();
 		if (!trimmedTitle) return;
@@ -188,8 +202,10 @@ function goalPreviewPanel() {
 		state.activeGoalProposal = null;
 		const teamMode = state.previewTeamMode;
 		const worktree = state.previewWorktree;
+		const workflowId = _selectedWorkflowId || undefined;
 		state.previewTeamMode = true;
 		state.previewWorktree = true;
+		_selectedWorkflowId = "";
 		// Clean up persisted draft
 		if (sessionId) {
 			deleteGoalDraft(sessionId);
@@ -198,7 +214,7 @@ function goalPreviewPanel() {
 		setHashRoute("landing");
 		state.appView = "authenticated";
 
-		await createGoal(trimmedTitle, state.previewCwd.trim(), { spec: state.previewSpec, team: teamMode, worktree });
+		await createGoal(trimmedTitle, state.previewCwd.trim(), { spec: state.previewSpec, team: teamMode, worktree, workflowId });
 		if (sessionId) {
 			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
 			clearSessionModel(sessionId);
@@ -257,6 +273,21 @@ function goalPreviewPanel() {
 						onChange: (v) => { state.previewWorktree = v; const sid = activeSessionId(); if (sid) saveGoalDraft(sid); renderApp(); },
 					})}</div>
 				</div>
+				${_cachedWorkflows.length > 0 ? html`
+					<div>
+						<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Workflow (optional)</label>
+						<select
+							class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background text-foreground"
+							.value=${_selectedWorkflowId}
+							@change=${(e: Event) => { _selectedWorkflowId = (e.target as HTMLSelectElement).value; renderApp(); }}
+						>
+							<option value="">None</option>
+							${_cachedWorkflows.map((wf) => html`
+								<option value=${wf.id} ?selected=${_selectedWorkflowId === wf.id}>${wf.name} (${wf.artifacts.length} artifacts)</option>
+							`)}
+						</select>
+					</div>
+				` : ""}
 				<div class="flex-1 flex flex-col min-h-0">
 					<div class="flex items-center justify-between mb-1.5">
 						<label class="text-xs text-muted-foreground font-medium">Spec</label>
@@ -608,123 +639,6 @@ function toolPreviewPanel() {
 					variant: "default",
 					onClick: handleViewTool,
 					children: html`<span class="inline-flex items-center gap-1.5">${icon(Wrench, "sm")} View Tool</span>`,
-				}) : ""}
-			</div>
-		</div>
-	`;
-}
-
-function artifactSpecPreviewPanel() {
-	const handleCreateSpec = async () => {
-		const id = state.specPreviewId.trim();
-		const name = state.specPreviewName.trim();
-		if (!id || !name) return;
-
-		const sessionId = activeSessionId();
-		if (state.remoteAgent) {
-			state.remoteAgent.disconnect();
-			state.remoteAgent = null;
-			state.connectionStatus = "disconnected";
-		}
-		state.assistantType = null;
-		state.activeArtifactSpecProposal = null;
-		localStorage.removeItem("gateway.sessionId");
-		setHashRoute("landing");
-		state.appView = "authenticated";
-
-		const { createArtifactSpec } = await import("./api.js");
-		await createArtifactSpec({
-			id,
-			name,
-			description: state.specPreviewDescription,
-			kind: state.specPreviewKind as any,
-			format: state.specPreviewFormat as any,
-			mustHave: state.specPreviewMustHave.split("\n").map((s) => s.replace(/^-\s*/, "").trim()).filter(Boolean),
-			shouldHave: state.specPreviewShouldHave.split("\n").map((s) => s.replace(/^-\s*/, "").trim()).filter(Boolean),
-			mustNotHave: state.specPreviewMustNotHave.split("\n").map((s) => s.replace(/^-\s*/, "").trim()).filter(Boolean),
-			requires: state.specPreviewRequires.split(",").map((s) => s.trim()).filter(Boolean),
-			suggestedRole: state.specPreviewSuggestedRole || undefined,
-		});
-
-		if (sessionId) {
-			await gatewayFetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
-			clearSessionModel(sessionId);
-		}
-		await refreshSessions();
-
-		const { loadArtifactSpecPageData } = await import("./artifact-spec-page.js");
-		await loadArtifactSpecPageData();
-		setHashRoute("artifact-specs");
-		renderApp();
-	};
-
-	const field = (label: string, stateKey: string, editedKey: string, type: "input" | "textarea" | "select" = "input", options?: { value: string; label: string }[]) => {
-		const value = (state as any)[stateKey];
-		const onInput = (e: Event) => {
-			(state as any)[stateKey] = (e.target as HTMLInputElement).value;
-			(state as any)[editedKey] = true;
-			renderApp();
-		};
-		if (type === "select" && options) {
-			return html`
-				<div>
-					<div class="text-xs text-muted-foreground mb-1">${label}</div>
-					<select class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background" .value=${value} @change=${onInput}>
-						${options.map((o) => html`<option value=${o.value} ?selected=${value === o.value}>${o.label}</option>`)}
-					</select>
-				</div>
-			`;
-		}
-		if (type === "textarea") {
-			return html`
-				<div>
-					<div class="text-xs text-muted-foreground mb-1">${label}</div>
-					<textarea class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background resize-y" rows="3" .value=${value} @input=${onInput}></textarea>
-				</div>
-			`;
-		}
-		return html`
-			<div>
-				<div class="text-xs text-muted-foreground mb-1">${label}</div>
-				<input class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background" .value=${value} @input=${onInput} />
-			</div>
-		`;
-	};
-
-	const canCreate = state.specPreviewId.trim() && state.specPreviewName.trim();
-
-	return html`
-		<div class="goal-preview-panel flex-1 flex flex-col border-l border-border min-h-0">
-			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-3">
-				<div class="text-sm font-semibold mb-1">Artifact Spec Preview</div>
-				${!state.assistantHasProposal ? html`<div class="text-sm text-muted-foreground italic">Waiting for assistant to propose a spec...</div>` : ""}
-				${field("ID", "specPreviewId", "specPreviewIdEdited")}
-				${field("Name", "specPreviewName", "specPreviewNameEdited")}
-				${field("Description", "specPreviewDescription", "specPreviewDescriptionEdited", "textarea")}
-				${field("Kind", "specPreviewKind", "specPreviewKindEdited", "select", [
-					{ value: "analysis", label: "Analysis" },
-					{ value: "deliverable", label: "Deliverable" },
-					{ value: "review", label: "Review" },
-					{ value: "verification", label: "Verification" },
-				])}
-				${field("Format", "specPreviewFormat", "specPreviewFormatEdited", "select", [
-					{ value: "markdown", label: "Markdown" },
-					{ value: "html", label: "HTML" },
-					{ value: "diff", label: "Diff" },
-					{ value: "command", label: "Command" },
-				])}
-				${field("Must Have (one per line)", "specPreviewMustHave", "specPreviewMustHaveEdited", "textarea")}
-				${field("Should Have (one per line)", "specPreviewShouldHave", "specPreviewShouldHaveEdited", "textarea")}
-				${field("Must Not Have (one per line)", "specPreviewMustNotHave", "specPreviewMustNotHaveEdited", "textarea")}
-				${field("Requires (comma-separated spec IDs)", "specPreviewRequires", "specPreviewRequiresEdited")}
-				${field("Suggested Role", "specPreviewSuggestedRole", "specPreviewSuggestedRoleEdited")}
-			</div>
-			<div class="shrink-0 flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
-				${Button({ variant: "ghost", onClick: backToSessions, children: "Close" })}
-				${canCreate ? Button({
-					variant: "default",
-					onClick: handleCreateSpec,
-					children: html`<span class="inline-flex items-center gap-1.5">${icon(Layers, "sm")} Create Spec</span>`,
 				}) : ""}
 			</div>
 		</div>
@@ -1208,7 +1122,6 @@ function getAssistantPreviewPanel(type: string) {
 		case "goal": return goalPreviewPanel();
 		case "role": return rolePreviewPanel();
 		case "tool": return toolPreviewPanel();
-		case "artifact-spec": return artifactSpecPreviewPanel();
 		case "personality": return personalityPreviewPanel();
 		case "staff": return staffPreviewPanel();
 		default: return "";
@@ -1599,8 +1512,8 @@ export function doRenderApp(): void {
 		if (route.view === "tools" || route.view === "tool-edit") {
 			return renderToolManagerPage();
 		}
-		if (route.view === "artifact-specs" || route.view === "artifact-spec-edit") {
-			return renderArtifactSpecPage();
+		if (route.view === "workflows" || route.view === "workflow-edit") {
+			return renderWorkflowPage();
 		}
 		if (route.view === "personalities" || route.view === "personality-edit") {
 			return renderPersonalityManagerPage();

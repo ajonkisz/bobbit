@@ -1,0 +1,135 @@
+id: bug-fix
+name: Bug Fix
+description: >
+  Fix a reported bug with verified reproduction, minimal fix, 
+  code review, and full test evidence.
+artifacts:
+  - id: issue-analysis
+    name: Issue Analysis
+    description: Root cause analysis with reproduction steps
+    kind: analysis
+    format: markdown
+    dependsOn: []
+    mustHave:
+      - Bug description and observed vs expected behaviour
+      - Specific reproduction steps
+      - Root cause with file:line references
+      - Affected code paths
+    shouldHave:
+      - Impact assessment
+      - Related issues or prior art
+    mustNotHave:
+      - Implementation details (that's a separate artifact)
+    verification:
+      type: llm-review
+      prompt: |
+        Review this issue analysis. Verify:
+        1. Reproduction steps are specific enough to follow mechanically
+        2. Root cause references actual source files and lines
+        3. Analysis distinguishes symptoms from underlying cause
+
+  - id: reproducing-test
+    name: Reproducing Test
+    description: A test that fails on master (proving the bug) and passes on the fix branch
+    kind: verification
+    format: command
+    dependsOn: [issue-analysis]
+    mustHave:
+      - Test that exercises the exact bug described in the issue analysis
+      - Run command that can be executed mechanically
+      - Test fails on master, passes on fix branch
+    mustNotHave:
+      - Tests that pass on both branches (not actually reproducing the bug)
+    verification:
+      type: command
+      steps:
+        - name: "Test fails on master (bug exists)"
+          type: command
+          command: "git stash push -m verify -q && git checkout {{master}} -q && {{command}}; X=$?; git checkout {{branch}} -q && git stash pop -q 2>/dev/null; [ $X -ne 0 ]"
+          timeout: 300
+        - name: "Test passes on fix branch (bug is fixed)"
+          type: command
+          command: "{{command}}"
+          timeout: 300
+
+  - id: implementation
+    name: Implementation
+    description: The code fix itself
+    kind: deliverable
+    format: diff
+    dependsOn: [issue-analysis, reproducing-test]
+    mustHave:
+      - All changes committed to goal branch
+      - Type-check passes (npm run check or equivalent)
+      - Fix addresses the root cause identified in issue analysis
+      - Minimal change — no unrelated modifications
+    mustNotHave:
+      - Unrelated refactoring mixed in
+      - Commented-out code
+    suggestedRole: coder
+    verification:
+      type: command
+      steps:
+        - name: "Type check passes"
+          type: command
+          command: "npm run check"
+          timeout: 120
+
+  - id: code-review
+    name: Code Review
+    description: Expert review verifying the fix is correct and minimal
+    kind: review
+    format: markdown
+    dependsOn: [implementation]
+    mustHave:
+      - Confirms fix addresses root cause from issue analysis
+      - Checks for regression risk
+      - Verifies minimality (no unrelated changes)
+      - Clear accept/reject verdict
+    mustNotHave:
+      - Rubber-stamp approval without specific observations
+    suggestedRole: reviewer
+    verification:
+      type: llm-review
+      prompt: |
+        Review this code review artifact. Verify:
+        1. The reviewer made specific observations about the code, not generic praise
+        2. The review references the root cause from the issue analysis
+        3. There is a clear verdict (accept/reject) with reasoning
+
+  - id: test-results
+    name: Test Results
+    description: Full test suite results proving no regressions
+    kind: verification
+    format: command
+    dependsOn: [implementation]
+    mustHave:
+      - Full test suite run command and output
+      - All tests pass
+      - No skipped tests that were previously passing
+    verification:
+      type: command
+      steps:
+        - name: "Full test suite passes"
+          type: command
+          command: "{{command}}"
+          timeout: 600
+
+  - id: bug-fix-report
+    name: Bug Fix Report
+    description: Final summary tying together the full bug fix lifecycle
+    kind: deliverable
+    format: html
+    dependsOn: [code-review, test-results]
+    mustHave:
+      - Bug summary and impact
+      - Root cause explanation
+      - Fix description with key code changes
+      - Test evidence (reproducing test + full suite)
+      - Review outcome
+    verification:
+      type: llm-review
+      prompt: |
+        Review this bug fix report. Verify all sections are present
+        and substantive (not just headings with placeholder text).
+        Cross-reference claims against the other artifacts in context.

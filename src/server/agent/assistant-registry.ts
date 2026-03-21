@@ -1,7 +1,6 @@
 import { GOAL_ASSISTANT_PROMPT } from "./goal-assistant.js";
 import { ROLE_ASSISTANT_PROMPT } from "./role-assistant.js";
 import { TOOL_ASSISTANT_PROMPT } from "./tool-assistant.js";
-import { ARTIFACT_SPEC_ASSISTANT_PROMPT } from "./artifact-spec-assistant.js";
 import { PERSONALITY_ASSISTANT_PROMPT } from "./personality-assistant.js";
 import { STAFF_ASSISTANT_PROMPT } from "./staff-assistant.js";
 
@@ -30,12 +29,6 @@ export const ASSISTANT_REGISTRY: Record<string, AssistantDef> = {
 		title: "Tool Assistant",
 		promptTitle: "Tool Management Assistant",
 		prompt: TOOL_ASSISTANT_PROMPT,
-	},
-	"artifact-spec": {
-		type: "artifact-spec",
-		title: "Spec Assistant",
-		promptTitle: "Artifact Spec Assistant",
-		prompt: ARTIFACT_SPEC_ASSISTANT_PROMPT,
 	},
 	personality: {
 		type: "personality",

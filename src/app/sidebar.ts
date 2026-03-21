@@ -317,11 +317,11 @@ export function renderSidebar() {
 					</button>
 					<button
 						class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
-						@click=${() => { import("./artifact-spec-page.js").then((m) => m.loadArtifactSpecPageData()); import("./routing.js").then((m) => m.setHashRoute("artifact-specs")); }}
-						title="Manage artifact specs"
+						@click=${() => { import("./workflow-page.js").then((m) => m.loadWorkflowPageData()); import("./routing.js").then((m) => m.setHashRoute("workflows")); }}
+						title="Manage workflows"
 					>
 						${icon(Layers, "sm")}
-						<span>Specs</span>
+						<span>Workflows</span>
 					</button>
 				</div>
 				<div class="flex items-center">

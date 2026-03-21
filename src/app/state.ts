@@ -19,7 +19,6 @@ export interface GatewaySession {
 	goalAssistant?: boolean;
 	roleAssistant?: boolean;
 	toolAssistant?: boolean;
-	artifactSpecAssistant?: boolean;
 	assistantType?: string;
 	colorIndex?: number;
 	/** If this is a delegate session, the parent session ID */
@@ -57,6 +56,25 @@ export interface Goal {
 	repoPath?: string;
 	team?: boolean;
 	teamLeadSessionId?: string;
+	workflowId?: string;
+	workflow?: {
+		id: string;
+		name: string;
+		description: string;
+		artifacts: Array<{
+			id: string;
+			name: string;
+			description: string;
+			kind: string;
+			format: string;
+			dependsOn: string[];
+			mustHave: string[];
+			shouldHave: string[];
+			mustNotHave: string[];
+			suggestedRole?: string;
+			verification?: any;
+		}>;
+	};
 }
 
 export type AppView = "disconnected" | "authenticated";
@@ -147,36 +165,6 @@ export const state = {
 	personalityPreviewDescriptionEdited: false,
 	personalityPreviewPromptFragmentEdited: false,
 	personalityPreviewPromptFragmentEditMode: false,
-
-	// Artifact spec assistant split-screen state
-	isArtifactSpecAssistantSession: false,
-	artifactSpecAssistantTab: "chat" as "chat" | "preview",
-	activeArtifactSpecProposal: null as {
-		id: string; name: string; description: string; kind: string; format: string;
-		mustHave: string; shouldHave: string; mustNotHave: string;
-		requires: string; suggestedRole: string;
-	} | null,
-	specPreviewId: "",
-	specPreviewName: "",
-	specPreviewDescription: "",
-	specPreviewKind: "analysis",
-	specPreviewFormat: "markdown",
-	specPreviewMustHave: "",
-	specPreviewShouldHave: "",
-	specPreviewMustNotHave: "",
-	specPreviewRequires: "",
-	specPreviewSuggestedRole: "",
-	specPreviewIdEdited: false,
-	specPreviewNameEdited: false,
-	specPreviewDescriptionEdited: false,
-	specPreviewKindEdited: false,
-	specPreviewFormatEdited: false,
-	specPreviewMustHaveEdited: false,
-	specPreviewShouldHaveEdited: false,
-	specPreviewMustNotHaveEdited: false,
-	specPreviewRequiresEdited: false,
-	specPreviewSuggestedRoleEdited: false,
-	hasReceivedSpecProposal: false,
 
 	// HTML preview panel (for live visual iteration — same pattern as goal/role assistant)
 	isPreviewSession: false,

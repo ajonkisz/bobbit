@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { piDir } from "../pi-dir.js";
+import type { Workflow } from "./workflow-store.js";
 
 export type GoalState = "todo" | "in-progress" | "complete" | "shelved";
 
@@ -25,6 +26,10 @@ export interface PersistedGoal {
 	teamLeadSessionId?: string;
 	/** Artifact types to skip requirement enforcement for */
 	skipArtifactRequirements?: string[];
+	/** ID of the workflow template this goal was created from */
+	workflowId?: string;
+	/** Frozen snapshot of the workflow at goal creation time */
+	workflow?: Workflow;
 }
 
 const STORE_DIR = piDir();

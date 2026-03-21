@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { GoalStore, type GoalState, type PersistedGoal } from "./goal-store.js";
 import { createWorktree, cleanupWorktree } from "../skills/git.js";
+import type { WorkflowStore } from "./workflow-store.js";
 
 /**
  * Sanitize a goal title into a valid git branch name.
@@ -32,9 +33,14 @@ function getRepoRoot(cwd: string): string {
 
 export class GoalManager {
 	private store = new GoalStore();
+	private workflowStore?: WorkflowStore;
 
-	createGoal(title: string, cwd: string, opts?: { spec?: string; team?: boolean; worktree?: boolean }): PersistedGoal {
-		const { spec = "", team = true, worktree = true } = opts ?? {};
+	constructor(workflowStore?: WorkflowStore) {
+		this.workflowStore = workflowStore;
+	}
+
+	createGoal(title: string, cwd: string, opts?: { spec?: string; team?: boolean; worktree?: boolean; workflowId?: string; workflowStore?: WorkflowStore }): PersistedGoal {
+		const { spec = "", team = true, worktree = true, workflowId, workflowStore = this.workflowStore } = opts ?? {};
 		const now = Date.now();
 		const id = randomUUID();
 
@@ -74,6 +80,17 @@ export class GoalManager {
 			repoPath,
 			team,
 		};
+
+		// Snapshot workflow onto goal if workflowId is provided
+		if (workflowId && workflowStore) {
+			const wf = workflowStore.get(workflowId);
+			if (!wf) {
+				throw new Error(`Workflow not found: ${workflowId}`);
+			}
+			goal.workflowId = workflowId;
+			goal.workflow = JSON.parse(JSON.stringify(wf));
+		}
+
 		this.store.put(goal);
 		return goal;
 	}

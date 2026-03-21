@@ -23,8 +23,9 @@ import { PersonalityManager } from "./agent/personality-manager.js";
 import type { TaskState } from "./agent/task-store.js";
 import { BgProcessManager } from "./agent/bg-process-manager.js";
 import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
-import { ArtifactSpecStore } from "./agent/artifact-spec-store.js";
-import { ArtifactSpecManager } from "./agent/artifact-spec-manager.js";
+import { WorkflowStore } from "./agent/workflow-store.js";
+import { WorkflowManager } from "./agent/workflow-manager.js";
+import { VerificationHarness } from "./agent/verification-harness.js";
 import { StaffManager } from "./agent/staff-manager.js";
 import { TriggerEngine } from "./agent/staff-trigger-engine.js";
 
@@ -59,6 +60,8 @@ export function createGateway(config: GatewayConfig) {
 	const roleManager = new RoleManager(roleStore);
 	const toolStore = new ToolStore();
 	const toolManager = new ToolManager(toolStore);
+	const goalArtifactStore = new GoalArtifactStore();
+	const workflowStore = new WorkflowStore();
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
@@ -66,12 +69,11 @@ export function createGateway(config: GatewayConfig) {
 		personalityManager,
 		roleManager,
 		toolManager,
+		workflowStore,
 	});
 	const protocol = config.tls ? "https" : "http";
 	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
-	const goalArtifactStore = new GoalArtifactStore();
-	const artifactSpecStore = new ArtifactSpecStore();
-	const artifactSpecManager = new ArtifactSpecManager(artifactSpecStore);
+	const workflowManager = new WorkflowManager(workflowStore);
 	const staffManager = new StaffManager();
 	const triggerEngine = new TriggerEngine(staffManager, sessionManager);
 	triggerEngine.start();
@@ -90,6 +92,9 @@ export function createGateway(config: GatewayConfig) {
 	(sessionManager as any).bgProcessManager = bgProcessManager;
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
+
+	// Verification harness — assigned after wss is created (closure captures the reference)
+	let verificationHarness: VerificationHarness;
 
 	const requestHandler = async (req: http.IncomingMessage, res: http.ServerResponse) => {
 		const url = new URL(req.url || "/", `http://${req.headers.host}`);
@@ -127,7 +132,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, personalityManager, bgProcessManager, staffManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, personalityManager, bgProcessManager, staffManager, workflowManager, verificationHarness);
 
 			return;
 		}
@@ -154,6 +159,28 @@ export function createGateway(config: GatewayConfig) {
 
 	// WebSocket server (noServer mode — we handle upgrade manually)
 	const wss = new WebSocketServer({ noServer: true });
+
+	// Broadcast a message to WebSocket clients belonging to a specific goal
+	function broadcastToGoal(goalId: string, event: any): void {
+		const data = JSON.stringify(event);
+		for (const ws of wss.clients) {
+			if ((ws as any).authenticated && ws.readyState === 1 /* OPEN */) {
+				const sid = (ws as any).sessionId as string | undefined;
+				if (sid) {
+					const session = sessionManager.getSession(sid);
+					if (session?.teamGoalId === goalId || session?.goalId === goalId) {
+						ws.send(data);
+						continue;
+					}
+				}
+				// Fallback: if we can't determine goal association, still send
+				// (e.g. the user's browser session viewing the goal dashboard)
+				ws.send(data);
+			}
+		}
+	}
+
+	verificationHarness = new VerificationHarness(goalArtifactStore, broadcastToGoal);
 
 	server.on("upgrade", (req, socket, head) => {
 		const url = new URL(req.url || "/", `http://${req.headers.host}`);
@@ -206,10 +233,11 @@ async function handleApiRoute(
 	roleManager: RoleManager,
 	toolManager: ToolManager,
 	goalArtifactStore: GoalArtifactStore,
-	artifactSpecManager: ArtifactSpecManager,
 	personalityManager: PersonalityManager,
 	bgProcessManager: BgProcessManager,
 	staffManager: StaffManager,
+	workflowManager: WorkflowManager,
+	verificationHarness: VerificationHarness,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -274,7 +302,6 @@ async function handleApiRoute(
 			goalAssistant: session.assistantType === "goal",
 			roleAssistant: session.assistantType === "role",
 			toolAssistant: session.assistantType === "tool",
-			artifactSpecAssistant: session.assistantType === "artifact-spec",
 			delegateOf: session.delegateOf,
 			role: session.role,
 			teamGoalId: session.teamGoalId,
@@ -323,7 +350,6 @@ async function handleApiRoute(
 			if (body?.goalAssistant) assistantType = "goal";
 			else if (body?.roleAssistant) assistantType = "role";
 			else if (body?.toolAssistant) assistantType = "tool";
-			else if (body?.artifactSpecAssistant) assistantType = "artifact-spec";
 		}
 
 		// If creating under a goal, use the goal's cwd as default
@@ -403,7 +429,6 @@ async function handleApiRoute(
 				goalAssistant: session.assistantType === "goal",
 				roleAssistant: session.assistantType === "role",
 				toolAssistant: session.assistantType === "tool",
-				artifactSpecAssistant: session.assistantType === "artifact-spec",
 				role: session.role,
 				accessory: session.accessory,
 				personalities: session.personalities,
@@ -430,12 +455,23 @@ async function handleApiRoute(
 		const spec = body?.spec || "";
 		const team = body?.team === true || body?.swarm === true; // Accept legacy 'swarm' field
 		const worktree = body?.worktree === true;
+		const workflowId = body?.workflowId;
 		if (!title || typeof title !== "string") {
 			json({ error: "Missing title" }, 400);
 			return;
 		}
-		const goal = sessionManager.goalManager.createGoal(title, cwd, { spec, team, worktree });
-		json(goal, 201);
+		try {
+			const goal = sessionManager.goalManager.createGoal(title, cwd, {
+				spec,
+				team,
+				worktree,
+				workflowId: workflowId && typeof workflowId === "string" ? workflowId : undefined,
+				workflowStore: workflowId ? workflowManager.store : undefined,
+			});
+			json(goal, 201);
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
 		return;
 	}
 
@@ -694,22 +730,41 @@ async function handleApiRoute(
 			json({ error: "Missing producedBy" }, 400); return;
 		}
 
-		// Enforce artifact spec requirements if specId is provided
-		if (body.specId && typeof body.specId === "string") {
-			const spec = artifactSpecManager.getSpec(body.specId);
-			if (spec && spec.requires && spec.requires.length > 0) {
+		// Enforce workflow artifact dependency gating
+		const workflowArtifactId = body.workflowArtifactId;
+		if (workflowArtifactId && typeof workflowArtifactId === "string" && goal.workflow) {
+			const wfArtifact = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
+			if (!wfArtifact) {
+				json({ error: `Unknown workflow artifact: ${workflowArtifactId}` }, 400);
+				return;
+			}
+			if (wfArtifact.dependsOn.length > 0) {
 				const existingArtifacts = goalArtifactStore.getByGoalId(goalId);
-				const existingSpecIds = new Set(existingArtifacts.map(a => a.specId || a.type));
-				const missingSpecs: string[] = [];
-				for (const reqId of spec.requires) {
-					if (!existingSpecIds.has(reqId)) {
-						missingSpecs.push(reqId);
-					}
-				}
-				if (missingSpecs.length > 0) {
-					json({ error: "Missing required artifacts", missingSpecs }, 409);
+				const acceptedWfIds = new Set(
+					existingArtifacts
+						.filter(a => a.status === "accepted" && a.workflowArtifactId)
+						.map(a => a.workflowArtifactId!)
+				);
+				const missing = wfArtifact.dependsOn.filter(dep => !acceptedWfIds.has(dep));
+				if (missing.length > 0) {
+					const missingNames = missing.map(id => {
+						const def = goal.workflow!.artifacts.find(a => a.id === id);
+						return def?.name || id;
+					});
+					json({ error: `Unmet dependencies: ${missingNames.join(", ")}`, missing }, 409);
 					return;
 				}
+			}
+		}
+
+		// Determine initial status: if workflow artifact has verification, start as "submitted"
+		let initialStatus = body.status;
+		const resolvedWfArtifactId = workflowArtifactId && typeof workflowArtifactId === "string" ? workflowArtifactId : undefined;
+		let wfArtifactForVerification: import("./agent/workflow-store.js").WorkflowArtifact | undefined;
+		if (resolvedWfArtifactId && goal.workflow) {
+			wfArtifactForVerification = goal.workflow.artifacts.find(a => a.id === resolvedWfArtifactId);
+			if (wfArtifactForVerification?.verification) {
+				initialStatus = "submitted";
 			}
 		}
 
@@ -721,9 +776,18 @@ async function handleApiRoute(
 			producedBy: body.producedBy,
 			skillId: body.skillId,
 			specId: body.specId,
-			status: body.status,
+			workflowArtifactId: resolvedWfArtifactId,
+			status: initialStatus,
 		});
 		json(artifact, 201);
+
+		// Fire-and-forget verification if the workflow artifact has a verification config
+		if (wfArtifactForVerification?.verification) {
+			verificationHarness.verify(
+				artifact.id, artifact, wfArtifactForVerification,
+				goal.cwd, goal.branch, "master", goal.workflow || undefined,
+			).catch(err => console.error("[verification] Error:", err));
+		}
 		return;
 	}
 
@@ -753,7 +817,42 @@ async function handleApiRoute(
 			skillId: body.skillId,
 		});
 		if (!updated) { json({ error: "Artifact not found" }, 404); return; }
+
+		// Re-trigger verification on update if artifact has a workflow artifact with verification
+		if (updated.workflowArtifactId) {
+			const goalId = goalArtifactMatch[1];
+			const goal = sessionManager.goalManager.getGoal(goalId);
+			if (goal?.workflow) {
+				const wfArt = goal.workflow.artifacts.find(a => a.id === updated.workflowArtifactId);
+				if (wfArt?.verification) {
+					// Reset status to submitted and re-verify
+					goalArtifactStore.update(updated.id, { status: "submitted", verificationResult: undefined, rejectionReason: undefined });
+					updated.status = "submitted";
+					verificationHarness.verify(
+						updated.id, updated, wfArt,
+						goal.cwd, goal.branch, "master", goal.workflow || undefined,
+					).catch(err => console.error("[verification] Error:", err));
+				}
+			}
+		}
+
 		json(updated);
+		return;
+	}
+
+	// GET /api/goals/:goalId/workflow-context/:workflowArtifactId — get dependency context for a workflow artifact
+	const workflowContextMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/workflow-context\/([^/]+)$/);
+	if (workflowContextMatch && req.method === "GET") {
+		const goalId = workflowContextMatch[1];
+		const workflowArtifactId = workflowContextMatch[2];
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+		if (!goal.workflow) { json({ error: "Goal has no workflow" }, 404); return; }
+		const wfArtifact = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
+		if (!wfArtifact) { json({ error: "Workflow artifact not found" }, 404); return; }
+
+		const context = teamManager.buildDependencyContext(goalId, workflowArtifactId);
+		json({ context, workflowArtifact: wfArtifact });
 		return;
 	}
 
@@ -883,7 +982,9 @@ async function handleApiRoute(
 			return;
 		}
 		try {
-			const spawnOpts = Array.isArray(body.personalities) ? { personalities: body.personalities as string[] } : undefined;
+			const spawnOpts: { personalities?: string[]; workflowArtifactId?: string } = {};
+			if (Array.isArray(body.personalities)) spawnOpts.personalities = body.personalities as string[];
+			if (typeof body.workflowArtifactId === "string") spawnOpts.workflowArtifactId = body.workflowArtifactId;
 			const result = await teamManager.spawnRole(goalId, body.role, body.task, spawnOpts);
 			json(result, 201);
 		} catch (err) {
@@ -1536,60 +1637,64 @@ async function handleApiRoute(
 		return;
 	}
 
-	// ── Artifact Spec endpoints ────────────────────────────────────
+	// ── Workflow endpoints ──────────────────────────────────────────
 
-	// GET /api/artifact-specs
-	const artifactSpecsMatch = url.pathname === "/api/artifact-specs";
-	if (artifactSpecsMatch && req.method === "GET") {
-		json({ specs: artifactSpecManager.listSpecs() });
+	// POST /api/workflows/:id/clone (must be checked BEFORE single-workflow route)
+	const workflowCloneMatch = url.pathname.match(/^\/api\/workflows\/([^/]+)\/clone$/);
+	if (workflowCloneMatch && req.method === "POST") {
+		const id = decodeURIComponent(workflowCloneMatch[1]);
+		try {
+			const cloned = workflowManager.cloneWorkflow(id);
+			json(cloned, 201);
+		} catch (err: any) {
+			json({ error: err.message }, 404);
+		}
 		return;
 	}
 
-	// POST /api/artifact-specs
-	if (artifactSpecsMatch && req.method === "POST") {
+	// GET /api/workflows
+	const workflowsMatch = url.pathname === "/api/workflows";
+	if (workflowsMatch && req.method === "GET") {
+		json({ workflows: workflowManager.listWorkflows() });
+		return;
+	}
+
+	// POST /api/workflows
+	if (workflowsMatch && req.method === "POST") {
 		const body = await readBody(req);
-		if (!body?.id || typeof body.id !== "string") { json({ error: "Missing id" }, 400); return; }
-		if (!body?.name || typeof body.name !== "string") { json({ error: "Missing name" }, 400); return; }
-		if (!body?.kind || typeof body.kind !== "string") { json({ error: "Missing kind" }, 400); return; }
-		if (!body?.format || typeof body.format !== "string") { json({ error: "Missing format" }, 400); return; }
+		if (!body) { json({ error: "Missing body" }, 400); return; }
 		try {
-			const spec = artifactSpecManager.createSpec({
+			const workflow = workflowManager.createWorkflow({
 				id: body.id,
 				name: body.name,
-				description: body.description || "",
-				kind: body.kind,
-				format: body.format,
-				mustHave: body.mustHave,
-				shouldHave: body.shouldHave,
-				mustNotHave: body.mustNotHave,
-				requires: body.requires,
-				suggestedRole: body.suggestedRole,
+				description: body.description,
+				artifacts: body.artifacts || [],
 			});
-			json(spec, 201);
+			json(workflow, 201);
 		} catch (err: any) {
 			json({ error: err.message }, 400);
 		}
 		return;
 	}
 
-	// GET /api/artifact-specs/:id
-	const artifactSpecMatch = url.pathname.match(/^\/api\/artifact-specs\/([^/]+)$/);
-	if (artifactSpecMatch && req.method === "GET") {
-		const spec = artifactSpecManager.getSpec(decodeURIComponent(artifactSpecMatch[1]));
-		if (!spec) { json({ error: "Artifact spec not found" }, 404); return; }
-		json(spec);
+	// GET /api/workflows/:id
+	const workflowMatch = url.pathname.match(/^\/api\/workflows\/([^/]+)$/);
+	if (workflowMatch && req.method === "GET") {
+		const wf = workflowManager.getWorkflow(decodeURIComponent(workflowMatch[1]));
+		if (!wf) { json({ error: "Workflow not found" }, 404); return; }
+		json(wf);
 		return;
 	}
 
-	// PUT /api/artifact-specs/:id
-	if (artifactSpecMatch && req.method === "PUT") {
-		const specId = decodeURIComponent(artifactSpecMatch[1]);
+	// PUT /api/workflows/:id
+	if (workflowMatch && req.method === "PUT") {
+		const id = decodeURIComponent(workflowMatch[1]);
 		const body = await readBody(req);
 		if (!body) { json({ error: "Missing body" }, 400); return; }
 		try {
-			const ok = artifactSpecManager.updateSpec(specId, body);
-			if (!ok) { json({ error: "Artifact spec not found" }, 404); return; }
-			const updated = artifactSpecManager.getSpec(specId);
+			const ok = workflowManager.updateWorkflow(id, body);
+			if (!ok) { json({ error: "Workflow not found" }, 404); return; }
+			const updated = workflowManager.getWorkflow(id);
 			json(updated);
 		} catch (err: any) {
 			json({ error: err.message }, 400);
@@ -1597,21 +1702,18 @@ async function handleApiRoute(
 		return;
 	}
 
-	// DELETE /api/artifact-specs/:id
-	if (artifactSpecMatch && req.method === "DELETE") {
-		const specId = decodeURIComponent(artifactSpecMatch[1]);
-		const spec = artifactSpecManager.getSpec(specId);
-		if (!spec) { json({ error: "Artifact spec not found" }, 404); return; }
-		// Check if any goal artifacts reference this spec
+	// DELETE /api/workflows/:id
+	if (workflowMatch && req.method === "DELETE") {
+		const id = decodeURIComponent(workflowMatch[1]);
+		const wf = workflowManager.getWorkflow(id);
+		if (!wf) { json({ error: "Workflow not found" }, 404); return; }
+		// Check if any active goal references this workflow
 		const allGoals = sessionManager.goalManager.listGoals();
-		for (const goal of allGoals) {
-			const artifacts = goalArtifactStore.getByGoalId(goal.id);
-			if (artifacts.some(a => a.specId === specId)) {
-				json({ error: "Cannot delete: artifact spec is referenced by existing goal artifacts" }, 409);
-				return;
-			}
+		if (allGoals.some((g: any) => g.workflowId === id && g.state !== "complete")) {
+			json({ error: "Cannot delete: workflow is in use by active goals" }, 409);
+			return;
 		}
-		artifactSpecManager.deleteSpec(specId);
+		workflowManager.deleteWorkflow(id);
 		res.writeHead(204);
 		res.end();
 		return;

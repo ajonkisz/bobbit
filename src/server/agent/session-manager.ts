@@ -41,7 +41,7 @@ export interface SessionInfo {
 	isCompacting: boolean;
 	titleGenerated: boolean;
 	goalId?: string;
-	/** Assistant type: "goal" | "role" | "tool" | "artifact-spec" */
+	/** Assistant type: "goal" | "role" | "tool" */
 	assistantType?: string;
 	/** Whether this session has a live HTML preview panel */
 	preview?: boolean;
@@ -97,6 +97,8 @@ export interface SessionManagerOptions {
 	roleManager?: RoleManager;
 	/** Tool manager for generating tool documentation in system prompts */
 	toolManager?: ToolManager;
+	/** Workflow store for injecting into GoalManager */
+	workflowStore?: import("./workflow-store.js").WorkflowStore;
 }
 
 export class SessionManager {
@@ -119,7 +121,7 @@ export class SessionManager {
 		this.personalityManager = options?.personalityManager;
 		this.roleManager = options?.roleManager;
 		this.toolManager = options?.toolManager;
-		this.goalManager = new GoalManager();
+		this.goalManager = new GoalManager(options?.workflowStore);
 		this.taskManager = new TaskManager();
 	}
 
@@ -612,7 +614,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, assistantType?: string, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; allowedTools?: string[]; personalities?: Array<{ label: string; promptFragment: string }>; personalityNames?: string[] }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, assistantType?: string, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; allowedTools?: string[]; personalities?: Array<{ label: string; promptFragment: string }>; personalityNames?: string[]; workflowContext?: string }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -704,6 +706,7 @@ export class SessionManager {
 				taskDependsOn,
 				personalities: opts?.personalities,
 				allowedTools: effectiveAllowedTools,
+				workflowContext: opts?.workflowContext,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
@@ -997,7 +1000,6 @@ export class SessionManager {
 		goalAssistant?: boolean;
 		roleAssistant?: boolean;
 		toolAssistant?: boolean;
-		artifactSpecAssistant?: boolean;
 		delegateOf?: string;
 		role?: string;
 		teamGoalId?: string;
@@ -1023,7 +1025,6 @@ export class SessionManager {
 			goalAssistant: s.assistantType === "goal",
 			roleAssistant: s.assistantType === "role",
 			toolAssistant: s.assistantType === "tool",
-			artifactSpecAssistant: s.assistantType === "artifact-spec",
 			delegateOf: s.delegateOf,
 			role: s.role,
 			teamGoalId: s.teamGoalId,

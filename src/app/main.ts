@@ -134,7 +134,7 @@ async function handleHashChange(): Promise<void> {
 			await loadToolPageData();
 			navigateToToolEdit(route.toolName);
 			await refreshSessions();
-		} else if (route.view === "artifact-specs") {
+		} else if (route.view === "workflows") {
 			clearDashboardState();
 			if (state.remoteAgent) {
 				state.remoteAgent.disconnect();
@@ -143,11 +143,11 @@ async function handleHashChange(): Promise<void> {
 			}
 			state.goalDashboardId = null;
 			state.appView = "authenticated";
-			const { loadArtifactSpecPageData } = await import("./artifact-spec-page.js");
-			loadArtifactSpecPageData();
+			const { loadWorkflowPageData } = await import("./workflow-page.js");
+			loadWorkflowPageData();
 			renderApp();
 			await refreshSessions();
-		} else if (route.view === "artifact-spec-edit" && route.artifactSpecId) {
+		} else if (route.view === "workflow-edit" && route.workflowId) {
 			clearDashboardState();
 			if (state.remoteAgent) {
 				state.remoteAgent.disconnect();
@@ -156,9 +156,9 @@ async function handleHashChange(): Promise<void> {
 			}
 			state.goalDashboardId = null;
 			state.appView = "authenticated";
-			const { loadArtifactSpecPageData, navigateToArtifactSpecEdit } = await import("./artifact-spec-page.js");
-			await loadArtifactSpecPageData();
-			navigateToArtifactSpecEdit(route.artifactSpecId);
+			const { loadWorkflowPageData, navigateToWorkflowEdit } = await import("./workflow-page.js");
+			await loadWorkflowPageData();
+			navigateToWorkflowEdit(route.workflowId);
 			await refreshSessions();
 		} else if (route.view === "staff") {
 			clearDashboardState();
@@ -284,6 +284,13 @@ async function initApp() {
 				const { loadToolPageData, navigateToToolEdit } = await import("./tool-manager-page.js");
 				await loadToolPageData();
 				navigateToToolEdit(route.toolName);
+			} else if (route.view === "workflows") {
+				const { loadWorkflowPageData } = await import("./workflow-page.js");
+				loadWorkflowPageData();
+			} else if (route.view === "workflow-edit" && route.workflowId) {
+				const { loadWorkflowPageData, navigateToWorkflowEdit } = await import("./workflow-page.js");
+				await loadWorkflowPageData();
+				navigateToWorkflowEdit(route.workflowId);
 			} else if (route.view === "staff") {
 				const { loadStaffPageData } = await import("./staff-page.js");
 				loadStaffPageData();

@@ -12,6 +12,14 @@ export interface GoalArtifact {
 	producedBy: string;
 	skillId?: string;
 	specId?: string;
+	/** Links to a workflow artifact definition within the goal's workflow snapshot */
+	workflowArtifactId?: string;
+	/** Result of automated verification steps */
+	verificationResult?: {
+		steps: Array<{ name: string; type: string; passed: boolean; output: string }>;
+	};
+	/** Reason the artifact was rejected during verification */
+	rejectionReason?: string;
 	status?: "submitted" | "accepted" | "rejected";
 	version: number;
 	createdAt: number;
@@ -38,6 +46,10 @@ export class GoalArtifactStore {
 							// Migration: existing artifacts without status are accepted
 							if (a.status === undefined) {
 								a.status = "accepted";
+							}
+							// Migration: map legacy specId to workflowArtifactId
+							if (a.specId && !a.workflowArtifactId) {
+								a.workflowArtifactId = a.specId;
 							}
 							this.artifacts.set(a.id, a);
 						}
@@ -84,7 +96,7 @@ export class GoalArtifactStore {
 		return Array.from(this.artifacts.values()).filter((a) => a.goalId === goalId);
 	}
 
-	update(id: string, updates: Partial<Pick<GoalArtifact, "name" | "type" | "content" | "skillId">>): GoalArtifact | undefined {
+	update(id: string, updates: Partial<Pick<GoalArtifact, "name" | "type" | "content" | "skillId" | "status" | "workflowArtifactId" | "verificationResult" | "rejectionReason">>): GoalArtifact | undefined {
 		const existing = this.artifacts.get(id);
 		if (!existing) return undefined;
 		const cleaned: Record<string, unknown> = {};

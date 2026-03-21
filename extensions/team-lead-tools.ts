@@ -80,11 +80,13 @@ export default function (pi: ExtensionAPI) {
 			role: Type.String({ description: "Agent role: 'coder', 'reviewer', or 'tester'" }),
 			task: Type.String({ description: "Task description sent as the agent's first prompt" }),
 			personalities: Type.Optional(Type.Array(Type.String(), { description: "Personality names (e.g. 'thorough', 'creative'). If omitted, uses the role's default personalities." })),
+			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this agent should produce. When set, accepted upstream dependency artifacts are injected into the agent's context." })),
 		}),
 		async execute(_id, params) {
 			try {
 				const body: Record<string, unknown> = { role: params.role, task: params.task };
 				if (params.personalities && params.personalities.length > 0) body.personalities = params.personalities;
+				if (params.workflowArtifactId) body.workflowArtifactId = params.workflowArtifactId;
 				return ok(await api("POST", `/api/goals/${goalId}/team/spawn`, body));
 			} catch (e: any) { return err(e.message); }
 		},

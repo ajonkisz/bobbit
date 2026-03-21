@@ -78,6 +78,7 @@ export function handleWebSocketConnection(
 
 			clearTimeout(authTimeout);
 			authenticated = true;
+			(ws as any).authenticated = true;
 
 			const session = sessionManager.getSession(sessionId);
 			if (!session) {

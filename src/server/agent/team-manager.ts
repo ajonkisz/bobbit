@@ -395,11 +395,62 @@ export class TeamManager {
 	 * Creates an isolated git worktree and a session with the role's system prompt.
 	 * Sends the task as the first prompt.
 	 */
+	/**
+	 * Build context from accepted upstream dependency artifacts for a workflow artifact.
+	 * Returns formatted markdown with each dependency's content, or empty string if none.
+	 */
+	buildDependencyContext(goalId: string, workflowArtifactId: string): string {
+		const goal = this.goalManager.getGoal(goalId);
+		if (!goal?.workflow) return "";
+
+		const wfArtifact = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
+		if (!wfArtifact || !wfArtifact.dependsOn?.length) return "";
+
+		const goalArtifacts = this.config.goalArtifactStore?.getByGoalId(goalId) ?? [];
+		const parts: string[] = [];
+
+		for (const depId of wfArtifact.dependsOn) {
+			const depDef = goal.workflow.artifacts.find(a => a.id === depId);
+			const depArtifact = goalArtifacts.find(
+				a => a.workflowArtifactId === depId && a.status === "accepted"
+			);
+			if (depArtifact && depDef) {
+				parts.push(`## ${depDef.name}\n\n${depArtifact.content}`);
+			}
+		}
+
+		if (parts.length === 0) return "";
+		return "\n\n# Upstream Artifacts\n\nHere are the accepted upstream artifacts you should build on:\n\n" + parts.join("\n\n---\n\n");
+	}
+
+	/**
+	 * Try to extract a workflowArtifactId from the task description.
+	 * Looks for a pattern like `[workflowArtifact:some-id]` in the task text.
+	 */
+	private extractWorkflowArtifactId(task: string, goalId: string): string | undefined {
+		// Check for explicit tag
+		const tagMatch = task.match(/\[workflowArtifact:([^\]]+)\]/);
+		if (tagMatch) return tagMatch[1];
+
+		// Try to match against workflow artifact names/IDs in the goal
+		const goal = this.goalManager.getGoal(goalId);
+		if (!goal?.workflow) return undefined;
+
+		const taskLower = task.toLowerCase();
+		for (const wfArtifact of goal.workflow.artifacts) {
+			// Match by artifact name (case-insensitive) or exact ID
+			if (taskLower.includes(wfArtifact.name.toLowerCase()) || task.includes(wfArtifact.id)) {
+				return wfArtifact.id;
+			}
+		}
+		return undefined;
+	}
+
 	async spawnRole(
 		goalId: string,
 		role: string,
 		task: string,
-		opts?: { personalities?: string[] },
+		opts?: { personalities?: string[]; workflowArtifactId?: string },
 	): Promise<{ sessionId: string; worktreePath: string }> {
 		const roleStore = this.config.roleStore;
 		const storedRoleDef = roleStore?.get(role);
@@ -460,13 +511,21 @@ export class TeamManager {
 				resolvedPersonalities = this.config.personalityManager.resolvePersonalities(personalityNames);
 			}
 
+			// Build workflow dependency context for the system prompt
+			let workflowContext: string | undefined;
+			const wfArtifactId = opts?.workflowArtifactId ?? this.extractWorkflowArtifactId(task, goalId);
+			if (wfArtifactId) {
+				const ctx = this.buildDependencyContext(goalId, wfArtifactId);
+				if (ctx) workflowContext = ctx;
+			}
+
 			// Create the session with the role's worktree as cwd, role prompt appended to goal spec
 			const session = await this.sessionManager.createSession(
 				worktreeResult.worktreePath,
 				undefined,
 				goalId,
 				undefined,
-				{ rolePrompt, allowedTools, personalities: resolvedPersonalities, personalityNames },
+				{ rolePrompt, allowedTools, personalities: resolvedPersonalities, personalityNames, workflowContext },
 			);
 
 			// Assign a unique color and title
@@ -496,8 +555,11 @@ export class TeamManager {
 			this.sessionToGoal.set(session.id, goalId);
 			this.persistEntry(goalId);
 
+			// Enrich task prompt with upstream dependency context if available
+			const enrichedTask = workflowContext ? task + workflowContext : task;
+
 			// Send the task as the first prompt
-			session.rpcClient.prompt(task).catch((err: any) => {
+			session.rpcClient.prompt(enrichedTask).catch((err: any) => {
 				console.error('[team-manager] Failed to send task prompt:', err);
 			});
 
@@ -681,13 +743,33 @@ export class TeamManager {
 
 		// Enforce required artifacts before allowing completion
 		if (this.config.goalArtifactStore) {
-			const artifacts = this.config.goalArtifactStore.getByGoalId(goalId);
-			const types = new Set(artifacts.map(a => a.type));
-			const missing: string[] = [];
-			if (!types.has("review-findings")) missing.push("review-findings");
-			if (!types.has("summary-report")) missing.push("summary-report");
-			if (missing.length > 0) {
-				throw new Error(`Cannot complete goal � missing required artifacts: ${missing.join(", ")}. Create them with artifact_create before calling team_complete.`);
+			const goal = this.goalManager.getGoal(goalId);
+			const skipReqs = goal?.skipArtifactRequirements;
+
+			// Legacy artifact type requirements (review-findings, summary-report)
+			if (!skipReqs || (!skipReqs.includes("review-findings") && !skipReqs.includes("summary-report"))) {
+				const artifacts = this.config.goalArtifactStore.getByGoalId(goalId);
+				const types = new Set(artifacts.map(a => a.type));
+				const missing: string[] = [];
+				if (!skipReqs?.includes("review-findings") && !types.has("review-findings")) missing.push("review-findings");
+				if (!skipReqs?.includes("summary-report") && !types.has("summary-report")) missing.push("summary-report");
+				if (missing.length > 0) {
+					throw new Error(`Cannot complete goal — missing required artifacts: ${missing.join(", ")}. Create them with artifact_create before calling team_complete.`);
+				}
+			}
+
+			// Workflow artifact requirements
+			if (goal?.workflow && (!skipReqs || !skipReqs.includes("workflow"))) {
+				const artifacts = this.config.goalArtifactStore.getByGoalId(goalId);
+				const acceptedWfIds = new Set(
+					artifacts
+						.filter(a => a.status === "accepted" && a.workflowArtifactId)
+						.map(a => a.workflowArtifactId!)
+				);
+				const missingWf = goal.workflow.artifacts.filter(a => !acceptedWfIds.has(a.id));
+				if (missingWf.length > 0) {
+					throw new Error(`Cannot complete: missing accepted artifacts for: ${missingWf.map(a => a.name).join(", ")}`);
+				}
 			}
 		}
 

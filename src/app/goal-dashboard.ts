@@ -611,6 +611,7 @@ function renderNavBar(goal: Goal): TemplateResult {
 					${svgArrowLeft}
 				</button>
 				<span class="nav-title">${goal.title}</span>
+				${goal.workflow ? html`<span class="nav-workflow-badge" title="Uses workflow: ${goal.workflow.name}">${goal.workflow.name}</span>` : nothing}
 			</div>
 			<div class="nav-right">
 				<button class="btn-icon" @click=${() => showGoalDialog(goal)} title="Edit goal">${svgPencil}</button>
@@ -1058,15 +1059,120 @@ function renderCommitsTab(): TemplateResult {
 // RENDER: ARTIFACTS TAB
 // ============================================================================
 
-function renderArtifactsTab(): TemplateResult {
-	const statuses = getArtifactStatuses(artifacts);
+function renderWorkflowChecklist(): TemplateResult {
+	if (!currentGoal?.workflow) return nothing as any;
 
-	if (statuses.length === 0) {
+	const wfArtifacts = currentGoal.workflow.artifacts;
+
+	// Build a map from workflowArtifactId to GoalArtifact
+	const goalArtifactMap = new Map<string, GoalArtifact>();
+	for (const a of artifacts) {
+		if (a.workflowArtifactId && !goalArtifactMap.has(a.workflowArtifactId)) {
+			goalArtifactMap.set(a.workflowArtifactId, a);
+		}
+	}
+
+	// Topological sort for display order
+	const visited = new Set<string>();
+	const sorted: typeof wfArtifacts = [];
+	const artMap = new Map(wfArtifacts.map(a => [a.id, a]));
+	function visit(id: string) {
+		if (visited.has(id)) return;
+		visited.add(id);
+		const art = artMap.get(id);
+		if (!art) return;
+		for (const dep of art.dependsOn) visit(dep);
+		sorted.push(art);
+	}
+	for (const a of wfArtifacts) visit(a.id);
+
+	const kindColors: Record<string, string> = {
+		analysis: "#60a5fa",
+		deliverable: "#34d399",
+		review: "#fbbf24",
+		verification: "#a78bfa",
+	};
+
+	return html`
+		<div class="wf-checklist">
+			<div class="wf-checklist-header">
+				<span class="wf-checklist-title">Workflow: ${currentGoal.workflow.name}</span>
+				<span class="wf-checklist-count">${sorted.filter(a => goalArtifactMap.get(a.id)?.status === "accepted").length}/${sorted.length} accepted</span>
+			</div>
+			${sorted.map(wfArt => {
+				const goalArt = goalArtifactMap.get(wfArt.id);
+				const status = goalArt?.status || "not-started";
+				const indent = wfArt.dependsOn.length > 0 ? "padding-left:20px;" : "";
+				const color = kindColors[wfArt.kind] || "#888";
+
+				let statusIcon: string;
+				let statusClass: string;
+				if (status === "accepted") {
+					statusIcon = "\u25CF"; // ●
+					statusClass = "wf-status-accepted";
+				} else if (status === "submitted") {
+					statusIcon = "\u25D0"; // ◐
+					statusClass = "wf-status-submitted";
+				} else if (status === "rejected") {
+					statusIcon = "\u2717"; // ✗
+					statusClass = "wf-status-rejected";
+				} else {
+					statusIcon = "\u25CB"; // ○
+					statusClass = "wf-status-pending";
+				}
+
+				const isExpanded = goalArt ? expandedArtifactIds.has(goalArt.id) : false;
+
+				return html`
+					<div class="wf-checklist-item" style="${indent}"
+						@click=${() => goalArt && toggleArtifactExpand(goalArt.id)}>
+						<span class="wf-status-icon ${statusClass}">${statusIcon}</span>
+						<span class="wf-kind-dot" style="background:${color}"></span>
+						<div class="wf-checklist-info">
+							<span class="wf-checklist-name">${wfArt.name}</span>
+							${wfArt.dependsOn.length > 0 ? html`
+								<span class="wf-checklist-deps">depends on: ${wfArt.dependsOn.join(", ")}</span>
+							` : nothing}
+						</div>
+						<span class="wf-checklist-status-label">${status === "not-started" ? "pending" : status}</span>
+						${goalArt ? html`<span class="wf-checklist-view">${isExpanded ? "Hide" : "View"}</span>` : nothing}
+					</div>
+					${isExpanded && goalArt ? html`
+						<div class="artifact-content-panel" style="${indent}">
+							<div class="artifact-content-header">
+								<span>${goalArt.name}</span>
+								${goalArt.verificationResult ? html`
+									<span class="artifact-skill-badge">
+										${goalArt.verificationResult.steps.filter(s => s.passed).length}/${goalArt.verificationResult.steps.length} checks passed
+									</span>
+								` : nothing}
+								${goalArt.rejectionReason ? html`
+									<span class="artifact-skill-badge" style="color:var(--destructive)">Rejected: ${goalArt.rejectionReason}</span>
+								` : nothing}
+							</div>
+							<pre class="artifact-content-body">${goalArt.content}</pre>
+						</div>
+					` : nothing}
+				`;
+			})}
+		</div>
+	`;
+}
+
+function renderArtifactsTab(): TemplateResult {
+	// If goal has a workflow, show the workflow checklist first
+	const hasWorkflow = currentGoal?.workflow && currentGoal.workflow.artifacts.length > 0;
+
+	const statuses = getArtifactStatuses(artifacts);
+	const hasAny = statuses.length > 0 || hasWorkflow;
+
+	if (!hasAny) {
 		return html`<div class="tab-empty">${svgFile}<span>No artifacts yet</span></div>`;
 	}
 
 	return html`
 		<div class="tab-panel-inner" style="padding-top:0;">
+			${hasWorkflow ? renderWorkflowChecklist() : nothing}
 			<div class="artifact-list">
 				${statuses.map(status => {
 					const { type, label, required, artifact } = status;

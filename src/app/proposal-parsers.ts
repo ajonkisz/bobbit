@@ -25,12 +25,6 @@ export const PROPOSAL_PARSERS: ProposalParser[] = [
 		callbackName: "onToolProposal",
 	},
 	{
-		tag: "artifact_spec_proposal",
-		fields: ["id", "name", "description", "kind", "format", "must-have", "should-have", "must-not-have", "requires", "suggested-role"],
-		requiredFields: ["id", "name"],
-		callbackName: "onArtifactSpecProposal",
-	},
-	{
 		tag: "personality_proposal",
 		fields: ["name", "label", "description", "prompt_fragment"],
 		requiredFields: ["name", "label", "prompt_fragment"],

@@ -2,9 +2,9 @@
 // URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected, #/goal/{id} = dashboard)
 // ============================================================================
 
-export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles" | "role-edit" | "tools" | "tool-edit" | "artifact-specs" | "artifact-spec-edit" | "personalities" | "personality-edit" | "staff" | "staff-edit";
+export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles" | "role-edit" | "tools" | "tool-edit" | "workflows" | "workflow-edit" | "personalities" | "personality-edit" | "staff" | "staff-edit";
 
-export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string; roleName?: string; toolName?: string; artifactSpecId?: string; personalityName?: string; staffId?: string } {
+export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string; roleName?: string; toolName?: string; workflowId?: string; personalityName?: string; staffId?: string } {
 	const hash = window.location.hash || "";
 	const sessionMatch = hash.match(/^#\/session\/([a-f0-9-]+)$/i);
 	if (sessionMatch) {
@@ -28,12 +28,12 @@ export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalI
 	if (hash === "#/tools") {
 		return { view: "tools" };
 	}
-	const artifactSpecEditMatch = hash.match(/^#\/artifact-specs\/([a-zA-Z0-9_-]+)$/);
-	if (artifactSpecEditMatch) {
-		return { view: "artifact-spec-edit", artifactSpecId: artifactSpecEditMatch[1] };
+	const workflowEditMatch = hash.match(/^#\/workflows\/([a-zA-Z0-9_-]+)$/);
+	if (workflowEditMatch) {
+		return { view: "workflow-edit", workflowId: workflowEditMatch[1] };
 	}
-	if (hash === "#/artifact-specs") {
-		return { view: "artifact-specs" };
+	if (hash === "#/workflows") {
+		return { view: "workflows" };
 	}
 	const staffEditMatch = hash.match(/^#\/staff\/([a-f0-9-]+)$/i);
 	if (staffEditMatch) {
@@ -66,10 +66,10 @@ export function setHashRoute(view: RouteView, id?: string, replace?: boolean): v
 		newHash = `#/tools/${id}`;
 	} else if (view === "tools") {
 		newHash = "#/tools";
-	} else if (view === "artifact-spec-edit" && id) {
-		newHash = `#/artifact-specs/${id}`;
-	} else if (view === "artifact-specs") {
-		newHash = "#/artifact-specs";
+	} else if (view === "workflow-edit" && id) {
+		newHash = `#/workflows/${id}`;
+	} else if (view === "workflows") {
+		newHash = "#/workflows";
 	} else if (view === "staff-edit" && id) {
 		newHash = `#/staff/${id}`;
 	} else if (view === "staff") {

@@ -92,6 +92,8 @@ export interface PromptParts {
 	toolDocs?: string;
 	/** Allowed tool names for this session — used to filter tool docs */
 	allowedTools?: string[];
+	/** Pre-formatted upstream artifact context from workflow dependencies */
+	workflowContext?: string;
 }
 
 /**
@@ -160,6 +162,11 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 		}
 
 		sections.push(taskLines.join("\n"));
+	}
+
+	// 6. Workflow dependency context (accepted upstream artifacts)
+	if (parts.workflowContext?.trim()) {
+		sections.push(parts.workflowContext.trim());
 	}
 
 	if (sections.length === 0) return undefined;

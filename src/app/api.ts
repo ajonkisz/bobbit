@@ -182,12 +182,14 @@ export async function fetchGitStatus(sessionId: string): Promise<GitStatusData |
 // GOAL API
 // ============================================================================
 
-export async function createGoal(title: string, cwd: string, opts?: { spec?: string; team?: boolean; worktree?: boolean }): Promise<Goal | null> {
-	const { spec = "", team = true, worktree = true } = opts ?? {};
+export async function createGoal(title: string, cwd: string, opts?: { spec?: string; team?: boolean; worktree?: boolean; workflowId?: string }): Promise<Goal | null> {
+	const { spec = "", team = true, worktree = true, workflowId } = opts ?? {};
 	try {
+		const body: Record<string, any> = { title, cwd, spec, team, worktree };
+		if (workflowId) body.workflowId = workflowId;
 		const res = await gatewayFetch("/api/goals", {
 			method: "POST",
-			body: JSON.stringify({ title, cwd, spec, team, worktree }),
+			body: JSON.stringify(body),
 		});
 		if (!res.ok) throw new Error(`Failed to create goal: ${res.status}`);
 		const goal = await res.json();
@@ -326,6 +328,7 @@ export interface GoalArtifact {
 	name: string;
 	type: string;
 	specId?: string;
+	workflowArtifactId?: string;
 	status?: string;
 	content: string;
 	producedBy: string;
@@ -333,55 +336,65 @@ export interface GoalArtifact {
 	version: number;
 	createdAt: number;
 	updatedAt: number;
+	verificationResult?: {
+		steps: Array<{ name: string; type: string; passed: boolean; output: string }>;
+	};
+	rejectionReason?: string;
 }
 
 // ============================================================================
-// ARTIFACT SPEC API
+// WORKFLOW API
 // ============================================================================
 
-export type ArtifactKind = "analysis" | "deliverable" | "review" | "verification";
-export type ArtifactFormat = "markdown" | "html" | "diff" | "command";
-
-export interface ArtifactSpec {
+export interface WorkflowArtifact {
 	id: string;
 	name: string;
 	description: string;
-	kind: ArtifactKind;
-	format: ArtifactFormat;
+	kind: string;
+	format: string;
+	dependsOn: string[];
 	mustHave: string[];
 	shouldHave: string[];
 	mustNotHave: string[];
-	requires?: string[];
 	suggestedRole?: string;
+	verification?: any;
+}
+
+export interface Workflow {
+	id: string;
+	name: string;
+	description: string;
+	artifacts: WorkflowArtifact[];
 	createdAt: number;
 	updatedAt: number;
 }
 
-export async function fetchArtifactSpecs(): Promise<ArtifactSpec[]> {
+export async function fetchWorkflows(): Promise<Workflow[]> {
 	try {
-		const res = await gatewayFetch("/api/artifact-specs");
-		if (!res.ok) throw new Error(`Failed: ${res.status}`);
+		const res = await gatewayFetch("/api/workflows");
+		if (!res.ok) return [];
 		const data = await res.json();
-		return data.specs || [];
-	} catch (err) {
-		console.error("[api] fetchArtifactSpecs failed:", err);
+		return data.workflows || [];
+	} catch {
 		return [];
 	}
 }
 
-export async function fetchArtifactSpec(id: string): Promise<ArtifactSpec | null> {
+export async function fetchWorkflow(id: string): Promise<Workflow | null> {
 	try {
-		const res = await gatewayFetch(`/api/artifact-specs/${encodeURIComponent(id)}`);
+		const res = await gatewayFetch(`/api/workflows/${encodeURIComponent(id)}`);
 		if (!res.ok) return null;
 		return await res.json();
-	} catch { return null; }
+	} catch {
+		return null;
+	}
 }
 
-export async function createArtifactSpec(spec: { id: string; name: string; kind: string; format: string; description?: string; mustHave?: string[]; shouldHave?: string[]; mustNotHave?: string[]; requires?: string[]; suggestedRole?: string }): Promise<ArtifactSpec | null> {
+export async function createWorkflow(workflow: { id: string; name: string; description: string; artifacts: WorkflowArtifact[] }): Promise<Workflow | null> {
 	try {
-		const res = await gatewayFetch("/api/artifact-specs", {
+		const res = await gatewayFetch("/api/workflows", {
 			method: "POST",
-			body: JSON.stringify(spec),
+			body: JSON.stringify(workflow),
 		});
 		if (!res.ok) {
 			const data = await res.json().catch(() => ({}));
@@ -389,14 +402,14 @@ export async function createArtifactSpec(spec: { id: string; name: string; kind:
 		}
 		return await res.json();
 	} catch (err) {
-		showConnectionError("Failed to create artifact spec", err instanceof Error ? err.message : String(err));
+		showConnectionError("Failed to create workflow", err instanceof Error ? err.message : String(err));
 		return null;
 	}
 }
 
-export async function updateArtifactSpec(id: string, updates: Partial<ArtifactSpec>): Promise<boolean> {
+export async function updateWorkflow(id: string, updates: Partial<Workflow>): Promise<boolean> {
 	try {
-		const res = await gatewayFetch(`/api/artifact-specs/${encodeURIComponent(id)}`, {
+		const res = await gatewayFetch(`/api/workflows/${encodeURIComponent(id)}`, {
 			method: "PUT",
 			body: JSON.stringify(updates),
 		});
@@ -406,24 +419,36 @@ export async function updateArtifactSpec(id: string, updates: Partial<ArtifactSp
 		}
 		return true;
 	} catch (err) {
-		showConnectionError("Failed to update artifact spec", err instanceof Error ? err.message : String(err));
+		showConnectionError("Failed to update workflow", err instanceof Error ? err.message : String(err));
 		return false;
 	}
 }
 
-export async function deleteArtifactSpec(id: string): Promise<boolean> {
+export async function deleteWorkflow(id: string): Promise<boolean> {
 	try {
-		const res = await gatewayFetch(`/api/artifact-specs/${encodeURIComponent(id)}`, {
+		const res = await gatewayFetch(`/api/workflows/${encodeURIComponent(id)}`, {
 			method: "DELETE",
+		});
+		return res.ok || res.status === 204;
+	} catch (err) {
+		showConnectionError("Failed to delete workflow", err instanceof Error ? err.message : String(err));
+		return false;
+	}
+}
+
+export async function cloneWorkflow(id: string): Promise<Workflow | null> {
+	try {
+		const res = await gatewayFetch(`/api/workflows/${encodeURIComponent(id)}/clone`, {
+			method: "POST",
 		});
 		if (!res.ok) {
 			const data = await res.json().catch(() => ({}));
 			throw new Error(data.error || `Failed: ${res.status}`);
 		}
-		return true;
+		return await res.json();
 	} catch (err) {
-		showConnectionError("Failed to delete artifact spec", err instanceof Error ? err.message : String(err));
-		return false;
+		showConnectionError("Failed to clone workflow", err instanceof Error ? err.message : String(err));
+		return null;
 	}
 }
 
