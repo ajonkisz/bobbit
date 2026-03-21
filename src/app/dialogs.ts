@@ -794,8 +794,8 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let cwdValue = proposal.cwd || "";
 	let specValue = proposal.spec;
 	let saving = false;
-	let teamValue = false;
-	let worktreeValue = false;
+	let teamValue = true;
+	let worktreeValue = true;
 	let cwdDropdownOpen = false;
 	let cwdHighlightIndex = -1;
 
