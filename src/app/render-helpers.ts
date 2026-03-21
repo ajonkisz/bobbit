@@ -178,7 +178,7 @@ function renderSessionTime(session: GatewaySession) {
 	if (!time) return "";
 	const unseen = hasUnseenActivity(session);
 	return html`<span
-		class="shrink-0 flex items-center gap-0.5 text-[10px] tabular-nums ${unseen ? "text-muted-foreground font-medium" : "text-muted-foreground/50"}"
+		class="shrink-0 flex items-center gap-0.5 text-[10px] tabular-nums ${unseen ? "text-foreground/70 font-medium" : "text-muted-foreground/50"}"
 		title="${formatSessionAge(session.lastActivity)}"
 	>${time}${unseen ? html`<span class="text-primary" style="font-size:6px;line-height:1;">●</span>` : ""}</span>`;
 }
