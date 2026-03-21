@@ -55,6 +55,8 @@ export interface SessionInfo {
 	worktreePath?: string;
 	/** Task ID this session is working on */
 	taskId?: string;
+	/** Staff agent ID this session belongs to */
+	staffId?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory?: string;
 	/** Personality trait names */
@@ -542,6 +544,7 @@ export class SessionManager {
 			teamGoalId: ps.teamGoalId,
 			worktreePath: ps.worktreePath,
 			taskId: ps.taskId,
+			staffId: ps.staffId,
 			accessory: ps.accessory,
 			preview: ps.preview,
 			traits: ps.traits,
@@ -954,6 +957,7 @@ export class SessionManager {
 			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
+			staffId: session.staffId,
 			accessory: session.accessory,
 			preview: session.preview,
 			traits: session.traits,
@@ -984,6 +988,7 @@ export class SessionManager {
 		teamGoalId?: string;
 		worktreePath?: string;
 		taskId?: string;
+		staffId?: string;
 		accessory?: string;
 		preview?: boolean;
 		traits?: string[];
@@ -1009,6 +1014,7 @@ export class SessionManager {
 			teamGoalId: s.teamGoalId,
 			worktreePath: s.worktreePath,
 			taskId: s.taskId,
+			staffId: s.staffId,
 			accessory: s.accessory,
 			preview: s.preview,
 			traits: s.traits,

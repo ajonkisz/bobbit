@@ -24,6 +24,7 @@ import type { TaskState } from "./agent/task-store.js";
 import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
 import { ArtifactSpecStore } from "./agent/artifact-spec-store.js";
 import { ArtifactSpecManager } from "./agent/artifact-spec-manager.js";
+import { StaffManager } from "./agent/staff-manager.js";
 
 const VALID_TASK_STATES = new Set<string>(["todo", "in-progress", "blocked", "complete", "skipped"]);
 
@@ -69,6 +70,7 @@ export function createGateway(config: GatewayConfig) {
 	const goalArtifactStore = new GoalArtifactStore();
 	const artifactSpecStore = new ArtifactSpecStore();
 	const artifactSpecManager = new ArtifactSpecManager(artifactSpecStore);
+	const staffManager = new StaffManager();
 	const teamManager = new TeamManager(sessionManager, {
 		colorStore,
 		taskManager: sessionManager.taskManager,
@@ -115,7 +117,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, traitManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, traitManager, staffManager);
 			return;
 		}
 
@@ -194,6 +196,7 @@ async function handleApiRoute(
 	goalArtifactStore: GoalArtifactStore,
 	artifactSpecManager: ArtifactSpecManager,
 	traitManager: TraitManager,
+	staffManager: StaffManager,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -264,6 +267,7 @@ async function handleApiRoute(
 			teamGoalId: session.teamGoalId,
 			worktreePath: session.worktreePath,
 			taskId: session.taskId,
+			staffId: session.staffId,
 			colorIndex: colorStore.get(session.id),
 			preview: session.preview,
 			traits: session.traits,
@@ -1686,6 +1690,102 @@ async function handleApiRoute(
 			: path.join(piDir(), "preview.html");
 		fs.writeFileSync(previewPath, body?.html || "", "utf-8");
 		json({ ok: true });
+		return;
+	}
+
+	// ── Staff endpoints ────────────────────────────────────────────
+
+	// GET /api/staff
+	if (url.pathname === "/api/staff" && req.method === "GET") {
+		json({ staff: staffManager.listStaff() });
+		return;
+	}
+
+	// POST /api/staff
+	if (url.pathname === "/api/staff" && req.method === "POST") {
+		const body = await readBody(req);
+		if (!body?.name || typeof body.name !== "string") {
+			json({ error: "Missing name" }, 400);
+			return;
+		}
+		if (!body?.systemPrompt || typeof body.systemPrompt !== "string") {
+			json({ error: "Missing systemPrompt" }, 400);
+			return;
+		}
+		const cwd = body.cwd || config.defaultCwd;
+		const staff = staffManager.createStaff(
+			body.name,
+			body.description || "",
+			body.systemPrompt,
+			cwd,
+			{ triggers: body.triggers, roleId: body.roleId },
+		);
+		json(staff, 201);
+		return;
+	}
+
+	// Routes with staff :id parameter
+	const staffMatch = url.pathname.match(/^\/api\/staff\/([^/]+)$/);
+	if (staffMatch) {
+		const id = staffMatch[1];
+
+		if (req.method === "GET") {
+			const staff = staffManager.getStaff(id);
+			if (!staff) { json({ error: "Staff agent not found" }, 404); return; }
+			json(staff);
+			return;
+		}
+
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			const ok = staffManager.updateStaff(id, {
+				name: body.name,
+				description: body.description,
+				systemPrompt: body.systemPrompt,
+				cwd: body.cwd,
+				state: body.state,
+				triggers: body.triggers,
+				memory: body.memory,
+				roleId: body.roleId,
+			});
+			if (!ok) { json({ error: "Staff agent not found" }, 404); return; }
+			json(staffManager.getStaff(id));
+			return;
+		}
+
+		if (req.method === "DELETE") {
+			const ok = staffManager.deleteStaff(id);
+			if (!ok) { json({ error: "Staff agent not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
+	}
+
+	// POST /api/staff/:id/wake — manually trigger a wake cycle
+	const staffWakeMatch = url.pathname.match(/^\/api\/staff\/([^/]+)\/wake$/);
+	if (staffWakeMatch && req.method === "POST") {
+		const id = staffWakeMatch[1];
+		const staff = staffManager.getStaff(id);
+		if (!staff) { json({ error: "Staff agent not found" }, 404); return; }
+		const body = await readBody(req);
+		try {
+			const sessionId = await staffManager.wake(id, body?.prompt, sessionManager);
+			json({ sessionId }, 201);
+		} catch (err) {
+			json({ error: String(err) }, 400);
+		}
+		return;
+	}
+
+	// GET /api/staff/:id/sessions — list sessions for a staff agent
+	const staffSessionsMatch = url.pathname.match(/^\/api\/staff\/([^/]+)\/sessions$/);
+	if (staffSessionsMatch && req.method === "GET") {
+		const id = staffSessionsMatch[1];
+		const staff = staffManager.getStaff(id);
+		if (!staff) { json({ error: "Staff agent not found" }, 404); return; }
+		const sessions = staffManager.getSessionsByStaffId(id, sessionManager);
+		json({ sessions });
 		return;
 	}
 
