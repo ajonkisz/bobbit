@@ -1,4 +1,8 @@
 name: task_list
 description: "List all tasks for the goal"
+summary: "List all tasks for the current goal with state, type, and dependencies."
+provider:
+  type: bobbit-extension
+  extension: goal-tools.ts
 group: Tasks
 renderer: src/ui/tools/renderers/TaskToolRenderers.ts

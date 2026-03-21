@@ -1,4 +1,8 @@
 name: team_dismiss
 description: "Terminate an agent and clean up"
+summary: "Terminate a team agent and clean up its worktree."
+provider:
+  type: bobbit-extension
+  extension: team-lead-tools.ts
 group: Team
 renderer: src/ui/tools/renderers/TeamToolRenderers.ts

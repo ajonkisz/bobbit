@@ -1,4 +1,8 @@
 name: artifact_list
 description: "List all goal artifacts"
+summary: "List all goal artifacts (design docs, test plans, findings). Metadata only."
+provider:
+  type: bobbit-extension
+  extension: goal-tools.ts
 group: Artifacts
 renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts

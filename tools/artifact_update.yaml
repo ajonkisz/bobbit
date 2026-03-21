@@ -1,4 +1,8 @@
 name: artifact_update
 description: "Update an artifact's content"
+summary: "Update an artifact's content. Increments the version number."
+provider:
+  type: bobbit-extension
+  extension: goal-tools.ts
 group: Artifacts
 renderer: src/ui/tools/renderers/ArtifactToolRenderers.ts

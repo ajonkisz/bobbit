@@ -1,4 +1,8 @@
 name: team_abort
 description: "Force-abort a stuck agent that won't respond to steering"
+summary: "Force-abort a stuck agent that won't respond to steering."
+provider:
+  type: bobbit-extension
+  extension: team-lead-tools.ts
 group: Team
 renderer: src/ui/tools/renderers/TeamToolRenderers.ts

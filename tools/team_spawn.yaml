@@ -1,4 +1,8 @@
 name: team_spawn
 description: "Spawn a role agent with its own worktree"
+summary: "Spawn a role agent (coder, reviewer, tester) with its own git worktree."
+provider:
+  type: bobbit-extension
+  extension: team-lead-tools.ts
 group: Team
 renderer: src/ui/tools/renderers/TeamToolRenderers.ts

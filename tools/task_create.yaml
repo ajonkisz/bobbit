@@ -1,4 +1,8 @@
 name: task_create
 description: "Create a new task with type and dependencies"
+summary: "Create a new task with type, spec, and dependency tracking."
+provider:
+  type: bobbit-extension
+  extension: goal-tools.ts
 group: Tasks
 renderer: src/ui/tools/renderers/TaskToolRenderers.ts

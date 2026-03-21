@@ -1,4 +1,8 @@
 name: browser_click
 description: "Click an element by CSS selector"
+summary: "Click an element in the headless browser by CSS selector."
+provider:
+  type: user-extension
+  extension: playwright/index.ts
 group: Browser
 renderer: src/ui/tools/renderers/BrowserClickRenderer.ts

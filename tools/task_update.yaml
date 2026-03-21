@@ -1,4 +1,8 @@
 name: task_update
 description: "Update task fields, assignment, or state"
+summary: "Update task fields, assignment, or state (todo, in-progress, complete, blocked)."
+provider:
+  type: bobbit-extension
+  extension: goal-tools.ts
 group: Tasks
 renderer: src/ui/tools/renderers/TaskToolRenderers.ts

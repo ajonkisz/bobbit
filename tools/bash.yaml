@@ -1,5 +1,9 @@
 name: bash
 description: "Execute shell commands"
+summary: "Execute shell commands. Returns stdout/stderr, truncated to 2000 lines or 50KB."
+provider:
+  type: builtin
+  tool: bash
 group: Shell
 renderer: src/ui/tools/renderers/BashRenderer.ts
 docs: |

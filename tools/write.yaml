@@ -1,5 +1,9 @@
 name: write
 description: "Create or overwrite a file"
+summary: "Create or overwrite a file. Automatically creates parent directories."
+provider:
+  type: builtin
+  tool: write
 group: File System
 renderer: src/ui/tools/renderers/WriteRenderer.ts
 docs: |

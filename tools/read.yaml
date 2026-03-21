@@ -1,5 +1,9 @@
 name: read
 description: "Read file contents (text or images)"
+summary: "Read file contents (text or images). Truncated to 2000 lines or 50KB; use offset/limit for large files."
+provider:
+  type: builtin
+  tool: read
 group: File System
 renderer: src/ui/tools/renderers/ReadRenderer.ts
 docs: |
