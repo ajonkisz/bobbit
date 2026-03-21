@@ -138,7 +138,6 @@ function renderMobileLanding() {
 										</div>
 										${isUngroupedExpanded ? ungroupedSessions.map(renderSessionRow) : ""}
 									</div>
-								${renderStaffSidebarSection()}
 								` : ungroupedSessions.length > 0 ? html`
 									<div class="flex flex-col gap-0.5">
 										<div class="flex items-center gap-1.5 px-2 py-1.5">
