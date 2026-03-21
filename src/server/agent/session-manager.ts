@@ -491,6 +491,15 @@ export class SessionManager {
 			}
 		}
 
+		// Derive allowedTools from role so restored prompts filter tool docs correctly
+		let restoredAllowedTools: string[] | undefined;
+		if (ps.role && this.roleManager) {
+			const role = this.roleManager.getRole(ps.role);
+			if (role && role.allowedTools.length > 0) {
+				restoredAllowedTools = role.allowedTools;
+			}
+		}
+
 		// Re-assemble system prompt (global + AGENTS.md + goal spec)
 		const assistantDef = ps.assistantType ? getAssistantDef(ps.assistantType) : undefined;
 		if (assistantDef) {
@@ -516,6 +525,7 @@ export class SessionManager {
 				goalState: goal?.state,
 				goalSpec: goal?.spec,
 				traits: resolvedTraits,
+				allowedTools: restoredAllowedTools,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
@@ -545,6 +555,7 @@ export class SessionManager {
 			accessory: ps.accessory,
 			preview: ps.preview,
 			traits: ps.traits,
+			allowedTools: restoredAllowedTools,
 			promptQueue: new PromptQueue(ps.messageQueue),
 		};
 

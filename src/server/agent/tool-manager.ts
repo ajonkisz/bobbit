@@ -179,6 +179,16 @@ export class ToolManager {
 		return base?.provider;
 	}
 
+	/** Returns all tool providers in a single YAML scan (avoids repeated disk reads). */
+	getToolProviders(): Map<string, ToolProvider> {
+		const tools = loadToolDefinitions();
+		const map = new Map<string, ToolProvider>();
+		for (const tool of tools) {
+			if (tool.provider) map.set(tool.name, tool.provider);
+		}
+		return map;
+	}
+
 	/** Returns all tool names from YAML definitions. */
 	getAllToolNames(): string[] {
 		return loadToolDefinitions().map((t) => t.name);

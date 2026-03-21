@@ -34,23 +34,24 @@ export function computeToolActivationArgs(allowedTools?: string[], toolManager?:
 
 	if (!toolManager) {
 		// Fallback: no tool manager available, can't resolve providers.
-		// Enable all base tools and don't restrict extensions (backward compat).
-		console.warn("[tool-activation] No ToolManager provided — using fallback (all base tools, no extension control)");
+		// Enable all base tools and disable extension auto-discovery for safety.
+		console.warn("[tool-activation] No ToolManager provided — using fallback (all base tools, no extensions)");
 		args.push("--tools", "read,bash,edit,write,grep,find,ls");
+		args.push("--no-extensions");
 		return { args };
 	}
 
 	const extDir = path.join(piDir(), "extensions");
 
+	// Load all providers in a single YAML scan
+	const providers = toolManager.getToolProviders();
+
 	// No restrictions — enable all builtins and all user extensions
 	if (!allowedTools || allowedTools.length === 0) {
-		const allNames = toolManager.getAllToolNames();
 		const builtins: string[] = [];
 		const extensionPaths = new Set<string>();
 
-		for (const name of allNames) {
-			const provider = toolManager.getToolProvider(name);
-			if (!provider) continue;
+		for (const [, provider] of providers) {
 			if (provider.type === "builtin" && provider.tool) {
 				builtins.push(provider.tool);
 			} else if (provider.type === "user-extension" && provider.extension) {
@@ -74,7 +75,7 @@ export function computeToolActivationArgs(allowedTools?: string[], toolManager?:
 	const neededExtensions = new Set<string>();
 
 	for (const toolName of allowedTools) {
-		const provider = toolManager.getToolProvider(toolName);
+		const provider = providers.get(toolName);
 		if (!provider) {
 			// Unknown tool — log warning and skip
 			console.warn(`[tool-activation] Tool "${toolName}" has no provider in tools/*.yaml — skipping`);
