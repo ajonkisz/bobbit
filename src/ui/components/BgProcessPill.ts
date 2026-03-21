@@ -109,11 +109,6 @@ export class BgProcessPill extends LitElement {
 				${!isRunning && p.exitCode !== null
 					? html`<span class="${p.exitCode === 0 ? "text-muted-foreground" : "text-red-400"} shrink-0">${p.exitCode}</span>`
 					: nothing}
-				${!isRunning ? html`<span
-					class="ml-0.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-					@click=${this._dismiss}
-					title="Dismiss"
-				>&times;</span>` : nothing}
 			</button>
 
 			${this.expanded
@@ -129,12 +124,17 @@ export class BgProcessPill extends LitElement {
 								<span class="truncate font-mono">${p.id}</span>
 								<span class="text-[10px] text-muted-foreground font-normal">pid ${p.pid}</span>
 							</div>
-							${isRunning
-								? html`<button
-									class="px-2 py-0.5 rounded text-[11px] bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-									@click=${this._kill}
-								>Kill</button>`
-								: nothing}
+							<div class="flex items-center gap-1.5">
+								${isRunning
+									? html`<button
+										class="px-2 py-0.5 rounded text-[11px] bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+										@click=${this._kill}
+									>Kill</button>`
+									: html`<button
+										class="px-2 py-0.5 rounded text-[11px] bg-muted text-muted-foreground hover:text-foreground transition-colors"
+										@click=${this._dismiss}
+									>Remove</button>`}
+							</div>
 						</div>
 
 						<div class="text-muted-foreground mb-2 font-mono break-all">${p.command}</div>

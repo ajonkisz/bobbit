@@ -532,10 +532,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 				killBgProcess(sessionId, processId);
 			};
 			state.chatPanel.agentInterface.onBgProcessDismiss = (processId: string) => {
-				const ai = state.chatPanel?.agentInterface;
-				if (ai) {
-					ai.bgProcesses = ai.bgProcesses.filter((p) => p.id !== processId);
-				}
+				dismissBgProcess(sessionId, processId);
 			};
 		}
 
@@ -800,6 +797,17 @@ async function killBgProcess(sessionId: string, processId: string): Promise<void
 		await gatewayFetch(`/api/sessions/${sessionId}/bg-processes/${processId}`, { method: "DELETE" });
 		// Refresh the list after kill
 		refreshBgProcessesForSession(sessionId);
+	} catch { /* ignore */ }
+}
+
+async function dismissBgProcess(sessionId: string, processId: string): Promise<void> {
+	// Optimistically remove from UI
+	const ai = state.chatPanel?.agentInterface;
+	if (ai) {
+		ai.bgProcesses = ai.bgProcesses.filter((p) => p.id !== processId);
+	}
+	try {
+		await gatewayFetch(`/api/sessions/${sessionId}/bg-processes/${processId}`, { method: "DELETE" });
 	} catch { /* ignore */ }
 }
 

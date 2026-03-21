@@ -1734,12 +1734,16 @@ async function handleApiRoute(
 		return;
 	}
 
-	// DELETE /api/sessions/:id/bg-processes/:pid — kill a background process
+	// DELETE /api/sessions/:id/bg-processes/:pid — kill or remove a background process
 	const bgKillMatch = url.pathname.match(/^\/api\/sessions\/([^/]+)\/bg-processes\/([^/]+)$/);
 	if (bgKillMatch && req.method === "DELETE") {
 		const [, sessionId, processId] = bgKillMatch;
+		// Try kill first (running), then remove (exited)
 		const killed = bgProcessManager.kill(sessionId, processId);
-		if (!killed) { json({ error: "Process not found or already exited" }, 404); return; }
+		if (!killed) {
+			const removed = bgProcessManager.remove(sessionId, processId);
+			if (!removed) { json({ error: "Process not found" }, 404); return; }
+		}
 		json({ ok: true });
 		return;
 	}

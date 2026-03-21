@@ -212,6 +212,16 @@ export class BgProcessManager {
 		return true;
 	}
 
+	/** Remove an exited process from the map. Returns true if removed. */
+	remove(sessionId: string, processId: string): boolean {
+		const bg = this.processes.get(sessionId)?.get(processId);
+		if (!bg) return false;
+		if (bg.status === "running") return false; // must kill first
+		this.processes.get(sessionId)!.delete(processId);
+		if (this.processes.get(sessionId)!.size === 0) this.processes.delete(sessionId);
+		return true;
+	}
+
 	/** Clean up all bg processes for a session (on terminate) */
 	cleanup(sessionId: string): void {
 		const map = this.processes.get(sessionId);
