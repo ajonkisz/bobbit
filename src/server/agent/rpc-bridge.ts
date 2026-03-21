@@ -39,6 +39,11 @@ export class RpcBridge {
 		if (this.options.systemPromptPath) args.push("--system-prompt", this.options.systemPromptPath);
 		if (this.options.args) args.push(...this.options.args);
 
+		// Enable all built-in tools (including grep, find, ls) unless --tools was explicitly passed
+		if (!args.includes("--tools")) {
+			args.push("--tools", "read,bash,edit,write,grep,find,ls");
+		}
+
 		this.process = spawn("node", [cliPath, ...args], {
 			stdio: ["pipe", "pipe", "pipe"],
 			cwd: this.options.cwd,

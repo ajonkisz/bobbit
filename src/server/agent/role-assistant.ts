@@ -46,7 +46,7 @@ Include git conventions and idle behavior.
 - **name**: URL-safe identifier (lowercase alphanumeric + hyphens). This is immutable after creation.
 - **label**: Short human-readable display name.
 - **prompt**: The full system prompt template. Make it detailed and actionable.
-- **tools**: Comma-separated list of allowed tools. Every role must explicitly list its tools. Available tools: read, write, edit, bash, web_search, web_fetch, delegate, browser_navigate, browser_screenshot, browser_click, browser_type, browser_eval, browser_wait, team_spawn, team_list, team_dismiss, team_complete, team_abort, task_list, task_create, task_update, artifact_list, artifact_create, artifact_get, artifact_update.
+- **tools**: Comma-separated list of allowed tools. Every role must explicitly list its tools. Available tools: read, write, edit, bash, grep, find, ls, web_search, web_fetch, delegate, browser_navigate, browser_screenshot, browser_click, browser_type, browser_eval, browser_wait, team_spawn, team_list, team_dismiss, team_complete, team_abort, task_list, task_create, task_update, artifact_list, artifact_create, artifact_get, artifact_update.
 - **accessory**: Pixel-art accessory for the agent's avatar. Options: crown, bandana, magnifier, palette, set-square, pencil, shield, none.
 
 ### Accessory guide
