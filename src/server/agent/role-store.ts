@@ -15,6 +15,8 @@ export interface Role {
 	allowedTools: string[];
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory: string;
+	/** Default personality traits applied when no explicit traits are specified */
+	defaultTraits?: string[];
 	createdAt: number;
 	updatedAt: number;
 }
@@ -65,6 +67,7 @@ export class RoleStore {
 						promptTemplate: data.promptTemplate ?? "",
 						allowedTools: Array.isArray(data.allowedTools) ? data.allowedTools : [],
 						accessory: data.accessory ?? "none",
+						defaultTraits: Array.isArray(data.defaultTraits) ? data.defaultTraits : undefined,
 						createdAt: data.createdAt ?? 0,
 						updatedAt: data.updatedAt ?? 0,
 					});
@@ -78,15 +81,19 @@ export class RoleStore {
 	private saveOne(role: Role): void {
 		const filePath = this.roleFilePath(role.name);
 		try {
-			const content = stringify({
+			const obj: Record<string, unknown> = {
 				name: role.name,
 				label: role.label,
 				accessory: role.accessory,
 				allowedTools: role.allowedTools,
-				createdAt: role.createdAt,
-				updatedAt: role.updatedAt,
-				promptTemplate: role.promptTemplate,
-			}, { lineWidth: 0 });
+			};
+			if (role.defaultTraits && role.defaultTraits.length > 0) {
+				obj.defaultTraits = role.defaultTraits;
+			}
+			obj.createdAt = role.createdAt;
+			obj.updatedAt = role.updatedAt;
+			obj.promptTemplate = role.promptTemplate;
+			const content = stringify(obj, { lineWidth: 0 });
 			fs.writeFileSync(filePath, content, "utf-8");
 		} catch (err) {
 			console.error(`[role-store] Failed to save ${filePath}:`, err);

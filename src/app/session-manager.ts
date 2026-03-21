@@ -559,7 +559,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 // CREATE & CONNECT
 // ============================================================================
 
-export async function createAndConnectSession(goalId?: string, roleId?: string): Promise<void> {
+export async function createAndConnectSession(goalId?: string, roleId?: string, traits?: string[]): Promise<void> {
 	if (state.creatingSession) return;
 	state.creatingSession = true;
 	state.creatingSessionForGoalId = goalId || null;
@@ -568,6 +568,7 @@ export async function createAndConnectSession(goalId?: string, roleId?: string):
 		const body: any = {};
 		if (goalId) body.goalId = goalId;
 		if (roleId) body.roleId = roleId;
+		if (traits && traits.length > 0) body.traits = traits;
 		const res = await gatewayFetch("/api/sessions", {
 			method: "POST",
 			body: JSON.stringify(body),

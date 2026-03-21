@@ -16,43 +16,112 @@ import {
 } from "./state.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
-import { refreshSessions, fetchRoles } from "./api.js";
+import { refreshSessions, fetchRoles, fetchTraits, type TraitData } from "./api.js";
 import { statusBobbit, sessionAcronym } from "./session-colors.js";
 import { renderGoalGroup, renderSessionRow, showSessionTooltip, hideSessionTooltip, SESSION_ROW_PY } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
 
 // ============================================================================
-// ROLE PICKER
+// ROLE + TRAIT PICKER
 // ============================================================================
 
-/** Toggle role picker dropdown, fetching roles if needed. */
-export async function toggleRolePicker(e: Event): Promise<void> {
+/** Cached trait definitions. */
+let _cachedTraits: TraitData[] = [];
+let _traitsLoaded = false;
+/** Currently selected role in the picker. */
+let _pickerRole = "";
+/** Currently selected traits in the picker. */
+let _pickerTraits = new Set<string>();
+/** Goal ID context for the picker (if launched from a goal). */
+let _pickerGoalId: string | undefined;
+
+async function ensureTraitsLoaded(): Promise<void> {
+	if (_traitsLoaded) return;
+	_traitsLoaded = true;
+	_cachedTraits = await fetchTraits();
+}
+
+/** Toggle role picker dropdown, fetching roles and traits if needed. */
+export async function toggleRolePicker(e: Event, goalId?: string): Promise<void> {
 	e.stopPropagation();
 	if (state.rolePickerOpen) {
 		state.rolePickerOpen = false;
 		renderApp();
 		return;
 	}
+	_pickerRole = "";
+	_pickerTraits = new Set();
+	_pickerGoalId = goalId;
 	if (state.roles.length === 0) await fetchRoles();
+	await ensureTraitsLoaded();
 	state.rolePickerOpen = true;
 	renderApp();
 }
 
+/** Exported for use in edit-session dialog and other places. */
+export { _cachedTraits as cachedTraits, ensureTraitsLoaded };
+
 export function renderRolePickerDropdown() {
 	if (!state.rolePickerOpen) return "";
+
+	const selectRole = (roleName: string) => {
+		_pickerRole = _pickerRole === roleName ? "" : roleName;
+		renderApp();
+	};
+	const toggleTrait = (traitName: string) => {
+		if (_pickerTraits.has(traitName)) _pickerTraits.delete(traitName);
+		else _pickerTraits.add(traitName);
+		renderApp();
+	};
+	const doCreate = () => {
+		state.rolePickerOpen = false;
+		const traits = [..._pickerTraits];
+		createAndConnectSession(_pickerGoalId, _pickerRole || undefined, traits.length > 0 ? traits : undefined);
+	};
+
 	return html`
-		<div class="absolute right-0 top-full mt-1 z-50 rounded-md shadow-lg py-1 min-w-[140px]"
+		<div class="absolute right-0 top-full mt-1 z-50 rounded-md shadow-lg py-1 min-w-[200px] max-w-[280px]"
 			style="background: var(--popover); border: 1px solid var(--border);"
 			@click=${(e: Event) => e.stopPropagation()}>
+			<!-- Roles -->
+			<div class="px-3 pt-1 pb-1 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Role</div>
 			${state.roles.length === 0
-				? html`<div class="px-3 py-2 text-xs text-muted-foreground">No roles defined</div>`
+				? html`<div class="px-3 py-1 text-xs text-muted-foreground">No roles defined</div>`
 				: state.roles.map(role => html`
-					<button class="w-full text-left px-3 py-2.5 text-sm hover:bg-secondary/50 active:bg-secondary text-foreground flex items-center gap-2"
-						@click=${() => { state.rolePickerOpen = false; createAndConnectSession(undefined, role.name); }}>
+					<button class="w-full text-left px-3 py-1.5 text-sm hover:bg-secondary/50 active:bg-secondary text-foreground flex items-center gap-2 ${_pickerRole === role.name ? "bg-secondary" : ""}"
+						@click=${() => selectRole(role.name)}>
 						<span class="shrink-0">${statusBobbit("idle", false, undefined, false, false, false, false, role.accessory, true)}</span>
-						<span>${role.label}</span>
+						<span class="flex-1">${role.label}</span>
+						${_pickerRole === role.name ? html`<span class="text-primary text-xs">&#10003;</span>` : ""}
 					</button>
 				`)}
+			<!-- Traits -->
+			${_cachedTraits.length > 0 ? html`
+				<div class="border-t border-border/50 mt-1 pt-1">
+					<div class="px-3 pt-1 pb-1.5 text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Traits</div>
+					<div class="px-3 pb-2 flex flex-wrap gap-1">
+						${_cachedTraits.map(trait => {
+							const selected = _pickerTraits.has(trait.name);
+							return html`<button
+								class="px-2 py-0.5 text-[11px] rounded-xl border transition-colors cursor-pointer"
+								style="${selected
+									? "background: hsl(var(--primary) / 0.15); color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.3);"
+									: "background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); border-color: transparent;"}"
+								title=${trait.description}
+								@click=${() => toggleTrait(trait.name)}
+							>${trait.label}</button>`;
+						})}
+					</div>
+				</div>
+			` : ""}
+			<!-- Create button -->
+			<div class="border-t border-border/50 px-3 py-2">
+				<button
+					class="w-full text-center px-3 py-1.5 text-sm rounded-md transition-colors"
+					style="background: hsl(var(--primary)); color: hsl(var(--primary-foreground));"
+					@click=${doCreate}
+				>Create Session</button>
+			</div>
 		</div>
 	`;
 }

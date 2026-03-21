@@ -74,15 +74,18 @@ export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "team_spawn",
 		label: "Spawn Team Agent",
-		description: "Spawn a new role agent with its own git worktree. Returns the new session ID and worktree path.",
-		promptSnippet: "Spawn a coder, reviewer, or tester agent with a task description.",
+		description: "Spawn a new role agent with its own git worktree. Returns the new session ID and worktree path. Optionally specify personality traits to shape how the agent works.",
+		promptSnippet: "Spawn a coder, reviewer, or tester agent with a task description and optional personality traits.",
 		parameters: Type.Object({
 			role: Type.String({ description: "Agent role: 'coder', 'reviewer', or 'tester'" }),
 			task: Type.String({ description: "Task description sent as the agent's first prompt" }),
+			traits: Type.Optional(Type.Array(Type.String(), { description: "Personality trait names (e.g. 'thorough', 'creative'). If omitted, uses the role's default traits." })),
 		}),
 		async execute(_id, params) {
 			try {
-				return ok(await api("POST", `/api/goals/${goalId}/team/spawn`, { role: params.role, task: params.task }));
+				const body: Record<string, unknown> = { role: params.role, task: params.task };
+				if (params.traits && params.traits.length > 0) body.traits = params.traits;
+				return ok(await api("POST", `/api/goals/${goalId}/team/spawn`, body));
 			} catch (e: any) { return err(e.message); }
 		},
 	});

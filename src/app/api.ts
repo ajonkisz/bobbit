@@ -449,6 +449,31 @@ export async function fetchGoalArtifact(goalId: string, artifactId: string): Pro
 }
 
 // ============================================================================
+// TRAIT API
+// ============================================================================
+
+export interface TraitData {
+	name: string;
+	label: string;
+	description: string;
+	promptFragment: string;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export async function fetchTraits(): Promise<TraitData[]> {
+	try {
+		const res = await gatewayFetch("/api/traits");
+		if (!res.ok) throw new Error(`Failed to fetch traits: ${res.status}`);
+		const data = await res.json();
+		return data.traits || [];
+	} catch (err) {
+		console.error("[trait-api] fetchTraits failed:", err);
+		return [];
+	}
+}
+
+// ============================================================================
 // ROLE API
 // ============================================================================
 

@@ -138,7 +138,18 @@ export function renderSessionRow(session: GatewaySession) {
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead", session.role === "coder", session.accessory)}
 			</div>
-			<div class="flex-1 min-w-0 truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			<div class="flex-1 min-w-0 flex flex-col">
+				<div class="truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+				${session.traits && session.traits.length > 0 ? html`
+					<div class="flex flex-wrap gap-0.5 mt-0.5">
+						${session.traits.map((t) => html`<span
+							class="text-[9px] leading-none px-1 py-px rounded-md"
+							style="background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); opacity: 0.8;"
+							title=${t}
+						>${t}</span>`)}
+					</div>
+				` : ""}
+			</div>
 			${mobile
 				? buttons
 				: html`<div class="sidebar-actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center gap-0 pr-1 pl-8 rounded-r-md" style="background:linear-gradient(to right, transparent 0%, var(--sidebar) 50%);">

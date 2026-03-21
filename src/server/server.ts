@@ -17,6 +17,8 @@ import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
 import { ToolStore } from "./agent/tool-store.js";
 import { ToolManager } from "./agent/tool-manager.js";
+import { TraitStore } from "./agent/trait-store.js";
+import { TraitManager } from "./agent/trait-manager.js";
 import { TOOL_ASSISTANT_PROMPT } from "./agent/tool-assistant.js";
 import { ARTIFACT_SPEC_ASSISTANT_PROMPT } from "./agent/artifact-spec-assistant.js";
 import type { TaskState } from "./agent/task-store.js";
@@ -48,18 +50,22 @@ export function createGateway(config: GatewayConfig) {
 	exportSkillDefinitions();
 
 	const colorStore = new ColorStore();
+	const traitStore = new TraitStore();
+	const traitManager = new TraitManager(traitStore);
+	fs.mkdirSync(piDir(), { recursive: true });
+	const roleStore = new RoleStore();
+	const roleManager = new RoleManager(roleStore);
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
 		systemPromptPath: config.systemPromptPath,
 		colorStore,
+		traitManager,
+		roleManager,
 	});
 	const protocol = config.tls ? "https" : "http";
 	const gatewayUrl = `${protocol}://${config.host}:${config.port}`;
 
-	fs.mkdirSync(piDir(), { recursive: true });
-	const roleStore = new RoleStore();
 	const toolStore = new ToolStore();
-	const roleManager = new RoleManager(roleStore);
 	const toolManager = new ToolManager(toolStore);
 	const goalArtifactStore = new GoalArtifactStore();
 	const artifactSpecStore = new ArtifactSpecStore();
@@ -69,6 +75,7 @@ export function createGateway(config: GatewayConfig) {
 		taskManager: sessionManager.taskManager,
 		roleStore,
 		goalArtifactStore,
+		traitManager,
 	});
 	const rateLimiter = new RateLimiter();
 	const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 60_000);
@@ -109,7 +116,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, artifactSpecManager, traitManager);
 			return;
 		}
 
@@ -187,6 +194,7 @@ async function handleApiRoute(
 	toolManager: ToolManager,
 	goalArtifactStore: GoalArtifactStore,
 	artifactSpecManager: ArtifactSpecManager,
+	traitManager: TraitManager,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -254,6 +262,7 @@ async function handleApiRoute(
 			taskId: session.taskId,
 			colorIndex: colorStore.get(session.id),
 			preview: session.preview,
+			traits: session.traits,
 		});
 		return;
 	}
@@ -308,7 +317,7 @@ async function handleApiRoute(
 
 		// If a roleId is provided, look up the role and pass its prompt/tools/accessory
 		const roleId = body?.roleId;
-		let createOpts: { rolePrompt?: string; allowedTools?: string[]; roleAssistant?: boolean; toolAssistant?: boolean; artifactSpecAssistant?: boolean } | undefined;
+		let createOpts: { rolePrompt?: string; allowedTools?: string[]; roleAssistant?: boolean; toolAssistant?: boolean; artifactSpecAssistant?: boolean; traits?: Array<{ label: string; promptFragment: string }>; traitNames?: string[] } | undefined;
 		let roleForMeta: { name: string; accessory: string } | undefined;
 
 		if (toolAssistant) {
@@ -328,6 +337,30 @@ async function handleApiRoute(
 				allowedTools: role.allowedTools,
 			};
 			roleForMeta = { name: role.name, accessory: role.accessory };
+		}
+
+		// Resolve personality traits
+		const bodyTraits = Array.isArray(body?.traits) ? body.traits as string[] : undefined;
+		let traitNames: string[] | undefined;
+		if (bodyTraits && bodyTraits.length > 0) {
+			// Validate trait names
+			const invalid = bodyTraits.filter(t => !traitManager.getTrait(t));
+			if (invalid.length > 0) {
+				json({ error: `Unknown traits: ${invalid.join(", ")}` }, 400);
+				return;
+			}
+			traitNames = bodyTraits;
+		} else if (roleForMeta) {
+			// Use role's default traits if no explicit traits provided
+			const role = roleManager.getRole(roleForMeta.name);
+			if (role?.defaultTraits && role.defaultTraits.length > 0) {
+				traitNames = role.defaultTraits;
+			}
+		}
+
+		if (traitNames && traitNames.length > 0) {
+			const resolved = traitManager.resolveTraits(traitNames);
+			createOpts = { ...createOpts, traits: resolved, traitNames };
 		}
 
 		try {
@@ -351,6 +384,7 @@ async function handleApiRoute(
 				artifactSpecAssistant: session.artifactSpecAssistant,
 				role: session.role,
 				accessory: session.accessory,
+				traits: session.traits,
 			}, 201);
 		} catch (err) {
 			json({ error: String(err) }, 500);
@@ -507,6 +541,64 @@ async function handleApiRoute(
 		if (req.method === "DELETE") {
 			const ok = roleManager.deleteRole(name);
 			if (!ok) { json({ error: "Role not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
+	}
+
+	// ── Trait endpoints ────────────────────────────────────────────
+
+	// GET /api/traits
+	if (url.pathname === "/api/traits" && req.method === "GET") {
+		json({ traits: traitManager.listTraits() });
+		return;
+	}
+
+	// POST /api/traits
+	if (url.pathname === "/api/traits" && req.method === "POST") {
+		const body = await readBody(req);
+		try {
+			const trait = traitManager.createTrait({
+				name: body?.name,
+				label: body?.label,
+				description: body?.description || "",
+				promptFragment: body?.promptFragment || "",
+			});
+			json(trait, 201);
+		} catch (err: any) {
+			json({ error: err.message }, 400);
+		}
+		return;
+	}
+
+	// Routes with trait :name parameter
+	const traitMatch = url.pathname.match(/^\/api\/traits\/([^/]+)$/);
+	if (traitMatch) {
+		const name = decodeURIComponent(traitMatch[1]);
+
+		if (req.method === "GET") {
+			const trait = traitManager.getTrait(name);
+			if (!trait) { json({ error: "Trait not found" }, 404); return; }
+			json(trait);
+			return;
+		}
+
+		if (req.method === "PUT") {
+			const body = await readBody(req);
+			if (!body) { json({ error: "Missing body" }, 400); return; }
+			const ok = traitManager.updateTrait(name, {
+				label: body.label,
+				description: body.description,
+				promptFragment: body.promptFragment,
+			});
+			if (!ok) { json({ error: "Trait not found" }, 404); return; }
+			json({ ok: true });
+			return;
+		}
+
+		if (req.method === "DELETE") {
+			const ok = traitManager.deleteTrait(name);
+			if (!ok) { json({ error: "Trait not found" }, 404); return; }
 			json({ ok: true });
 			return;
 		}
@@ -769,7 +861,8 @@ async function handleApiRoute(
 			return;
 		}
 		try {
-			const result = await teamManager.spawnRole(goalId, body.role, body.task);
+			const spawnOpts = Array.isArray(body.traits) ? { traits: body.traits as string[] } : undefined;
+			const result = await teamManager.spawnRole(goalId, body.role, body.task, spawnOpts);
 			json(result, 201);
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -1100,11 +1193,26 @@ async function handleApiRoute(
 			sessionManager.persistSessionMetadata(session).catch(() => {});
 		}
 
+		// Track whether roleId handling already took care of traits
+		let roleHandledTraits = false;
+
 		if (typeof body.roleId === "string" && body.roleId !== "") {
 			const role = roleManager.getRole(body.roleId);
 			if (!role) { json({ error: `Role "${body.roleId}" not found` }, 404); return; }
+			// If traits are also present, validate and pass them to assignRole to avoid double restart
+			let assignOpts: { traits?: string[] } | undefined;
+			if (Array.isArray(body.traits)) {
+				const newTraits = body.traits as string[];
+				const invalid = newTraits.filter((t: string) => !traitManager.getTrait(t));
+				if (invalid.length > 0) {
+					json({ error: `Unknown traits: ${invalid.join(", ")}` }, 400);
+					return;
+				}
+				assignOpts = { traits: newTraits };
+				roleHandledTraits = true;
+			}
 			try {
-				const ok = await sessionManager.assignRole(id, role);
+				const ok = await sessionManager.assignRole(id, role, assignOpts);
 				if (!ok) { json({ error: "Session not found" }, 404); return; }
 			} catch (err) {
 				json({ error: String(err) }, 400);
@@ -1126,6 +1234,23 @@ async function handleApiRoute(
 			if (typeof body.goalAssistant === "boolean") session.goalAssistant = body.goalAssistant;
 			if (typeof body.goalId === "string") session.goalId = body.goalId;
 			sessionManager.persistSessionMetadata(session).catch(() => {});
+		}
+
+		if (Array.isArray(body.traits) && !roleHandledTraits) {
+			const newTraits = body.traits as string[];
+			// Validate trait names
+			const invalid = newTraits.filter((t: string) => !traitManager.getTrait(t));
+			if (invalid.length > 0) {
+				json({ error: `Unknown traits: ${invalid.join(", ")}` }, 400);
+				return;
+			}
+			try {
+				const ok = await sessionManager.updateTraits(id, newTraits);
+				if (!ok) { json({ error: "Session not found" }, 404); return; }
+			} catch (err) {
+				json({ error: String(err) }, 400);
+				return;
+			}
 		}
 
 		json({ ok: true });

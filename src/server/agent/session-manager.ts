@@ -18,6 +18,8 @@ import { assembleSystemPrompt, cleanupSessionPrompt } from "./system-prompt.js";
 import { generateSessionTitle } from "./title-generator.js";
 import { CostTracker } from "./cost-tracker.js";
 import type { ColorStore } from "./color-store.js";
+import type { TraitManager } from "./trait-manager.js";
+import type { RoleManager } from "./role-manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -62,6 +64,8 @@ export interface SessionInfo {
 	taskId?: string;
 	/** Pixel-art accessory ID for the Bobbit sprite overlay */
 	accessory?: string;
+	/** Personality trait names */
+	traits?: string[];
 	/** Allowed tools for this session */
 	allowedTools?: string[];
 	/** Server-side prompt queue */
@@ -92,6 +96,10 @@ export interface SessionManagerOptions {
 	systemPromptPath?: string;
 	/** Color store for session color cleanup on terminate */
 	colorStore?: ColorStore;
+	/** Trait manager for resolving trait names to prompt fragments */
+	traitManager?: TraitManager;
+	/** Role manager for looking up role definitions (needed by updateTraits) */
+	roleManager?: RoleManager;
 }
 
 export class SessionManager {
@@ -101,6 +109,8 @@ export class SessionManager {
 	private store = new SessionStore();
 	private costTracker = new CostTracker();
 	private colorStore?: ColorStore;
+	private traitManager?: TraitManager;
+	private roleManager?: RoleManager;
 	goalManager: GoalManager;
 	taskManager: TaskManager;
 
@@ -108,6 +118,8 @@ export class SessionManager {
 		this.agentCliPath = options?.agentCliPath;
 		this.systemPromptPath = options?.systemPromptPath;
 		this.colorStore = options?.colorStore;
+		this.traitManager = options?.traitManager;
+		this.roleManager = options?.roleManager;
 		this.goalManager = new GoalManager();
 		this.taskManager = new TaskManager();
 	}
@@ -478,12 +490,17 @@ export class SessionManager {
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		} else {
 			const goal = ps.goalId ? this.goalManager.getGoal(ps.goalId) : undefined;
+			// Resolve persisted trait names to prompt fragments
+			const resolvedTraits = (ps.traits && ps.traits.length > 0 && this.traitManager)
+				? this.traitManager.resolveTraits(ps.traits)
+				: undefined;
 			const promptPath = assembleSystemPrompt(ps.id, {
 				baseSystemPromptPath: this.systemPromptPath,
 				cwd: ps.cwd,
 				goalTitle: goal?.title,
 				goalState: goal?.state,
 				goalSpec: goal?.spec,
+				traits: resolvedTraits,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
@@ -515,6 +532,7 @@ export class SessionManager {
 			taskId: ps.taskId,
 			accessory: ps.accessory,
 			preview: ps.preview,
+			traits: ps.traits,
 			promptQueue: new PromptQueue(ps.messageQueue),
 		};
 
@@ -565,7 +583,7 @@ export class SessionManager {
 		}
 	}
 
-	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; toolAssistant?: boolean; artifactSpecAssistant?: boolean; allowedTools?: string[] }): Promise<SessionInfo> {
+	async createSession(cwd: string, agentArgs?: string[], goalId?: string, goalAssistant?: boolean, opts?: { rolePrompt?: string; env?: Record<string, string>; taskId?: string; roleAssistant?: boolean; toolAssistant?: boolean; artifactSpecAssistant?: boolean; allowedTools?: string[]; traits?: Array<{ label: string; promptFragment: string }>; traitNames?: string[] }): Promise<SessionInfo> {
 		const id = randomUUID();
 
 		const bridgeOptions: RpcBridgeOptions = {
@@ -675,6 +693,7 @@ export class SessionManager {
 				taskType,
 				taskSpec,
 				taskDependsOn,
+				traits: opts?.traits,
 			});
 			if (promptPath) bridgeOptions.systemPromptPath = promptPath;
 		}
@@ -702,6 +721,7 @@ export class SessionManager {
 			toolAssistant: opts?.toolAssistant,
 			artifactSpecAssistant: opts?.artifactSpecAssistant,
 			taskId: opts?.taskId,
+			traits: opts?.traitNames,
 			allowedTools: opts?.allowedTools,
 			promptQueue: new PromptQueue(),
 		};
@@ -944,6 +964,7 @@ export class SessionManager {
 			taskId: session.taskId,
 			accessory: session.accessory,
 			preview: session.preview,
+			traits: session.traits,
 		});
 	}
 
@@ -969,6 +990,7 @@ export class SessionManager {
 		taskId?: string;
 		accessory?: string;
 		preview?: boolean;
+		traits?: string[];
 	}> {
 		return Array.from(this.sessions.values()).map((s) => ({
 			id: s.id,
@@ -991,6 +1013,7 @@ export class SessionManager {
 			taskId: s.taskId,
 			accessory: s.accessory,
 			preview: s.preview,
+			traits: s.traits,
 		}));
 	}
 
@@ -1036,7 +1059,7 @@ export class SessionManager {
 	 * the system prompt with the role instructions, and respawning with
 	 * `switch_session` to preserve conversation history.
 	 */
-	async assignRole(id: string, role: { name: string; promptTemplate: string; allowedTools: string[]; accessory: string }): Promise<boolean> {
+	async assignRole(id: string, role: { name: string; promptTemplate: string; allowedTools: string[]; accessory: string }, opts?: { traits?: string[] }): Promise<boolean> {
 		const session = this.sessions.get(id);
 		if (!session) return false;
 		if (session.status === "streaming") throw new Error("Cannot assign role while agent is streaming");
@@ -1064,12 +1087,19 @@ export class SessionManager {
 			goalSpec += `\n\n---\n\n## Tool Restrictions\n\nYou are ONLY allowed to use the following tools: ${toolList}\n\nDo NOT use any other tools. If a task requires a tool you don't have access to, explain what you need and ask for help instead of attempting to use the restricted tool.`;
 		}
 
+		// Resolve traits for system prompt
+		const traitNames = opts?.traits ?? session.traits;
+		const resolvedTraits = (traitNames && traitNames.length > 0 && this.traitManager)
+			? this.traitManager.resolveTraits(traitNames)
+			: undefined;
+
 		const promptPath = assembleSystemPrompt(id, {
 			baseSystemPromptPath: this.systemPromptPath,
 			cwd: session.cwd,
 			goalTitle: goal?.title,
 			goalState: goal?.state,
 			goalSpec,
+			traits: resolvedTraits,
 		});
 
 		// Respawn with new system prompt
@@ -1117,8 +1147,9 @@ export class SessionManager {
 		session.role = role.name;
 		session.accessory = role.accessory;
 		session.allowedTools = role.allowedTools;
+		if (opts?.traits) session.traits = opts.traits;
 
-		this.store.update(id, { role: role.name, accessory: role.accessory });
+		this.store.update(id, { role: role.name, accessory: role.accessory, traits: opts?.traits });
 
 		broadcast(session.clients, { type: "session_status", status: "idle" } as any);
 
@@ -1131,6 +1162,117 @@ export class SessionManager {
 		} catch { /* best-effort */ }
 
 		console.log(`[session-manager] Assigned role "${role.name}" to session ${id}`);
+		return true;
+	}
+
+	/**
+	 * Update traits for an existing session by killing the agent,
+	 * reassembling the system prompt with the new traits, and respawning
+	 * with `switch_session` to preserve conversation history.
+	 */
+	async updateTraits(id: string, traitNames: string[]): Promise<boolean> {
+		const session = this.sessions.get(id);
+		if (!session) return false;
+		if (session.status === "streaming") throw new Error("Cannot update traits while agent is streaming");
+
+		// Get the agent session file so we can restore conversation
+		let agentSessionFile: string | undefined;
+		try {
+			const stateResp = await session.rpcClient.getState();
+			if (stateResp.success) agentSessionFile = stateResp.data?.sessionFile;
+		} catch {
+			const persisted = this.store.get(id);
+			agentSessionFile = persisted?.agentSessionFile;
+		}
+
+		// Kill the current process
+		session.unsubscribe();
+		await session.rpcClient.stop();
+
+		// Reassemble system prompt with new traits (preserving role prompt if assigned)
+		const goal = session.goalId ? this.goalManager.getGoal(session.goalId) : undefined;
+		let goalSpec = goal?.spec;
+
+		// If the session has a role, include its prompt template (same pattern as assignRole)
+		if (session.role && this.roleManager) {
+			const role = this.roleManager.getRole(session.role);
+			if (role) {
+				goalSpec = (goalSpec ? goalSpec + "\n\n---\n\n" : "") + role.promptTemplate;
+				if (role.allowedTools.length > 0) {
+					const toolList = role.allowedTools.join(", ");
+					goalSpec += `\n\n---\n\n## Tool Restrictions\n\nYou are ONLY allowed to use the following tools: ${toolList}\n\nDo NOT use any other tools. If a task requires a tool you don't have access to, explain what you need and ask for help instead of attempting to use the restricted tool.`;
+				}
+			}
+		}
+
+		const resolvedTraits = (traitNames.length > 0 && this.traitManager)
+			? this.traitManager.resolveTraits(traitNames)
+			: undefined;
+
+		const promptPath = assembleSystemPrompt(id, {
+			baseSystemPromptPath: this.systemPromptPath,
+			cwd: session.cwd,
+			goalTitle: goal?.title,
+			goalState: goal?.state,
+			goalSpec,
+			traits: resolvedTraits,
+		});
+
+		// Respawn with new system prompt
+		const bridgeOptions: RpcBridgeOptions = { cwd: session.cwd };
+		if (this.agentCliPath) bridgeOptions.cliPath = this.agentCliPath;
+		if (promptPath) bridgeOptions.systemPromptPath = promptPath;
+		bridgeOptions.env = { BOBBIT_SESSION_ID: id };
+		if (session.goalId) {
+			bridgeOptions.env.BOBBIT_GOAL_ID = session.goalId;
+			if (!bridgeOptions.args?.includes("--extension")) {
+				bridgeOptions.args = ["--extension", GOAL_TOOLS_EXTENSION_PATH];
+			}
+		}
+
+		const rpcClient = new RpcBridge(bridgeOptions);
+		let switchingSession = true;
+		const unsub = rpcClient.onEvent((event: any) => {
+			session.lastActivity = Date.now();
+			this.store.update(id, { lastActivity: session.lastActivity });
+			this.handleAgentLifecycle(session, event);
+			session.eventBuffer.push(event);
+			broadcast(session.clients, { type: "event", data: event });
+			if (!switchingSession) this.trackCostFromEvent(session, event);
+		});
+
+		await rpcClient.start();
+
+		if (agentSessionFile && fs.existsSync(agentSessionFile)) {
+			const switchResp = await rpcClient.sendCommand(
+				{ type: "switch_session", sessionPath: agentSessionFile },
+				15_000,
+			);
+			if (!switchResp.success) {
+				console.error(`[session-manager] switch_session failed after trait update: ${switchResp.error}`);
+			}
+		}
+		switchingSession = false;
+
+		// Swap in the new bridge and update metadata
+		session.rpcClient = rpcClient;
+		session.unsubscribe = unsub;
+		session.status = "idle";
+		session.traits = traitNames;
+
+		this.store.update(id, { traits: traitNames });
+
+		broadcast(session.clients, { type: "session_status", status: "idle" } as any);
+
+		// Refresh messages and state for connected clients
+		try {
+			const msgs = await rpcClient.getMessages();
+			if (msgs.success) broadcast(session.clients, { type: "messages", data: msgs.data });
+			const st = await rpcClient.getState();
+			if (st.success) broadcast(session.clients, { type: "state", data: st.data });
+		} catch { /* best-effort */ }
+
+		console.log(`[session-manager] Updated traits for session ${id}: [${traitNames.join(", ")}]`);
 		return true;
 	}
 

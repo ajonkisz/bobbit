@@ -10,6 +10,7 @@ import type { PersistedTeamEntry } from "./team-store.js";
 import { generateTeamName } from "./team-names.js";
 import type { ColorStore } from "./color-store.js";
 import type { GoalArtifactStore } from "./goal-artifact-store.js";
+import type { TraitManager } from "./trait-manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -83,6 +84,8 @@ export interface TeamManagerConfig {
 	roleStore?: RoleStore;
 	/** Goal artifact store for checking artifact requirements on completion */
 	goalArtifactStore?: GoalArtifactStore;
+	/** Trait manager for resolving trait names to prompt fragments */
+	traitManager?: TraitManager;
 }
 
 export class TeamManager {
@@ -396,6 +399,7 @@ export class TeamManager {
 		goalId: string,
 		role: string,
 		task: string,
+		opts?: { traits?: string[] },
 	): Promise<{ sessionId: string; worktreePath: string }> {
 		const roleStore = this.config.roleStore;
 		const storedRoleDef = roleStore?.get(role);
@@ -449,13 +453,20 @@ export class TeamManager {
 			// Read allowed tools from role definition
 			const allowedTools = storedRoleDef.allowedTools;
 
+			// Resolve personality traits: explicit > role defaults
+			const traitNames = opts?.traits ?? storedRoleDef.defaultTraits;
+			let resolvedTraits: Array<{ label: string; promptFragment: string }> | undefined;
+			if (traitNames && traitNames.length > 0 && this.config.traitManager) {
+				resolvedTraits = this.config.traitManager.resolveTraits(traitNames);
+			}
+
 			// Create the session with the role's worktree as cwd, role prompt appended to goal spec
 			const session = await this.sessionManager.createSession(
 				worktreeResult.worktreePath,
 				undefined,
 				goalId,
 				false,
-				{ rolePrompt, allowedTools },
+				{ rolePrompt, allowedTools, traits: resolvedTraits, traitNames },
 			);
 
 			// Assign a unique color and title

@@ -86,6 +86,8 @@ export interface PromptParts {
 	taskSpec?: string;
 	/** Human-readable descriptions of dependency tasks */
 	taskDependsOn?: string[];
+	/** Personality traits to inject into the system prompt */
+	traits?: Array<{ label: string; promptFragment: string }>;
 }
 
 /**
@@ -120,6 +122,15 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 			? `# Goal\n\n**${parts.goalTitle}** (Status: ${parts.goalState || "unknown"})`
 			: "# Goal";
 		sections.push(header + "\n\n" + parts.goalSpec.trim());
+	}
+
+	// 3.5. Personality traits
+	if (parts.traits && parts.traits.length > 0) {
+		const lines = ["## Personality\n", "You should embody these traits in how you work:"];
+		for (const trait of parts.traits) {
+			lines.push(`- **${trait.label}**: ${trait.promptFragment}`);
+		}
+		sections.push(lines.join("\n"));
 	}
 
 	// 4. Task context
