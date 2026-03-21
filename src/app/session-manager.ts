@@ -16,7 +16,7 @@ import {
 import { gatewayFetch, refreshSessions, startSessionPolling, updateLocalSessionTitle, updateLocalSessionStatus, fetchGitStatus } from "./api.js";
 import { getRouteFromHash, setHashRoute, saveSessionModel, loadSessionModel, clearSessionModel, saveDraft, loadDraft } from "./routing.js";
 import { sessionHueRotation } from "./session-colors.js";
-import { showConnectionError, confirmAction, checkOAuthStatus, openOAuthDialog } from "./dialogs.js";
+import { showConnectionError, confirmAction, checkOAuthStatus, openOAuthDialog, showGoalEditDialogFromProposal } from "./dialogs.js";
 import { teardownMobileScrollTracking } from "./mobile-header.js";
 import { storage } from "./storage.js";
 
@@ -269,15 +269,20 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 
 		remote.onGoalProposal = (proposal) => {
 			state.activeGoalProposal = proposal;
-			if (!state.previewTitleEdited) state.previewTitle = proposal.title;
-			if (!state.previewCwdEdited) state.previewCwd = proposal.cwd || "";
-			if (!state.previewSpecEdited) state.previewSpec = proposal.spec;
-			state.hasReceivedProposal = true;
-			if (state.goalAssistantTab === "chat" && !isDesktop()) {
-				state.goalAssistantTab = "preview";
+			if (state.isGoalAssistantSession) {
+				if (!state.previewTitleEdited) state.previewTitle = proposal.title;
+				if (!state.previewCwdEdited) state.previewCwd = proposal.cwd || "";
+				if (!state.previewSpecEdited) state.previewSpec = proposal.spec;
+				state.hasReceivedProposal = true;
+				if (state.goalAssistantTab === "chat" && !isDesktop()) {
+					state.goalAssistantTab = "preview";
+				}
+				// Persist draft to IndexedDB
+				saveGoalDraft(sessionId);
+			} else {
+				// Non-goal-assistant session: show the proposal dialog
+				showGoalEditDialogFromProposal(proposal);
 			}
-			// Persist draft to IndexedDB
-			saveGoalDraft(sessionId);
 			renderApp();
 		};
 
@@ -400,6 +405,13 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 		state.chatPanel = new ChatPanel();
 		await state.chatPanel.setAgent(remote as any, {
 			onApiKeyRequired: async () => true,
+		});
+
+		// Listen for suggest-goal events from assistant messages
+		state.chatPanel.addEventListener('suggest-goal', () => {
+			if (state.remoteAgent) {
+				state.remoteAgent.prompt("Based on our conversation, please create a goal proposal for the improvement you suggested. Format it as a <goal_proposal> block with <title>, <spec>, and optionally <cwd> tags.");
+			}
 		});
 
 		// Set cwd and branch on the AgentInterface stats bar

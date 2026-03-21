@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>suggest-goal test</title>
+  <style>
+    .suggest-goal-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="results"></div>
+  <script type="module">
+    // Minimal shim — we test the detection/stripping logic in isolation,
+    // not the full Lit component (which requires a build step).
+
+    const SUGGEST_RE = /<suggest_goal\s*\/?>/g;
+    const DETECT_RE = /<suggest_goal\s*\/?>/;
+
+    function processMessage(textChunks) {
+      const hasSuggestGoal = textChunks.some(c => DETECT_RE.test(c));
+      const stripped = textChunks.map(c => c.replace(SUGGEST_RE, '')).filter(c => c.trim() !== '');
+      return { hasSuggestGoal, stripped };
+    }
+
+    // Expose for Playwright
+    window.__processMessage = processMessage;
+
+    // Test cases — run immediately
+    const results = [];
+
+    // 1. Tag present → detected, stripped
+    {
+      const r = processMessage(["Here is some text <suggest_goal/> and more text."]);
+      results.push({
+        name: "tag-present",
+        pass: r.hasSuggestGoal === true && r.stripped.length === 1 && !r.stripped[0].includes("suggest_goal"),
+        detail: JSON.stringify(r),
+      });
+    }
+
+    // 2. Tag absent → not detected
+    {
+      const r = processMessage(["Just normal text without any tag."]);
+      results.push({
+        name: "tag-absent",
+        pass: r.hasSuggestGoal === false && r.stripped.length === 1,
+        detail: JSON.stringify(r),
+      });
+    }
+
+    // 3. Whitespace variants
+    {
+      const variants = [
+        "<suggest_goal/>",
+        "<suggest_goal />",
+        "<suggest_goal  />",
+        "<suggest_goal>",
+      ];
+      const allDetected = variants.every(v => processMessage([v]).hasSuggestGoal);
+      const allStripped = variants.every(v => {
+        const r = processMessage([`text ${v} more`]);
+        return !r.stripped[0].includes("suggest_goal");
+      });
+      results.push({
+        name: "whitespace-variants",
+        pass: allDetected && allStripped,
+        detail: JSON.stringify({ allDetected, allStripped }),
+      });
+    }
+
+    // 4. Multiple tags → single detection, all stripped
+    {
+      const r = processMessage(["first <suggest_goal/> second <suggest_goal /> third"]);
+      results.push({
+        name: "multiple-tags",
+        pass: r.hasSuggestGoal === true && r.stripped.length === 1 && (r.stripped[0].match(/suggest_goal/g) || []).length === 0,
+        detail: JSON.stringify(r),
+      });
+    }
+
+    // 5. Tag is only content → stripped chunk removed
+    {
+      const r = processMessage(["<suggest_goal/>"]);
+      results.push({
+        name: "tag-only-content",
+        pass: r.hasSuggestGoal === true && r.stripped.length === 0,
+        detail: JSON.stringify(r),
+      });
+    }
+
+    window.__testResults = results;
+
+    // Render results
+    const el = document.getElementById("results");
+    el.innerHTML = results.map(r =>
+      `<div data-test="${r.name}" data-pass="${r.pass}">${r.name}: ${r.pass ? "PASS" : "FAIL"} — ${r.detail}</div>`
+    ).join("");
+  </script>
+
+  <!-- Button click event test -->
+  <div id="button-test">
+    <button class="suggest-goal-btn" id="test-btn">+ Create Goal</button>
+  </div>
+  <script>
+    // Test 6: button click fires CustomEvent
+    window.__eventFired = false;
+    window.__eventBubbled = false;
+
+    document.getElementById("button-test").addEventListener("suggest-goal", function() {
+      window.__eventBubbled = true;
+    });
+
+    document.getElementById("test-btn").addEventListener("click", function(e) {
+      e.stopPropagation();
+      const evt = new CustomEvent("suggest-goal", { bubbles: true, composed: true });
+      this.dispatchEvent(evt);
+      window.__eventFired = true;
+    });
+  </script>
+</body>
+</html>
