@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
@@ -22,11 +23,10 @@ import { PersonalityManager } from "./agent/personality-manager.js";
 
 import type { TaskState } from "./agent/task-store.js";
 import { BgProcessManager } from "./agent/bg-process-manager.js";
-import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
+import { GateStore } from "./agent/gate-store.js";
 import { WorkflowStore } from "./agent/workflow-store.js";
 import { WorkflowManager } from "./agent/workflow-manager.js";
 import { VerificationHarness } from "./agent/verification-harness.js";
-import { validateCommandArtifact } from "./agent/command-artifact-validator.js";
 import { StaffManager } from "./agent/staff-manager.js";
 import { TriggerEngine } from "./agent/staff-trigger-engine.js";
 
@@ -61,7 +61,7 @@ export function createGateway(config: GatewayConfig) {
 	const roleManager = new RoleManager(roleStore);
 	const toolStore = new ToolStore();
 	const toolManager = new ToolManager(toolStore);
-	const goalArtifactStore = new GoalArtifactStore();
+	const gateStore = new GateStore();
 	const workflowStore = new WorkflowStore();
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
@@ -82,7 +82,7 @@ export function createGateway(config: GatewayConfig) {
 		colorStore,
 		taskManager: sessionManager.taskManager,
 		roleStore,
-		goalArtifactStore,
+		gateStore,
 		personalityManager,
 	});
 	const bgProcessManager = new BgProcessManager((sessionId: string) => {
@@ -133,7 +133,7 @@ export function createGateway(config: GatewayConfig) {
 				return;
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, goalArtifactStore, personalityManager, bgProcessManager, staffManager, workflowManager, verificationHarness);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, teamManager, roleManager, toolManager, gateStore, personalityManager, bgProcessManager, staffManager, workflowManager, verificationHarness, broadcastToGoal);
 
 			return;
 		}
@@ -181,7 +181,7 @@ export function createGateway(config: GatewayConfig) {
 		}
 	}
 
-	verificationHarness = new VerificationHarness(goalArtifactStore, broadcastToGoal);
+	verificationHarness = new VerificationHarness(gateStore, broadcastToGoal);
 
 	server.on("upgrade", (req, socket, head) => {
 		const url = new URL(req.url || "/", `http://${req.headers.host}`);
@@ -236,12 +236,13 @@ async function handleApiRoute(
 	teamManager: TeamManager,
 	roleManager: RoleManager,
 	toolManager: ToolManager,
-	goalArtifactStore: GoalArtifactStore,
+	gateStore: GateStore,
 	personalityManager: PersonalityManager,
 	bgProcessManager: BgProcessManager,
 	staffManager: StaffManager,
 	workflowManager: WorkflowManager,
 	verificationHarness: VerificationHarness,
+	broadcastToGoal: (goalId: string, event: any) => void,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -472,6 +473,10 @@ async function handleApiRoute(
 				workflowId,
 				workflowStore: workflowManager.store,
 			});
+			// Initialize gate states for the workflow
+			if (goal.workflow) {
+				gateStore.initGatesForGoal(goal.id, goal.workflow.gates.map(g => g.id));
+			}
 			json(goal, 201);
 		} catch (err) {
 			json({ error: String(err) }, 400);
@@ -510,6 +515,7 @@ async function handleApiRoute(
 
 		if (req.method === "DELETE") {
 			sessionManager.taskManager.deleteTasksForGoal(id);
+			gateStore.removeGoalGates(id);
 			sessionManager.goalManager.deleteGoal(id);
 			json({ ok: true });
 			return;
@@ -708,192 +714,174 @@ async function handleApiRoute(
 		return;
 	}
 
-	// GET /api/goals/:goalId/artifacts — list artifacts for a goal
-	const goalArtifactsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/artifacts$/);
-	if (goalArtifactsMatch && req.method === "GET") {
-		const artifacts = goalArtifactStore.getByGoalId(goalArtifactsMatch[1]);
-		json({ artifacts });
-		return;
-	}
+	// ── Gate endpoints ─────────────────────────────────────────────
 
-	// POST /api/goals/:goalId/artifacts — create an artifact
-	if (goalArtifactsMatch && req.method === "POST") {
-		const goalId = goalArtifactsMatch[1];
+	// GET /api/goals/:goalId/gates — list gates for a goal
+	const goalGatesMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/gates$/);
+	if (goalGatesMatch && req.method === "GET") {
+		const goalId = goalGatesMatch[1];
 		const goal = sessionManager.goalManager.getGoal(goalId);
 		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+		const gates = gateStore.getGatesForGoal(goalId);
+		// Enrich with workflow gate definitions
+		const enriched = gates.map(g => {
+			const def = goal.workflow?.gates.find(wg => wg.id === g.gateId);
+			return { ...g, name: def?.name, dependsOn: def?.dependsOn, content: def?.content, injectDownstream: def?.injectDownstream, metadata: def?.metadata || g.currentMetadata, signalCount: g.signals.length };
+		});
+		json({ gates: enriched });
+		return;
+	}
+
+	// GET /api/goals/:goalId/gates/:gateId — gate detail
+	const gateDetailMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/gates\/([^/]+)$/);
+	if (gateDetailMatch && req.method === "GET") {
+		const [, goalId, gateId] = gateDetailMatch;
+		const gate = gateStore.getGate(goalId, gateId);
+		if (!gate) { json({ error: "Gate not found" }, 404); return; }
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		const def = goal?.workflow?.gates.find(wg => wg.id === gateId);
+		json({ ...gate, name: def?.name, dependsOn: def?.dependsOn, content: def?.content, injectDownstream: def?.injectDownstream });
+		return;
+	}
+
+	// POST /api/goals/:goalId/gates/:gateId/signal — signal a gate
+	const gateSignalMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/gates\/([^/]+)\/signal$/);
+	if (gateSignalMatch && req.method === "POST") {
+		const [, goalId, gateId] = gateSignalMatch;
+		const goal = sessionManager.goalManager.getGoal(goalId);
+		if (!goal) { json({ error: "Goal not found" }, 404); return; }
+		if (!goal.workflow) { json({ error: "Goal has no workflow" }, 400); return; }
+		const gateDef = goal.workflow.gates.find(g => g.id === gateId);
+		if (!gateDef) { json({ error: `Unknown gate: ${gateId}` }, 404); return; }
 
 		const body = await readBody(req);
-		if (!body?.name || typeof body.name !== "string") {
-			json({ error: "Missing name" }, 400); return;
-		}
-		if (!body?.type || typeof body.type !== "string") {
-			json({ error: "Missing type" }, 400); return;
-		}
-		if (!body?.content || typeof body.content !== "string") {
-			json({ error: "Missing content" }, 400); return;
-		}
-		if (!body?.producedBy || typeof body.producedBy !== "string") {
-			json({ error: "Missing producedBy" }, 400); return;
-		}
+		const signalSessionId = body?.sessionId || "unknown";
 
-		// Enforce workflow artifact dependency gating
-		const workflowArtifactId = body.workflowArtifactId;
-		if (workflowArtifactId && typeof workflowArtifactId === "string" && goal.workflow) {
-			const wfArtifact = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
-			if (!wfArtifact) {
-				json({ error: `Unknown workflow artifact: ${workflowArtifactId}` }, 400);
+		// Validate dependencies are met
+		for (const depId of gateDef.dependsOn) {
+			const depGate = gateStore.getGate(goalId, depId);
+			if (!depGate || depGate.status !== "passed") {
+				const depDef = goal.workflow.gates.find(g => g.id === depId);
+				json({ error: `Upstream gate "${depDef?.name || depId}" has not passed yet` }, 409);
 				return;
 			}
-			if (wfArtifact.dependsOn.length > 0) {
-				const existingArtifacts = goalArtifactStore.getByGoalId(goalId);
-				const acceptedWfIds = new Set(
-					existingArtifacts
-						.filter(a => a.status === "accepted" && a.workflowArtifactId)
-						.map(a => a.workflowArtifactId!)
-				);
-				const missing = wfArtifact.dependsOn.filter(dep => !acceptedWfIds.has(dep));
-				if (missing.length > 0) {
-					const missingNames = missing.map(id => {
-						const def = goal.workflow!.artifacts.find(a => a.id === id);
-						return def?.name || id;
-					});
-					json({ error: `Unmet dependencies: ${missingNames.join(", ")}`, missing }, 409);
+		}
+
+		// Validate metadata against gate's schema
+		if (gateDef.metadata && body?.metadata) {
+			for (const key of Object.keys(gateDef.metadata)) {
+				if (!(key in body.metadata)) {
+					json({ error: `Missing required metadata field: ${key}` }, 400);
 					return;
 				}
 			}
-		}
-
-		// Validate content for format: command workflow artifacts
-		if (workflowArtifactId && typeof workflowArtifactId === "string" && goal.workflow) {
-			const wfArt = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
-			if (wfArt?.format === "command") {
-				const validation = validateCommandArtifact(body.content);
-				if (!validation.valid) {
-					json({
-						error: `Invalid command artifact: ${validation.reason}`,
-						help: "This artifact has format 'command'. Its content is substituted directly into {{command}} in verification shell scripts and must be a raw, executable shell command. Example: npx playwright test tests/e2e/foo.spec.ts --config playwright-e2e.config.ts",
-					}, 400);
-					return;
-				}
+		} else if (gateDef.metadata && !body?.metadata) {
+			const required = Object.keys(gateDef.metadata);
+			if (required.length > 0) {
+				json({ error: `Missing required metadata fields: ${required.join(", ")}` }, 400);
+				return;
 			}
 		}
 
-		// Determine initial status: if workflow artifact has verification, start as "submitted"
-		let initialStatus = body.status;
-		const resolvedWfArtifactId = workflowArtifactId && typeof workflowArtifactId === "string" ? workflowArtifactId : undefined;
-		let wfArtifactForVerification: import("./agent/workflow-store.js").WorkflowArtifact | undefined;
-		if (resolvedWfArtifactId && goal.workflow) {
-			wfArtifactForVerification = goal.workflow.artifacts.find(a => a.id === resolvedWfArtifactId);
-			if (wfArtifactForVerification?.verification) {
-				initialStatus = "submitted";
-			}
-		}
+		// Get commit SHA
+		let commitSha = "unknown";
+		try {
+			commitSha = execSync("git rev-parse HEAD", { cwd: goal.cwd, encoding: "utf-8", timeout: 5000 }).trim();
+		} catch { /* ignore */ }
 
-		const artifact = goalArtifactStore.create({
-			goalId,
-			name: body.name,
-			type: body.type,
-			content: body.content,
-			producedBy: body.producedBy,
-			skillId: body.skillId,
-			specId: body.specId,
-			workflowArtifactId: resolvedWfArtifactId,
-			status: initialStatus,
-		});
-		json(artifact, 201);
+		// Compute content version
+		const existingGate = gateStore.getGate(goalId, gateId);
+		const contentVersion = body?.content ? (existingGate?.currentContentVersion || 0) + 1 : undefined;
 
-		// Fire-and-forget verification if the workflow artifact has a verification config
-		if (wfArtifactForVerification?.verification) {
-			verificationHarness.verify(
-				artifact.id, artifact, wfArtifactForVerification,
-				goal.cwd, goal.branch, "master", goal.workflow || undefined,
-			).catch(err => console.error("[verification] Error:", err));
-		}
-		return;
-	}
-
-	// GET /api/goals/:goalId/artifacts/:artifactId — get a specific artifact
-	const goalArtifactMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/artifacts\/([^/]+)$/);
-	if (goalArtifactMatch && req.method === "GET") {
-		const artifact = goalArtifactStore.get(goalArtifactMatch[2]);
-		if (!artifact || artifact.goalId !== goalArtifactMatch[1]) {
-			json({ error: "Artifact not found" }, 404); return;
-		}
-		json(artifact);
-		return;
-	}
-
-	// PUT /api/goals/:goalId/artifacts/:artifactId — revise an artifact
-	if (goalArtifactMatch && req.method === "PUT") {
-		const artifact = goalArtifactStore.get(goalArtifactMatch[2]);
-		if (!artifact || artifact.goalId !== goalArtifactMatch[1]) {
-			json({ error: "Artifact not found" }, 404); return;
-		}
-		const body = await readBody(req);
-		if (!body) { json({ error: "Missing body" }, 400); return; }
-
-		// Validate content for format: command workflow artifacts on update
-		if (body.content && typeof body.content === "string" && artifact.workflowArtifactId) {
-			const goalId = goalArtifactMatch[1];
-			const goal = sessionManager.goalManager.getGoal(goalId);
-			if (goal?.workflow) {
-				const wfArt = goal.workflow.artifacts.find(a => a.id === artifact.workflowArtifactId);
-				if (wfArt?.format === "command") {
-					const validation = validateCommandArtifact(body.content);
-					if (!validation.valid) {
-						json({
-							error: `Invalid command artifact: ${validation.reason}`,
-							help: "This artifact has format 'command'. Its content is substituted directly into {{command}} in verification shell scripts and must be a raw, executable shell command. Example: npx playwright test tests/e2e/foo.spec.ts --config playwright-e2e.config.ts",
-						}, 400);
-						return;
+		// Check if this is a re-signal of a passed gate — cascade reset
+		if (existingGate && existingGate.status === "passed") {
+			gateStore.cascadeReset(goalId, gateId, goal.workflow);
+			// Broadcast resets for downstream gates
+			for (const g of goal.workflow.gates) {
+				if (g.dependsOn.includes(gateId) || hasTransitiveDep(goal.workflow, g.id, gateId)) {
+					const downstream = gateStore.getGate(goalId, g.id);
+					if (downstream) {
+						broadcastToGoal(goalId, { type: "gate_status_changed", goalId, gateId: g.id, status: downstream.status });
 					}
 				}
 			}
 		}
 
-		const updated = goalArtifactStore.update(goalArtifactMatch[2], {
-			name: body.name,
-			type: body.type,
-			content: body.content,
-			skillId: body.skillId,
-		});
-		if (!updated) { json({ error: "Artifact not found" }, 404); return; }
+		// Create signal record
+		const signal = {
+			id: randomUUID(),
+			gateId,
+			goalId,
+			sessionId: signalSessionId,
+			timestamp: Date.now(),
+			commitSha,
+			metadata: body?.metadata,
+			content: body?.content,
+			contentVersion,
+			verification: { status: "running" as const, steps: [] },
+		};
 
-		// Re-trigger verification on update if artifact has a workflow artifact with verification
-		if (updated.workflowArtifactId) {
-			const goalId = goalArtifactMatch[1];
-			const goal = sessionManager.goalManager.getGoal(goalId);
-			if (goal?.workflow) {
-				const wfArt = goal.workflow.artifacts.find(a => a.id === updated.workflowArtifactId);
-				if (wfArt?.verification) {
-					// Reset status to submitted and re-verify
-					goalArtifactStore.update(updated.id, { status: "submitted", verificationResult: undefined, rejectionReason: undefined });
-					updated.status = "submitted";
-					verificationHarness.verify(
-						updated.id, updated, wfArt,
-						goal.cwd, goal.branch, "master", goal.workflow || undefined,
-					).catch(err => console.error("[verification] Error:", err));
-				}
-			}
+		gateStore.recordSignal(signal);
+
+		// Update gate content/metadata if provided
+		if (body?.content && contentVersion) {
+			gateStore.updateGateContent(goalId, gateId, body.content, contentVersion);
+		}
+		if (body?.metadata) {
+			gateStore.updateGateMetadata(goalId, gateId, body.metadata);
 		}
 
-		json(updated);
+		// Broadcast signal received
+		broadcastToGoal(goalId, { type: "gate_signal_received", goalId, gateId, signalId: signal.id });
+
+		// Build gate state map for metadata variable resolution
+		const allGateStates = new Map<string, { metadata?: Record<string, string> }>();
+		for (const gs of gateStore.getGatesForGoal(goalId)) {
+			allGateStates.set(gs.gateId, { metadata: gs.currentMetadata });
+		}
+
+		// Fire-and-forget verification
+		verificationHarness.verifyGateSignal(
+			signal, gateDef, goal.cwd, goal.branch, "master", allGateStates,
+		).catch(err => console.error("[verification] Gate signal error:", err));
+
+		json({ signal: { id: signal.id, gateId, status: "running" } }, 201);
 		return;
 	}
 
-	// GET /api/goals/:goalId/workflow-context/:workflowArtifactId — get dependency context for a workflow artifact
+	// GET /api/goals/:goalId/gates/:gateId/signals — signal history
+	const gateSignalsMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/gates\/([^/]+)\/signals$/);
+	if (gateSignalsMatch && req.method === "GET") {
+		const [, goalId, gateId] = gateSignalsMatch;
+		const gate = gateStore.getGate(goalId, gateId);
+		if (!gate) { json({ error: "Gate not found" }, 404); return; }
+		json({ signals: gate.signals });
+		return;
+	}
+
+	// GET /api/goals/:goalId/gates/:gateId/content — gate content
+	const gateContentMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/gates\/([^/]+)\/content$/);
+	if (gateContentMatch && req.method === "GET") {
+		const [, goalId, gateId] = gateContentMatch;
+		const gate = gateStore.getGate(goalId, gateId);
+		if (!gate) { json({ error: "Gate not found" }, 404); return; }
+		json({ content: gate.currentContent, version: gate.currentContentVersion });
+		return;
+	}
+
+	// GET /api/goals/:goalId/workflow-context/:gateId — get dependency context for a gate
 	const workflowContextMatch = url.pathname.match(/^\/api\/goals\/([^/]+)\/workflow-context\/([^/]+)$/);
 	if (workflowContextMatch && req.method === "GET") {
 		const goalId = workflowContextMatch[1];
-		const workflowArtifactId = workflowContextMatch[2];
+		const gateId = workflowContextMatch[2];
 		const goal = sessionManager.goalManager.getGoal(goalId);
 		if (!goal) { json({ error: "Goal not found" }, 404); return; }
 		if (!goal.workflow) { json({ error: "Goal has no workflow" }, 404); return; }
-		const wfArtifact = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
-		if (!wfArtifact) { json({ error: "Workflow artifact not found" }, 404); return; }
+		const gateDef = goal.workflow.gates.find(g => g.id === gateId);
+		if (!gateDef) { json({ error: "Gate not found" }, 404); return; }
 
-		const context = teamManager.buildDependencyContext(goalId, workflowArtifactId);
-		json({ context, workflowArtifact: wfArtifact });
+		const context = teamManager.buildDependencyContext(goalId, gateId);
+		json({ context, gate: gateDef });
 		return;
 	}
 
@@ -1722,7 +1710,7 @@ async function handleApiRoute(
 				id: body.id,
 				name: body.name,
 				description: body.description,
-				artifacts: body.artifacts || [],
+				gates: body.gates || [],
 			});
 			json(workflow, 201);
 		} catch (err: any) {
@@ -1993,6 +1981,17 @@ async function handleApiRoute(
 	}
 
 	json({ error: "Not found" }, 404);
+}
+
+/** Check if gateId transitively depends on targetId in the workflow DAG */
+function hasTransitiveDep(workflow: import("./agent/workflow-store.js").Workflow, gateId: string, targetId: string): boolean {
+	const gate = workflow.gates.find(g => g.id === gateId);
+	if (!gate) return false;
+	for (const dep of gate.dependsOn) {
+		if (dep === targetId) return true;
+		if (hasTransitiveDep(workflow, dep, targetId)) return true;
+	}
+	return false;
 }
 
 function readBody(req: http.IncomingMessage): Promise<any> {

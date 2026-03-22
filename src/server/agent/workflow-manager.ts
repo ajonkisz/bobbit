@@ -1,10 +1,7 @@
-import { WorkflowStore, type Workflow, type WorkflowArtifact } from "./workflow-store.js";
+import { WorkflowStore, type Workflow, type WorkflowGate } from "./workflow-store.js";
 
 /** Valid workflow ID pattern: lowercase alphanumeric + hyphens */
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
-
-const VALID_KINDS = new Set(["analysis", "deliverable", "review", "verification"]);
-const VALID_FORMATS = new Set(["markdown", "html", "diff", "command"]);
 
 export class WorkflowManager {
 	/** Exposed for passing to createGoal for workflow snapshotting */
@@ -18,9 +15,9 @@ export class WorkflowManager {
 		id: string;
 		name: string;
 		description?: string;
-		artifacts: WorkflowArtifact[];
+		gates: WorkflowGate[];
 	}): Workflow {
-		const { id, name, artifacts } = opts;
+		const { id, name, gates } = opts;
 
 		if (!id || typeof id !== "string") {
 			throw new Error("Missing workflow id");
@@ -35,14 +32,14 @@ export class WorkflowManager {
 			throw new Error("Missing workflow name");
 		}
 
-		this.validateArtifacts(artifacts);
+		this.validateGates(gates);
 
 		const now = Date.now();
 		const workflow: Workflow = {
 			id,
 			name,
 			description: opts.description || "",
-			artifacts,
+			gates,
 			createdAt: now,
 			updatedAt: now,
 		};
@@ -61,20 +58,19 @@ export class WorkflowManager {
 	updateWorkflow(id: string, updates: {
 		name?: string;
 		description?: string;
-		artifacts?: WorkflowArtifact[];
+		gates?: WorkflowGate[];
 	}): boolean {
 		const existing = this.store.get(id);
 		if (!existing) return false;
 
-		// If artifacts are being updated, validate the new DAG
-		if (updates.artifacts) {
-			this.validateArtifacts(updates.artifacts);
+		if (updates.gates) {
+			this.validateGates(updates.gates);
 		}
 
 		const cleaned: Partial<Omit<Workflow, "id" | "createdAt">> = {};
 		if (updates.name !== undefined) cleaned.name = updates.name;
 		if (updates.description !== undefined) cleaned.description = updates.description;
-		if (updates.artifacts !== undefined) cleaned.artifacts = updates.artifacts;
+		if (updates.gates !== undefined) cleaned.gates = updates.gates;
 		return this.store.update(id, cleaned);
 	}
 
@@ -91,10 +87,8 @@ export class WorkflowManager {
 			throw new Error(`Workflow "${id}" not found`);
 		}
 
-		// Deep copy via JSON round-trip
 		const cloned: Workflow = JSON.parse(JSON.stringify(original));
 
-		// Generate new ID: original-clone-<timestamp>, truncated to keep reasonable length
 		const suffix = `-clone-${Date.now()}`;
 		const maxBaseLen = 60 - suffix.length;
 		const base = id.length > maxBaseLen ? id.slice(0, maxBaseLen) : id;
@@ -109,61 +103,51 @@ export class WorkflowManager {
 	}
 
 	/**
-	 * Validate workflow artifacts:
-	 * 1. At least one artifact required
+	 * Validate workflow gates:
+	 * 1. At least one gate required
 	 * 2. Unique IDs within the workflow
 	 * 3. All dependsOn references exist within the workflow
 	 * 4. No self-references
 	 * 5. No circular dependencies (topological sort)
-	 * 6. Valid kind and format values
 	 */
-	private validateArtifacts(artifacts: WorkflowArtifact[]): void {
-		if (!Array.isArray(artifacts) || artifacts.length === 0) {
-			throw new Error("Workflow must have at least one artifact");
+	private validateGates(gates: WorkflowGate[]): void {
+		if (!Array.isArray(gates) || gates.length === 0) {
+			throw new Error("Workflow must have at least one gate");
 		}
 
-		// Check unique IDs and validate format
 		const ids = new Set<string>();
-		for (const artifact of artifacts) {
-			if (!artifact.id || typeof artifact.id !== "string") {
-				throw new Error("Each artifact must have an id");
+		for (const gate of gates) {
+			if (!gate.id || typeof gate.id !== "string") {
+				throw new Error("Each gate must have an id");
 			}
-			if (!ID_PATTERN.test(artifact.id)) {
-				throw new Error(`Artifact ID "${artifact.id}" must be lowercase alphanumeric + hyphens (e.g. 'issue-analysis')`);
+			if (!ID_PATTERN.test(gate.id)) {
+				throw new Error(`Gate ID "${gate.id}" must be lowercase alphanumeric + hyphens (e.g. 'issue-analysis')`);
 			}
-			if (ids.has(artifact.id)) {
-				throw new Error(`Duplicate artifact ID: "${artifact.id}"`);
+			if (ids.has(gate.id)) {
+				throw new Error(`Duplicate gate ID: "${gate.id}"`);
 			}
-			ids.add(artifact.id);
+			ids.add(gate.id);
 		}
 
-		// Validate each artifact
-		for (const artifact of artifacts) {
-			if (!artifact.name || typeof artifact.name !== "string") {
-				throw new Error(`Artifact "${artifact.id}" must have a name`);
-			}
-			if (artifact.kind && !VALID_KINDS.has(artifact.kind)) {
-				throw new Error(`Artifact "${artifact.id}" has invalid kind: ${artifact.kind}. Must be one of: analysis, deliverable, review, verification`);
-			}
-			if (artifact.format && !VALID_FORMATS.has(artifact.format)) {
-				throw new Error(`Artifact "${artifact.id}" has invalid format: ${artifact.format}. Must be one of: markdown, html, diff, command`);
+		for (const gate of gates) {
+			if (!gate.name || typeof gate.name !== "string") {
+				throw new Error(`Gate "${gate.id}" must have a name`);
 			}
 
-			// Check dependsOn references
-			if (Array.isArray(artifact.dependsOn)) {
-				for (const dep of artifact.dependsOn) {
-					if (dep === artifact.id) {
-						throw new Error(`Artifact "${artifact.id}" depends on itself`);
+			if (Array.isArray(gate.dependsOn)) {
+				for (const dep of gate.dependsOn) {
+					if (dep === gate.id) {
+						throw new Error(`Gate "${gate.id}" depends on itself`);
 					}
 					if (!ids.has(dep)) {
-						throw new Error(`Artifact "${artifact.id}" depends on unknown "${dep}"`);
+						throw new Error(`Gate "${gate.id}" depends on unknown "${dep}"`);
 					}
 				}
 			}
 		}
 
 		// Check for circular dependencies via topological sort
-		const artifactMap = new Map(artifacts.map(a => [a.id, a]));
+		const gateMap = new Map(gates.map(g => [g.id, g]));
 		const visited = new Set<string>();
 		const visiting = new Set<string>();
 
@@ -173,9 +157,9 @@ export class WorkflowManager {
 				throw new Error(`Circular dependency detected involving "${id}"`);
 			}
 			visiting.add(id);
-			const artifact = artifactMap.get(id)!;
-			if (Array.isArray(artifact.dependsOn)) {
-				for (const dep of artifact.dependsOn) {
+			const gate = gateMap.get(id)!;
+			if (Array.isArray(gate.dependsOn)) {
+				for (const dep of gate.dependsOn) {
 					visit(dep);
 				}
 			}
@@ -183,8 +167,8 @@ export class WorkflowManager {
 			visited.add(id);
 		};
 
-		for (const artifact of artifacts) {
-			visit(artifact.id);
+		for (const gate of gates) {
+			visit(gate.id);
 		}
 	}
 }

@@ -61,18 +61,21 @@ export interface Goal {
 		id: string;
 		name: string;
 		description: string;
-		artifacts: Array<{
+		gates: Array<{
 			id: string;
 			name: string;
-			description: string;
-			kind: string;
-			format: string;
 			dependsOn: string[];
-			mustHave: string[];
-			shouldHave: string[];
-			mustNotHave: string[];
-			suggestedRole?: string;
-			verification?: any;
+			content?: boolean;
+			injectDownstream?: boolean;
+			metadata?: Record<string, string>;
+			verify?: Array<{
+				name: string;
+				type: "command" | "llm-review";
+				run?: string;
+				prompt?: string;
+				expect?: "success" | "failure";
+				timeout?: number;
+			}>;
 		}>;
 	};
 }

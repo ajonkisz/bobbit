@@ -288,7 +288,7 @@ function goalPreviewPanel() {
 							@change=${(e: Event) => { _selectedWorkflowId = (e.target as HTMLSelectElement).value; renderApp(); }}
 						>
 							${_cachedWorkflows.map((wf) => html`
-								<option value=${wf.id} ?selected=${_selectedWorkflowId === wf.id}>${wf.name} (${wf.artifacts.length} artifacts)</option>
+								<option value=${wf.id} ?selected=${_selectedWorkflowId === wf.id}>${wf.name} (${wf.gates.length} gates)</option>
 							`)}
 						</select>
 					</div>

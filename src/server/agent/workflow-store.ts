@@ -3,46 +3,30 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { stringify, parse } from "yaml";
 
-export type ArtifactKind = "analysis" | "deliverable" | "review" | "verification";
-export type ArtifactFormat = "markdown" | "html" | "diff" | "command";
-
-export interface VerificationStep {
+export interface VerifyStep {
 	name: string;
 	type: "command" | "llm-review";
-	command?: string;
+	run?: string;
 	prompt?: string;
-	accept_when?: string;
-	timeout: number;
-}
-
-export interface VerificationConfig {
-	type: "command" | "llm-review" | "combined";
-	prompt?: string;
-	command?: string;
-	accept_when?: string;
+	expect?: "success" | "failure";
 	timeout?: number;
-	steps?: VerificationStep[];
 }
 
-export interface WorkflowArtifact {
+export interface WorkflowGate {
 	id: string;
 	name: string;
-	description: string;
-	kind: ArtifactKind;
-	format: ArtifactFormat;
 	dependsOn: string[];
-	mustHave: string[];
-	shouldHave: string[];
-	mustNotHave: string[];
-	suggestedRole?: string;
-	verification?: VerificationConfig;
+	content?: boolean;
+	injectDownstream?: boolean;
+	metadata?: Record<string, string>;
+	verify?: VerifyStep[];
 }
 
 export interface Workflow {
 	id: string;
 	name: string;
 	description: string;
-	artifacts: WorkflowArtifact[];
+	gates: WorkflowGate[];
 	createdAt: number;
 	updatedAt: number;
 }
@@ -100,32 +84,46 @@ export class WorkflowStore {
 	}
 
 	private normalizeWorkflow(data: Record<string, unknown>): Workflow {
-		const artifacts = Array.isArray(data.artifacts) ? data.artifacts : [];
+		const gates = Array.isArray(data.gates) ? data.gates : [];
 		return {
 			id: data.id as string,
 			name: (data.name as string) ?? (data.id as string),
 			description: (data.description as string) ?? "",
-			artifacts: artifacts.map((a: Record<string, unknown>) => this.normalizeArtifact(a)),
+			gates: gates.map((g: Record<string, unknown>) => this.normalizeGate(g)),
 			createdAt: (data.createdAt as number) ?? 0,
 			updatedAt: (data.updatedAt as number) ?? 0,
 		};
 	}
 
-	private normalizeArtifact(data: Record<string, unknown>): WorkflowArtifact {
-		const artifact: WorkflowArtifact = {
+	private normalizeGate(data: Record<string, unknown>): WorkflowGate {
+		const gate: WorkflowGate = {
 			id: (data.id as string) ?? "",
 			name: (data.name as string) ?? "",
-			description: (data.description as string) ?? "",
-			kind: (data.kind as ArtifactKind) ?? "analysis",
-			format: (data.format as ArtifactFormat) ?? "markdown",
-			dependsOn: Array.isArray(data.dependsOn) ? data.dependsOn : [],
-			mustHave: Array.isArray(data.mustHave) ? data.mustHave : [],
-			shouldHave: Array.isArray(data.shouldHave) ? data.shouldHave : [],
-			mustNotHave: Array.isArray(data.mustNotHave) ? data.mustNotHave : [],
+			dependsOn: Array.isArray(data.depends_on) ? data.depends_on
+				: Array.isArray(data.dependsOn) ? data.dependsOn
+				: [],
 		};
-		if (data.suggestedRole) artifact.suggestedRole = data.suggestedRole as string;
-		if (data.verification) artifact.verification = data.verification as VerificationConfig;
-		return artifact;
+		if (data.content === true) gate.content = true;
+		if (data.inject_downstream === true || data.injectDownstream === true) gate.injectDownstream = true;
+		if (data.metadata && typeof data.metadata === "object") {
+			gate.metadata = data.metadata as Record<string, string>;
+		}
+		if (Array.isArray(data.verify)) {
+			gate.verify = (data.verify as Record<string, unknown>[]).map(v => this.normalizeVerifyStep(v));
+		}
+		return gate;
+	}
+
+	private normalizeVerifyStep(data: Record<string, unknown>): VerifyStep {
+		const step: VerifyStep = {
+			name: (data.name as string) ?? "",
+			type: (data.type as "command" | "llm-review") ?? "command",
+		};
+		if (typeof data.run === "string") step.run = data.run;
+		if (typeof data.prompt === "string") step.prompt = data.prompt;
+		if (data.expect === "success" || data.expect === "failure") step.expect = data.expect;
+		if (typeof data.timeout === "number") step.timeout = data.timeout;
+		return step;
 	}
 
 	private saveOne(workflow: Workflow): void {
@@ -135,20 +133,25 @@ export class WorkflowStore {
 				id: workflow.id,
 				name: workflow.name,
 				description: workflow.description,
-				artifacts: workflow.artifacts.map((a) => {
+				gates: workflow.gates.map((g) => {
 					const out: Record<string, unknown> = {
-						id: a.id,
-						name: a.name,
-						description: a.description,
-						kind: a.kind,
-						format: a.format,
-						dependsOn: a.dependsOn,
-						mustHave: a.mustHave,
-						shouldHave: a.shouldHave,
-						mustNotHave: a.mustNotHave,
+						id: g.id,
+						name: g.name,
 					};
-					if (a.suggestedRole) out.suggestedRole = a.suggestedRole;
-					if (a.verification) out.verification = a.verification;
+					if (g.content) out.content = true;
+					if (g.injectDownstream) out.inject_downstream = true;
+					if (g.dependsOn.length > 0) out.depends_on = g.dependsOn;
+					if (g.metadata) out.metadata = g.metadata;
+					if (g.verify && g.verify.length > 0) {
+						out.verify = g.verify.map(v => {
+							const s: Record<string, unknown> = { name: v.name, type: v.type };
+							if (v.run) s.run = v.run;
+							if (v.prompt) s.prompt = v.prompt;
+							if (v.expect) s.expect = v.expect;
+							if (v.timeout) s.timeout = v.timeout;
+							return s;
+						});
+					}
 					return out;
 				}),
 				createdAt: workflow.createdAt,
@@ -162,9 +165,6 @@ export class WorkflowStore {
 	}
 
 	private seedDefaults(): void {
-		// Seed workflows are committed as YAML files in the repo (e.g. workflows/bug-fix.yaml).
-		// If they exist on disk but weren't loaded yet (e.g. first run), reload from disk.
-		// We no longer maintain a programmatic duplicate of the seed content.
 		const bugFixPath = path.join(WORKFLOWS_DIR, "bug-fix.yaml");
 		if (fs.existsSync(bugFixPath)) {
 			this.loadAll();

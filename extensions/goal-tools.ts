@@ -1,7 +1,7 @@
 /**
  * Goal tool extensions for Bobbit.
  *
- * Registers task and artifact management tools for ANY session associated
+ * Registers task and gate management tools for ANY session associated
  * with a goal. Loaded automatically via --extension when a session has a goalId.
  *
  * Team-specific tools (team_spawn, team_dismiss, etc.) live in team-lead-tools.ts
@@ -84,7 +84,6 @@ export default function (pi: ExtensionAPI) {
 		description: [
 			"Create a new task for the goal.",
 			"Types: implementation, code-review, testing, bug-fix, refactor, custom.",
-			"The server enforces artifact requirements — if a required artifact is missing, this returns a 409 error listing what's needed.",
 		].join(" "),
 		promptSnippet: "Create a task with title, type, optional spec, and dependencies.",
 		parameters: Type.Object({
@@ -92,16 +91,12 @@ export default function (pi: ExtensionAPI) {
 			type: Type.String({ description: "Task type: implementation, code-review, testing, bug-fix, refactor, or custom" }),
 			spec: Type.Optional(Type.String({ description: "Detailed specification for the task" })),
 			depends_on: Type.Optional(Type.Array(Type.String(), { description: "Task IDs this task depends on" })),
-			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this task should produce. Used for context injection when the agent is prompted." })),
-			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Workflow artifact IDs whose accepted content to inject when prompting the assigned agent." })),
 		}),
 		async execute(_id, params) {
 			try {
 				const body: Record<string, unknown> = { title: params.title, type: params.type };
 				if (params.spec) body.spec = params.spec;
 				if (params.depends_on?.length) body.dependsOn = params.depends_on;
-				if (params.workflowArtifactId) body.workflowArtifactId = params.workflowArtifactId;
-				if (params.inputArtifactIds?.length) body.inputArtifactIds = params.inputArtifactIds;
 				return ok(await api("POST", `/api/goals/${goalId}/tasks`, body));
 			} catch (e: any) { return err(e.message); }
 		},
@@ -129,7 +124,6 @@ export default function (pi: ExtensionAPI) {
 		async execute(_id, params) {
 			try {
 				const { task_id, assigned_to, state, ...fields } = params;
-				// Update fields
 				const updateBody: Record<string, unknown> = {};
 				if (fields.title !== undefined) updateBody.title = fields.title;
 				if (fields.spec !== undefined) updateBody.spec = fields.spec;
@@ -138,95 +132,71 @@ export default function (pi: ExtensionAPI) {
 				if (Object.keys(updateBody).length > 0) {
 					await api("PUT", `/api/tasks/${task_id}`, updateBody);
 				}
-				// Assign
 				if (assigned_to) {
 					await api("POST", `/api/tasks/${task_id}/assign`, { sessionId: assigned_to });
 				}
-				// Transition
 				if (state) {
 					await api("POST", `/api/tasks/${task_id}/transition`, { state });
 				}
-				// Return current task state
 				return ok(await api("GET", `/api/tasks/${task_id}`));
 			} catch (e: any) { return err(e.message); }
 		},
 	});
 
-	// ── Artifact tools ────────────────────────────────────────────────
+	// ── Gate tools ────────────────────────────────────────────────────
 
 	pi.registerTool({
-		name: "artifact_list",
-		label: "List Artifacts",
-		description: "List all artifacts for the goal (name, type, version, timestamps). Does not include content — use artifact_get for that.",
-		promptSnippet: "List all goal artifacts (metadata only, no content).",
+		name: "gate_list",
+		label: "List Gates",
+		description: "List all gates for the current goal with their status, dependencies, and signal count.",
+		promptSnippet: "List all gates for the goal with status.",
 		parameters: Type.Object({}),
 		async execute() {
 			try {
-				return ok(await api("GET", `/api/goals/${goalId}/artifacts`));
+				return ok(await api("GET", `/api/goals/${goalId}/gates`));
 			} catch (e: any) { return err(e.message); }
 		},
 	});
 
 	pi.registerTool({
-		name: "artifact_create",
-		label: "Create Artifact",
+		name: "gate_status",
+		label: "Gate Status",
+		description: "Get current status of a specific gate (pending/passed/failed) plus latest verification results and signal history.",
+		promptSnippet: "Get gate status, verification results, and signal history.",
+		parameters: Type.Object({
+			gate_id: Type.String({ description: "Gate ID (e.g. 'issue-analysis', 'implementation')" }),
+		}),
+		async execute(_id, params) {
+			try {
+				return ok(await api("GET", `/api/goals/${goalId}/gates/${params.gate_id}`));
+			} catch (e: any) { return err(e.message); }
+		},
+	});
+
+	pi.registerTool({
+		name: "gate_signal",
+		label: "Signal Gate",
 		description: [
-			"Create a goal artifact. Types: design-doc (blocks implementation tasks),",
-			"test-plan, review-findings (blocks goal completion), gap-analysis, security-findings, pr, custom.",
+			"Signal that a gate is ready for verification.",
+			"For content gates, provide markdown content.",
+			"For metadata gates, provide key-value metadata.",
+			"Triggers async verification. Returns signal info.",
 		].join(" "),
-		promptSnippet: "Create a goal artifact (design-doc, review-findings, test-plan, etc.).",
+		promptSnippet: "Signal a gate for verification with optional content and metadata.",
 		parameters: Type.Object({
-			name: Type.String({ description: "Human-readable artifact name" }),
-			type: Type.String({ description: "Artifact type: design-doc, test-plan, review-findings, gap-analysis, security-findings, pr, or custom" }),
-			content: Type.String({ description: "Artifact content (markdown or JSON)" }),
-			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this fulfils. Links the artifact to a workflow definition and enforces dependency gating." })),
+			gate_id: Type.String({ description: "Gate ID to signal (e.g. 'issue-analysis', 'reproducing-test')" }),
+			content: Type.Optional(Type.String({ description: "Markdown content for content gates" })),
+			metadata: Type.Optional(Type.Record(Type.String(), Type.String(), { description: "Key-value metadata (e.g. { test_command: 'npm test' })" })),
 		}),
 		async execute(_id, params) {
 			try {
-				const body: Record<string, unknown> = {
-					name: params.name,
-					type: params.type,
-					content: params.content,
-					producedBy: sessionId,
-				};
-				if (params.workflowArtifactId) body.workflowArtifactId = params.workflowArtifactId;
-				return ok(await api("POST", `/api/goals/${goalId}/artifacts`, body));
+				const body: Record<string, unknown> = { sessionId };
+				if (params.content) body.content = params.content;
+				if (params.metadata) body.metadata = params.metadata;
+				return ok(await api("POST", `/api/goals/${goalId}/gates/${params.gate_id}/signal`, body));
 			} catch (e: any) { return err(e.message); }
 		},
 	});
 
-	pi.registerTool({
-		name: "artifact_get",
-		label: "Get Artifact",
-		description: "Get a specific artifact including its full content.",
-		promptSnippet: "Get an artifact's full content by ID.",
-		parameters: Type.Object({
-			artifact_id: Type.String({ description: "Artifact ID" }),
-		}),
-		async execute(_id, params) {
-			try {
-				return ok(await api("GET", `/api/goals/${goalId}/artifacts/${params.artifact_id}`));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	pi.registerTool({
-		name: "artifact_update",
-		label: "Update Artifact",
-		description: "Update an artifact's content. Increments the version number.",
-		promptSnippet: "Update an artifact's content (increments version).",
-		parameters: Type.Object({
-			artifact_id: Type.String({ description: "Artifact ID" }),
-			content: Type.String({ description: "New content (markdown or JSON)" }),
-		}),
-		async execute(_id, params) {
-			try {
-				return ok(await api("PUT", `/api/goals/${goalId}/artifacts/${params.artifact_id}`, {
-					content: params.content,
-				}));
-			} catch (e: any) { return err(e.message); }
-		},
-	});
-
-	console.log(`[goal-tools] Registered 7 task/artifact tools for session ${sessionId}, goal ${goalId}`);
+	console.log(`[goal-tools] Registered 6 task/gate tools for session ${sessionId}, goal ${goalId}`);
 }

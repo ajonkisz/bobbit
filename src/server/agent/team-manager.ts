@@ -9,7 +9,7 @@ import { TeamStore } from "./team-store.js";
 import type { PersistedTeamEntry } from "./team-store.js";
 import { generateTeamName } from "./team-names.js";
 import type { ColorStore } from "./color-store.js";
-import type { GoalArtifactStore } from "./goal-artifact-store.js";
+import type { GateStore } from "./gate-store.js";
 import type { PersonalityManager } from "./personality-manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -82,8 +82,8 @@ export interface TeamManagerConfig {
 	taskManager: TaskManager;
 	/** Role store for looking up role definitions (prompts, accessories, tools) */
 	roleStore?: RoleStore;
-	/** Goal artifact store for checking artifact requirements on completion */
-	goalArtifactStore?: GoalArtifactStore;
+	/** Gate store for checking gate status on completion and building dependency context */
+	gateStore?: GateStore;
 	/** Personality manager for resolving personality names to prompt fragments */
 	personalityManager?: PersonalityManager;
 }
@@ -438,55 +438,52 @@ export class TeamManager {
 	 */
 	buildDependencyContext(goalId: string, workflowArtifactId?: string, explicitInputIds?: string[]): string {
 		const goal = this.goalManager.getGoal(goalId);
-		if (!goal?.workflow) return "";
+		if (!goal?.workflow || !this.config.gateStore) return "";
 
-		// Determine which workflow artifact IDs to inject
+		// Determine which gate IDs to inject content from
 		let inputIds: string[];
 		if (explicitInputIds && explicitInputIds.length > 0) {
 			inputIds = explicitInputIds;
 		} else if (workflowArtifactId) {
-			const wfArtifact = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
-			if (!wfArtifact || !wfArtifact.dependsOn?.length) return "";
-			inputIds = wfArtifact.dependsOn;
+			const wfGate = goal.workflow.gates.find(g => g.id === workflowArtifactId);
+			if (!wfGate || !wfGate.dependsOn?.length) return "";
+			inputIds = wfGate.dependsOn;
 		} else {
 			return "";
 		}
 
-		const goalArtifacts = this.config.goalArtifactStore?.getByGoalId(goalId) ?? [];
+		const gateStates = this.config.gateStore.getGatesForGoal(goalId);
 		const parts: string[] = [];
 
 		for (const depId of inputIds) {
-			const depDef = goal.workflow.artifacts.find(a => a.id === depId);
-			const depArtifact = goalArtifacts.find(
-				a => a.workflowArtifactId === depId && a.status === "accepted"
-			);
-			if (depArtifact && depDef) {
-				parts.push(`## ${depDef.name}\n\n${depArtifact.content}`);
+			const gateDef = goal.workflow.gates.find(g => g.id === depId);
+			const gateState = gateStates.find(g => g.gateId === depId);
+			if (gateDef && gateState && gateState.status === "passed" && gateDef.injectDownstream && gateState.currentContent) {
+				parts.push(`## Gate: ${gateDef.name} (passed)\n\n${gateState.currentContent}`);
 			}
 		}
 
 		if (parts.length === 0) return "";
-		return "\n\n# Upstream Artifacts\n\nHere are the accepted upstream artifacts you should build on:\n\n" + parts.join("\n\n---\n\n");
+		return "\n\n# Upstream Gates\n\nContent from passed upstream gates:\n\n" + parts.join("\n\n---\n\n");
 	}
 
 	/**
-	 * Try to extract a workflowArtifactId from the task description.
-	 * Looks for a pattern like `[workflowArtifact:some-id]` in the task text.
+	 * Try to extract a workflowArtifactId (gate ID) from the task description.
+	 * Looks for a pattern like `[workflowArtifact:some-id]` or `[gate:some-id]` in the task text.
 	 */
 	private extractWorkflowArtifactId(task: string, goalId: string): string | undefined {
 		// Check for explicit tag
-		const tagMatch = task.match(/\[workflowArtifact:([^\]]+)\]/);
+		const tagMatch = task.match(/\[(?:workflowArtifact|gate):([^\]]+)\]/);
 		if (tagMatch) return tagMatch[1];
 
-		// Try to match against workflow artifact names/IDs in the goal
+		// Try to match against workflow gate names/IDs in the goal
 		const goal = this.goalManager.getGoal(goalId);
 		if (!goal?.workflow) return undefined;
 
 		const taskLower = task.toLowerCase();
-		for (const wfArtifact of goal.workflow.artifacts) {
-			// Match by artifact name (case-insensitive) or exact ID
-			if (taskLower.includes(wfArtifact.name.toLowerCase()) || task.includes(wfArtifact.id)) {
-				return wfArtifact.id;
+		for (const gate of goal.workflow.gates) {
+			if (taskLower.includes(gate.name.toLowerCase()) || task.includes(gate.id)) {
+				return gate.id;
 			}
 		}
 		return undefined;
@@ -788,34 +785,17 @@ export class TeamManager {
 			throw new Error(`No active team for goal: ${goalId}`);
 		}
 
-		// Enforce required artifacts before allowing completion
-		if (this.config.goalArtifactStore) {
+		// Enforce gate requirements before allowing completion
+		if (this.config.gateStore) {
 			const goal = this.goalManager.getGoal(goalId);
 			const skipReqs = goal?.skipArtifactRequirements;
 
-			// Legacy artifact type requirements (review-findings, summary-report)
-			if (!skipReqs || (!skipReqs.includes("review-findings") && !skipReqs.includes("summary-report"))) {
-				const artifacts = this.config.goalArtifactStore.getByGoalId(goalId);
-				const types = new Set(artifacts.map(a => a.type));
-				const missing: string[] = [];
-				if (!skipReqs?.includes("review-findings") && !types.has("review-findings")) missing.push("review-findings");
-				if (!skipReqs?.includes("summary-report") && !types.has("summary-report")) missing.push("summary-report");
-				if (missing.length > 0) {
-					throw new Error(`Cannot complete goal — missing required artifacts: ${missing.join(", ")}. Create them with artifact_create before calling team_complete.`);
-				}
-			}
-
-			// Workflow artifact requirements
 			if (goal?.workflow && (!skipReqs || !skipReqs.includes("workflow"))) {
-				const artifacts = this.config.goalArtifactStore.getByGoalId(goalId);
-				const acceptedWfIds = new Set(
-					artifacts
-						.filter(a => a.status === "accepted" && a.workflowArtifactId)
-						.map(a => a.workflowArtifactId!)
-				);
-				const missingWf = goal.workflow.artifacts.filter(a => !acceptedWfIds.has(a.id));
-				if (missingWf.length > 0) {
-					throw new Error(`Cannot complete: missing accepted artifacts for: ${missingWf.map(a => a.name).join(", ")}`);
+				const gateStates = this.config.gateStore.getGatesForGoal(goalId);
+				const passedIds = new Set(gateStates.filter(g => g.status === "passed").map(g => g.gateId));
+				const failedGates = goal.workflow.gates.filter(g => !passedIds.has(g.id));
+				if (failedGates.length > 0) {
+					throw new Error(`Cannot complete: gates not passed: ${failedGates.map(g => g.name).join(", ")}`);
 				}
 			}
 		}

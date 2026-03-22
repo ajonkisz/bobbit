@@ -80,8 +80,8 @@ export default function (pi: ExtensionAPI) {
 			role: Type.String({ description: "Agent role: 'coder', 'reviewer', or 'tester'" }),
 			task: Type.String({ description: "Task description sent as the agent's first prompt" }),
 			personalities: Type.Optional(Type.Array(Type.String(), { description: "Personality names (e.g. 'thorough', 'creative'). If omitted, uses the role's default personalities." })),
-			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this agent should produce. If inputArtifactIds is not set, the DAG dependencies of this artifact are auto-injected as context." })),
-			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Workflow artifact IDs whose accepted content should be injected into the agent's context. Overrides automatic DAG resolution." })),
+			workflowArtifactId: Type.Optional(Type.String({ description: "Gate ID this agent is working toward. If inputArtifactIds is not set, content from upstream passed gates is auto-injected as context." })),
+			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Gate IDs whose passed content should be injected into the agent's context. Overrides automatic DAG resolution." })),
 		}),
 		async execute(_id, params) {
 			try {
@@ -174,8 +174,8 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			session_id: Type.String({ description: "Session ID of the agent to prompt" }),
 			message: Type.String({ description: "Prompt message for the agent" }),
-			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this agent should produce. If inputArtifactIds is not set, the DAG dependencies of this artifact are auto-injected as context." })),
-			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Workflow artifact IDs whose accepted content should be injected into the agent's context. Overrides automatic DAG resolution." })),
+			workflowArtifactId: Type.Optional(Type.String({ description: "Gate ID this agent is working toward. If inputArtifactIds is not set, content from upstream passed gates is auto-injected as context." })),
+			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Gate IDs whose passed content should be injected into the agent's context. Overrides automatic DAG resolution." })),
 		}),
 		async execute(_id, params) {
 			try {

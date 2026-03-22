@@ -843,7 +843,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let cwdDropdownOpen = false;
 	let cwdHighlightIndex = -1;
 	let workflowId = proposal.workflow || "general";
-	let _proposalWorkflows: Array<{ id: string; name: string; artifacts: any[] }> = [];
+	let _proposalWorkflows: Array<{ id: string; name: string; gates: any[] }> = [];
 
 	// Load workflows for the selector
 	import("./api.js").then(({ fetchWorkflows }) => {
@@ -936,7 +936,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 											@change=${(e: Event) => { workflowId = (e.target as HTMLSelectElement).value; renderProposalDialog(); }}
 										>
 											${_proposalWorkflows.map((wf) => html`
-												<option value=${wf.id} ?selected=${workflowId === wf.id}>${wf.name} (${wf.artifacts.length} artifacts)</option>
+												<option value=${wf.id} ?selected=${workflowId === wf.id}>${wf.name} (${wf.gates.length} gates)</option>
 											`)}
 										</select>
 									</div>

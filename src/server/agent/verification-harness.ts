@@ -1,15 +1,13 @@
 import { exec, execSync } from "node:child_process";
 import path from "node:path";
-import type { GoalArtifactStore, GoalArtifact } from "./goal-artifact-store.js";
-import type { WorkflowArtifact, VerificationConfig, Workflow } from "./workflow-store.js";
+import type { GateStore, GateSignal } from "./gate-store.js";
+import type { WorkflowGate, Workflow } from "./workflow-store.js";
 
 /** Resolve Git Bash on Windows — avoids WSL's bash which `shell: "bash"` may pick up. */
 function resolveShell(): string {
 	if (process.platform !== "win32") return "/bin/sh";
 	try {
 		const gitExe = execSync("where.exe git", { encoding: "utf-8" }).split("\n")[0].trim();
-		// Walk up from e.g. C:\Program Files\Git\mingw64\bin\git.exe or C:\Program Files\Git\cmd\git.exe
-		// to find the Git root, then descend to usr\bin\bash.exe
 		let dir = path.dirname(gitExe);
 		for (let i = 0; i < 4; i++) {
 			const candidate = path.join(dir, "usr", "bin", "bash.exe");
@@ -17,176 +15,190 @@ function resolveShell(): string {
 			dir = path.dirname(dir);
 		}
 	} catch {}
-	return "bash"; // fallback
+	return "bash";
 }
 
 const SHELL = resolveShell();
 
 export class VerificationHarness {
 	constructor(
-		private goalArtifactStore: GoalArtifactStore,
+		private gateStore: GateStore,
 		private broadcastFn: (goalId: string, event: any) => void,
 	) {}
 
 	/**
-	 * Run verification async (fire-and-forget from caller).
-	 * Updates artifact status and broadcasts result when done.
+	 * Verify a gate signal asynchronously (fire-and-forget from caller).
+	 * Updates signal verification results and gate status when done.
 	 */
-	async verify(
-		artifactId: string,
-		goalArtifact: GoalArtifact,
-		workflowArtifact: WorkflowArtifact,
+	async verifyGateSignal(
+		signal: GateSignal,
+		gate: WorkflowGate,
 		cwd: string,
 		goalBranch?: string,
 		primaryBranch?: string,
-		workflow?: Workflow,
+		allGateStates?: Map<string, { metadata?: Record<string, string> }>,
 	): Promise<void> {
-		const verification = workflowArtifact.verification;
-		if (!verification) {
-			// No verification config → auto-accept
-			this.goalArtifactStore.update(artifactId, { status: "accepted" });
-			this.broadcastFn(goalArtifact.goalId, {
-				type: "artifact_verification_complete",
-				goalId: goalArtifact.goalId,
-				artifactId,
-				status: "accepted",
+		const steps = gate.verify;
+		if (!steps || steps.length === 0) {
+			// No verification — auto-pass
+			this.gateStore.updateSignalVerification(signal.id, { status: "passed", steps: [] });
+			this.gateStore.updateGateStatus(signal.goalId, signal.gateId, "passed");
+			this.broadcastFn(signal.goalId, {
+				type: "gate_verification_complete",
+				goalId: signal.goalId,
+				gateId: signal.gateId,
+				signalId: signal.id,
+				status: "passed",
+			});
+			this.broadcastFn(signal.goalId, {
+				type: "gate_status_changed",
+				goalId: signal.goalId,
+				gateId: signal.gateId,
+				status: "passed",
 			});
 			return;
 		}
 
+		// Broadcast verification started
+		this.broadcastFn(signal.goalId, {
+			type: "gate_verification_started",
+			goalId: signal.goalId,
+			gateId: signal.gateId,
+			signalId: signal.id,
+		});
+
 		try {
-			const steps = this.resolveSteps(verification);
-			const vars = this.buildVars(goalArtifact, cwd, goalBranch, primaryBranch);
-			const results: Array<{ name: string; type: string; passed: boolean; output: string }> = [];
+			const builtinVars: Record<string, string> = {
+				branch: goalBranch || "HEAD",
+				master: primaryBranch || "master",
+				cwd,
+			};
+
+			// Also include the current signal's metadata as bare variables
+			if (signal.metadata) {
+				for (const [k, v] of Object.entries(signal.metadata)) {
+					builtinVars[k] = v;
+				}
+			}
+
+			const results: GateSignal["verification"]["steps"] = [];
 
 			for (const step of steps) {
 				let result: { passed: boolean; output: string };
+				const startTime = Date.now();
+
 				if (step.type === "command") {
-					const cmd = this.substituteVars(step.command || "", vars);
-					result = await this.runCommandStep(cmd, cwd, step.timeout);
+					const cmd = this.substituteVars(step.run || "", builtinVars, allGateStates);
+					const expectFailure = step.expect === "failure";
+					result = await this.runCommandStep(cmd, cwd, step.timeout || 300, expectFailure);
 				} else {
-					// llm-review — auto-pass with warning (full LLM review is a future enhancement)
+					// llm-review — auto-pass with warning
 					console.warn(`[verification] LLM review step "${step.name}" auto-passed — not yet implemented`);
-					result = { passed: true, output: "⚠ LLM review not yet implemented — auto-passed. This artifact was NOT reviewed by an LLM." };
+					result = { passed: true, output: "⚠ LLM review not yet implemented — auto-passed." };
 				}
-				results.push({ name: step.name, type: step.type, passed: result.passed, output: result.output });
+
+				const duration_ms = Date.now() - startTime;
+				results.push({
+					name: step.name,
+					type: step.type,
+					passed: result.passed,
+					output: result.output,
+					duration_ms,
+					expect: step.expect,
+				});
+
 				if (!result.passed) break; // Stop on first failure
 			}
 
-			const allPassed = results.every((r) => r.passed);
-			const status = allPassed ? "accepted" : "rejected";
-			const rejectionReason = allPassed ? undefined : results.find((r) => !r.passed)?.output;
+			const allPassed = results.every(r => r.passed);
+			const status = allPassed ? "passed" : "failed";
 
-			this.goalArtifactStore.update(artifactId, {
+			this.gateStore.updateSignalVerification(signal.id, { status, steps: results });
+			this.gateStore.updateGateStatus(signal.goalId, signal.gateId, status);
+
+			this.broadcastFn(signal.goalId, {
+				type: "gate_verification_complete",
+				goalId: signal.goalId,
+				gateId: signal.gateId,
+				signalId: signal.id,
 				status,
-				verificationResult: { steps: results },
-				rejectionReason,
 			});
-
-			this.broadcastFn(goalArtifact.goalId, {
-				type: "artifact_verification_complete",
-				goalId: goalArtifact.goalId,
-				artifactId,
+			this.broadcastFn(signal.goalId, {
+				type: "gate_status_changed",
+				goalId: signal.goalId,
+				gateId: signal.gateId,
 				status,
-				verificationResult: { steps: results },
-				rejectionReason,
 			});
-
-			// Cascade rejection to downstream artifacts
-			if (status === "rejected" && workflow && workflowArtifact.id) {
-				this.cascadeRejection(goalArtifact.goalId, workflowArtifact.id, workflow);
-			}
 		} catch (err: any) {
-			this.goalArtifactStore.update(artifactId, {
-				status: "rejected",
-				rejectionReason: `Verification error: ${err.message}`,
+			this.gateStore.updateSignalVerification(signal.id, {
+				status: "failed",
+				steps: [{ name: "Error", type: "command", passed: false, output: err.message, duration_ms: 0 }],
 			});
-			this.broadcastFn(goalArtifact.goalId, {
-				type: "artifact_verification_complete",
-				goalId: goalArtifact.goalId,
-				artifactId,
-				status: "rejected",
-				rejectionReason: `Verification error: ${err.message}`,
+			this.gateStore.updateGateStatus(signal.goalId, signal.gateId, "failed");
+
+			this.broadcastFn(signal.goalId, {
+				type: "gate_verification_complete",
+				goalId: signal.goalId,
+				gateId: signal.gateId,
+				signalId: signal.id,
+				status: "failed",
+			});
+			this.broadcastFn(signal.goalId, {
+				type: "gate_status_changed",
+				goalId: signal.goalId,
+				gateId: signal.gateId,
+				status: "failed",
 			});
 		}
 	}
 
 	/**
-	 * When an upstream artifact is rejected, cascade invalidation to downstream
-	 * artifacts that depend on it. Downstream artifacts with "accepted" status
-	 * are reset to "submitted" with a rejection reason noting the broken dependency.
+	 * Substitute variables in a template string.
+	 * Supports: {{var}}, {{gate_id.field}} (for upstream gate metadata)
 	 */
-	cascadeRejection(
-		goalId: string,
-		rejectedWorkflowArtifactId: string,
-		workflow: Workflow,
-	): void {
-		// Find all workflow artifacts that depend (directly or transitively) on the rejected one
-		const dependents = new Set<string>();
-		const findDependents = (wfArtId: string) => {
-			for (const art of workflow.artifacts) {
-				if (art.dependsOn.includes(wfArtId) && !dependents.has(art.id)) {
-					dependents.add(art.id);
-					findDependents(art.id); // transitive
+	private substituteVars(
+		template: string,
+		builtinVars: Record<string, string>,
+		allGateStates?: Map<string, { metadata?: Record<string, string> }>,
+	): string {
+		return template.replace(/\{\{([^}]+)\}\}/g, (match, key: string) => {
+			const trimmed = key.trim();
+
+			// Check builtin vars first
+			if (trimmed in builtinVars) return builtinVars[trimmed];
+
+			// Check for gate_id.field syntax
+			const dotIndex = trimmed.indexOf(".");
+			if (dotIndex > 0 && allGateStates) {
+				const gateId = trimmed.slice(0, dotIndex);
+				const field = trimmed.slice(dotIndex + 1);
+				const gateState = allGateStates.get(gateId);
+				if (gateState?.metadata && field in gateState.metadata) {
+					return gateState.metadata[field];
 				}
 			}
-		};
-		findDependents(rejectedWorkflowArtifactId);
 
-		if (dependents.size === 0) return;
-
-		const goalArtifacts = this.goalArtifactStore.getByGoalId(goalId);
-		for (const ga of goalArtifacts) {
-			if (ga.workflowArtifactId && dependents.has(ga.workflowArtifactId) && ga.status === "accepted") {
-				const depName = workflow.artifacts.find(a => a.id === rejectedWorkflowArtifactId)?.name || rejectedWorkflowArtifactId;
-				this.goalArtifactStore.update(ga.id, {
-					status: "rejected",
-					rejectionReason: `Dependency "${depName}" was re-verified and rejected. This artifact needs re-submission.`,
-				});
-				this.broadcastFn(goalId, {
-					type: "artifact_verification_complete",
-					goalId,
-					artifactId: ga.id,
-					status: "rejected",
-					rejectionReason: `Dependency "${depName}" was rejected — downstream invalidated.`,
-				});
-			}
-		}
+			return match; // Leave unresolved
+		});
 	}
 
-	private resolveSteps(config: VerificationConfig): Array<{ name: string; type: "command" | "llm-review"; command?: string; prompt?: string; timeout: number }> {
-		if (config.steps && config.steps.length > 0) return config.steps;
-		// Single-step configs (non-combined)
-		if (config.type === "command") {
-			return [{ name: "Command check", type: "command", command: config.command, timeout: config.timeout || 300 }];
-		}
-		if (config.type === "llm-review") {
-			return [{ name: "LLM review", type: "llm-review", prompt: config.prompt, timeout: config.timeout || 600 }];
-		}
-		return [];
-	}
-
-	private buildVars(artifact: GoalArtifact, cwd: string, goalBranch?: string, primaryBranch?: string): Record<string, string> {
-		return {
-			command: artifact.content || "",
-			branch: goalBranch || "HEAD",
-			master: primaryBranch || "master",
-			cwd,
-		};
-	}
-
-	private substituteVars(template: string, vars: Record<string, string>): string {
-		return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
-	}
-
-	private runCommandStep(command: string, cwd: string, timeoutSec: number): Promise<{ passed: boolean; output: string }> {
+	private runCommandStep(
+		command: string,
+		cwd: string,
+		timeoutSec: number,
+		expectFailure: boolean,
+	): Promise<{ passed: boolean; output: string }> {
 		return new Promise((resolve) => {
 			exec(command, { cwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024, shell: SHELL }, (error, stdout, stderr) => {
-				const output = (stdout + "\n" + stderr).trim().slice(-5000); // Keep last 5KB
-				if (error) {
-					resolve({ passed: false, output: output || error.message });
+				const output = (stdout + "\n" + stderr).trim().slice(-5000);
+				const exitedNonZero = !!error;
+
+				if (expectFailure) {
+					// expect: failure — non-zero exit = pass, zero exit = fail
+					resolve({ passed: exitedNonZero, output: output || (error?.message ?? "") });
 				} else {
-					resolve({ passed: true, output });
+					// expect: success (default) — zero exit = pass
+					resolve({ passed: !exitedNonZero, output: output || (error?.message ?? "") });
 				}
 			});
 		});

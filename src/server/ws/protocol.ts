@@ -56,4 +56,7 @@ export type ServerMessage =
 	| { type: "bg_process_created"; process: { id: string; command: string; pid: number; status: string; exitCode: number | null; startTime: number } }
 	| { type: "bg_process_output"; processId: string; stream: "stdout" | "stderr"; text: string; ts: number }
 	| { type: "bg_process_exited"; processId: string; exitCode: number | null }
-	| { type: "artifact_verification_complete"; goalId: string; artifactId: string; status: "accepted" | "rejected"; verificationResult?: any; rejectionReason?: string };
+	| { type: "gate_signal_received"; goalId: string; gateId: string; signalId: string }
+	| { type: "gate_verification_started"; goalId: string; gateId: string; signalId: string }
+	| { type: "gate_verification_complete"; goalId: string; gateId: string; signalId: string; status: string }
+	| { type: "gate_status_changed"; goalId: string; gateId: string; status: string };

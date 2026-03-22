@@ -346,25 +346,33 @@ export interface GoalArtifact {
 // WORKFLOW API
 // ============================================================================
 
-export interface WorkflowArtifact {
+export interface VerifyStep {
+	name: string;
+	type: "command" | "llm-review";
+	run?: string;
+	prompt?: string;
+	expect?: "success" | "failure";
+	timeout?: number;
+}
+
+export interface WorkflowGate {
 	id: string;
 	name: string;
-	description: string;
-	kind: string;
-	format: string;
 	dependsOn: string[];
-	mustHave: string[];
-	shouldHave: string[];
-	mustNotHave: string[];
-	suggestedRole?: string;
-	verification?: any;
+	content?: boolean;
+	injectDownstream?: boolean;
+	metadata?: Record<string, string>;
+	verify?: VerifyStep[];
 }
+
+/** @deprecated Use WorkflowGate instead */
+export type WorkflowArtifact = WorkflowGate;
 
 export interface Workflow {
 	id: string;
 	name: string;
 	description: string;
-	artifacts: WorkflowArtifact[];
+	gates: WorkflowGate[];
 	createdAt: number;
 	updatedAt: number;
 }
@@ -390,7 +398,7 @@ export async function fetchWorkflow(id: string): Promise<Workflow | null> {
 	}
 }
 
-export async function createWorkflow(workflow: { id: string; name: string; description: string; artifacts: WorkflowArtifact[] }): Promise<Workflow | null> {
+export async function createWorkflow(workflow: { id: string; name: string; description: string; gates: WorkflowGate[] }): Promise<Workflow | null> {
 	try {
 		const res = await gatewayFetch("/api/workflows", {
 			method: "POST",
@@ -453,23 +461,94 @@ export async function cloneWorkflow(id: string): Promise<Workflow | null> {
 }
 
 export async function fetchGoalArtifacts(goalId: string): Promise<GoalArtifact[]> {
+	// Legacy — returns empty. Use fetchGoalGates instead.
+	return [];
+}
+
+export async function fetchGoalArtifact(goalId: string, artifactId: string): Promise<GoalArtifact | null> {
+	// Legacy — returns null. Use gate endpoints instead.
+	return null;
+}
+
+// ── Gate API ─────────────────────────────────────────────────────
+
+export interface GateState {
+	gateId: string;
+	goalId: string;
+	status: "pending" | "passed" | "failed";
+	currentContent?: string;
+	currentContentVersion?: number;
+	currentMetadata?: Record<string, string>;
+	signals: GateSignal[];
+	updatedAt: number;
+	// Enriched from workflow definition
+	name?: string;
+	dependsOn?: string[];
+	signalCount?: number;
+}
+
+export interface GateSignal {
+	id: string;
+	gateId: string;
+	goalId: string;
+	sessionId: string;
+	timestamp: number;
+	commitSha: string;
+	metadata?: Record<string, string>;
+	content?: string;
+	contentVersion?: number;
+	verification: {
+		status: "running" | "passed" | "failed";
+		steps: Array<{
+			name: string;
+			type: string;
+			passed: boolean;
+			output: string;
+			duration_ms: number;
+			expect?: string;
+		}>;
+	};
+}
+
+export async function fetchGoalGates(goalId: string): Promise<GateState[]> {
 	try {
-		const res = await gatewayFetch(`/api/goals/${goalId}/artifacts`);
+		const res = await gatewayFetch(`/api/goals/${goalId}/gates`);
 		if (!res.ok) return [];
 		const data = await res.json();
-		return data.artifacts || [];
+		return data.gates || [];
 	} catch {
 		return [];
 	}
 }
 
-export async function fetchGoalArtifact(goalId: string, artifactId: string): Promise<GoalArtifact | null> {
+export async function fetchGateDetail(goalId: string, gateId: string): Promise<GateState | null> {
 	try {
-		const res = await gatewayFetch(`/api/goals/${goalId}/artifacts/${artifactId}`);
+		const res = await gatewayFetch(`/api/goals/${goalId}/gates/${gateId}`);
 		if (!res.ok) return null;
 		return await res.json();
 	} catch {
 		return null;
+	}
+}
+
+export async function fetchGateSignals(goalId: string, gateId: string): Promise<GateSignal[]> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/gates/${gateId}/signals`);
+		if (!res.ok) return [];
+		const data = await res.json();
+		return data.signals || [];
+	} catch {
+		return [];
+	}
+}
+
+export async function fetchGateContent(goalId: string, gateId: string): Promise<{ content?: string; version?: number }> {
+	try {
+		const res = await gatewayFetch(`/api/goals/${goalId}/gates/${gateId}/content`);
+		if (!res.ok) return {};
+		return await res.json();
+	} catch {
+		return {};
 	}
 }
 

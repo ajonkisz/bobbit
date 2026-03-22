@@ -393,50 +393,40 @@ interface PipelineNode {
 	status: "accepted" | "submitted" | "rejected" | "pending";
 }
 
-/** Compute dependency depth for each workflow artifact via BFS from roots. */
-function computeDepthLevels(wfArtifacts: Array<{ id: string; name: string; kind: string; dependsOn: string[] }>): PipelineNode[][] {
+/** Compute dependency depth for each workflow gate via BFS from roots. */
+function computeDepthLevels(wfGates: Array<{ id: string; name: string; dependsOn: string[] }>): PipelineNode[][] {
 	const depthMap = new Map<string, number>();
-	const artMap = new Map(wfArtifacts.map(a => [a.id, a]));
+	const gateMap = new Map(wfGates.map(g => [g.id, g]));
 
-	// Compute depth: max depth of all dependencies + 1
 	const visiting = new Set<string>();
 	function getDepth(id: string): number {
 		if (depthMap.has(id)) return depthMap.get(id)!;
-		if (visiting.has(id)) return 0; // cycle guard
+		if (visiting.has(id)) return 0;
 		visiting.add(id);
-		const art = artMap.get(id);
-		if (!art || art.dependsOn.length === 0) {
+		const gate = gateMap.get(id);
+		if (!gate || gate.dependsOn.length === 0) {
 			depthMap.set(id, 0);
 			return 0;
 		}
-		const d = Math.max(...art.dependsOn.map(dep => getDepth(dep))) + 1;
+		const d = Math.max(...gate.dependsOn.map(dep => getDepth(dep))) + 1;
 		depthMap.set(id, d);
 		return d;
 	}
 
-	for (const a of wfArtifacts) getDepth(a.id);
+	for (const g of wfGates) getDepth(g.id);
 
-	// Build a map from workflowArtifactId to GoalArtifact status
-	const goalArtifactMap = new Map<string, GoalArtifact>();
-	for (const a of artifacts) {
-		if (a.workflowArtifactId && !goalArtifactMap.has(a.workflowArtifactId)) {
-			goalArtifactMap.set(a.workflowArtifactId, a);
-		}
-	}
-
-	// Group by depth
+	// Group by depth — gates don't have artifact statuses, show all as pending for now
 	const maxDepth = Math.max(0, ...Array.from(depthMap.values()));
 	const levels: PipelineNode[][] = [];
 	for (let d = 0; d <= maxDepth; d++) {
 		const nodesAtDepth: PipelineNode[] = [];
-		for (const a of wfArtifacts) {
-			if (depthMap.get(a.id) === d) {
-				const goalArt = goalArtifactMap.get(a.id);
+		for (const g of wfGates) {
+			if (depthMap.get(g.id) === d) {
 				nodesAtDepth.push({
-					id: a.id,
-					name: a.name,
-					kind: a.kind,
-					status: (goalArt?.status as PipelineNode["status"]) || "pending",
+					id: g.id,
+					name: g.name,
+					kind: "gate",
+					status: "pending",
 				});
 			}
 		}
@@ -830,7 +820,7 @@ function renderSummaryRow(taskList: Task[], agentList: TeamAgent[]): TemplateRes
 // ============================================================================
 
 function renderPhasePipeline(): TemplateResult {
-	const wfArtifacts = currentGoal?.workflow?.artifacts;
+	const wfArtifacts = currentGoal?.workflow?.gates;
 	if (!wfArtifacts || wfArtifacts.length === 0) return html``;
 
 	const levels = computeDepthLevels(wfArtifacts);
@@ -891,7 +881,7 @@ function setTab(tab: typeof dashboardTab): void {
 }
 
 function renderTabBar(): TemplateResult {
-	const wfTotal = currentGoal?.workflow?.artifacts.length ?? 0;
+	const wfTotal = currentGoal?.workflow?.gates.length ?? 0;
 	const wfAccepted = artifacts.filter(a => a.status === "accepted" && a.workflowArtifactId).length;
 	const artifactCountStr = wfTotal > 0 ? `${wfAccepted}/${wfTotal}` : String(artifacts.length);
 
@@ -1097,122 +1087,45 @@ function renderCommitsTab(): TemplateResult {
 function renderWorkflowChecklist(): TemplateResult {
 	if (!currentGoal?.workflow) return nothing as any;
 
-	const wfArtifacts = currentGoal.workflow.artifacts;
-
-	// Build a map from workflowArtifactId to GoalArtifact
-	const goalArtifactMap = new Map<string, GoalArtifact>();
-	for (const a of artifacts) {
-		if (a.workflowArtifactId && !goalArtifactMap.has(a.workflowArtifactId)) {
-			goalArtifactMap.set(a.workflowArtifactId, a);
-		}
-	}
+	const wfGates = currentGoal.workflow.gates;
 
 	// Topological sort for display order
 	const visited = new Set<string>();
-	const sorted: typeof wfArtifacts = [];
-	const artMap = new Map(wfArtifacts.map(a => [a.id, a]));
+	const sorted: typeof wfGates = [];
+	const gateMap = new Map(wfGates.map(g => [g.id, g]));
 	function visit(id: string) {
 		if (visited.has(id)) return;
 		visited.add(id);
-		const art = artMap.get(id);
-		if (!art) return;
-		for (const dep of art.dependsOn) visit(dep);
-		sorted.push(art);
+		const gate = gateMap.get(id);
+		if (!gate) return;
+		for (const dep of gate.dependsOn) visit(dep);
+		sorted.push(gate);
 	}
-	for (const a of wfArtifacts) visit(a.id);
-
-	const kindColors: Record<string, string> = {
-		analysis: "#60a5fa",
-		deliverable: "#34d399",
-		review: "#fbbf24",
-		verification: "#a78bfa",
-	};
+	for (const g of wfGates) visit(g.id);
 
 	return html`
 		<div class="wf-checklist">
 			<div class="wf-checklist-header">
 				<span class="wf-checklist-title">Workflow: ${currentGoal.workflow.name}</span>
-				<span class="wf-checklist-count">${sorted.filter(a => goalArtifactMap.get(a.id)?.status === "accepted").length}/${sorted.length} accepted</span>
+				<span class="wf-checklist-count">${sorted.length} gate${sorted.length !== 1 ? "s" : ""}</span>
 			</div>
-			${sorted.map(wfArt => {
-				const goalArt = goalArtifactMap.get(wfArt.id);
-				const status = goalArt?.status || "not-started";
-				const indent = wfArt.dependsOn.length > 0 ? "padding-left:20px;" : "";
-				const color = kindColors[wfArt.kind] || "#888";
-				const kindIcon = KIND_ICONS[wfArt.kind] || "\uD83D\uDCCB";
-
-				let statusIcon: string;
-				let statusClass: string;
-				if (status === "accepted") {
-					statusIcon = "\u25CF"; // ●
-					statusClass = "wf-status-accepted";
-				} else if (status === "submitted") {
-					statusIcon = "\u25D0"; // ◐
-					statusClass = "wf-status-submitted";
-				} else if (status === "rejected") {
-					statusIcon = "\u2717"; // ✗
-					statusClass = "wf-status-rejected";
-				} else {
-					statusIcon = "\u25CB"; // ○
-					statusClass = "wf-status-pending";
-				}
-
-				const isExpanded = goalArt ? expandedArtifactIds.has(goalArt.id) : false;
-				const isHtml = goalArt ? isHtmlContent(goalArt.content) : false;
-
-				const handleClick = () => {
-					if (!goalArt) return;
-					if (isHtml) {
-						openArtifactView(goalArt);
-					} else {
-						toggleArtifactExpand(goalArt.id);
-					}
-				};
-
+			${sorted.map(gate => {
+				const indent = gate.dependsOn.length > 0 ? "padding-left:20px;" : "";
 				return html`
-					<div class="wf-checklist-item" style="${indent}"
-						@click=${handleClick}>
-						<span class="wf-status-icon ${statusClass}">${statusIcon}</span>
-						<span class="wf-kind-dot" style="background:${color}">${kindIcon}</span>
+					<div class="wf-checklist-item" style="${indent}">
+						<span class="wf-status-icon wf-status-pending">\u25CB</span>
+						<span class="wf-kind-dot" style="background:#60a5fa">\u26D4</span>
 						<div class="wf-checklist-info">
-							<span class="wf-checklist-name">${wfArt.name}</span>
+							<span class="wf-checklist-name">${gate.name}</span>
 							<div class="wf-checklist-meta">
-								${wfArt.dependsOn.length > 0 ? html`
-									<span class="wf-checklist-deps">depends on: ${wfArt.dependsOn.join(", ")}</span>
+								${gate.dependsOn.length > 0 ? html`
+									<span class="wf-checklist-deps">depends on: ${gate.dependsOn.join(", ")}</span>
 								` : nothing}
-								${goalArt ? html`
-									<span class="wf-checklist-detail">
-										<span class="artifact-badge badge-version">v${goalArt.version}</span>
-										<span class="wf-checklist-time">${formatRelativeTime(goalArt.updatedAt)}</span>
-										${goalArt.producedBy ? html`
-											<span class="wf-checklist-producer">\u00B7 ${(() => {
-												const s = state.gatewaySessions.find(gs => gs.id === goalArt.producedBy);
-												return s?.title || goalArt.producedBy.slice(0, 8);
-											})()}</span>
-										` : nothing}
-									</span>
-								` : nothing}
+								${gate.content ? html`<span class="wf-checklist-deps">content gate</span>` : nothing}
 							</div>
 						</div>
-						<span class="wf-checklist-status-label">${status === "not-started" ? "pending" : status}</span>
-						${goalArt ? html`<span class="wf-checklist-view">${isHtml ? "View" : isExpanded ? "Hide" : "View"}</span>` : nothing}
+						<span class="wf-checklist-status-label">pending</span>
 					</div>
-					${isExpanded && goalArt && !isHtml ? html`
-						<div class="artifact-content-panel" style="${indent}">
-							<div class="artifact-content-header">
-								<span>${goalArt.name}</span>
-								${goalArt.verificationResult ? html`
-									<span class="artifact-skill-badge">
-										${goalArt.verificationResult.steps.filter(s => s.passed).length}/${goalArt.verificationResult.steps.length} checks passed
-									</span>
-								` : nothing}
-								${goalArt.rejectionReason ? html`
-									<span class="artifact-skill-badge" style="color:var(--destructive)">Rejected: ${goalArt.rejectionReason}</span>
-								` : nothing}
-							</div>
-							<pre class="artifact-content-body">${goalArt.content}</pre>
-						</div>
-					` : nothing}
 				`;
 			})}
 		</div>
@@ -1220,7 +1133,7 @@ function renderWorkflowChecklist(): TemplateResult {
 }
 
 function renderArtifactsTab(): TemplateResult {
-	const hasWorkflow = currentGoal?.workflow && currentGoal.workflow.artifacts.length > 0;
+	const hasWorkflow = currentGoal?.workflow && currentGoal.workflow.gates.length > 0;
 
 	if (!hasWorkflow) {
 		return html`<div class="tab-empty">${svgFile}<span>No workflow artifacts defined</span></div>`;
