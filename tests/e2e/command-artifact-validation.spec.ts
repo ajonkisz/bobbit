@@ -144,8 +144,8 @@ test.describe("Command artifact validation", () => {
 		expect(body.help).toBeTruthy();
 	});
 
-	test("rejects content starting with markdown heading", async () => {
-		const content = "# Test Results\nnpx playwright test";
+	test("rejects content starting with markdown heading (no commands after)", async () => {
+		const content = "# Test Results\nAll tests passed successfully.";
 		const resp = await apiFetch(`/api/goals/${goalId}/artifacts`, {
 			method: "POST",
 			body: createArtifactBody(content, "test-cmd"),
@@ -179,6 +179,15 @@ test.describe("Command artifact validation", () => {
 		const resp = await apiFetch(`/api/goals/${goalId}/artifacts`, {
 			method: "POST",
 			body: createArtifactBody("npx playwright test foo.spec.ts", "test-cmd"),
+		});
+		expect(resp.status).toBe(201);
+	});
+
+	test("accepts shell-comment-prefixed command", async () => {
+		const content = "# Run the reproducing test\nnpx playwright test tests/e2e/foo.spec.ts";
+		const resp = await apiFetch(`/api/goals/${goalId}/artifacts`, {
+			method: "POST",
+			body: createArtifactBody(content, "test-cmd"),
 		});
 		expect(resp.status).toBe(201);
 	});

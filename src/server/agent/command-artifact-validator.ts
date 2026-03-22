@@ -62,12 +62,16 @@ export function validateCommandArtifact(content: string): CommandValidationResul
 		};
 	}
 
-	// 3. Starts with markdown heading
+	// 3. Starts with markdown heading (but not a shell comment followed by commands)
 	if (content.trimStart().startsWith("# ")) {
-		return {
-			valid: false,
-			reason: "Starts with a markdown heading. Must be a raw shell command, not a document.",
-		};
+		const nonEmptyLines = content.split("\n").filter(l => l.trim().length > 0);
+		const hasCommandAfter = nonEmptyLines.slice(1).some(looksLikeShellCommand);
+		if (!hasCommandAfter) {
+			return {
+				valid: false,
+				reason: "Starts with a markdown heading. Must be a raw shell command, not a document.",
+			};
+		}
 	}
 
 	// 4. Multi-paragraph prose heuristic
