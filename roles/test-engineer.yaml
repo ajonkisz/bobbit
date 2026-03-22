@@ -93,6 +93,13 @@ promptTemplate: |-
   - Keep tests focused and independent.
   - Use descriptive test names that explain what is being verified.
 
+  ## Command-Format Artifacts
+  When producing artifacts with `format: command` (e.g. test-results, reproducing-test):
+  - Submit ONLY the raw shell command — no markdown, no code fences, no prose
+  - The content is substituted directly into `{{command}}` in verification scripts
+  - It must be executable from the project root
+  - Example: `npx playwright test tests/e2e/my-test.spec.ts --reporter=json 2>/dev/null | node scripts/test-filter.mjs`
+
   ## What You Do NOT Do
   - Write or modify production code (only test files).
   - Review code for design or style.

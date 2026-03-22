@@ -30,7 +30,10 @@ artifacts:
 
   - id: reproducing-test
     name: Reproducing Test
-    description: A test that fails on master (proving the bug) and passes on the fix branch
+    description: >
+      A single shell command that runs the reproducing test.
+      Submitted as raw command text — no markdown.
+      It is substituted directly into {{command}} in verification scripts.
     kind: verification
     format: command
     dependsOn: [issue-analysis]
@@ -38,8 +41,10 @@ artifacts:
       - Test that exercises the exact bug described in the issue analysis
       - Run command that can be executed mechanically
       - Test fails on master, passes on fix branch
+      - Content must be a single executable shell command (no markdown, no prose — it is substituted directly into {{command}} in verification scripts)
     mustNotHave:
       - Tests that pass on both branches (not actually reproducing the bug)
+      - Markdown formatting, code fences, or prose descriptions
     verification:
       type: command
       steps:
@@ -99,7 +104,10 @@ artifacts:
 
   - id: test-results
     name: Test Results
-    description: Full test suite results proving no regressions
+    description: >
+      A single shell command that runs the full test suite.
+      Submitted as raw command text — no markdown.
+      It is substituted directly into {{command}} in verification scripts.
     kind: verification
     format: command
     dependsOn: [implementation]
@@ -107,6 +115,9 @@ artifacts:
       - Full test suite run command and output
       - All tests pass
       - No skipped tests that were previously passing
+      - Content must be a single executable shell command (no markdown, no prose — it is substituted directly into {{command}} in verification scripts)
+    mustNotHave:
+      - Markdown formatting, code fences, or prose descriptions
     verification:
       type: command
       steps:
