@@ -120,9 +120,10 @@
   <div class="comparison-col">
     <h3>Wizard Hat <span class="badge badge-head">Head-worn</span></h3>
     <p class="desc">
-      Classic pointy wizard hat in purple/violet with a bent tip, gold star sparkle, and gold band accent.
-      <code>addsHeight: true</code> — extends above the sprite like the crown.
-      Counter-hue-rotated to maintain purple tones across all session colors.
+      Compact wizard hat in purple-turquoise tones that sits directly on the bobbit's head. Floppy tip curves right with a teal+gold sparkle.
+      Brim overlaps the upper head. Gold star and teal accents in the hat band.
+      <code>addsHeight: true</code> — extends ~2 rows above the sprite.
+      Counter-hue-rotated to maintain purple-teal tones across all session colors.
     </p>
   </div>
 
@@ -199,16 +200,15 @@ const BOBBIT_SHADOW = `
   2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000
 `;
 
-// Wizard hat: rows -4 to 3 — pointy hat with bent tip, gold star, purple body, wide brim
+// Wizard hat: rows -2 to 2 — compact hat sitting ON the head, floppy tip curving right
+// With yOffset=3 + extraTopRows=4: row 1 = body row 0 (head top), row 2 = body row 1 (brim overlaps upper head)
+// Purple-turquoise body with gold star + teal accents, floppy tip sparkle
 const WIZARD_HAT_SHADOW = `
-  7px -4px 0 #fef08a,8px -4px 0 #fde047,
-  6px -3px 0 #000,7px -3px 0 #a78bfa,8px -3px 0 #000,
-  5px -2px 0 #000,6px -2px 0 #8b5cf6,7px -2px 0 #a78bfa,8px -2px 0 #000,
-  4px -1px 0 #000,5px -1px 0 #7c3aed,6px -1px 0 #8b5cf6,7px -1px 0 #a78bfa,8px -1px 0 #000,
-  3px 0px 0 #000,4px 0px 0 #6d28d9,5px 0px 0 #7c3aed,6px 0px 0 #8b5cf6,7px 0px 0 #a78bfa,8px 0px 0 #000,
-  2px 1px 0 #000,3px 1px 0 #6d28d9,4px 1px 0 #7c3aed,5px 1px 0 #fbbf24,6px 1px 0 #fde047,7px 1px 0 #8b5cf6,8px 1px 0 #a78bfa,9px 1px 0 #000,
-  0px 2px 0 #000,1px 2px 0 #6d28d9,2px 2px 0 #7c3aed,3px 2px 0 #7c3aed,4px 2px 0 #8b5cf6,5px 2px 0 #8b5cf6,6px 2px 0 #a78bfa,7px 2px 0 #a78bfa,8px 2px 0 #7c3aed,9px 2px 0 #6d28d9,10px 2px 0 #000,
-  0px 3px 0 #000,1px 3px 0 #000,2px 3px 0 #000,3px 3px 0 #000,4px 3px 0 #000,5px 3px 0 #000,6px 3px 0 #000,7px 3px 0 #000,8px 3px 0 #000,9px 3px 0 #000,10px 3px 0 #000
+  7px -2px 0 #2dd4bf,8px -2px 0 #fde047,
+  5px -1px 0 #000,6px -1px 0 #6366f1,7px -1px 0 #818cf8,8px -1px 0 #000,
+  2px 0px 0 #000,3px 0px 0 #6d28d9,4px 0px 0 #7c3aed,5px 0px 0 #8b5cf6,6px 0px 0 #6366f1,7px 0px 0 #a78bfa,8px 0px 0 #000,
+  1px 1px 0 #000,2px 1px 0 #6d28d9,3px 1px 0 #7c3aed,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #14b8a6,7px 1px 0 #a78bfa,8px 1px 0 #6d28d9,9px 1px 0 #000,
+  0px 2px 0 #000,1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,10px 2px 0 #000
 `;
 
 // Magic wand: diagonal wand with 4-point gold star at tip, brown handle
@@ -279,7 +279,7 @@ let showBase = true;
 // RENDERING
 // ============================================================================
 
-function createSprite(scale, hueRotate, accShadow, accYOffset, isHeadWorn) {
+function createSprite(scale, hueRotate, accShadow, accYOffset, isHeadWorn, extraTopRows = 5) {
   const container = document.createElement('div');
   container.className = 'sprite-container';
 
@@ -287,7 +287,7 @@ function createSprite(scale, hueRotate, accShadow, accYOffset, isHeadWorn) {
   const bodyW = 10 * scale;
   const bodyH = 9 * scale;
   const extraRight = accShadow ? (isHeadWorn ? 1 : 6) * scale : 0;
-  const extraTop = isHeadWorn ? 5 * scale : 0; // space for hat above head
+  const extraTop = isHeadWorn ? extraTopRows * scale : 0; // space for hat above head
 
   const totalW = bodyW + extraRight + 2 * scale;
   const totalH = bodyH + extraTop + 2 * scale;
@@ -343,7 +343,7 @@ function createSprite(scale, hueRotate, accShadow, accYOffset, isHeadWorn) {
   return container;
 }
 
-function buildGrid(containerId, accShadow, accYOffset, isHeadWorn, scale, hues) {
+function buildGrid(containerId, accShadow, accYOffset, isHeadWorn, scale, hues, extraTopRows = 5) {
   const grid = document.getElementById(containerId);
   if (!grid) return;
   grid.innerHTML = '';
@@ -352,7 +352,7 @@ function buildGrid(containerId, accShadow, accYOffset, isHeadWorn, scale, hues) 
     const card = document.createElement('div');
     card.className = 'sprite-card' + (scale >= 3 ? ' large' : '');
 
-    const sprite = createSprite(scale, hue, accShadow, accYOffset, isHeadWorn);
+    const sprite = createSprite(scale, hue, accShadow, accYOffset, isHeadWorn, extraTopRows);
     card.appendChild(sprite);
 
     const label = document.createElement('div');
@@ -392,9 +392,9 @@ function buildReferenceGrid() {
 }
 
 function render() {
-  // Wizard hat
-  buildGrid('wizard-hat-sidebar', WIZARD_HAT_SHADOW, 1, true, 1.6, DISPLAY_HUES);
-  buildGrid('wizard-hat-chat', WIZARD_HAT_SHADOW, 1, true, 3.5, DISPLAY_HUES);
+  // Wizard hat (yOffset=3, extraTopRows=4 — hat sits ON the head)
+  buildGrid('wizard-hat-sidebar', WIZARD_HAT_SHADOW, 3, true, 1.6, DISPLAY_HUES, 4);
+  buildGrid('wizard-hat-chat', WIZARD_HAT_SHADOW, 3, true, 3.5, DISPLAY_HUES, 4);
 
   // Magic wand
   buildGrid('wand-sidebar', WAND_SHADOW, 0, false, 1.6, DISPLAY_HUES);
@@ -419,7 +419,7 @@ function buildBothGrid() {
       // Wizard hat card
       const card1 = document.createElement('div');
       card1.className = 'sprite-card' + (scale >= 3 ? ' large' : '');
-      card1.appendChild(createSprite(scale, hue, WIZARD_HAT_SHADOW, 1, true));
+      card1.appendChild(createSprite(scale, hue, WIZARD_HAT_SHADOW, 3, true, 4));
       const l1 = document.createElement('div');
       l1.className = 'sprite-card-label';
       l1.textContent = `Hat ${hue >= 0 ? '+' : ''}${hue}°`;
