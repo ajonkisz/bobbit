@@ -1,5 +1,5 @@
-import { exec, execSync } from "node:child_process";
-import { statSync, appendFileSync } from "node:fs";
+import { execSync, spawn } from "node:child_process";
+import { statSync } from "node:fs";
 import path from "node:path";
 import type { GateStore, GateSignal } from "./gate-store.js";
 import type { WorkflowGate, Workflow } from "./workflow-store.js";
@@ -207,21 +207,31 @@ export class VerificationHarness {
 		expectFailure: boolean,
 	): Promise<{ passed: boolean; output: string }> {
 		return new Promise((resolve) => {
-			// Normalize cwd to forward slashes — Node's exec() on Windows (Git Bash env) fails with ENOENT on backslash paths
+			// Normalize cwd to forward slashes — Node's exec() on Windows fails with ENOENT on backslash paths
 			const normalizedCwd = cwd.replace(/\\/g, "/");
-			try { appendFileSync(path.join(process.env.USERPROFILE || "", ".pi", "verify-exec.log"), `[${new Date().toISOString()}] shell=${JSON.stringify(SHELL)} cwd=${normalizedCwd} cmd=${command} envSHELL=${process.env.SHELL} envPATH=${(process.env.PATH||"").substring(0,300)}\n`); } catch {}
-			exec(command, { cwd: normalizedCwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024, shell: SHELL }, (error, stdout, stderr) => {
-				try { appendFileSync(path.join(process.env.USERPROFILE || "", ".pi", "verify-exec.log"), `[${new Date().toISOString()}] exit=${error ? error.code : 0} stdout=${stdout.substring(0,80)} stderr=${stderr.substring(0,80)}\n`); } catch {};
+			// Use spawn() directly with the shell as the executable and -c flag.
+			// Node's exec() shell option doesn't reliably use the specified shell path on Windows.
+			const child = spawn(SHELL, ["-c", command], {
+				cwd: normalizedCwd,
+				timeout: timeoutSec * 1000,
+				stdio: ["ignore", "pipe", "pipe"],
+				windowsHide: true,
+			});
+			let stdout = "";
+			let stderr = "";
+			child.stdout.on("data", (d: Buffer) => { stdout += d.toString(); if (stdout.length > 1024 * 1024) stdout = stdout.slice(-512 * 1024); });
+			child.stderr.on("data", (d: Buffer) => { stderr += d.toString(); if (stderr.length > 1024 * 1024) stderr = stderr.slice(-512 * 1024); });
+			child.on("close", (code) => {
 				const output = (stdout + "\n" + stderr).trim().slice(-5000);
-				const exitedNonZero = !!error;
-
+				const exitedNonZero = code !== 0;
 				if (expectFailure) {
-					// expect: failure — non-zero exit = pass, zero exit = fail
-					resolve({ passed: exitedNonZero, output: output || (error?.message ?? "") });
+					resolve({ passed: exitedNonZero, output: output || `exit code ${code}` });
 				} else {
-					// expect: success (default) — zero exit = pass
-					resolve({ passed: !exitedNonZero, output: output || (error?.message ?? "") });
+					resolve({ passed: !exitedNonZero, output: output || `exit code ${code}` });
 				}
+			});
+			child.on("error", (err) => {
+				resolve({ passed: expectFailure, output: err.message });
 			});
 		});
 	}
