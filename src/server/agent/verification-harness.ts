@@ -15,6 +15,15 @@ function resolveShell(): string {
 			dir = path.dirname(dir);
 		}
 	} catch {}
+	// Hardcoded fallback paths for Git Bash
+	const fallbacks = [
+		"C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+		"C:\\Program Files\\Git\\bin\\bash.exe",
+		"C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe",
+	];
+	for (const fb of fallbacks) {
+		try { execSync(`"${fb}" --version`, { stdio: "ignore" }); return fb; } catch {}
+	}
 	return "bash";
 }
 
