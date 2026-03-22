@@ -1,6 +1,6 @@
-# Goals, Workflows, Tasks & Artifacts
+# Goals, Workflows, Tasks & Gates
 
-This document explains how Bobbit's goal orchestration system works — how goals, workflows, tasks, and artifacts relate to each other, and how context flows between agents.
+This document explains how Bobbit's goal orchestration system works — how goals, workflows, tasks, and gates relate to each other, and how context flows between agents.
 
 ## Concepts
 
@@ -12,7 +12,7 @@ Goals can run in **team mode**, where a Team Lead agent orchestrates multiple ro
 
 ### Workflows
 
-A **workflow** is a reusable template that defines which artifacts a goal must produce, their dependency relationships (a DAG), quality criteria, and verification configs. Workflows are stored as YAML files in `workflows/` at the repo root.
+A **workflow** is a reusable template that defines which gates a goal must pass, their dependency relationships (a DAG), and verification configs. Workflows are stored as YAML files in `workflows/` at the repo root.
 
 When a goal is created with a `workflowId`, the entire workflow is **snapshotted** into `PersistedGoal.workflow`. This frozen copy is immune to later template edits — the goal's requirements are locked at creation time.
 
@@ -21,46 +21,114 @@ Goals without workflows still work fine — workflows are optional.
 #### Workflow data model
 
 ```typescript
-interface WorkflowArtifact {
-  id: string;              // Unique within this workflow, e.g. "issue-analysis"
+interface VerifyStep {
+  name: string;
+  type: "command" | "llm-review";
+  run?: string;       // Shell command (for type: "command")
+  prompt?: string;    // Review prompt (for type: "llm-review")
+  expect?: "success" | "failure";
+  timeout?: number;
+}
+
+interface WorkflowGate {
+  id: string;              // Unique within this workflow, e.g. "design-doc"
   name: string;            // Display name
-  description: string;     // What this artifact is
-  kind: "analysis" | "deliverable" | "review" | "verification";
-  format: "markdown" | "html" | "diff" | "command";
-  dependsOn: string[];     // Other artifact IDs within THIS workflow (the DAG)
-  mustHave: string[];      // Non-negotiable quality criteria
-  shouldHave: string[];    // Recommended but not required
-  mustNotHave: string[];   // Disqualifying traits
-  suggestedRole?: string;  // Role best suited to produce this
-  verification?: VerificationConfig;
+  dependsOn: string[];     // Other gate IDs within THIS workflow (the DAG)
+  content?: boolean;       // Whether this gate accepts markdown content
+  injectDownstream?: boolean; // Whether passed content is injected into downstream agents
+  metadata?: Record<string, string>; // Key-value metadata schema
+  verify?: VerifyStep[];   // Verification steps to run on signal
 }
 
 interface Workflow {
   id: string;
   name: string;
   description: string;
-  artifacts: WorkflowArtifact[];
+  gates: WorkflowGate[];
   createdAt: number;
   updatedAt: number;
 }
 ```
 
+#### Workflow YAML format
+
+Workflows are defined in `workflows/<id>.yaml`:
+
+```yaml
+id: general
+name: General
+description: Lightweight workflow for general-purpose goals
+
+gates:
+  - id: design-doc
+    name: Design Document
+    content: true
+    inject_downstream: true
+    verify:
+      - name: "Design quality"
+        type: llm-review
+        prompt: |
+          Review this design document. Verify:
+          1. Approach is clearly described
+          2. File changes are listed
+          3. Acceptance criteria are specific and testable
+
+  - id: implementation
+    name: Implementation
+    depends_on: [design-doc]
+    verify:
+      - name: "Type check passes"
+        type: command
+        run: "npm run check"
+      - name: "Code review"
+        type: llm-review
+        prompt: |
+          Review the implementation for correctness, completeness, and code quality.
+
+  - id: ready-to-merge
+    name: Ready to Merge
+    depends_on: [implementation]
+    verify:
+      - name: "All gates passed"
+        type: command
+        run: "echo 'All upstream gates passed'"
+```
+
 #### Dependency DAG
 
-Each workflow artifact's `dependsOn` lists sibling artifact IDs that must be accepted before it can be submitted. This serves two purposes:
+Each gate's `dependsOn` lists sibling gate IDs that must pass before it can be signaled. This serves two purposes:
 
-1. **Submission gating** — the server returns 409 if you try to submit an artifact before its dependencies are accepted.
-2. **Context injection** — when an agent is spawned to produce an artifact, the accepted content of its dependencies is automatically injected into the agent's system prompt.
+1. **Signal gating** — the server returns 409 if you try to signal a gate before its dependencies have passed.
+2. **Context injection** — when an agent is spawned to produce work for a gate, the passed content of upstream gates is automatically injected into the agent's system prompt.
 
-#### Verification
+### Gate states
 
-Workflow artifacts can define automated verification that runs when the artifact is submitted:
+Each gate has a status: `pending`, `passed`, or `failed`.
 
-- **Command** — runs shell commands, checks exit codes (e.g. "test fails on master, passes on fix branch")
-- **LLM review** — spawns a sub-agent for qualitative review against criteria
+- **`pending`** — initial state; the gate has not been signaled, or was reset after an upstream re-signal.
+- **`passed`** — the gate was signaled and all verification steps succeeded (or no verification was defined).
+- **`failed`** — the gate was signaled but verification failed.
+
+When a previously-passed gate is re-signaled, all transitive downstream gates are cascade-reset to `pending`.
+
+### Signaling a gate
+
+Agents signal gates via the `gate_signal` tool (or `POST /api/goals/:id/gates/:gateId/signal`). A signal can include:
+
+- **Content** — markdown text (for content gates like design docs)
+- **Metadata** — key-value pairs (for metadata gates like test results)
+
+Each signal is recorded in the gate's signal history with a unique ID, timestamp, and session reference.
+
+### Verification
+
+Gates can define automated verification that runs when signaled:
+
+- **Command** — runs shell commands, checks exit codes (e.g. `npm run check`)
+- **LLM review** — spawns a sub-agent for qualitative review against a prompt
 - **Combined** — mechanical + qualitative steps in sequence
 
-Verification is async. On submission, the artifact status transitions to `"submitted"`. If verification is defined, it runs in the background. On completion: `"accepted"` (all steps pass) or `"rejected"` (any step fails, with details). A WebSocket event `artifact_verification_complete` is emitted. If no verification is defined, the artifact is auto-accepted.
+Verification is async. On signal, the verification status is `"running"`. On completion: the gate transitions to `"passed"` (all steps pass) or `"failed"` (any step fails, with details). A WebSocket event `gate_verification_complete` is emitted. If no verification is defined, the gate auto-passes.
 
 ### Tasks
 
@@ -70,124 +138,94 @@ Tasks have a state machine: `todo` → `in-progress` → `complete` | `skipped` 
 
 Tasks can declare:
 - **`dependsOn`** — other task IDs that must complete first (advisory, not enforced)
-- **`workflowArtifactId`** — which workflow artifact this task should produce
-- **`inputArtifactIds`** — which workflow artifact IDs to inject as context when prompting the assigned agent
+- **`workflowGateId`** — which workflow gate this task should produce output for
+- **`inputGateIds`** — which workflow gate IDs to inject as context when prompting the assigned agent
 
 Tasks and workflows are complementary layers:
-- **Workflows** = quality layer (what artifacts to produce, in what order, with what criteria)
+- **Workflows** = quality layer (what gates to pass, in what order, with what verification)
 - **Tasks** = operational layer (who's doing what, status tracking, assignment)
-
-### Artifacts
-
-**Goal artifacts** are the formal documents and deliverables produced during a goal's lifecycle — design docs, test plans, review findings, etc.
-
-Each artifact has:
-- `type` — `design-doc`, `test-plan`, `review-findings`, `gap-analysis`, `security-findings`, `custom`
-- `content` — markdown or JSON
-- `version` — incremented on each update
-- `workflowArtifactId` — links to the workflow artifact definition it fulfils (if a workflow is active)
-- `status` — `submitted` | `accepted` | `rejected` (when verification is defined)
-- `verificationResult` — step-by-step results from verification
-- `rejectionReason` — why verification failed
-
-#### Server-enforced gates
-
-Regardless of whether a workflow is present, the server enforces:
-- A **`design-doc`** artifact must exist before any `implementation` task can be created (409 on `task_create`).
-- A **`review-findings`** artifact must exist before the goal can be completed via `team_complete` (409).
-
-When a workflow IS present, additional gates apply:
-- An artifact with `workflowArtifactId` can only be created once all its workflow dependencies have accepted artifacts (409 with details of what's missing).
-- `team_complete` requires every workflow artifact to have an accepted goal artifact.
 
 ## Context injection
 
-Context injection is the mechanism that feeds accepted upstream artifact content into agent prompts. This is how the design doc shapes the implementation, and the issue analysis feeds the reproducing test.
+Context injection is the mechanism that feeds passed upstream gate content into agent prompts. This is how the design doc shapes the implementation, and the issue analysis feeds the reproducing test.
 
 ### At spawn time (`team_spawn`)
 
 When spawning an agent via `team_spawn`, you can pass:
 
-- **`workflowArtifactId`** (0 or 1) — declares which workflow artifact the agent should produce. If `inputArtifactIds` is not set, the server auto-resolves inputs from the DAG's `dependsOn`.
-- **`inputArtifactIds`** (0 or more) — explicit list of workflow artifact IDs whose accepted content to inject. Overrides automatic DAG resolution.
+- **`workflowGateId`** (0 or 1) — declares which workflow gate the agent should produce output for. If `inputGateIds` is not set, the server auto-resolves inputs from the DAG's `dependsOn`.
+- **`inputGateIds`** (0 or more) — explicit list of workflow gate IDs whose passed content to inject. Overrides automatic DAG resolution.
 
-The resolved artifact content is injected into the agent's **system prompt** under a `# Upstream Artifacts` section.
+The resolved gate content is injected into the agent's **system prompt** under a `# Upstream Gates` section.
 
 **Examples:**
 ```
-# Auto-resolve from DAG (implementation depends on issue-analysis + reproducing-test):
-team_spawn(role="coder", task="Implement the fix", workflowArtifactId="implementation")
+# Auto-resolve from DAG (implementation depends on design-doc):
+team_spawn(role="coder", task="Implement the fix", workflowGateId="implementation")
 
 # Explicit inputs (reviewer needs more context than the formal DAG requires):
 team_spawn(role="reviewer", task="Review the fix",
-  workflowArtifactId="code-review",
-  inputArtifactIds=["issue-analysis", "implementation", "test-results"])
+  workflowGateId="code-review",
+  inputGateIds=["design-doc", "implementation", "test-results"])
 ```
 
 ### At prompt time (`team_prompt`)
 
 When prompting an existing agent with new work via `team_prompt`, you can pass the same parameters:
 
-- **`workflowArtifactId`** (optional) — what the agent should produce next
-- **`inputArtifactIds`** (optional) — which artifacts to inject as context
+- **`workflowGateId`** (optional) — what the agent should produce next
+- **`inputGateIds`** (optional) — which gate content to inject as context
 
-The resolved artifact content is **prepended to the prompt message**, so the agent receives fresh context for the new task without needing to be respawned.
+The resolved gate content is **prepended to the prompt message**, so the agent receives fresh context for the new task without needing to be respawned.
 
 **Example:**
 ```
 team_prompt(session_id="abc", message="Now review the implementation",
-  workflowArtifactId="code-review",
-  inputArtifactIds=["issue-analysis", "implementation", "test-results"])
+  workflowGateId="code-review",
+  inputGateIds=["design-doc", "implementation", "test-results"])
 ```
 
-### On artifact creation (`artifact_create`)
+### On gate signal (`gate_signal`)
 
-When creating a goal artifact, pass `workflowArtifactId` to link it to the workflow definition. This enables:
-- Dependency gating (server checks all upstream dependencies are accepted)
-- Verification (if the workflow artifact has a verification config)
-- Completion tracking (the goal dashboard shows which workflow artifacts are fulfilled)
+When signaling a gate, the server checks that all upstream dependencies have passed. If any upstream gate has not passed, the signal is rejected with a 409 response listing the missing dependency.
 
 ## How it all fits together
 
 Here's the typical flow for a team goal with a workflow:
 
 ```
-1. User creates a goal with workflowId="bug-fix"
-   → Server snapshots the bug-fix workflow into the goal
+1. User creates a goal with workflowId="general"
+   → Server snapshots the workflow into the goal
+   → Gate states initialized: design-doc=pending, implementation=pending, ready-to-merge=pending
 
-2. Team Lead reads the workflow, sees the artifact DAG:
-   issue-analysis → reproducing-test → implementation → code-review
-                                      ↘ test-results → bug-fix-report
+2. Team Lead reads the workflow, sees the gate DAG:
+   design-doc → implementation → ready-to-merge
 
-3. Team Lead creates tasks linked to workflow artifacts:
-   task_create(title="Analyse the bug", type="custom",
-     workflowArtifactId="issue-analysis")
+3. Team Lead creates tasks linked to workflow gates:
+   task_create(title="Write design doc", type="custom",
+     workflowGateId="design-doc")
 
-4. Team Lead spawns an agent with artifact context:
-   team_spawn(role="coder", task="Analyse the bug",
-     workflowArtifactId="issue-analysis")
-   → Agent gets the goal spec in its system prompt (no upstream deps for first artifact)
+4. Team Lead spawns an agent with gate context:
+   team_spawn(role="coder", task="Write design doc",
+     workflowGateId="design-doc")
+   → Agent gets the goal spec in its system prompt (no upstream deps for first gate)
 
-5. Agent produces the analysis:
-   artifact_create(name="Issue Analysis", type="custom", content="...",
-     workflowArtifactId="issue-analysis")
-   → Server runs verification (if configured) → status: accepted
+5. Agent produces the design and signals the gate:
+   gate_signal(gate_id="design-doc", content="# Design\n\n...")
+   → Server runs verification (if configured) → gate status: passed
 
 6. Team Lead spawns next agent with upstream context:
-   team_spawn(role="tester", task="Write reproducing test",
-     workflowArtifactId="reproducing-test")
-   → Agent receives the accepted issue-analysis content in its system prompt
+   team_spawn(role="coder", task="Implement the design",
+     workflowGateId="implementation")
+   → Agent receives the passed design-doc content in its system prompt
 
-7. Or reuses an existing agent with fresh context:
-   team_prompt(session_id="existing-agent",
-     message="Now write the reproducing test",
-     workflowArtifactId="reproducing-test",
-     inputArtifactIds=["issue-analysis"])
-   → Agent receives the issue-analysis content prepended to the prompt
+7. Agent completes implementation and signals:
+   gate_signal(gate_id="implementation")
+   → Verification runs (npm run check + LLM review) → gate status: passed
 
-8. Process continues through the DAG until all artifacts are accepted
+8. Process continues through the DAG until all gates pass
 
-9. team_complete() — server verifies all workflow artifacts are fulfilled
+9. team_complete() — server verifies all workflow gates have passed
 ```
 
 ## REST API reference
@@ -203,27 +241,29 @@ Here's the typical flow for a team goal with a workflow:
 | `DELETE` | `/api/workflows/:id` | Delete (blocked if in-use by active goals) |
 | `POST` | `/api/workflows/:id/clone` | Deep-copy a workflow with a new ID |
 
-### Goal artifacts (workflow-aware)
+### Gates
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/goals/:id/artifacts` | Create artifact — accepts `workflowArtifactId` for linking + gating |
-| `PUT` | `/api/goals/:id/artifacts/:aid` | Update artifact — re-triggers verification if linked to workflow |
-| `GET` | `/api/goals/:id/workflow-context/:wfArtifactId` | Get resolved dependency context for a workflow artifact |
+| `GET` | `/api/goals/:id/gates` | List all gates for a goal with status and definitions |
+| `GET` | `/api/goals/:id/gates/:gateId` | Get gate detail (status, signals, definition) |
+| `POST` | `/api/goals/:id/gates/:gateId/signal` | Signal a gate — triggers verification |
+| `GET` | `/api/goals/:id/gates/:gateId/signals` | Get signal history for a gate |
+| `GET` | `/api/goals/:id/gates/:gateId/content` | Get the current passed content of a gate |
 
-### Tasks (artifact-linked)
+### Tasks (gate-linked)
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/goals/:id/tasks` | Create task — accepts `workflowArtifactId` and `inputArtifactIds` |
-| `PUT` | `/api/tasks/:id` | Update task — accepts `workflowArtifactId` and `inputArtifactIds` |
+| `POST` | `/api/goals/:id/tasks` | Create task — accepts `workflowGateId` and `inputGateIds` |
+| `PUT` | `/api/tasks/:id` | Update task — accepts `workflowGateId` and `inputGateIds` |
 
 ### Team (context injection)
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/api/goals/:id/team/spawn` | Spawn agent — `workflowArtifactId` + `inputArtifactIds` for context injection |
-| `POST` | `/api/goals/:id/team/prompt` | Prompt agent — `workflowArtifactId` + `inputArtifactIds` prepended to message |
+| `POST` | `/api/goals/:id/team/spawn` | Spawn agent — `workflowGateId` + `inputGateIds` for context injection |
+| `POST` | `/api/goals/:id/team/prompt` | Prompt agent — `workflowGateId` + `inputGateIds` prepended to message |
 
 ## Storage
 
@@ -231,8 +271,8 @@ Here's the typical flow for a team goal with a workflow:
 |---|---|
 | `workflows/*.yaml` | Workflow templates (repo-local, version controlled) |
 | `~/.pi/gateway-goals.json` | Goals with snapshotted workflows |
-| `~/.pi/gateway-goal-artifacts.json` | Goal artifacts with workflow links and verification results |
-| `~/.pi/gateway-tasks.json` | Tasks with workflow artifact links |
+| `~/.pi/gateway-gates.json` | Gate state and signal history |
+| `~/.pi/gateway-tasks.json` | Tasks with workflow gate links |
 
 ## Key source files
 
@@ -241,11 +281,11 @@ Here's the typical flow for a team goal with a workflow:
 | `src/server/agent/workflow-store.ts` | YAML persistence for workflow templates |
 | `src/server/agent/workflow-manager.ts` | Workflow CRUD, DAG validation, cloning |
 | `src/server/agent/verification-harness.ts` | Async verification (command + LLM review) |
-| `src/server/agent/goal-artifact-store.ts` | Goal artifact storage with workflow linking |
-| `src/server/agent/task-store.ts` | Task persistence with `workflowArtifactId` and `inputArtifactIds` |
+| `src/server/agent/gate-store.ts` | Gate state and signal history persistence |
+| `src/server/agent/task-store.ts` | Task persistence with `workflowGateId` and `inputGateIds` |
 | `src/server/agent/team-manager.ts` | Context injection via `buildDependencyContext()` |
-| `src/server/agent/system-prompt.ts` | System prompt assembly including workflow context |
-| `extensions/goal-tools.ts` | Agent tools: `artifact_create`, `task_create` with workflow params |
+| `src/server/agent/system-prompt.ts` | System prompt assembly including gate context |
+| `extensions/goal-tools.ts` | Agent tools: `gate_signal`, `gate_status`, `gate_list`, `task_create` |
 | `extensions/team-lead-tools.ts` | Agent tools: `team_spawn`, `team_prompt` with context injection |
 | `roles/team-lead.yaml` | Team Lead prompt template (workflow-aware) |
-| `workflows/bug-fix.yaml` | Seed workflow: bug fix lifecycle |
+| `workflows/general.yaml` | Seed workflow: general-purpose lifecycle |
