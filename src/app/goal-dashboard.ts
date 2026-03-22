@@ -1089,11 +1089,19 @@ function renderGateChecklist(): TemplateResult {
 	}
 	for (const g of wfGates) visit(g.id);
 
+	const passedCount = gates.filter(g => g.status === "passed").length;
+	const totalCount = sorted.length;
+	const pct = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
+
 	return html`
 		<div class="wf-checklist">
 			<div class="wf-checklist-header">
 				<span class="wf-checklist-title">Workflow: ${currentGoal.workflow.name}</span>
-				<span class="wf-checklist-count">${gates.filter(g => g.status === "passed").length}/${sorted.length} passed</span>
+				<span class="wf-checklist-count">${passedCount}/${totalCount} passed</span>
+			</div>
+			<div class="wf-progress">
+				<div class="wf-progress-bar"><div class="wf-progress-fill" style="width:${pct}%"></div></div>
+				<span class="wf-progress-label">${passedCount}/${totalCount} gates passed</span>
 			</div>
 			${sorted.map(wfGate => {
 				const gs = statusMap.get(wfGate.id);
@@ -1102,29 +1110,29 @@ function renderGateChecklist(): TemplateResult {
 				const isExpanded = expandedGateIds.has(wfGate.id);
 				const signalCount = gs?.signals?.length ?? 0;
 
-				let statusIcon: string;
-				let statusClass: string;
-				if (status === "passed") {
-					statusIcon = "\u25CF"; // ●
-					statusClass = "wf-status-accepted";
-				} else if (status === "failed") {
-					statusIcon = "\u2717"; // ✗
-					statusClass = "wf-status-rejected";
-				} else {
-					statusIcon = "\u25CB"; // ○
-					statusClass = "wf-status-pending";
-				}
-
 				// Check if any signal is running
 				const hasRunning = gs?.signals?.some(s => s.verification.status === "running");
-				if (hasRunning) {
-					statusIcon = "\u25D0"; // ◐
-					statusClass = "wf-status-submitted";
+				const effectiveStatus = hasRunning && status !== "passed" ? "running" : status;
+
+				let dotClass: string;
+				let dotContent: string;
+				if (effectiveStatus === "passed") {
+					dotClass = "gate-dot gate-dot--passed";
+					dotContent = "\u2713";
+				} else if (effectiveStatus === "failed") {
+					dotClass = "gate-dot gate-dot--failed";
+					dotContent = "\u2717";
+				} else if (effectiveStatus === "running") {
+					dotClass = "gate-dot gate-dot--running";
+					dotContent = "";
+				} else {
+					dotClass = "gate-dot gate-dot--pending";
+					dotContent = "";
 				}
 
 				return html`
 					<div class="wf-checklist-item" style="${indent}" @click=${() => toggleGateExpand(wfGate.id)}>
-						<span class="wf-status-icon ${statusClass}">${statusIcon}</span>
+						<span class="${dotClass}">${dotContent}</span>
 						<div class="wf-checklist-info">
 							<span class="wf-checklist-name">${wfGate.name}</span>
 							<div class="wf-checklist-meta">
@@ -1135,7 +1143,7 @@ function renderGateChecklist(): TemplateResult {
 								${wfGate.metadata && Object.keys(wfGate.metadata).length > 0 ? html`<span class="wf-checklist-deps">\u00B7 metadata: ${Object.keys(wfGate.metadata).join(", ")}</span>` : nothing}
 							</div>
 						</div>
-						<span class="wf-checklist-status-label gate-status-label--${status}">${hasRunning ? "verifying" : status}</span>
+						<span class="wf-checklist-status-label gate-status-label--${effectiveStatus === "running" ? "pending" : status}">${hasRunning ? "verifying" : status}</span>
 						${signalCount > 0 ? html`<span class="gate-signal-badge">${signalCount} signal${signalCount !== 1 ? "s" : ""}</span>` : nothing}
 						<span class="wf-checklist-view">${isExpanded ? "Hide" : "View"}</span>
 					</div>
