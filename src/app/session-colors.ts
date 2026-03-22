@@ -144,6 +144,19 @@ export const ACCESSORIES: Record<string, AccessoryDefinition> = {
 		yOffset: 0,
 		addsHeight: false,
 	},
+	"wizard-hat": {
+		id: "wizard-hat",
+		label: "Wizard Hat",
+		shadow: `
+			7px -2px 0 #2dd4bf,8px -2px 0 #fde047,
+			5px -1px 0 #000,6px -1px 0 #6366f1,7px -1px 0 #818cf8,8px -1px 0 #000,
+			2px 0px 0 #000,3px 0px 0 #6d28d9,4px 0px 0 #7c3aed,5px 0px 0 #8b5cf6,6px 0px 0 #6366f1,7px 0px 0 #a78bfa,8px 0px 0 #000,
+			1px 1px 0 #000,2px 1px 0 #6d28d9,3px 1px 0 #7c3aed,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #14b8a6,7px 1px 0 #a78bfa,8px 1px 0 #6d28d9,9px 1px 0 #000,
+			0px 2px 0 #000,1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,10px 2px 0 #000
+		`,
+		yOffset: 2,
+		addsHeight: true,
+	},
 };
 
 /** List of all accessory IDs (for iteration/UI selectors) */
