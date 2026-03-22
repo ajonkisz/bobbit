@@ -1,5 +1,5 @@
 import { exec, execSync } from "node:child_process";
-import { statSync } from "node:fs";
+import { statSync, appendFileSync } from "node:fs";
 import path from "node:path";
 import type { GateStore, GateSignal } from "./gate-store.js";
 import type { WorkflowGate, Workflow } from "./workflow-store.js";
@@ -209,7 +209,9 @@ export class VerificationHarness {
 		return new Promise((resolve) => {
 			// Normalize cwd to forward slashes — Node's exec() on Windows (Git Bash env) fails with ENOENT on backslash paths
 			const normalizedCwd = cwd.replace(/\\/g, "/");
+			try { appendFileSync(path.join(process.env.USERPROFILE || "", ".pi", "verify-exec.log"), `[${new Date().toISOString()}] shell=${JSON.stringify(SHELL)} cwd=${normalizedCwd} cmd=${command} envSHELL=${process.env.SHELL} envPATH=${(process.env.PATH||"").substring(0,300)}\n`); } catch {}
 			exec(command, { cwd: normalizedCwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024, shell: SHELL }, (error, stdout, stderr) => {
+				try { appendFileSync(path.join(process.env.USERPROFILE || "", ".pi", "verify-exec.log"), `[${new Date().toISOString()}] exit=${error ? error.code : 0} stdout=${stdout.substring(0,80)} stderr=${stderr.substring(0,80)}\n`); } catch {};
 				const output = (stdout + "\n" + stderr).trim().slice(-5000);
 				const exitedNonZero = !!error;
 
