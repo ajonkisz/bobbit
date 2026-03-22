@@ -399,8 +399,11 @@ function computeDepthLevels(wfArtifacts: Array<{ id: string; name: string; kind:
 	const artMap = new Map(wfArtifacts.map(a => [a.id, a]));
 
 	// Compute depth: max depth of all dependencies + 1
+	const visiting = new Set<string>();
 	function getDepth(id: string): number {
 		if (depthMap.has(id)) return depthMap.get(id)!;
+		if (visiting.has(id)) return 0; // cycle guard
+		visiting.add(id);
 		const art = artMap.get(id);
 		if (!art || art.dependsOn.length === 0) {
 			depthMap.set(id, 0);
