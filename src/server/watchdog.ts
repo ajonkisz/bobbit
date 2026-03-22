@@ -110,7 +110,7 @@ const PROBE_TIMEOUT_MS = 5_000;
 const FAILURE_THRESHOLD = 3;
 
 /** Grace period after launching harness before probing starts (ms) */
-const STARTUP_GRACE_MS = 30_000;
+const STARTUP_GRACE_MS = 120_000;
 
 // ---------------------------------------------------------------------------
 // State
