@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bobbit Accessory Mockup — Wizard Hat vs Magic Wand</title>
+<title>Bobbit Accessory Mockup — Wizard Hat + Wand Refinement</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -72,42 +72,41 @@
   }
   .note strong { color: #999; }
 
-  .comparison {
-    display: flex; gap: 40px; flex-wrap: wrap;
-  }
-  .comparison-col {
-    flex: 1; min-width: 300px;
-  }
-  .comparison-col h3 {
-    display: flex; align-items: center; gap: 8px;
-  }
   .badge {
     font-size: 10px; padding: 2px 6px; border-radius: 4px;
-    font-weight: 600; text-transform: uppercase;
+    font-weight: 600; text-transform: uppercase; display: inline-block; margin-left: 8px;
   }
   .badge-head { background: #7c3aed33; color: #a78bfa; }
   .badge-hand { background: #f59e0b33; color: #fbbf24; }
+  .badge-combo { background: #14b8a633; color: #5eead4; }
 
   .desc {
     font-size: 12px; color: #888; margin-bottom: 16px; line-height: 1.6;
+    max-width: 800px;
   }
   .desc code {
     background: #2a2a3e; padding: 1px 4px; border-radius: 3px; font-size: 11px; color: #a78bfa;
   }
 
   .hidden { display: none !important; }
+
+  .option-header {
+    background: #1e1e36; border: 1px solid #333; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px;
+  }
+  .option-header h3 { margin-bottom: 6px; }
 </style>
 </head>
 <body>
 
-<h1>Bobbit Accessory Proposals</h1>
-<h2>Interactive mockup — Wizard Hat vs Magic Wand</h2>
+<h1>Bobbit Accessory — Wizard Hat + Wand Refinement</h1>
+<h2>Choose an option for the Assistant role</h2>
 
 <div class="controls">
   <div class="toggle-group">
-    <button class="toggle-btn active" onclick="show('wizard-hat')">🧙 Wizard Hat</button>
-    <button class="toggle-btn" onclick="show('wand')">✨ Magic Wand</button>
-    <button class="toggle-btn" onclick="show('both')">Both</button>
+    <button class="toggle-btn active" onclick="show('hat')">A: Wizard Hat</button>
+    <button class="toggle-btn" onclick="show('bw-wand')">B: B&amp;W Wand</button>
+    <button class="toggle-btn" onclick="show('combo')">C: Hat + Wand</button>
+    <button class="toggle-btn" onclick="show('all')">All Options</button>
   </div>
   <div class="toggle-group">
     <button class="toggle-btn active" onclick="toggleBase(true)">With Bobbit</button>
@@ -115,59 +114,56 @@
   </div>
 </div>
 
-<!-- ===== WIZARD HAT SECTION ===== -->
-<div id="section-wizard-hat">
-  <div class="comparison-col">
-    <h3>Wizard Hat <span class="badge badge-head">Head-worn</span></h3>
+<!-- ===== OPTION A: WIZARD HAT ===== -->
+<div id="section-hat">
+  <div class="option-header">
+    <h3>Option A: Wizard Hat <span class="badge badge-head">Head-worn</span></h3>
     <p class="desc">
-      Compact wizard hat in purple-turquoise tones that sits directly on the bobbit's head. Floppy tip curves right with a teal+gold sparkle.
-      Brim overlaps the upper head. Gold star and teal accents in the hat band.
-      <code>addsHeight: true</code> — extends ~2 rows above the sprite.
-      Counter-hue-rotated to maintain purple-teal tones across all session colors.
+      Purple-turquoise wizard hat sitting on the bobbit's head. Floppy tip curving right with teal + gold sparkle accents.
+      <code>addsHeight: true</code> — extends above the sprite like the crown.
     </p>
   </div>
-
   <div class="section">
-    <div class="section-title">Sidebar Scale (1.6×)</div>
-    <div class="grid" id="wizard-hat-sidebar"></div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Chat Scale (3.5×)</div>
-    <div class="grid" id="wizard-hat-chat"></div>
+    <div class="section-title">Sidebar (1.6x) &amp; Chat (3.5x)</div>
+    <div class="grid" id="hat-sidebar"></div>
+    <div style="height: 16px"></div>
+    <div class="grid" id="hat-chat"></div>
   </div>
 </div>
 
-<!-- ===== MAGIC WAND SECTION ===== -->
-<div id="section-wand">
-  <div class="comparison-col">
-    <h3>Magic Wand <span class="badge badge-hand">Hand-held</span></h3>
+<!-- ===== OPTION B: B&W WAND ===== -->
+<div id="section-bw-wand" class="hidden">
+  <div class="option-header">
+    <h3>Option B: Classic Black &amp; White Wand <span class="badge badge-hand">Hand-held</span></h3>
     <p class="desc">
-      Thin wand with a glowing 4-point star tip in gold/yellow. Brown wooden handle, diagonal placement matching the pencil's position.
-      <code>addsHeight: false</code> — positioned on the right side. Uses depth keyframes like other hand-held items.
+      Classic stage magician wand — black stick with white tips. Simple, iconic, instantly recognizable.
+      <code>addsHeight: false</code> — held on the right side with depth keyframes.
     </p>
   </div>
-
   <div class="section">
-    <div class="section-title">Sidebar Scale (1.6×)</div>
-    <div class="grid" id="wand-sidebar"></div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Chat Scale (3.5×)</div>
-    <div class="grid" id="wand-chat"></div>
+    <div class="section-title">Sidebar (1.6x) &amp; Chat (3.5x)</div>
+    <div class="grid" id="bw-wand-sidebar"></div>
+    <div style="height: 16px"></div>
+    <div class="grid" id="bw-wand-chat"></div>
   </div>
 </div>
 
-<!-- ===== SIDE-BY-SIDE COMPARISON ===== -->
-<div id="section-both" class="hidden">
-  <div class="section">
-    <div class="section-title">Side-by-Side Comparison — Chat Scale (3.5×)</div>
-    <div class="grid" id="both-chat"></div>
+<!-- ===== OPTION C: COMBO HAT + WAND ===== -->
+<div id="section-combo" class="hidden">
+  <div class="option-header">
+    <h3>Option C: Wizard Hat + Wand Combined <span class="badge badge-combo">Head + Hand</span></h3>
+    <p class="desc">
+      Both accessories merged into one definition — the hat pixels occupy the head area (rows -2 to 2)
+      and the wand pixels occupy the right side (rows 3-9). They don't overlap spatially, so they combine
+      into a single <code>box-shadow</code>. <code>addsHeight: true</code>.
+      The wand portion uses a classic black &amp; white design with a star sparkle at the tip.
+    </p>
   </div>
   <div class="section">
-    <div class="section-title">Side-by-Side Comparison — Sidebar Scale (1.6×)</div>
-    <div class="grid" id="both-sidebar"></div>
+    <div class="section-title">Sidebar (1.6x) &amp; Chat (3.5x)</div>
+    <div class="grid" id="combo-sidebar"></div>
+    <div style="height: 16px"></div>
+    <div class="grid" id="combo-chat"></div>
   </div>
 </div>
 
@@ -177,10 +173,8 @@
 </div>
 
 <p class="note">
-  <strong>How counter-hue-rotate works:</strong> The bobbit body uses <code>filter: hue-rotate(Ndeg)</code> to create session identity colors.
-  Accessories inside the rotated container apply <code>filter: hue-rotate(-Ndeg)</code> to cancel out the rotation,
-  keeping gold stars gold and purple hats purple regardless of the session's color.
-  Each card shows the hue rotation value and the resulting bobbit color.
+  <strong>Counter-hue-rotate:</strong> The bobbit body uses <code>hue-rotate(N)</code> for session identity.
+  Accessories apply <code>hue-rotate(-N)</code> to maintain their intended colors across all sessions.
 </p>
 
 <script>
@@ -200,9 +194,7 @@ const BOBBIT_SHADOW = `
   2px 8px 0 #000,3px 8px 0 #000,4px 8px 0 #000,5px 8px 0 #000,6px 8px 0 #000,7px 8px 0 #000
 `;
 
-// Wizard hat: rows -2 to 2 — compact hat sitting ON the head, floppy tip curving right
-// With yOffset=3 + extraTopRows=4: row 1 = body row 0 (head top), row 2 = body row 1 (brim overlaps upper head)
-// Purple-turquoise body with gold star + teal accents, floppy tip sparkle
+// ---- OPTION A: Wizard Hat (same as current refined version) ----
 const WIZARD_HAT_SHADOW = `
   7px -2px 0 #2dd4bf,8px -2px 0 #fde047,
   5px -1px 0 #000,6px -1px 0 #6366f1,7px -1px 0 #818cf8,8px -1px 0 #000,
@@ -211,18 +203,34 @@ const WIZARD_HAT_SHADOW = `
   0px 2px 0 #000,1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,10px 2px 0 #000
 `;
 
-// Magic wand: diagonal wand with 4-point gold star at tip, brown handle
-const WAND_SHADOW = `
-  12px 1px 0 #fef08a,
-  10px 2px 0 #fde047,11px 2px 0 #000,12px 2px 0 #fbbf24,13px 2px 0 #000,14px 2px 0 #fde047,
-  11px 3px 0 #fbbf24,12px 3px 0 #fef08a,13px 3px 0 #fbbf24,
-  10px 4px 0 #fde047,11px 4px 0 #000,12px 4px 0 #fbbf24,13px 4px 0 #000,14px 4px 0 #fde047,
-  12px 5px 0 #fef08a,
-  10px 5px 0 #000,11px 5px 0 #a0522d,
-  9px 6px 0 #000,10px 6px 0 #8b4513,11px 6px 0 #000,
-  8px 7px 0 #000,9px 7px 0 #a0522d,10px 7px 0 #000,
-  7px 8px 0 #000,8px 8px 0 #8b4513,9px 8px 0 #000,
-  6px 9px 0 #000,7px 9px 0 #4b3520,8px 9px 0 #000
+// ---- OPTION B: Classic B&W Wand ----
+// Black stick with white tips, held diagonally — iconic stage magician look
+const BW_WAND_SHADOW = `
+  11px 2px 0 #000,
+  10px 3px 0 #000,11px 3px 0 #fff,12px 3px 0 #000,
+  10px 4px 0 #000,11px 4px 0 #e5e5e5,12px 4px 0 #000,
+  9px 5px 0 #000,10px 5px 0 #222,11px 5px 0 #000,
+  8px 6px 0 #000,9px 6px 0 #111,10px 6px 0 #000,
+  7px 7px 0 #000,8px 7px 0 #222,9px 7px 0 #000,
+  6px 8px 0 #000,7px 8px 0 #fff,8px 8px 0 #000,
+  5px 9px 0 #000,6px 9px 0 #e5e5e5,7px 9px 0 #000
+`;
+
+// ---- OPTION C: Combined Hat + B&W Wand ----
+// Hat pixels (rows -2 to 2) + wand pixels (rows 3-9) in one shadow
+const COMBO_SHADOW = `
+  7px -2px 0 #2dd4bf,8px -2px 0 #fde047,
+  5px -1px 0 #000,6px -1px 0 #6366f1,7px -1px 0 #818cf8,8px -1px 0 #000,
+  2px 0px 0 #000,3px 0px 0 #6d28d9,4px 0px 0 #7c3aed,5px 0px 0 #8b5cf6,6px 0px 0 #6366f1,7px 0px 0 #a78bfa,8px 0px 0 #000,
+  1px 1px 0 #000,2px 1px 0 #6d28d9,3px 1px 0 #7c3aed,4px 1px 0 #fbbf24,5px 1px 0 #fde047,6px 1px 0 #14b8a6,7px 1px 0 #a78bfa,8px 1px 0 #6d28d9,9px 1px 0 #000,
+  0px 2px 0 #000,1px 2px 0 #000,2px 2px 0 #000,3px 2px 0 #000,4px 2px 0 #000,5px 2px 0 #000,6px 2px 0 #000,7px 2px 0 #000,8px 2px 0 #000,9px 2px 0 #000,10px 2px 0 #000,
+  11px 3px 0 #000,
+  10px 4px 0 #000,11px 4px 0 #fff,12px 4px 0 #000,
+  10px 5px 0 #000,11px 5px 0 #e5e5e5,12px 5px 0 #000,
+  9px 6px 0 #000,10px 6px 0 #222,11px 6px 0 #000,
+  8px 7px 0 #000,9px 7px 0 #111,10px 7px 0 #000,
+  7px 8px 0 #000,8px 8px 0 #222,9px 8px 0 #000,
+  6px 9px 0 #000,7px 9px 0 #fff,8px 9px 0 #000
 `;
 
 // Reference accessories
@@ -253,24 +261,12 @@ const BANDANA_SHADOW = `
 `;
 
 const HUE_ROTATIONS = [-110, -85, -60, -35, -10, 0, 15, 25, 40, 50, 65, 75, 100, 125];
-// Show a good spread of colors
 const DISPLAY_HUES = [-110, -60, -10, 0, 25, 50, 75, 125];
 
 const HUE_NAMES = {
-  '-110': 'Red',
-  '-85': 'Orange',
-  '-60': 'Coral',
-  '-35': 'Gold',
-  '-10': 'Lime',
-  '0': 'Green (base)',
-  '15': 'Teal',
-  '25': 'Cyan',
-  '40': 'Sky',
-  '50': 'Blue',
-  '65': 'Indigo',
-  '75': 'Purple',
-  '100': 'Magenta',
-  '125': 'Pink',
+  '-110': 'Red', '-85': 'Orange', '-60': 'Coral', '-35': 'Gold', '-10': 'Lime',
+  '0': 'Green', '15': 'Teal', '25': 'Cyan', '40': 'Sky', '50': 'Blue',
+  '65': 'Indigo', '75': 'Purple', '100': 'Magenta', '125': 'Pink',
 };
 
 let showBase = true;
@@ -283,12 +279,10 @@ function createSprite(scale, hueRotate, accShadow, accYOffset, isHeadWorn, extra
   const container = document.createElement('div');
   container.className = 'sprite-container';
 
-  // Calculate dimensions
   const bodyW = 10 * scale;
   const bodyH = 9 * scale;
-  const extraRight = accShadow ? (isHeadWorn ? 1 : 6) * scale : 0;
-  const extraTop = isHeadWorn ? extraTopRows * scale : 0; // space for hat above head
-
+  const extraRight = accShadow ? (isHeadWorn ? 4 : 6) * scale : 0;
+  const extraTop = isHeadWorn ? extraTopRows * scale : 0;
   const totalW = bodyW + extraRight + 2 * scale;
   const totalH = bodyH + extraTop + 2 * scale;
 
@@ -296,17 +290,14 @@ function createSprite(scale, hueRotate, accShadow, accYOffset, isHeadWorn, extra
   container.style.height = totalH + 'px';
   container.style.position = 'relative';
 
-  // Hue-rotate wrapper for the body
+  // Hue-rotate wrapper
   const wrapper = document.createElement('div');
-  wrapper.className = 'body-wrapper';
   wrapper.style.position = 'absolute';
   wrapper.style.left = '0';
   wrapper.style.top = '0';
   wrapper.style.width = '100%';
   wrapper.style.height = '100%';
-  if (hueRotate !== 0) {
-    wrapper.style.filter = `hue-rotate(${hueRotate}deg)`;
-  }
+  if (hueRotate !== 0) wrapper.style.filter = `hue-rotate(${hueRotate}deg)`;
 
   // Bobbit body
   const body = document.createElement('span');
@@ -318,7 +309,6 @@ function createSprite(scale, hueRotate, accShadow, accYOffset, isHeadWorn, extra
   body.style.boxShadow = BOBBIT_SHADOW;
   body.style.opacity = showBase ? '1' : '0.15';
   wrapper.appendChild(body);
-
   container.appendChild(wrapper);
 
   // Accessory layer (counter-hue-rotated)
@@ -326,17 +316,11 @@ function createSprite(scale, hueRotate, accShadow, accYOffset, isHeadWorn, extra
     const acc = document.createElement('span');
     acc.className = 'pixel-element accessory-layer';
     acc.style.left = (1 * scale) + 'px';
-    if (isHeadWorn) {
-      acc.style.top = (accYOffset * scale + 1 * scale) + 'px';
-    } else {
-      acc.style.top = (extraTop + 1 * scale) + 'px';
-    }
+    acc.style.top = isHeadWorn ? (accYOffset * scale + 1 * scale) + 'px' : (extraTop + 1 * scale) + 'px';
     acc.style.transform = `scale(${scale})`;
     acc.style.transformOrigin = '0 0';
     acc.style.boxShadow = accShadow;
-    if (hueRotate !== 0) {
-      acc.style.filter = `hue-rotate(${-hueRotate}deg)`;
-    }
+    if (hueRotate !== 0) acc.style.filter = `hue-rotate(${-hueRotate}deg)`;
     container.appendChild(acc);
   }
 
@@ -347,19 +331,14 @@ function buildGrid(containerId, accShadow, accYOffset, isHeadWorn, scale, hues, 
   const grid = document.getElementById(containerId);
   if (!grid) return;
   grid.innerHTML = '';
-
   hues.forEach(hue => {
     const card = document.createElement('div');
     card.className = 'sprite-card' + (scale >= 3 ? ' large' : '');
-
-    const sprite = createSprite(scale, hue, accShadow, accYOffset, isHeadWorn, extraTopRows);
-    card.appendChild(sprite);
-
+    card.appendChild(createSprite(scale, hue, accShadow, accYOffset, isHeadWorn, extraTopRows));
     const label = document.createElement('div');
     label.className = 'sprite-card-label';
     label.textContent = `${hue >= 0 ? '+' : ''}${hue}° ${HUE_NAMES[hue] || ''}`;
     card.appendChild(label);
-
     grid.appendChild(card);
   });
 }
@@ -368,75 +347,38 @@ function buildReferenceGrid() {
   const grid = document.getElementById('reference-grid');
   if (!grid) return;
   grid.innerHTML = '';
-
   const refs = [
     { name: 'Crown', shadow: CROWN_SHADOW, yOffset: 1, head: true },
     { name: 'Bandana', shadow: BANDANA_SHADOW, yOffset: 0, head: false },
     { name: 'Pencil', shadow: PENCIL_SHADOW, yOffset: 0, head: false },
   ];
-
   refs.forEach(ref => {
     const card = document.createElement('div');
     card.className = 'sprite-card large';
-
-    const sprite = createSprite(3.5, 0, ref.shadow, ref.yOffset, ref.head);
-    card.appendChild(sprite);
-
+    card.appendChild(createSprite(3.5, 0, ref.shadow, ref.yOffset, ref.head));
     const label = document.createElement('div');
     label.className = 'sprite-card-label';
     label.textContent = ref.name;
     card.appendChild(label);
-
     grid.appendChild(card);
   });
 }
 
 function render() {
-  // Wizard hat (yOffset=3, extraTopRows=4 — hat sits ON the head)
-  buildGrid('wizard-hat-sidebar', WIZARD_HAT_SHADOW, 3, true, 1.6, DISPLAY_HUES, 4);
-  buildGrid('wizard-hat-chat', WIZARD_HAT_SHADOW, 3, true, 3.5, DISPLAY_HUES, 4);
+  // Option A: Wizard Hat
+  buildGrid('hat-sidebar', WIZARD_HAT_SHADOW, 3, true, 1.6, DISPLAY_HUES, 4);
+  buildGrid('hat-chat', WIZARD_HAT_SHADOW, 3, true, 3.5, DISPLAY_HUES, 4);
 
-  // Magic wand
-  buildGrid('wand-sidebar', WAND_SHADOW, 0, false, 1.6, DISPLAY_HUES);
-  buildGrid('wand-chat', WAND_SHADOW, 0, false, 3.5, DISPLAY_HUES);
+  // Option B: B&W Wand
+  buildGrid('bw-wand-sidebar', BW_WAND_SHADOW, 0, false, 1.6, DISPLAY_HUES);
+  buildGrid('bw-wand-chat', BW_WAND_SHADOW, 0, false, 3.5, DISPLAY_HUES);
 
-  // Both comparison
-  buildBothGrid();
+  // Option C: Combined
+  buildGrid('combo-sidebar', COMBO_SHADOW, 3, true, 1.6, DISPLAY_HUES, 4);
+  buildGrid('combo-chat', COMBO_SHADOW, 3, true, 3.5, DISPLAY_HUES, 4);
 
   // Reference
   buildReferenceGrid();
-}
-
-function buildBothGrid() {
-  ['both-chat', 'both-sidebar'].forEach(id => {
-    const grid = document.getElementById(id);
-    if (!grid) return;
-    grid.innerHTML = '';
-    const scale = id.includes('chat') ? 3.5 : 1.6;
-    const hues = [0, -60, 50, -110, 75];
-
-    hues.forEach(hue => {
-      // Wizard hat card
-      const card1 = document.createElement('div');
-      card1.className = 'sprite-card' + (scale >= 3 ? ' large' : '');
-      card1.appendChild(createSprite(scale, hue, WIZARD_HAT_SHADOW, 3, true, 4));
-      const l1 = document.createElement('div');
-      l1.className = 'sprite-card-label';
-      l1.textContent = `Hat ${hue >= 0 ? '+' : ''}${hue}°`;
-      card1.appendChild(l1);
-      grid.appendChild(card1);
-
-      // Wand card
-      const card2 = document.createElement('div');
-      card2.className = 'sprite-card' + (scale >= 3 ? ' large' : '');
-      card2.appendChild(createSprite(scale, hue, WAND_SHADOW, 0, false));
-      const l2 = document.createElement('div');
-      l2.className = 'sprite-card-label';
-      l2.textContent = `Wand ${hue >= 0 ? '+' : ''}${hue}°`;
-      card2.appendChild(l2);
-      grid.appendChild(card2);
-    });
-  });
 }
 
 // ============================================================================
@@ -445,21 +387,22 @@ function buildBothGrid() {
 
 function show(mode) {
   document.querySelectorAll('.controls .toggle-group:first-child .toggle-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (event && event.target) event.target.classList.add('active');
 
-  const hat = document.getElementById('section-wizard-hat');
-  const wand = document.getElementById('section-wand');
-  const both = document.getElementById('section-both');
-
-  hat.classList.toggle('hidden', mode === 'wand');
-  wand.classList.toggle('hidden', mode === 'wizard-hat');
-  both.classList.toggle('hidden', mode !== 'both');
+  const ids = ['section-hat', 'section-bw-wand', 'section-combo'];
+  if (mode === 'all') {
+    ids.forEach(id => document.getElementById(id).classList.remove('hidden'));
+  } else {
+    document.getElementById('section-hat').classList.toggle('hidden', mode !== 'hat');
+    document.getElementById('section-bw-wand').classList.toggle('hidden', mode !== 'bw-wand');
+    document.getElementById('section-combo').classList.toggle('hidden', mode !== 'combo');
+  }
 }
 
 function toggleBase(on) {
   showBase = on;
   document.querySelectorAll('.controls .toggle-group:nth-child(2) .toggle-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  if (event && event.target) event.target.classList.add('active');
   document.querySelectorAll('.bobbit-body').forEach(el => {
     el.style.opacity = showBase ? '1' : '0.15';
   });
@@ -467,9 +410,6 @@ function toggleBase(on) {
 
 // Initial render
 render();
-// Start with wand hidden
-document.getElementById('section-wand').classList.add('hidden');
-document.getElementById('section-both').classList.add('hidden');
 </script>
 </body>
 </html>
