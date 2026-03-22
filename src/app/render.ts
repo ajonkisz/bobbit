@@ -40,8 +40,6 @@ import "./workflow-page.css";
 import { renderPersonalityManagerPage } from "./personality-manager-page.js";
 import "./personality-manager.css";
 import { renderStaffPage } from "./staff-page.js";
-import { renderOfficePage } from "./office-viz.js";
-import "./office-viz.css";
 
 // ============================================================================
 // MOBILE LANDING PAGE
@@ -1578,9 +1576,6 @@ export function doRenderApp(): void {
 	const mainArea = () => {
 		// Goal dashboard route
 		const route = getRouteFromHash();
-		if (route.view === "office") {
-			return renderOfficePage();
-		}
 		if (route.view === "goal-dashboard" && route.goalId) {
 			return renderGoalDashboard();
 		}

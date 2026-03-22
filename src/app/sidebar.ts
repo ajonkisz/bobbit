@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Bot, Building2, ChevronDown, Drama, Goal as GoalIcon, List, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Users, Workflow, Wrench } from "lucide";
+import { Bot, ChevronDown, Drama, Goal as GoalIcon, List, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Users, Workflow, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -346,14 +346,6 @@ export function renderSidebar() {
 					>
 						${icon(GoalIcon, "sm")}
 						<span>New Goal</span>
-					</button>
-					<button
-						class="flex-1 flex items-center justify-center gap-1 px-1 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-colors"
-						@click=${() => { import("./routing.js").then((m) => m.setHashRoute("office")); }}
-						title="Isometric office view"
-					>
-						${icon(Building2, "sm")}
-						<span>Office</span>
 					</button>
 				</div>
 			</div>
