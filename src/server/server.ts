@@ -26,6 +26,7 @@ import { GoalArtifactStore } from "./agent/goal-artifact-store.js";
 import { WorkflowStore } from "./agent/workflow-store.js";
 import { WorkflowManager } from "./agent/workflow-manager.js";
 import { VerificationHarness } from "./agent/verification-harness.js";
+import { validateCommandArtifact } from "./agent/command-artifact-validator.js";
 import { StaffManager } from "./agent/staff-manager.js";
 import { TriggerEngine } from "./agent/staff-trigger-engine.js";
 
@@ -759,6 +760,21 @@ async function handleApiRoute(
 			}
 		}
 
+		// Validate content for format: command workflow artifacts
+		if (workflowArtifactId && typeof workflowArtifactId === "string" && goal.workflow) {
+			const wfArt = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
+			if (wfArt?.format === "command") {
+				const validation = validateCommandArtifact(body.content);
+				if (!validation.valid) {
+					json({
+						error: `Invalid command artifact: ${validation.reason}`,
+						help: "This artifact has format 'command'. Its content is substituted directly into {{command}} in verification shell scripts and must be a raw, executable shell command. Example: npx playwright test tests/e2e/foo.spec.ts --config playwright-e2e.config.ts",
+					}, 400);
+					return;
+				}
+			}
+		}
+
 		// Determine initial status: if workflow artifact has verification, start as "submitted"
 		let initialStatus = body.status;
 		const resolvedWfArtifactId = workflowArtifactId && typeof workflowArtifactId === "string" ? workflowArtifactId : undefined;
@@ -812,6 +828,26 @@ async function handleApiRoute(
 		}
 		const body = await readBody(req);
 		if (!body) { json({ error: "Missing body" }, 400); return; }
+
+		// Validate content for format: command workflow artifacts on update
+		if (body.content && typeof body.content === "string" && artifact.workflowArtifactId) {
+			const goalId = goalArtifactMatch[1];
+			const goal = sessionManager.goalManager.getGoal(goalId);
+			if (goal?.workflow) {
+				const wfArt = goal.workflow.artifacts.find(a => a.id === artifact.workflowArtifactId);
+				if (wfArt?.format === "command") {
+					const validation = validateCommandArtifact(body.content);
+					if (!validation.valid) {
+						json({
+							error: `Invalid command artifact: ${validation.reason}`,
+							help: "This artifact has format 'command'. Its content is substituted directly into {{command}} in verification shell scripts and must be a raw, executable shell command. Example: npx playwright test tests/e2e/foo.spec.ts --config playwright-e2e.config.ts",
+						}, 400);
+						return;
+					}
+				}
+			}
+		}
+
 		const updated = goalArtifactStore.update(goalArtifactMatch[2], {
 			name: body.name,
 			type: body.type,
