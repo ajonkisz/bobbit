@@ -201,6 +201,22 @@ export class TeamManager {
 					}
 				}
 			}
+
+			// Re-subscribe to worker agent events so the team lead is notified
+			// when workers go idle (these subscriptions are lost on restart)
+			for (const agent of entry.agents) {
+				const workerSession = this.sessionManager.getSession(agent.sessionId);
+				if (!workerSession || workerSession.status === "terminated") continue;
+				const { role, sessionId } = agent;
+				const agentId = `${role}-${sessionId.slice(0, 8)}`;
+				const unsubscribe = workerSession.rpcClient.onEvent((event: any) => {
+					if (event.type !== "agent_end") return;
+					this.notifyTeamLead(p.goalId, sessionId, role, agentId).catch((err) => {
+						console.error("[team-manager] Failed to notify team lead:", err);
+					});
+				});
+				agent.unsubscribeEvent = unsubscribe;
+			}
 		}
 	}
 
