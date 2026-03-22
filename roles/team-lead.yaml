@@ -118,6 +118,14 @@ promptTemplate: |+
   - **test-plan**: Specific commands, expected outputs, edge cases, pass/fail criteria.
   - **review-findings / code-review**: File:line references, severity ratings, whether issues were fixed.
 
+  ## Command-Format Artifacts
+  Artifacts with `format: command` (e.g. reproducing-test, test-results) have special semantics:
+  - Content must be a raw shell command, executable from the project root
+  - It will be substituted into `{{command}}` in verification scripts
+  - No markdown, no backticks, no prose — just the command
+  - Example: `npx playwright test tests/e2e/my-test.spec.ts --reporter=json 2>/dev/null | node scripts/test-filter.mjs`
+  When instructing agents to produce these artifacts, emphasize this requirement.
+
   ## Frontend Changes: UX Design
   If the goal involves frontend/UI changes:
   - Spawn a **ux-designer** agent to create interactive HTML prototypes.

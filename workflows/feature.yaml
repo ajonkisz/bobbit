@@ -53,13 +53,19 @@ artifacts:
 
   - id: test-results
     name: Test Results
-    description: Full test suite results proving no regressions
+    description: >
+      A single shell command that runs the full test suite.
+      Submitted as raw command text — no markdown.
+      It is substituted directly into {{command}} in verification scripts.
     kind: verification
     format: command
     dependsOn: [implementation]
     mustHave:
       - Full test suite run command and output
       - All tests pass
+      - Content must be a single executable shell command (no markdown, no prose — it is substituted directly into {{command}} in verification scripts)
+    mustNotHave:
+      - Markdown formatting, code fences, or prose descriptions
     verification:
       type: command
       steps:
