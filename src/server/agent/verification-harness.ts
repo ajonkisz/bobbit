@@ -1,30 +1,39 @@
 import { exec, execSync } from "node:child_process";
+import { statSync } from "node:fs";
 import path from "node:path";
 import type { GateStore, GateSignal } from "./gate-store.js";
 import type { WorkflowGate, Workflow } from "./workflow-store.js";
 
-/** Resolve Git Bash on Windows — avoids WSL's bash which `shell: "bash"` may pick up. */
+/** Resolve a shell for verification commands.
+ *  On Windows, find Git Bash so that Unix tools (grep, etc.) work in verify steps.
+ *  Falls back to cmd.exe if Git Bash can't be found. */
 function resolveShell(): string {
 	if (process.platform !== "win32") return "/bin/sh";
+	// Try Git Bash via common install locations (use forward-slash paths which Node handles fine)
+	const candidates = [
+		"C:/Program Files/Git/usr/bin/bash.exe",
+		"C:/Program Files/Git/bin/bash.exe",
+		"C:/Program Files (x86)/Git/usr/bin/bash.exe",
+	];
+	// Also try to find via `where.exe git` and traverse up
 	try {
-		const gitExe = execSync("where.exe git", { encoding: "utf-8" }).split("\n")[0].trim();
-		let dir = path.dirname(gitExe);
-		for (let i = 0; i < 4; i++) {
-			const candidate = path.join(dir, "usr", "bin", "bash.exe");
-			try { execSync(`"${candidate}" --version`, { stdio: "ignore" }); return candidate; } catch {}
-			dir = path.dirname(dir);
+		const gitExe = execSync("where.exe git", { encoding: "utf-8", shell: process.env.ComSpec || "cmd.exe" }).split("\n")[0].trim();
+		if (gitExe) {
+			let dir = path.dirname(gitExe);
+			for (let i = 0; i < 4; i++) {
+				candidates.unshift(path.join(dir, "usr", "bin", "bash.exe").replace(/\\/g, "/"));
+				dir = path.dirname(dir);
+			}
 		}
 	} catch {}
-	// Hardcoded fallback paths for Git Bash
-	const fallbacks = [
-		"C:\\Program Files\\Git\\usr\\bin\\bash.exe",
-		"C:\\Program Files\\Git\\bin\\bash.exe",
-		"C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe",
-	];
-	for (const fb of fallbacks) {
-		try { execSync(`"${fb}" --version`, { stdio: "ignore" }); return fb; } catch {}
+	for (const c of candidates) {
+		try {
+			statSync(c);
+			return c;
+		} catch {}
 	}
-	return "bash";
+	// Last resort: cmd.exe (grep etc. won't work but npm scripts will)
+	return process.env.ComSpec || "cmd.exe";
 }
 
 const SHELL = resolveShell();
@@ -198,7 +207,9 @@ export class VerificationHarness {
 		expectFailure: boolean,
 	): Promise<{ passed: boolean; output: string }> {
 		return new Promise((resolve) => {
-			exec(command, { cwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024, shell: SHELL }, (error, stdout, stderr) => {
+			// Normalize cwd to forward slashes — Node's exec() on Windows (Git Bash env) fails with ENOENT on backslash paths
+			const normalizedCwd = cwd.replace(/\\/g, "/");
+			exec(command, { cwd: normalizedCwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024, shell: SHELL }, (error, stdout, stderr) => {
 				const output = (stdout + "\n" + stderr).trim().slice(-5000);
 				const exitedNonZero = !!error;
 
