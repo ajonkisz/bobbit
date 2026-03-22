@@ -18,10 +18,7 @@ src/
 │   ├── index.ts     # Server barrel export
 │   ├── pi-dir.ts    # Resolves ~/.pi directory path (respects BOBBIT_PI_DIR env var)
 │   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, teams, title generation
-│   │   ├── artifact-spec-assistant.ts  # System prompt for artifact spec assistant
-│   │   ├── artifact-spec-manager.ts    # Artifact spec CRUD operations
-│   │   ├── artifact-spec-store.ts      # Artifact spec persistence (YAML files in artifact-specs/)
-│   │   ├── assistant-registry.ts       # Registry of assistant types (goal, role, tool, artifact-spec)
+│   │   ├── assistant-registry.ts       # Registry of assistant types (goal, role, tool)
 │   │   ├── color-store.ts              # Per-session color index persistence (~/.pi/gateway-session-colors.json)
 │   │   ├── cost-tracker.ts             # Per-session token/cost tracking
 │   │   ├── event-buffer.ts             # Circular buffer for tool_execution_update replay on reconnect
@@ -48,7 +45,10 @@ src/
 │   │   ├── tool-manager.ts             # Tool CRUD with renderer discovery
 │   │   ├── tool-store.ts               # Tool metadata persistence (~/.pi/gateway-tools.json)
 │   │   ├── personality-manager.ts       # Personality definitions and management
-│   │   └── personality-store.ts        # Personality persistence (YAML files in personalities/)
+│   │   ├── personality-store.ts        # Personality persistence (YAML files in personalities/)
+│   │   ├── verification-harness.ts     # Async artifact verification (command + LLM review)
+│   │   ├── workflow-manager.ts         # Workflow CRUD, DAG validation, cloning
+│   │   └── workflow-store.ts           # Workflow persistence (YAML files in workflows/)
 │   ├── auth/        # Token auth, rate limiting, TLS, OAuth, DNS
 │   │   ├── desec.ts       # deSEC dynamic DNS updates on startup
 │   │   ├── oauth.ts       # OAuth flow (start, complete, status)
@@ -188,8 +188,6 @@ src/
 ├── app/             # Browser entry point (connects to gateway)
 │   ├── api.ts                   # REST API client helpers
 │   ├── app.css                  # Global app styles
-│   ├── artifact-spec-page.ts    # Artifact spec management page
-│   ├── artifact-spec.css        # Artifact spec page styles
 │   ├── custom-messages.ts       # Custom message type definitions
 │   ├── cwd-combobox.ts          # Working directory combobox component
 │   ├── dialogs.ts               # App-level dialog helpers
@@ -199,7 +197,7 @@ src/
 │   ├── mobile-header.ts         # Mobile responsive header
 │   ├── oauth.ts                 # Browser-side OAuth flow
 │   ├── preview-panel.ts         # Live preview panel (split-pane HTML preview)
-│   ├── proposal-parsers.ts      # Parse assistant proposals (goal, role, tool, artifact-spec)
+│   ├── proposal-parsers.ts      # Parse assistant proposals (goal, role, tool)
 │   ├── qrcode.d.ts              # QR code library type declarations
 │   ├── remote-agent.ts          # WebSocket ↔ Agent interface adapter (critical file)
 │   ├── render-helpers.ts        # Shared rendering helpers
@@ -351,4 +349,12 @@ Repo-local storage (YAML files, not in `~/.pi/`):
 |---|---|---|
 | `roles/*.yaml` | `RoleStore` | Role definitions and tool access |
 | `personalities/*.yaml` | `PersonalityStore` | Personality definitions |
-| `artifact-specs/*.yaml` | `ArtifactSpecStore` | Artifact spec definitions |
+| `workflows/*.yaml` | `WorkflowStore` | Workflow templates (artifact DAGs, verification configs) |
+
+## Goals, workflows, tasks & artifacts
+
+Goals can optionally have a **workflow** — a DAG of artifacts the goal must produce, with dependency gating, quality criteria, and automated verification. Workflows are YAML templates snapshotted into the goal at creation.
+
+**Tasks** link to workflow artifacts via `workflowArtifactId` (output) and `inputArtifactIds` (context inputs). **Context injection** feeds accepted upstream artifact content into agent prompts automatically — at spawn time (`team_spawn`) or prompt time (`team_prompt`).
+
+For the full architecture — data models, context injection mechanics, verification lifecycle, REST API, and worked examples — see [docs/goals-workflows-tasks.md](docs/goals-workflows-tasks.md).
