@@ -1,6 +1,26 @@
-import { exec } from "node:child_process";
+import { exec, execSync } from "node:child_process";
+import path from "node:path";
 import type { GoalArtifactStore, GoalArtifact } from "./goal-artifact-store.js";
 import type { WorkflowArtifact, VerificationConfig, Workflow } from "./workflow-store.js";
+
+/** Resolve Git Bash on Windows — avoids WSL's bash which `shell: "bash"` may pick up. */
+function resolveShell(): string {
+	if (process.platform !== "win32") return "/bin/sh";
+	try {
+		const gitExe = execSync("where.exe git", { encoding: "utf-8" }).split("\n")[0].trim();
+		// Walk up from e.g. C:\Program Files\Git\mingw64\bin\git.exe or C:\Program Files\Git\cmd\git.exe
+		// to find the Git root, then descend to usr\bin\bash.exe
+		let dir = path.dirname(gitExe);
+		for (let i = 0; i < 4; i++) {
+			const candidate = path.join(dir, "usr", "bin", "bash.exe");
+			try { execSync(`"${candidate}" --version`, { stdio: "ignore" }); return candidate; } catch {}
+			dir = path.dirname(dir);
+		}
+	} catch {}
+	return "bash"; // fallback
+}
+
+const SHELL = resolveShell();
 
 export class VerificationHarness {
 	constructor(
@@ -161,7 +181,7 @@ export class VerificationHarness {
 
 	private runCommandStep(command: string, cwd: string, timeoutSec: number): Promise<{ passed: boolean; output: string }> {
 		return new Promise((resolve) => {
-			exec(command, { cwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024, shell: process.platform === "win32" ? "bash" : "/bin/sh" }, (error, stdout, stderr) => {
+			exec(command, { cwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024, shell: SHELL }, (error, stdout, stderr) => {
 				const output = (stdout + "\n" + stderr).trim().slice(-5000); // Keep last 5KB
 				if (error) {
 					resolve({ passed: false, output: output || error.message });
