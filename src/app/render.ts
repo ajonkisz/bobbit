@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, MessagesSquare, ChevronDown, ChevronRight, Goal as GoalIcon, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, UserCheck, Users, Workflow as WorkflowIcon, Wrench } from "lucide";
+import { ArrowLeft, MessagesSquare, ChevronDown, ChevronRight, Drama, Goal as GoalIcon, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Trash2, Unplug, UserCheck, Users, Workflow as WorkflowIcon, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -64,7 +64,7 @@ function renderMobileLanding() {
 						</button>
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 							@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); setHashRoute("personalities"); }}>
-							${icon(Sparkles, "xs")} Personalities
+							${icon(Drama, "xs")} Personalities
 						</button>
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 							@click=${() => { import("./tool-manager-page.js").then((m) => m.loadToolPageData()); setHashRoute("tools"); }}>
@@ -1110,7 +1110,7 @@ function personalityPreviewPanel() {
 					variant: "default",
 					onClick: handleCreatePersonality,
 					disabled: !state.personalityPreviewName.trim() || !state.personalityPreviewLabel.trim(),
-					children: html`<span class="inline-flex items-center gap-1.5">${icon(Sparkles, "sm")} Create Personality</span>`,
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(Drama, "sm")} Create Personality</span>`,
 				})}
 			</div>
 		</div>

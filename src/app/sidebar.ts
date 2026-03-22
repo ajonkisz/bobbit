@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Bot, ChevronDown, Goal as GoalIcon, List, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Sparkles, Users, Workflow, Wrench } from "lucide";
+import { Bot, ChevronDown, Drama, Goal as GoalIcon, List, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Users, Workflow, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -318,7 +318,7 @@ export function renderSidebar() {
 						@click=${() => { import("./personality-manager-page.js").then((m) => m.loadPersonalityPageData()); import("./routing.js").then((m) => m.setHashRoute("personalities")); }}
 						title="Manage personalities"
 					>
-						${icon(Sparkles, "sm")}
+						${icon(Drama, "sm")}
 						<span>Personalities</span>
 					</button>
 					<button
