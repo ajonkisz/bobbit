@@ -1040,3 +1040,278 @@
 		animation: phase-glow-rejected 2.5s ease-in-out infinite;
 	}
 }
+
+/* ============================================================================
+ * GATE TIMELINE — Signal history, verification steps, gate detail
+ * ============================================================================ */
+
+/* ── Signal count badge on pipeline nodes ── */
+.gate-signal-count {
+	font-size: 9px;
+	font-weight: 700;
+	background: rgba(255,255,255,0.12);
+	padding: 1px 5px;
+	border-radius: 8px;
+	margin-left: 2px;
+}
+.phase-node.done .gate-signal-count { background: oklch(0.65 0.15 145 / 0.2); }
+.phase-node.active .gate-signal-count { background: oklch(0.62 0.15 250 / 0.2); }
+.phase-node.rejected .gate-signal-count { background: oklch(0.70 0.14 55 / 0.2); }
+
+/* Running dot animation */
+.phase-running-dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: oklch(0.62 0.15 250);
+}
+@media (prefers-reduced-motion: no-preference) {
+	.phase-running-dot {
+		animation: phase-dot-pulse 2.5s ease-in-out infinite;
+	}
+}
+
+/* ── Gate status label colors ── */
+.gate-status-label--passed { color: oklch(0.72 0.15 145) !important; background: oklch(0.65 0.15 145 / 0.12) !important; }
+.gate-status-label--failed { color: var(--destructive) !important; background: color-mix(in oklch, var(--destructive) 10%, transparent) !important; }
+.gate-status-label--pending { color: var(--muted-foreground) !important; }
+
+/* ── Gate signal badge (in checklist items) ── */
+.gate-signal-badge {
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: oklch(0.62 0.15 250 / 0.12);
+	color: oklch(0.72 0.15 250);
+	flex-shrink: 0;
+}
+
+/* ── Gate detail panel (expanded view under checklist item) ── */
+.gate-detail-panel {
+	margin: 0 12px 8px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	overflow: hidden;
+	background: var(--background);
+}
+
+.gate-detail-section {
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--border-subtle);
+}
+.gate-detail-section:last-child { border-bottom: none; }
+
+.gate-detail-section-title {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--muted-foreground);
+	margin-bottom: 6px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+/* ── Gate metadata ── */
+.gate-metadata-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 16px;
+}
+.gate-metadata-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+}
+.gate-metadata-key {
+	color: var(--muted-foreground);
+	font-weight: 500;
+}
+.gate-metadata-value {
+	font-family: var(--font-mono, monospace);
+	font-size: 11px;
+	background: var(--secondary);
+	padding: 1px 6px;
+	border-radius: 3px;
+}
+
+/* ── Gate content ── */
+.gate-content-version {
+	font-size: 9px;
+	font-weight: 700;
+	background: oklch(0.65 0.15 145 / 0.12);
+	color: oklch(0.72 0.15 145);
+	padding: 1px 5px;
+	border-radius: 3px;
+}
+.gate-content-body {
+	padding: 10px;
+	margin: 0;
+	font-size: 12px;
+	font-family: var(--font-mono, monospace);
+	line-height: 1.5;
+	color: var(--foreground);
+	background: var(--secondary);
+	border-radius: 4px;
+	overflow-x: auto;
+	max-height: 300px;
+	overflow-y: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+/* ── No signals placeholder ── */
+.gate-no-signals {
+	font-size: 12px;
+	color: var(--text-tertiary);
+	padding: 4px 0;
+}
+
+/* ── Signal timeline ── */
+.signal-timeline {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+.signal-entry {
+	border-left: 3px solid #444;
+	margin-left: 4px;
+	padding: 0;
+}
+.signal-entry--passed { border-left-color: oklch(0.65 0.15 145); }
+.signal-entry--failed { border-left-color: var(--destructive); }
+.signal-entry--running { border-left-color: oklch(0.70 0.14 75); }
+
+.signal-entry__header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	font-size: 12px;
+	cursor: pointer;
+	transition: background 150ms;
+}
+.signal-entry__header:hover { background: var(--secondary); }
+
+.signal-status-badge {
+	font-size: 10px;
+	font-weight: 600;
+	padding: 1px 7px;
+	border-radius: 4px;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+.signal-status-badge--passed { background: oklch(0.65 0.15 145 / 0.12); color: oklch(0.72 0.15 145); }
+.signal-status-badge--failed { background: color-mix(in oklch, var(--destructive) 12%, transparent); color: var(--destructive); }
+.signal-status-badge--running { background: oklch(0.70 0.14 75 / 0.12); color: oklch(0.78 0.14 75); }
+
+.signal-entry__commit {
+	font-family: var(--font-mono, monospace);
+	font-size: 11px;
+	color: var(--primary);
+	background: color-mix(in oklch, var(--primary) 8%, transparent);
+	padding: 1px 6px;
+	border-radius: 3px;
+}
+
+.signal-entry__time {
+	font-size: 11px;
+	color: var(--text-tertiary);
+}
+
+.signal-steps-summary {
+	font-size: 10px;
+	color: var(--muted-foreground);
+	margin-left: auto;
+}
+
+.signal-expand-icon {
+	font-size: 10px;
+	color: var(--text-tertiary);
+	flex-shrink: 0;
+}
+
+/* ── Signal expanded body ── */
+.signal-entry__body {
+	padding: 4px 10px 10px;
+}
+
+/* ── Verification steps ── */
+.verify-step {
+	padding: 4px 8px;
+	margin: 4px 0;
+	border-radius: 4px;
+	font-size: 12px;
+}
+.verify-step--pass { background: oklch(0.65 0.15 145 / 0.05); }
+.verify-step--fail { background: color-mix(in oklch, var(--destructive) 5%, transparent); }
+
+.verify-step__header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.verify-step__icon {
+	font-weight: 700;
+	width: 14px;
+	text-align: center;
+}
+.verify-step--pass .verify-step__icon { color: oklch(0.72 0.15 145); }
+.verify-step--fail .verify-step__icon { color: var(--destructive); }
+
+.verify-step__name {
+	font-weight: 500;
+}
+.verify-step__type {
+	font-size: 10px;
+	color: var(--text-tertiary);
+	padding: 0 4px;
+	border-radius: 3px;
+	background: var(--secondary);
+}
+.verify-step__expect {
+	font-size: 10px;
+	color: oklch(0.78 0.14 75);
+}
+.verify-step__duration {
+	font-size: 10px;
+	color: var(--text-tertiary);
+	margin-left: auto;
+}
+
+.verify-step__output {
+	background: rgba(0,0,0,0.3);
+	padding: 8px;
+	border-radius: 4px;
+	font-family: var(--font-mono, monospace);
+	font-size: 11px;
+	white-space: pre-wrap;
+	max-height: 200px;
+	overflow-y: auto;
+	margin-top: 4px;
+	color: var(--muted-foreground);
+	word-break: break-word;
+}
+
+/* ── Signal metadata ── */
+.signal-metadata {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 8px;
+	padding-top: 6px;
+	border-top: 1px solid var(--border-subtle);
+	font-size: 11px;
+}
+.signal-metadata-label {
+	color: var(--muted-foreground);
+	font-weight: 600;
+}
+.signal-metadata-item {
+	color: var(--text-tertiary);
+}

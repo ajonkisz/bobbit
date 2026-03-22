@@ -1,7 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { state, renderApp, type Goal } from "./state.js";
-import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState, fetchGoalArtifacts, fetchRoles, type GoalArtifact } from "./api.js";
+import { gatewayFetch, deleteGoal, startTeam, teardownTeam, getTeamState, fetchGoalGates, fetchRoles, type GateState, type GateSignal } from "./api.js";
 import { setHashRoute } from "./routing.js";
 import { createAndConnectSession, connectToSession } from "./session-manager.js";
 import { showGoalDialog } from "./dialogs.js";
@@ -46,10 +46,10 @@ let currentGoalId: string | null = null;
 let currentGoal: Goal | null = null;
 let tasks: Task[] = [];
 let commits: CommitInfo[] = [];
-let artifacts: GoalArtifact[] = [];
-let expandedArtifactIds: Set<string> = new Set();
-let fullscreenArtifact: GoalArtifact | null = null;
-let artifactPollTimer: ReturnType<typeof setInterval> | null = null;
+let gates: GateState[] = [];
+let expandedGateIds: Set<string> = new Set();
+let expandedSignalIds: Set<string> = new Set();
+let gatePollTimer: ReturnType<typeof setInterval> | null = null;
 let teamActive = false;
 let teamStarting = false;
 let teamStopping = false;
@@ -81,7 +81,7 @@ let costPollTimer: ReturnType<typeof setInterval> | null = null;
 let gitStatusPollTimer: ReturnType<typeof setInterval> | null = null;
 
 /** Current dashboard tab */
-let dashboardTab: "tasks" | "agents" | "commits" | "artifacts" = "artifacts";
+let dashboardTab: "tasks" | "agents" | "commits" | "gates" = "gates";
 
 /** Role picker dropdown state */
 let roleDropdownOpen = false;
@@ -100,11 +100,11 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 	startTaskPolling(goalId);
 
 	try {
-		const [goalRes, tasksRes, commitsRes, fetchedArtifacts, gitStatusRes, costRes] = await Promise.all([
+		const [goalRes, tasksRes, commitsRes, fetchedGates, gitStatusRes, costRes] = await Promise.all([
 			gatewayFetch(`/api/goals/${goalId}`),
 			gatewayFetch(`/api/goals/${goalId}/tasks`),
 			gatewayFetch(`/api/goals/${goalId}/commits?limit=20`).catch(() => null),
-			fetchGoalArtifacts(goalId),
+			fetchGoalGates(goalId),
 			gatewayFetch(`/api/goals/${goalId}/git-status`).catch(() => null),
 			gatewayFetch(`/api/goals/${goalId}/cost`).catch(() => null),
 		]);
@@ -127,7 +127,7 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 			commits = [];
 		}
 
-		artifacts = fetchedArtifacts;
+		gates = fetchedGates;
 
 		if (gitStatusRes && gitStatusRes.ok) {
 			gitStatus = await gitStatusRes.json();
@@ -140,7 +140,7 @@ export async function loadDashboardData(goalId: string): Promise<void> {
 		const teamState = await getTeamState(goalId);
 		teamActive = teamState != null;
 
-		startArtifactPolling(goalId);
+		startGatePolling(goalId);
 		startCostPolling(goalId);
 		startGitStatusPolling(goalId);
 
@@ -158,20 +158,21 @@ export function clearDashboardState(): void {
 	currentGoal = null;
 	tasks = [];
 	commits = [];
-	artifacts = [];
-	expandedArtifactIds = new Set();
+	gates = [];
+	expandedGateIds = new Set();
+	expandedSignalIds = new Set();
 	teamActive = false;
 	teamStarting = false;
 	teamStopping = false;
 	loading = true;
 	error = "";
-	dashboardTab = "artifacts";
+	dashboardTab = "gates";
 	roleDropdownOpen = false;
 	gitStatus = null;
 	goalCost = null;
 	stopAgentPolling();
 	stopTaskPolling();
-	stopArtifactPolling();
+	stopGatePolling();
 	stopCostPolling();
 	stopGitStatusPolling();
 }
@@ -243,22 +244,22 @@ function stopAgentPolling(): void {
 	agents = [];
 }
 
-function startArtifactPolling(goalId: string): void {
-	stopArtifactPolling();
-	artifactPollTimer = setInterval(async () => {
+function startGatePolling(goalId: string): void {
+	stopGatePolling();
+	gatePollTimer = setInterval(async () => {
 		if (!currentGoalId || currentGoalId !== goalId) return;
 		try {
-			const newArtifacts = await fetchGoalArtifacts(goalId);
-			if (JSON.stringify(newArtifacts) !== JSON.stringify(artifacts)) {
-				artifacts = newArtifacts;
+			const newGates = await fetchGoalGates(goalId);
+			if (JSON.stringify(newGates) !== JSON.stringify(gates)) {
+				gates = newGates;
 				renderApp();
 			}
 		} catch { /* ignore */ }
-	}, 10_000);
+	}, 8_000);
 }
 
-function stopArtifactPolling(): void {
-	if (artifactPollTimer) { clearInterval(artifactPollTimer); artifactPollTimer = null; }
+function stopGatePolling(): void {
+	if (gatePollTimer) { clearInterval(gatePollTimer); gatePollTimer = null; }
 }
 
 function startCostPolling(goalId: string): void {
@@ -348,7 +349,8 @@ function findAssigneeSession(sessionId: string | undefined) {
 }
 
 function formatRelativeTime(timestamp: string | number): string {
-	const diffMs = Date.now() - new Date(timestamp).getTime();
+	const ts = typeof timestamp === "number" ? timestamp : new Date(timestamp).getTime();
+	const diffMs = Date.now() - ts;
 	const mins = Math.floor(diffMs / 60_000);
 	if (mins < 1) return "just now";
 	if (mins < 60) return `${mins}m ago`;
@@ -383,18 +385,31 @@ function formatAgentName(agent: TeamAgent): string {
 }
 
 // ============================================================================
-// WORKFLOW PIPELINE HELPERS
+// GATE PIPELINE HELPERS
 // ============================================================================
 
-interface PipelineNode {
+/** Build a map from gate ID to GateState from the fetched gates array */
+function getGateStatusMap(): Map<string, GateState> {
+	const map = new Map<string, GateState>();
+	for (const g of gates) {
+		map.set(g.gateId, g);
+	}
+	return map;
+}
+
+interface GatePipelineNode {
 	id: string;
 	name: string;
-	kind: string;
-	status: "accepted" | "submitted" | "rejected" | "pending";
+	status: "pending" | "passed" | "failed" | "running";
+	signalCount: number;
+	dependsOn: string[];
 }
 
 /** Compute dependency depth for each workflow gate via BFS from roots. */
-function computeDepthLevels(wfGates: Array<{ id: string; name: string; dependsOn: string[] }>): PipelineNode[][] {
+function computeGateDepthLevels(
+	wfGates: Array<{ id: string; name: string; dependsOn: string[] }>,
+	statusMap: Map<string, GateState>,
+): GatePipelineNode[][] {
 	const depthMap = new Map<string, number>();
 	const gateMap = new Map(wfGates.map(g => [g.id, g]));
 
@@ -415,87 +430,29 @@ function computeDepthLevels(wfGates: Array<{ id: string; name: string; dependsOn
 
 	for (const g of wfGates) getDepth(g.id);
 
-	// Group by depth — gates don't have artifact statuses, show all as pending for now
 	const maxDepth = Math.max(0, ...Array.from(depthMap.values()));
-	const levels: PipelineNode[][] = [];
+	const levels: GatePipelineNode[][] = [];
 	for (let d = 0; d <= maxDepth; d++) {
-		const nodesAtDepth: PipelineNode[] = [];
+		const nodesAtDepth: GatePipelineNode[] = [];
 		for (const g of wfGates) {
 			if (depthMap.get(g.id) === d) {
+				const gs = statusMap.get(g.id);
+				// Determine if any signal is currently running
+				const hasRunning = gs?.signals?.some(s => s.verification.status === "running");
+				let status: GatePipelineNode["status"] = gs?.status ?? "pending";
+				if (hasRunning && status !== "passed") status = "running";
 				nodesAtDepth.push({
 					id: g.id,
 					name: g.name,
-					kind: "gate",
-					status: "pending",
+					status,
+					signalCount: gs?.signals?.length ?? 0,
+					dependsOn: g.dependsOn,
 				});
 			}
 		}
 		if (nodesAtDepth.length > 0) levels.push(nodesAtDepth);
 	}
 	return levels;
-}
-
-// ============================================================================
-// ARTIFACT HELPERS
-// ============================================================================
-
-const ARTIFACT_TYPE_LABELS: Record<string, string> = {
-	"design-doc": "Design Document",
-	"test-plan": "Test Plan",
-	"review-findings": "Review Findings",
-	"gap-analysis": "Gap Analysis",
-	"security-findings": "Security Findings",
-	"summary-report": "Summary Report",
-	"pr": "Pull Request",
-	"custom": "Custom",
-};
-
-const ARTIFACT_TYPE_ICONS: Record<string, string> = {
-	"design-doc": "\uD83D\uDCD0",
-	"test-plan": "\uD83E\uDDEA",
-	"review-findings": "\uD83D\uDD0D",
-	"gap-analysis": "\uD83D\uDCCA",
-	"security-findings": "\uD83D\uDD12",
-	"summary-report": "\uD83D\uDCDD",
-	"pr": "🔀",
-	"custom": "\uD83D\uDCCB",
-};
-
-/** Kind-based icon mapping for workflow artifacts */
-const KIND_ICONS: Record<string, string> = {
-	analysis: "\uD83D\uDCD0",
-	deliverable: "\uD83D\uDCDD",
-	review: "\uD83D\uDD0D",
-	verification: "\uD83E\uDDEA",
-};
-
-export function isHtmlContent(content: string): boolean {
-	const trimmed = content.trimStart();
-	return trimmed.startsWith("<!") || trimmed.startsWith("<html");
-}
-
-function openArtifactView(artifact: GoalArtifact): void {
-	if (isHtmlContent(artifact.content)) {
-		fullscreenArtifact = artifact;
-	} else {
-		toggleArtifactExpand(artifact.id);
-		return;
-	}
-	renderApp();
-}
-
-function closeFullscreenArtifact(): void {
-	fullscreenArtifact = null;
-	renderApp();
-}
-
-function toggleArtifactExpand(artifactId: string): void {
-	if (expandedArtifactIds.has(artifactId)) {
-		expandedArtifactIds.delete(artifactId);
-	} else {
-		expandedArtifactIds.add(artifactId);
-	}
-	renderApp();
 }
 
 // ============================================================================
@@ -579,14 +536,12 @@ const svgStop = html`<svg width="13" height="13" viewBox="0 0 24 24" fill="none"
 const svgPlus = html`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
 const svgChevronDown = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
 const svgTeam = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
-const svgGitBranch = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M6 9v12"/></svg>`;
-const svgMerge = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>`;
 const svgDollar = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
 const svgFolder = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
 const svgTasks = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`;
 const svgAgents = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
 const svgCommit = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/></svg>`;
-const svgFile = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>`;
+const svgGate = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V2"/><path d="M5 12H2"/><path d="M22 12h-3"/><circle cx="12" cy="12" r="4"/><path d="m15 9 2-2"/><path d="m7 15 2-2"/></svg>`;
 const svgClock = html`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`;
 const svgPhaseArrow = html`<svg viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M0 6h16M13 2l4 4-4 4"/></svg>`;
 
@@ -816,44 +771,28 @@ function renderSummaryRow(taskList: Task[], agentList: TeamAgent[]): TemplateRes
 }
 
 // ============================================================================
-// RENDER: PHASE PIPELINE
+// RENDER: GATE PIPELINE (horizontal visualization)
 // ============================================================================
 
-function renderPhasePipeline(): TemplateResult {
-	const wfArtifacts = currentGoal?.workflow?.gates;
-	if (!wfArtifacts || wfArtifacts.length === 0) return html``;
+function renderGatePipeline(): TemplateResult {
+	const wfGates = currentGoal?.workflow?.gates;
+	if (!wfGates || wfGates.length === 0) return html``;
 
-	const levels = computeDepthLevels(wfArtifacts);
-
-	const kindColorMap: Record<string, string> = {
-		analysis: "kind-analysis",
-		deliverable: "kind-deliverable",
-		review: "kind-review",
-		verification: "kind-verification",
-	};
+	const statusMap = getGateStatusMap();
+	const levels = computeGateDepthLevels(wfGates, statusMap);
 
 	return html`
 		<div class="phase-pipeline">
 			${levels.map((group, gi) => {
-				const prevDone = gi > 0 && levels[gi - 1].every(n => n.status === "accepted");
-				const anyActive = group.some(n => n.status === "submitted");
-				const arrowClass = prevDone ? "done" : anyActive ? "active" : "";
+				const prevAllPassed = gi > 0 && levels[gi - 1].every(n => n.status === "passed");
+				const anyRunning = group.some(n => n.status === "running");
+				const arrowClass = prevAllPassed ? "done" : anyRunning ? "active" : "";
 
 				return html`
 					${gi > 0 ? html`<div class="phase-arrow ${arrowClass}">${svgPhaseArrow}</div>` : nothing}
-					${group.length === 1 ? html`
-						<div class="phase-node ${nodeStatusClass(group[0].status)} ${kindColorMap[group[0].kind] || ""}">
-							${group[0].status === "accepted" ? html`<span class="phase-check">\u2713</span>` : nothing}
-							${group[0].name}
-						</div>
-					` : html`
+					${group.length === 1 ? renderGateNode(group[0]) : html`
 						<div class="phase-group">
-							${group.map(node => html`
-								<div class="phase-node ${nodeStatusClass(node.status)} ${kindColorMap[node.kind] || ""}">
-									${node.status === "accepted" ? html`<span class="phase-check">\u2713</span>` : nothing}
-									${node.name}
-								</div>
-							`)}
+							${group.map(node => renderGateNode(node))}
 						</div>
 					`}
 				`;
@@ -862,13 +801,45 @@ function renderPhasePipeline(): TemplateResult {
 	`;
 }
 
-function nodeStatusClass(status: PipelineNode["status"]): string {
+function renderGateNode(node: GatePipelineNode): TemplateResult {
+	const statusClass = gateNodeStatusClass(node.status);
+	const isExpanded = expandedGateIds.has(node.id);
+	return html`
+		<div class="phase-node ${statusClass}" @click=${() => toggleGateExpand(node.id)} title="${node.name} (${node.status})${node.signalCount > 0 ? ` \u2014 ${node.signalCount} signal${node.signalCount !== 1 ? "s" : ""}` : ""}">
+			${node.status === "passed" ? html`<span class="phase-check">\u2713</span>` : nothing}
+			${node.status === "failed" ? html`<span class="phase-check" style="color:var(--destructive)">\u2717</span>` : nothing}
+			${node.status === "running" ? html`<span class="phase-running-dot"></span>` : nothing}
+			${node.name}
+			${node.signalCount > 0 ? html`<span class="gate-signal-count">${node.signalCount}</span>` : nothing}
+		</div>
+	`;
+}
+
+function gateNodeStatusClass(status: GatePipelineNode["status"]): string {
 	switch (status) {
-		case "accepted": return "done";
-		case "submitted": return "active";
-		case "rejected": return "rejected";
+		case "passed": return "done";
+		case "running": return "active";
+		case "failed": return "rejected";
 		default: return "";
 	}
+}
+
+function toggleGateExpand(gateId: string): void {
+	if (expandedGateIds.has(gateId)) {
+		expandedGateIds.delete(gateId);
+	} else {
+		expandedGateIds.add(gateId);
+	}
+	renderApp();
+}
+
+function toggleSignalExpand(signalId: string): void {
+	if (expandedSignalIds.has(signalId)) {
+		expandedSignalIds.delete(signalId);
+	} else {
+		expandedSignalIds.add(signalId);
+	}
+	renderApp();
 }
 
 // ============================================================================
@@ -882,11 +853,11 @@ function setTab(tab: typeof dashboardTab): void {
 
 function renderTabBar(): TemplateResult {
 	const wfTotal = currentGoal?.workflow?.gates.length ?? 0;
-	const wfAccepted = artifacts.filter(a => a.status === "accepted" && a.workflowArtifactId).length;
-	const artifactCountStr = wfTotal > 0 ? `${wfAccepted}/${wfTotal}` : String(artifacts.length);
+	const passedCount = gates.filter(g => g.status === "passed").length;
+	const gateCountStr = wfTotal > 0 ? `${passedCount}/${wfTotal}` : String(gates.length);
 
 	const tabs: Array<{ id: typeof dashboardTab; label: string; icon: TemplateResult; countStr: string }> = [
-		{ id: "artifacts", label: "Artifacts", icon: svgFile, countStr: artifactCountStr },
+		{ id: "gates", label: "Gates", icon: svgGate, countStr: gateCountStr },
 		{ id: "tasks", label: "Tasks", icon: svgTasks, countStr: String(tasks.length) },
 		{ id: "agents", label: "Agents", icon: svgAgents, countStr: String(agents.length) },
 		{ id: "commits", label: "Commits", icon: svgCommit, countStr: String(commits.length) },
@@ -1081,13 +1052,28 @@ function renderCommitsTab(): TemplateResult {
 }
 
 // ============================================================================
-// RENDER: ARTIFACTS TAB
+// RENDER: GATES TAB
 // ============================================================================
 
-function renderWorkflowChecklist(): TemplateResult {
+function renderGatesTab(): TemplateResult {
+	const hasWorkflow = currentGoal?.workflow && currentGoal.workflow.gates.length > 0;
+
+	if (!hasWorkflow) {
+		return html`<div class="tab-empty">${svgGate}<span>No workflow gates defined</span></div>`;
+	}
+
+	return html`
+		<div class="tab-panel-inner" style="padding-top:0;">
+			${renderGateChecklist()}
+		</div>
+	`;
+}
+
+function renderGateChecklist(): TemplateResult {
 	if (!currentGoal?.workflow) return nothing as any;
 
 	const wfGates = currentGoal.workflow.gates;
+	const statusMap = getGateStatusMap();
 
 	// Topological sort for display order
 	const visited = new Set<string>();
@@ -1107,41 +1093,154 @@ function renderWorkflowChecklist(): TemplateResult {
 		<div class="wf-checklist">
 			<div class="wf-checklist-header">
 				<span class="wf-checklist-title">Workflow: ${currentGoal.workflow.name}</span>
-				<span class="wf-checklist-count">${sorted.length} gate${sorted.length !== 1 ? "s" : ""}</span>
+				<span class="wf-checklist-count">${gates.filter(g => g.status === "passed").length}/${sorted.length} passed</span>
 			</div>
-			${sorted.map(gate => {
-				const indent = gate.dependsOn.length > 0 ? "padding-left:20px;" : "";
+			${sorted.map(wfGate => {
+				const gs = statusMap.get(wfGate.id);
+				const status = gs?.status ?? "pending";
+				const indent = wfGate.dependsOn.length > 0 ? "padding-left:20px;" : "";
+				const isExpanded = expandedGateIds.has(wfGate.id);
+				const signalCount = gs?.signals?.length ?? 0;
+
+				let statusIcon: string;
+				let statusClass: string;
+				if (status === "passed") {
+					statusIcon = "\u25CF"; // ●
+					statusClass = "wf-status-accepted";
+				} else if (status === "failed") {
+					statusIcon = "\u2717"; // ✗
+					statusClass = "wf-status-rejected";
+				} else {
+					statusIcon = "\u25CB"; // ○
+					statusClass = "wf-status-pending";
+				}
+
+				// Check if any signal is running
+				const hasRunning = gs?.signals?.some(s => s.verification.status === "running");
+				if (hasRunning) {
+					statusIcon = "\u25D0"; // ◐
+					statusClass = "wf-status-submitted";
+				}
+
 				return html`
-					<div class="wf-checklist-item" style="${indent}">
-						<span class="wf-status-icon wf-status-pending">\u25CB</span>
-						<span class="wf-kind-dot" style="background:#60a5fa">\u26D4</span>
+					<div class="wf-checklist-item" style="${indent}" @click=${() => toggleGateExpand(wfGate.id)}>
+						<span class="wf-status-icon ${statusClass}">${statusIcon}</span>
 						<div class="wf-checklist-info">
-							<span class="wf-checklist-name">${gate.name}</span>
+							<span class="wf-checklist-name">${wfGate.name}</span>
 							<div class="wf-checklist-meta">
-								${gate.dependsOn.length > 0 ? html`
-									<span class="wf-checklist-deps">depends on: ${gate.dependsOn.join(", ")}</span>
+								${wfGate.dependsOn.length > 0 ? html`
+									<span class="wf-checklist-deps">depends on: ${wfGate.dependsOn.join(", ")}</span>
 								` : nothing}
-								${gate.content ? html`<span class="wf-checklist-deps">content gate</span>` : nothing}
+								${wfGate.content ? html`<span class="wf-checklist-deps">\u00B7 content gate</span>` : nothing}
+								${wfGate.metadata && Object.keys(wfGate.metadata).length > 0 ? html`<span class="wf-checklist-deps">\u00B7 metadata: ${Object.keys(wfGate.metadata).join(", ")}</span>` : nothing}
 							</div>
 						</div>
-						<span class="wf-checklist-status-label">pending</span>
+						<span class="wf-checklist-status-label gate-status-label--${status}">${hasRunning ? "verifying" : status}</span>
+						${signalCount > 0 ? html`<span class="gate-signal-badge">${signalCount} signal${signalCount !== 1 ? "s" : ""}</span>` : nothing}
+						<span class="wf-checklist-view">${isExpanded ? "Hide" : "View"}</span>
 					</div>
+					${isExpanded ? renderGateDetail(wfGate, gs) : nothing}
 				`;
 			})}
 		</div>
 	`;
 }
 
-function renderArtifactsTab(): TemplateResult {
-	const hasWorkflow = currentGoal?.workflow && currentGoal.workflow.gates.length > 0;
-
-	if (!hasWorkflow) {
-		return html`<div class="tab-empty">${svgFile}<span>No workflow artifacts defined</span></div>`;
-	}
+function renderGateDetail(
+	wfGate: NonNullable<Goal["workflow"]>["gates"][number],
+	gs: GateState | undefined,
+): TemplateResult {
+	const signals = gs?.signals ?? [];
+	const indent = wfGate.dependsOn.length > 0 ? "padding-left:20px;" : "";
 
 	return html`
-		<div class="tab-panel-inner" style="padding-top:0;">
-			${renderWorkflowChecklist()}
+		<div class="gate-detail-panel" style="${indent}">
+			${/* Metadata section */ ""}
+			${gs?.currentMetadata && Object.keys(gs.currentMetadata).length > 0 ? html`
+				<div class="gate-detail-section">
+					<div class="gate-detail-section-title">Metadata</div>
+					<div class="gate-metadata-grid">
+						${Object.entries(gs.currentMetadata).map(([key, value]) => html`
+							<div class="gate-metadata-item">
+								<span class="gate-metadata-key">${key}</span>
+								<code class="gate-metadata-value">${value}</code>
+							</div>
+						`)}
+					</div>
+				</div>
+			` : nothing}
+
+			${/* Content section */ ""}
+			${gs?.currentContent ? html`
+				<div class="gate-detail-section">
+					<div class="gate-detail-section-title">Content <span class="gate-content-version">v${gs.currentContentVersion ?? 1}</span></div>
+					<pre class="gate-content-body">${gs.currentContent}</pre>
+				</div>
+			` : nothing}
+
+			${/* Signal timeline */ ""}
+			<div class="gate-detail-section">
+				<div class="gate-detail-section-title">Signal History</div>
+				${signals.length === 0
+					? html`<div class="gate-no-signals">No signals yet</div>`
+					: html`
+						<div class="signal-timeline">
+							${[...signals].reverse().map(signal => renderSignalEntry(signal))}
+						</div>
+					`
+				}
+			</div>
+		</div>
+	`;
+}
+
+function renderSignalEntry(signal: GateSignal): TemplateResult {
+	const vStatus = signal.verification.status;
+	const isExpanded = expandedSignalIds.has(signal.id);
+	const shortSha = signal.commitSha ? signal.commitSha.slice(0, 7) : "???????";
+
+	return html`
+		<div class="signal-entry signal-entry--${vStatus}">
+			<div class="signal-entry__header" @click=${() => toggleSignalExpand(signal.id)}>
+				<span class="signal-status-badge signal-status-badge--${vStatus}">
+					${vStatus === "passed" ? "\u2713" : vStatus === "failed" ? "\u2717" : "\u23F3"}
+					${vStatus}
+				</span>
+				<code class="signal-entry__commit">${shortSha}</code>
+				<span class="signal-entry__time">${formatRelativeTime(signal.timestamp)}</span>
+				${signal.verification.steps.length > 0 ? html`
+					<span class="signal-steps-summary">
+						${signal.verification.steps.filter(s => s.passed).length}/${signal.verification.steps.length} checks
+					</span>
+				` : nothing}
+				<span class="signal-expand-icon">${isExpanded ? "\u25B4" : "\u25BE"}</span>
+			</div>
+			${isExpanded ? html`
+				<div class="signal-entry__body">
+					${signal.verification.steps.map(step => html`
+						<div class="verify-step verify-step--${step.passed ? "pass" : "fail"}">
+							<div class="verify-step__header">
+								<span class="verify-step__icon">${step.passed ? "\u2713" : "\u2717"}</span>
+								<span class="verify-step__name">${step.name}</span>
+								<span class="verify-step__type">${step.type}</span>
+								${step.expect ? html`<span class="verify-step__expect">expect: ${step.expect}</span>` : nothing}
+								<span class="verify-step__duration">${step.duration_ms}ms</span>
+							</div>
+							${step.output ? html`
+								<div class="verify-step__output">${step.output}</div>
+							` : nothing}
+						</div>
+					`)}
+					${signal.metadata && Object.keys(signal.metadata).length > 0 ? html`
+						<div class="signal-metadata">
+							<span class="signal-metadata-label">Metadata:</span>
+							${Object.entries(signal.metadata).map(([k, v]) => html`
+								<span class="signal-metadata-item"><strong>${k}:</strong> ${v}</span>
+							`)}
+						</div>
+					` : nothing}
+				</div>
+			` : nothing}
 		</div>
 	`;
 }
@@ -1187,25 +1286,14 @@ export function renderGoalDashboard(): TemplateResult {
 			${renderNavBar(currentGoal)}
 			${renderMetaRows(currentGoal)}
 			${renderSummaryRow(tasks, agents)}
-			${renderPhasePipeline()}
+			${renderGatePipeline()}
 			${renderTabBar()}
 			<div class="tab-content">
+				<div class="tab-panel ${activeTab === "gates" ? "active" : ""}">${activeTab === "gates" ? renderGatesTab() : nothing}</div>
 				<div class="tab-panel ${activeTab === "tasks" ? "active" : ""}">${activeTab === "tasks" ? renderTasksTab() : nothing}</div>
 				<div class="tab-panel ${activeTab === "agents" ? "active" : ""}">${activeTab === "agents" ? renderAgentsTab() : nothing}</div>
 				<div class="tab-panel ${activeTab === "commits" ? "active" : ""}">${activeTab === "commits" ? renderCommitsTab() : nothing}</div>
-				<div class="tab-panel ${activeTab === "artifacts" ? "active" : ""}">${activeTab === "artifacts" ? renderArtifactsTab() : nothing}</div>
 			</div>
-			${fullscreenArtifact ? html`
-				<div class="artifact-overlay" @click=${(e: Event) => { if ((e.target as HTMLElement).classList.contains("artifact-overlay")) closeFullscreenArtifact(); }}>
-					<div class="artifact-overlay-panel">
-						<div class="artifact-overlay-header">
-							<span class="artifact-overlay-title">${fullscreenArtifact.name}</span>
-							<button class="artifact-overlay-close" @click=${closeFullscreenArtifact}>&times;</button>
-						</div>
-						<iframe class="artifact-overlay-iframe" sandbox="allow-scripts" .srcdoc=${fullscreenArtifact.content}></iframe>
-					</div>
-				</div>
-			` : nothing}
 		</div>
 	`;
 }
