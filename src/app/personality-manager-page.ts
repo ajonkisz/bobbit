@@ -2,9 +2,9 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
-import { ArrowLeft, Pencil, Plus, Sparkles, Trash2 } from "lucide";
-import { fetchPersonalities, createPersonality, updatePersonality, deletePersonality, gatewayFetch, type PersonalityData } from "./api.js";
-import { state, renderApp } from "./state.js";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide";
+import { fetchPersonalities, createPersonality, updatePersonality, deletePersonality, type PersonalityData } from "./api.js";
+import { renderApp } from "./state.js";
 import { setHashRoute } from "./routing.js";
 
 // ============================================================================
@@ -102,29 +102,6 @@ export function navigateToPersonalityEdit(personalityName: string): void {
 		selectedPersonality = null;
 	}
 	renderApp();
-}
-
-async function createPersonalityAssistantSession(): Promise<void> {
-	if (state.creatingSession) return;
-	state.creatingSession = true;
-	renderApp();
-	try {
-		const res = await gatewayFetch("/api/sessions", {
-			method: "POST",
-			body: JSON.stringify({ assistantType: "personality" }),
-		});
-		if (!res.ok) throw new Error(`Session creation failed: ${res.status}`);
-		const { id } = await res.json();
-		const { connectToSession } = await import("./session-manager.js");
-		await connectToSession(id, false, { assistantType: "personality" });
-	} catch (err) {
-		const { showConnectionError } = await import("./dialogs.js");
-		const msg = err instanceof Error ? err.message : String(err);
-		showConnectionError("Failed to create personality assistant", msg);
-	} finally {
-		state.creatingSession = false;
-		renderApp();
-	}
 }
 
 // ============================================================================
@@ -293,16 +270,10 @@ function renderNavBar(): TemplateResult {
 			</div>
 			<div class="personalities-nav-right">
 				${Button({
-					variant: "ghost" as any,
-					size: "sm",
-					onClick: showCreate,
-					children: html`<span class="inline-flex items-center gap-1.5">${icon(Pencil, "sm")} Create Manually</span>`,
-				})}
-				${Button({
 					variant: "default",
 					size: "sm",
-					onClick: createPersonalityAssistantSession,
-					children: html`<span class="inline-flex items-center gap-1.5 font-semibold">${icon(Sparkles, "sm")} Create with Assistant</span>`,
+					onClick: showCreate,
+					children: html`<span class="inline-flex items-center gap-1.5 font-semibold">${icon(Plus, "sm")} New Personality</span>`,
 				})}
 			</div>
 		</div>
@@ -354,8 +325,8 @@ function renderListView(): TemplateResult {
 				<p class="personalities-empty-desc">Personalities shape how agents communicate — their tone, style, and behavioral constraints.</p>
 				${Button({
 					variant: "default",
-					onClick: createPersonalityAssistantSession,
-					children: html`<span class="inline-flex items-center gap-1.5">${icon(Sparkles, "sm")} Create your first personality</span>`,
+					onClick: showCreate,
+					children: html`<span class="inline-flex items-center gap-1.5">${icon(Plus, "sm")} Create your first personality</span>`,
 				})}
 			</div>
 		`;
