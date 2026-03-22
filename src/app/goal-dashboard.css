@@ -342,6 +342,35 @@
 	font-weight: 600;
 	padding-left: 20px;
 }
+.phase-node.rejected {
+	color: oklch(0.78 0.14 55);
+	border-color: oklch(0.70 0.14 55 / 0.4);
+	background: oklch(0.70 0.14 55 / 0.1);
+	box-shadow: 0 0 0 1px oklch(0.70 0.14 55 / 0.15);
+}
+/* Kind-based color variants for pipeline nodes */
+.phase-node.kind-analysis { --kind-color: oklch(0.62 0.15 250); }
+.phase-node.kind-deliverable { --kind-color: oklch(0.65 0.15 145); }
+.phase-node.kind-review { --kind-color: oklch(0.70 0.14 75); }
+.phase-node.kind-verification { --kind-color: oklch(0.60 0.15 290); }
+.phase-node.done.kind-analysis { color: oklch(0.72 0.15 250); border-color: oklch(0.62 0.15 250 / 0.25); background: oklch(0.62 0.15 250 / 0.06); }
+.phase-node.done.kind-deliverable { color: oklch(0.72 0.15 145); border-color: oklch(0.65 0.15 145 / 0.25); background: oklch(0.65 0.15 145 / 0.06); }
+.phase-node.done.kind-review { color: oklch(0.78 0.14 75); border-color: oklch(0.70 0.14 75 / 0.25); background: oklch(0.70 0.14 75 / 0.06); }
+.phase-node.done.kind-verification { color: oklch(0.70 0.15 290); border-color: oklch(0.60 0.15 290 / 0.25); background: oklch(0.60 0.15 290 / 0.06); }
+.phase-node.active.kind-analysis { color: oklch(0.72 0.15 250); border-color: oklch(0.62 0.15 250 / 0.4); background: oklch(0.62 0.15 250 / 0.1); }
+.phase-node.active.kind-deliverable { color: oklch(0.72 0.15 145); border-color: oklch(0.65 0.15 145 / 0.4); background: oklch(0.65 0.15 145 / 0.1); }
+.phase-node.active.kind-review { color: oklch(0.78 0.14 75); border-color: oklch(0.70 0.14 75 / 0.4); background: oklch(0.70 0.14 75 / 0.1); }
+.phase-node.active.kind-verification { color: oklch(0.70 0.15 290); border-color: oklch(0.60 0.15 290 / 0.4); background: oklch(0.60 0.15 290 / 0.1); }
+/* Phase group for parallel artifacts at same depth */
+.phase-group {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 4px 6px;
+	border: 1px dashed var(--border-subtle);
+	border-radius: 12px;
+	background: color-mix(in oklch, var(--secondary) 50%, transparent);
+}
 .phase-check { display: none; font-size: 10px; }
 .phase-arrow {
 	display: flex;
@@ -928,10 +957,14 @@
 .wf-status-pending { color: var(--muted-foreground); }
 
 .wf-kind-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
+	width: 22px;
+	height: 22px;
+	border-radius: 4px;
 	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
 }
 
 .wf-checklist-info {
@@ -971,3 +1004,39 @@
 	cursor: pointer;
 }
 .wf-checklist-view:hover { text-decoration: underline; }
+
+.wf-checklist-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.wf-checklist-detail {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	color: var(--text-tertiary);
+}
+
+.wf-checklist-time {
+	font-size: 10px;
+	color: var(--text-tertiary);
+}
+
+.wf-checklist-producer {
+	font-size: 10px;
+	color: var(--text-tertiary);
+}
+
+/* Rejected phase glow animation */
+@keyframes phase-glow-rejected {
+	0%, 100% { box-shadow: 0 0 0 1px oklch(0.70 0.14 55 / 0.15), 0 0 8px oklch(0.70 0.14 55 / 0.08); }
+	50% { box-shadow: 0 0 0 3px oklch(0.70 0.14 55 / 0.2), 0 0 16px oklch(0.70 0.14 55 / 0.15); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.phase-node.rejected {
+		animation: phase-glow-rejected 2.5s ease-in-out infinite;
+	}
+}
