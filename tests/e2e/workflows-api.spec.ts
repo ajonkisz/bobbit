@@ -13,23 +13,20 @@ async function apiFetch(path: string, opts?: RequestInit): Promise<Response> {
 	});
 }
 
-/** Helper: minimal valid workflow body for creation */
+/** Helper: minimal valid v2 workflow body (gates-based) */
 function minimalWorkflow(id: string, name?: string) {
 	return {
 		id,
 		name: name || `Test Workflow ${id}`,
 		description: "A test workflow",
-		artifacts: [
+		gates: [
 			{
 				id: "step-a",
 				name: "Step A",
-				description: "First step",
-				kind: "analysis",
-				format: "markdown",
-				dependsOn: [],
-				mustHave: ["something"],
-				shouldHave: [],
-				mustNotHave: [],
+				depends_on: [],
+				verify: [
+					{ name: "Check", type: "command", run: "echo ok" },
+				],
 			},
 		],
 	};
@@ -48,7 +45,8 @@ test.describe("Workflow CRUD API", () => {
 		const bugFix = workflows.find((w: any) => w.id === "bug-fix");
 		expect(bugFix).toBeTruthy();
 		expect(bugFix.name).toBe("Bug Fix");
-		expect(bugFix.artifacts).toHaveLength(6);
+		expect(bugFix.gates).toBeTruthy();
+		expect(bugFix.gates.length).toBeGreaterThan(0);
 	});
 
 	test("Full CRUD lifecycle", async () => {
@@ -62,7 +60,7 @@ test.describe("Workflow CRUD API", () => {
 		expect(createResp.status).toBe(201);
 		const created = await createResp.json();
 		expect(created.id).toBe(id);
-		expect(created.artifacts).toHaveLength(1);
+		expect(created.gates).toHaveLength(1);
 
 		// GET — retrieve by id
 		const getResp = await apiFetch(`/api/workflows/${id}`);
@@ -97,27 +95,24 @@ test.describe("Workflow CRUD API", () => {
 	});
 
 	test("POST validates DAG — circular deps", async () => {
+		const id = "e2e-circular-" + Date.now();
 		const resp = await apiFetch("/api/workflows", {
 			method: "POST",
 			body: JSON.stringify({
-				id: "e2e-circular-" + Date.now(),
+				id,
 				name: "Circular",
 				description: "",
-				artifacts: [
-					{
-						id: "a", name: "A", description: "", kind: "analysis", format: "markdown",
-						dependsOn: ["b"], mustHave: [], shouldHave: [], mustNotHave: [],
-					},
-					{
-						id: "b", name: "B", description: "", kind: "analysis", format: "markdown",
-						dependsOn: ["a"], mustHave: [], shouldHave: [], mustNotHave: [],
-					},
+				gates: [
+					{ id: "a", name: "Gate A", dependsOn: ["b"], verify: [] },
+					{ id: "b", name: "Gate B", dependsOn: ["a"], verify: [] },
 				],
 			}),
 		});
 		expect(resp.status).toBe(400);
 		const body = await resp.json();
 		expect(body.error).toContain("Circular dependency");
+		// Cleanup in case it was created
+		await apiFetch(`/api/workflows/${id}`, { method: "DELETE" }).catch(() => {});
 	});
 
 	test("POST validates DAG — duplicate IDs", async () => {
@@ -127,21 +122,15 @@ test.describe("Workflow CRUD API", () => {
 				id: "e2e-dupid-" + Date.now(),
 				name: "DupIDs",
 				description: "",
-				artifacts: [
-					{
-						id: "same", name: "A", description: "", kind: "analysis", format: "markdown",
-						dependsOn: [], mustHave: [], shouldHave: [], mustNotHave: [],
-					},
-					{
-						id: "same", name: "B", description: "", kind: "analysis", format: "markdown",
-						dependsOn: [], mustHave: [], shouldHave: [], mustNotHave: [],
-					},
+				gates: [
+					{ id: "same", name: "Gate A", dependsOn: [], verify: [] },
+					{ id: "same", name: "Gate B", dependsOn: [], verify: [] },
 				],
 			}),
 		});
 		expect(resp.status).toBe(400);
 		const body = await resp.json();
-		expect(body.error).toContain("Duplicate artifact ID");
+		expect(body.error).toContain("Duplicate gate ID");
 	});
 
 	test("POST validates DAG — unknown dependsOn", async () => {
@@ -151,11 +140,8 @@ test.describe("Workflow CRUD API", () => {
 				id: "e2e-unknowndep-" + Date.now(),
 				name: "UnknownDep",
 				description: "",
-				artifacts: [
-					{
-						id: "a", name: "A", description: "", kind: "analysis", format: "markdown",
-						dependsOn: ["nonexistent"], mustHave: [], shouldHave: [], mustNotHave: [],
-					},
+				gates: [
+					{ id: "a", name: "Gate A", dependsOn: ["nonexistent"], verify: [] },
 				],
 			}),
 		});
@@ -164,19 +150,19 @@ test.describe("Workflow CRUD API", () => {
 		expect(body.error).toContain("unknown");
 	});
 
-	test("POST validates — empty artifacts", async () => {
+	test("POST validates — empty gates", async () => {
 		const resp = await apiFetch("/api/workflows", {
 			method: "POST",
 			body: JSON.stringify({
 				id: "e2e-empty-" + Date.now(),
 				name: "Empty",
 				description: "",
-				artifacts: [],
+				gates: [],
 			}),
 		});
 		expect(resp.status).toBe(400);
 		const body = await resp.json();
-		expect(body.error).toContain("at least one artifact");
+		expect(body.error).toContain("at least one gate");
 	});
 
 	test("POST validates — missing name", async () => {
@@ -185,11 +171,8 @@ test.describe("Workflow CRUD API", () => {
 			body: JSON.stringify({
 				id: "e2e-noname-" + Date.now(),
 				description: "",
-				artifacts: [
-					{
-						id: "a", name: "A", description: "", kind: "analysis", format: "markdown",
-						dependsOn: [], mustHave: [], shouldHave: [], mustNotHave: [],
-					},
+				gates: [
+					{ id: "a", name: "A", depends_on: [] },
 				],
 			}),
 		});
@@ -228,7 +211,7 @@ test.describe("Workflow CRUD API", () => {
 		const cloned = await resp.json();
 		expect(cloned.id).not.toBe("bug-fix");
 		expect(cloned.id).toContain("bug-fix-clone-");
-		expect(cloned.artifacts).toHaveLength(6);
+		expect(cloned.gates.length).toBeGreaterThan(0);
 		expect(cloned.name).toBe("Bug Fix");
 
 		// Cleanup — delete the clone

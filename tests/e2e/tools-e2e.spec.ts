@@ -411,7 +411,7 @@ test.describe("Tasks API", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 5. REST API — Goal Artifacts CRUD
+// 5. REST API — Gates (replaced Artifacts)
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe("Artifacts API", () => {
@@ -420,7 +420,7 @@ test.describe("Artifacts API", () => {
 	test.beforeEach(async () => {
 		const resp = await apiFetch("/api/goals", {
 			method: "POST",
-			body: JSON.stringify({ title: "Artifact test " + Date.now(), cwd: process.cwd(), team: true }),
+			body: JSON.stringify({ title: "Gate test " + Date.now(), cwd: process.cwd(), team: false, workflowId: "general" }),
 		});
 		goalId = (await resp.json()).id;
 	});
@@ -429,38 +429,22 @@ test.describe("Artifacts API", () => {
 	});
 
 	test("CRUD lifecycle", async () => {
-		// Create
-		const createResp = await apiFetch(`/api/goals/${goalId}/artifacts`, {
-			method: "POST",
-			body: JSON.stringify({ name: "test-doc", type: "design-doc", content: "# Design\nTest.", producedBy: "test" }),
-		});
-		expect(createResp.status).toBe(201);
-		const artifact = await createResp.json();
-		expect(artifact.id).toBeTruthy();
-		expect(artifact.version).toBe(1);
-
-		// List
-		const listResp = await apiFetch(`/api/goals/${goalId}/artifacts`);
+		// List gates
+		const listResp = await apiFetch(`/api/goals/${goalId}/gates`);
 		expect(listResp.status).toBe(200);
-		const { artifacts } = await listResp.json();
-		expect(artifacts.length).toBe(1);
+		const { gates } = await listResp.json();
+		expect(gates.length).toBeGreaterThan(0);
+		expect(gates[0].status).toBe("pending");
 
-		// Get
-		const getResp = await apiFetch(`/api/goals/${goalId}/artifacts/${artifact.id}`);
+		// Get gate detail
+		const getResp = await apiFetch(`/api/goals/${goalId}/gates/design-doc`);
 		expect(getResp.status).toBe(200);
-		expect((await getResp.json()).content).toContain("Test.");
-
-		// Update (revision)
-		const updateResp = await apiFetch(`/api/goals/${goalId}/artifacts/${artifact.id}`, {
-			method: "PUT",
-			body: JSON.stringify({ content: "# Design v2\nRevised." }),
-		});
-		expect(updateResp.status).toBe(200);
-		expect((await updateResp.json()).version).toBe(2);
+		const gate = await getResp.json();
+		expect(gate.gateId).toBe("design-doc");
 	});
 
 	test("returns 404 for non-existent artifact", async () => {
-		const resp = await apiFetch(`/api/goals/${goalId}/artifacts/nonexistent`);
+		const resp = await apiFetch(`/api/goals/${goalId}/gates/nonexistent`);
 		expect(resp.status).toBe(404);
 	});
 });
