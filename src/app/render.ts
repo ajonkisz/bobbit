@@ -181,6 +181,11 @@ let _cachedWorkflows: Workflow[] = [];
 let _workflowsLoaded = false;
 let _selectedWorkflowId = "";
 
+/** Set the selected workflow ID from outside the render module (e.g. from a goal proposal). */
+export function setSelectedWorkflowId(id: string): void {
+	_selectedWorkflowId = id;
+}
+
 function ensureWorkflowsLoaded(): void {
 	if (_workflowsLoaded) return;
 	_workflowsLoaded = true;

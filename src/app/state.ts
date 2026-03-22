@@ -102,7 +102,7 @@ export const state = {
 	sidebarCollapsed: localStorage.getItem("bobbit-sidebar-collapsed") === "true",
 
 	/** Active goal proposal from a goal-assistant session */
-	activeGoalProposal: null as { title: string; spec: string; cwd?: string } | null,
+	activeGoalProposal: null as { title: string; spec: string; cwd?: string; workflow?: string } | null,
 
 	// Unified assistant state
 	assistantType: null as string | null,

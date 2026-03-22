@@ -81,7 +81,7 @@ export class RemoteAgent {
 	/** Callback fired when connection status changes (connected/reconnecting/disconnected). */
 	onConnectionStatusChange?: (status: ConnectionStatus) => void;
 	/** Callback fired when a goal proposal is detected in an assistant message. */
-	onGoalProposal?: (proposal: { title: string; spec: string; cwd?: string }) => void;
+	onGoalProposal?: (proposal: { title: string; spec: string; cwd?: string; workflow?: string }) => void;
 	/** Callback fired when a role proposal is detected in an assistant message. */
 	onRoleProposal?: (proposal: { name: string; label: string; prompt: string; tools: string; accessory: string }) => void;
 	/** Callback fired when a tool proposal is detected in an assistant message. */

@@ -22,6 +22,7 @@ import { showConnectionError, confirmAction, checkOAuthStatus, openOAuthDialog, 
 import { teardownMobileScrollTracking } from "./mobile-header.js";
 import { storage } from "./storage.js";
 import { markSessionVisited } from "./render-helpers.js";
+import { setSelectedWorkflowId } from "./render.js";
 
 // ============================================================================
 // GOAL DRAFT PERSISTENCE HELPERS
@@ -358,6 +359,7 @@ export async function connectToSession(sessionId: string, isExisting: boolean, o
 				if (!state.previewTitleEdited) state.previewTitle = proposal.title;
 				if (!state.previewCwdEdited) state.previewCwd = proposal.cwd || "";
 				if (!state.previewSpecEdited) state.previewSpec = proposal.spec;
+				if (proposal.workflow) setSelectedWorkflowId(proposal.workflow);
 				state.assistantHasProposal = true;
 				if (state.assistantTab === "chat" && !isDesktop()) {
 					state.assistantTab = "preview";

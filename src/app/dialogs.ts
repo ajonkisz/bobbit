@@ -830,7 +830,7 @@ async function createGoalAssistantSession(): Promise<void> {
 	}
 }
 
-export function showGoalEditDialogFromProposal(proposal: { title: string; spec: string; cwd?: string }): void {
+export function showGoalEditDialogFromProposal(proposal: { title: string; spec: string; cwd?: string; workflow?: string }): void {
 	const container = document.createElement("div");
 	document.body.appendChild(container);
 
@@ -842,7 +842,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let worktreeValue = true;
 	let cwdDropdownOpen = false;
 	let cwdHighlightIndex = -1;
-	let workflowId = "";
+	let workflowId = proposal.workflow || "";
 	let _proposalWorkflows: Array<{ id: string; name: string; artifacts: any[] }> = [];
 
 	// Load workflows for the selector
