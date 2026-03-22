@@ -175,15 +175,18 @@ export default function (pi: ExtensionAPI) {
 			name: Type.String({ description: "Human-readable artifact name" }),
 			type: Type.String({ description: "Artifact type: design-doc, test-plan, review-findings, gap-analysis, security-findings, or custom" }),
 			content: Type.String({ description: "Artifact content (markdown or JSON)" }),
+			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this fulfils. Links the artifact to a workflow definition and enforces dependency gating." })),
 		}),
 		async execute(_id, params) {
 			try {
-				return ok(await api("POST", `/api/goals/${goalId}/artifacts`, {
+				const body: Record<string, unknown> = {
 					name: params.name,
 					type: params.type,
 					content: params.content,
 					producedBy: sessionId,
-				}));
+				};
+				if (params.workflowArtifactId) body.workflowArtifactId = params.workflowArtifactId;
+				return ok(await api("POST", `/api/goals/${goalId}/artifacts`, body));
 			} catch (e: any) { return err(e.message); }
 		},
 	});

@@ -102,11 +102,11 @@ promptTemplate: |+
 
   When a workflow is active:
   1. **Follow the workflow's DAG**, not a fixed phase sequence. The workflow tells you exactly what to produce and in what order.
-  2. **Create goal artifacts that fulfil workflow artifacts.** When creating an artifact, set `workflowArtifactId` to link it to the workflow definition. The server enforces dependency gating — you'll get a 409 if dependencies aren't met.
-  3. **Use `suggestedRole`** from the workflow artifact definition to pick which role to spawn.
-  4. **Check quality criteria** — each workflow artifact lists mustHave/shouldHave/mustNotHave. Ensure the produced content meets these before submitting.
-  5. **Handle rejections** — if verification rejects an artifact, check the rejection reason, fix the issue, and resubmit via `artifact_update`.
-  6. **Context injection** — when you spawn an agent with `workflowArtifactId`, the server automatically injects accepted upstream dependency artifacts into the agent's context. The agent receives the design doc, test plan, etc. without you needing to copy-paste.
+  2. **Always pass `workflowArtifactId` when spawning agents.** This is critical — it tells the server which workflow artifact the agent is producing, and triggers automatic context injection of accepted upstream dependencies. The agent receives the full content of all dependency artifacts (design doc, test plan, etc.) in its system prompt without you needing to copy-paste anything.
+  3. **Create goal artifacts that fulfil workflow artifacts.** When creating an artifact via `artifact_create`, set `workflowArtifactId` to link it to the workflow definition. The server enforces dependency gating — you'll get a 409 if dependencies aren't met.
+  4. **Use `suggestedRole`** from the workflow artifact definition to pick which role to spawn.
+  5. **Check quality criteria** — each workflow artifact lists mustHave/shouldHave/mustNotHave. Ensure the produced content meets these before submitting.
+  6. **Handle rejections** — if verification rejects an artifact, check the rejection reason, fix the issue, and resubmit via `artifact_update`.
 
   ### When NO workflow is present
   Use your judgment to structure the work. A sensible default approach:
