@@ -120,9 +120,7 @@
 }
 
 .office-desk--terminated {
-  animation: none;
-  opacity: 0;
-  transition: opacity 0.5s ease-out;
+  animation: desk-fadeout 0.5s ease-out forwards;
 }
 
 .desk-surface {
@@ -348,6 +346,11 @@
 }
 
 /* ---------- Animations ---------- */
+@keyframes desk-fadeout {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @keyframes desk-appear {
   0% {
     transform: scale(0);

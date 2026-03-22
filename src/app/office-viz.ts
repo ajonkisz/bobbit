@@ -72,30 +72,30 @@ async function pollGoals(): Promise<void> {
 		const data = await res.json();
 		const rawGoals = data.goals || [];
 
-		const newGoals: OfficeGoal[] = [];
-		for (const g of rawGoals) {
+		// Fetch task counts for all goals in parallel
+		const taskPromises = rawGoals.map((g: any) =>
+			gatewayFetch(`/api/goals/${g.id}/tasks`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+		);
+		const taskResults = await Promise.allSettled(taskPromises);
+
+		const newGoals: OfficeGoal[] = rawGoals.map((g: any, i: number) => {
 			const taskCounts = { todo: 0, inProgress: 0, complete: 0 };
-			try {
-				const taskRes = await gatewayFetch(`/api/goals/${g.id}/tasks`);
-				if (taskRes.ok) {
-					const taskData = await taskRes.json();
-					const tasks = taskData.tasks || [];
-					for (const t of tasks) {
-						if (t.state === "todo") taskCounts.todo++;
-						else if (t.state === "in-progress" || t.state === "blocked") taskCounts.inProgress++;
-						else if (t.state === "complete" || t.state === "skipped") taskCounts.complete++;
-					}
+			const result = taskResults[i];
+			if (result.status === "fulfilled" && result.value) {
+				const tasks = result.value.tasks || [];
+				for (const t of tasks) {
+					if (t.state === "todo") taskCounts.todo++;
+					else if (t.state === "in-progress" || t.state === "blocked") taskCounts.inProgress++;
+					else if (t.state === "complete" || t.state === "skipped") taskCounts.complete++;
 				}
-			} catch {
-				/* ignore */
 			}
-			newGoals.push({
+			return {
 				id: g.id,
 				title: g.title || "Untitled Goal",
 				state: g.state || "todo",
 				taskCounts,
-			});
-		}
+			};
+		});
 		goals = newGoals;
 		renderApp();
 	} catch {
@@ -129,6 +129,8 @@ export function clearOfficeState(): void {
 		clearInterval(goalPollTimer);
 		goalPollTimer = null;
 	}
+	sessions = [];
+	goals = [];
 }
 
 // ============================================================================
@@ -214,11 +216,16 @@ function computeLayout(): { desks: DeskPosition[]; whiteboards: WhiteboardPositi
 	for (const goal of goals) {
 		const hasDesk = whiteboards.some((w) => w.goal.id === goal.id);
 		if (!hasDesk) {
+			if (col >= COLS) {
+				col = 0;
+				row++;
+			}
 			whiteboards.push({
 				goal,
 				x: START_X + col * H_SPACING - 30,
 				y: START_Y + row * V_SPACING - 40,
 			});
+			col++;
 		}
 	}
 

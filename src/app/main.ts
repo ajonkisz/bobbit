@@ -26,6 +26,7 @@ setRenderApp(doRenderApp);
 // ============================================================================
 
 let handlingHashChange = false;
+let _officeLoaded = false;
 
 async function handleHashChange(): Promise<void> {
 	if (handlingHashChange) return;
@@ -35,7 +36,7 @@ async function handleHashChange(): Promise<void> {
 		const route = getRouteFromHash();
 
 		// Clean up office polling when navigating away
-		if (route.view !== "office") {
+		if (route.view !== "office" && _officeLoaded) {
 			import("./office-viz.js").then((m) => m.clearOfficeState()).catch(() => {});
 		}
 
@@ -202,6 +203,7 @@ async function handleHashChange(): Promise<void> {
 			state.goalDashboardId = null;
 			state.appView = "authenticated";
 			const { loadOfficeData } = await import("./office-viz.js");
+			_officeLoaded = true;
 			loadOfficeData();
 			renderApp();
 			await refreshSessions();
@@ -326,6 +328,7 @@ async function initApp() {
 				navigateToPersonalityEdit(route.personalityName);
 			} else if (route.view === "office") {
 				const { loadOfficeData } = await import("./office-viz.js");
+				_officeLoaded = true;
 				loadOfficeData();
 			}
 		} catch {
