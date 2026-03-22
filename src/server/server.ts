@@ -209,6 +209,9 @@ export function createGateway(config: GatewayConfig) {
 		async start() {
 			// Restore persisted sessions before accepting connections
 			await sessionManager.restoreSessions();
+			// Now that sessions are live, re-subscribe to team events
+			// (must happen after restoreSessions so session objects exist)
+			teamManager.resubscribeTeamEvents();
 			return new Promise<void>((resolve) => {
 				server.listen(config.port, config.host, () => resolve());
 			});

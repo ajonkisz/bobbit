@@ -161,6 +161,11 @@ export class TeamManager {
 	 * Restore teams from disk persistence.
 	 * Reconstructs the in-memory Maps from the persisted store.
 	 */
+	/**
+	 * Phase 1: Restore team data structures and reverse lookups from disk.
+	 * Called from the constructor (before sessions are restored).
+	 * Event subscriptions are deferred to resubscribeTeamEvents().
+	 */
 	private restoreTeams(): void {
 		const persisted = this.store.getAll();
 		for (const p of persisted) {
@@ -190,14 +195,23 @@ export class TeamManager {
 			console.log(
 				`[team-manager] Restored team for goal ${p.goalId} — team lead: ${p.teamLeadSessionId}, agents: ${entry.agents.length}`,
 			);
+		}
+	}
 
+	/**
+	 * Phase 2: Re-subscribe to team lead and worker agent events.
+	 * Must be called AFTER sessions have been restored (restoreSessions()),
+	 * because it needs live session objects to attach event listeners.
+	 */
+	resubscribeTeamEvents(): void {
+		for (const [goalId, entry] of this.teams) {
 			// Re-subscribe to team lead events and restart idle timer if needed
-			if (p.teamLeadSessionId) {
-				const tlSession = this.sessionManager.getSession(p.teamLeadSessionId);
+			if (entry.teamLeadSessionId) {
+				const tlSession = this.sessionManager.getSession(entry.teamLeadSessionId);
 				if (tlSession && tlSession.status !== "terminated") {
-					this.subscribeTeamLeadEvents(p.goalId);
+					this.subscribeTeamLeadEvents(goalId);
 					if (tlSession.status === "idle" && entry.agents.length > 0) {
-						this.startIdleNudgeTimer(p.goalId);
+						this.startIdleNudgeTimer(goalId);
 					}
 				}
 			}
@@ -211,13 +225,14 @@ export class TeamManager {
 				const agentId = `${role}-${sessionId.slice(0, 8)}`;
 				const unsubscribe = workerSession.rpcClient.onEvent((event: any) => {
 					if (event.type !== "agent_end") return;
-					this.notifyTeamLead(p.goalId, sessionId, role, agentId).catch((err) => {
+					this.notifyTeamLead(goalId, sessionId, role, agentId).catch((err) => {
 						console.error("[team-manager] Failed to notify team lead:", err);
 					});
 				});
 				agent.unsubscribeEvent = unsubscribe;
 			}
 		}
+		console.log(`[team-manager] Re-subscribed to events for ${this.teams.size} team(s)`);
 	}
 
 	/**
