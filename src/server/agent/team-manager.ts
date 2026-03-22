@@ -399,17 +399,32 @@ export class TeamManager {
 	 * Build context from accepted upstream dependency artifacts for a workflow artifact.
 	 * Returns formatted markdown with each dependency's content, or empty string if none.
 	 */
-	buildDependencyContext(goalId: string, workflowArtifactId: string): string {
+	/**
+	 * Build context from accepted upstream dependency artifacts.
+	 *
+	 * If `explicitInputIds` is provided, those workflow artifact IDs are used directly.
+	 * Otherwise, auto-resolves from the DAG's `dependsOn` for `workflowArtifactId`.
+	 */
+	buildDependencyContext(goalId: string, workflowArtifactId?: string, explicitInputIds?: string[]): string {
 		const goal = this.goalManager.getGoal(goalId);
 		if (!goal?.workflow) return "";
 
-		const wfArtifact = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
-		if (!wfArtifact || !wfArtifact.dependsOn?.length) return "";
+		// Determine which workflow artifact IDs to inject
+		let inputIds: string[];
+		if (explicitInputIds && explicitInputIds.length > 0) {
+			inputIds = explicitInputIds;
+		} else if (workflowArtifactId) {
+			const wfArtifact = goal.workflow.artifacts.find(a => a.id === workflowArtifactId);
+			if (!wfArtifact || !wfArtifact.dependsOn?.length) return "";
+			inputIds = wfArtifact.dependsOn;
+		} else {
+			return "";
+		}
 
 		const goalArtifacts = this.config.goalArtifactStore?.getByGoalId(goalId) ?? [];
 		const parts: string[] = [];
 
-		for (const depId of wfArtifact.dependsOn) {
+		for (const depId of inputIds) {
 			const depDef = goal.workflow.artifacts.find(a => a.id === depId);
 			const depArtifact = goalArtifacts.find(
 				a => a.workflowArtifactId === depId && a.status === "accepted"
@@ -450,7 +465,7 @@ export class TeamManager {
 		goalId: string,
 		role: string,
 		task: string,
-		opts?: { personalities?: string[]; workflowArtifactId?: string },
+		opts?: { personalities?: string[]; workflowArtifactId?: string; inputArtifactIds?: string[] },
 	): Promise<{ sessionId: string; worktreePath: string }> {
 		const roleStore = this.config.roleStore;
 		const storedRoleDef = roleStore?.get(role);
@@ -514,8 +529,9 @@ export class TeamManager {
 			// Build workflow dependency context for the system prompt
 			let workflowContext: string | undefined;
 			const wfArtifactId = opts?.workflowArtifactId ?? this.extractWorkflowArtifactId(task, goalId);
-			if (wfArtifactId) {
-				const ctx = this.buildDependencyContext(goalId, wfArtifactId);
+			const explicitInputs = opts?.inputArtifactIds;
+			if (explicitInputs?.length || wfArtifactId) {
+				const ctx = this.buildDependencyContext(goalId, wfArtifactId, explicitInputs);
 				if (ctx) workflowContext = ctx;
 			}
 

@@ -982,9 +982,10 @@ async function handleApiRoute(
 			return;
 		}
 		try {
-			const spawnOpts: { personalities?: string[]; workflowArtifactId?: string } = {};
+			const spawnOpts: { personalities?: string[]; workflowArtifactId?: string; inputArtifactIds?: string[] } = {};
 			if (Array.isArray(body.personalities)) spawnOpts.personalities = body.personalities as string[];
 			if (typeof body.workflowArtifactId === "string") spawnOpts.workflowArtifactId = body.workflowArtifactId;
+			if (Array.isArray(body.inputArtifactIds)) spawnOpts.inputArtifactIds = body.inputArtifactIds as string[];
 			const result = await teamManager.spawnRole(goalId, body.role, body.task, spawnOpts);
 			json(result, 201);
 		} catch (err) {

@@ -52,11 +52,14 @@ promptTemplate: |+
   - **team_spawn** — Spawn a role agent with its own git worktree. Returns `{ sessionId, worktreePath }`.
     - `role`: `"coder"`, `"reviewer"`, or `"tester"`
     - `task`: Task description sent as the agent's first prompt
-    - `workflowArtifactId` (optional): Workflow artifact ID this agent should produce. Accepted upstream artifacts are injected into the agent's context automatically.
+    - `workflowArtifactId` (optional): Workflow artifact ID this agent should produce (0 or 1). If `inputArtifactIds` is not set, the DAG dependencies of this artifact are auto-injected as context.
+    - `inputArtifactIds` (optional): Array of workflow artifact IDs whose accepted content to inject as context (0 or more). Overrides automatic DAG resolution — use when the agent needs artifacts beyond the formal dependencies.
     - `personalities` (optional): Array of personality names
     ```
-    team_spawn(role="coder", task="Implement OAuth2 PKCE flow per the design doc", workflowArtifactId="implementation")
-    → { sessionId: "e5a5f575-...", worktreePath: "/path/to/worktree" }
+    # Auto-resolve inputs from DAG dependencies:
+    team_spawn(role="coder", task="Implement the fix", workflowArtifactId="implementation")
+    # Explicit inputs (e.g. reviewer needs issue-analysis + implementation + test-results):
+    team_spawn(role="reviewer", task="Review the fix", workflowArtifactId="code-review", inputArtifactIds=["issue-analysis", "implementation", "test-results"])
     ```
 
   - **team_list** — List all agents with role, status, worktree, and task. No parameters.
@@ -102,11 +105,12 @@ promptTemplate: |+
 
   When a workflow is active:
   1. **Follow the workflow's DAG**, not a fixed phase sequence. The workflow tells you exactly what to produce and in what order.
-  2. **Always pass `workflowArtifactId` when spawning agents.** This is critical — it tells the server which workflow artifact the agent is producing, and triggers automatic context injection of accepted upstream dependencies. The agent receives the full content of all dependency artifacts (design doc, test plan, etc.) in its system prompt without you needing to copy-paste anything.
-  3. **Create goal artifacts that fulfil workflow artifacts.** When creating an artifact via `artifact_create`, set `workflowArtifactId` to link it to the workflow definition. The server enforces dependency gating — you'll get a 409 if dependencies aren't met.
-  4. **Use `suggestedRole`** from the workflow artifact definition to pick which role to spawn.
-  5. **Check quality criteria** — each workflow artifact lists mustHave/shouldHave/mustNotHave. Ensure the produced content meets these before submitting.
-  6. **Handle rejections** — if verification rejects an artifact, check the rejection reason, fix the issue, and resubmit via `artifact_update`.
+  2. **Always pass `workflowArtifactId` when spawning agents** to declare which workflow artifact the agent is producing. This also auto-injects the DAG dependency artifacts into the agent's context.
+  3. **Use `inputArtifactIds` when the agent needs extra context** beyond the formal DAG dependencies. For example, a reviewer might need the issue-analysis, implementation, AND test-results even if code-review only formally depends on implementation. Explicit inputs override auto-resolution.
+  4. **Create goal artifacts that fulfil workflow artifacts.** When creating an artifact via `artifact_create`, set `workflowArtifactId` to link it to the workflow definition. The server enforces dependency gating — you'll get a 409 if dependencies aren't met.
+  5. **Use `suggestedRole`** from the workflow artifact definition to pick which role to spawn.
+  6. **Check quality criteria** — each workflow artifact lists mustHave/shouldHave/mustNotHave. Ensure the produced content meets these before submitting.
+  7. **Handle rejections** — if verification rejects an artifact, check the rejection reason, fix the issue, and resubmit via `artifact_update`.
 
   ### When NO workflow is present
   Use your judgment to structure the work. A sensible default approach:
