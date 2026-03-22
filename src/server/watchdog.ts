@@ -50,16 +50,55 @@ const forwardedArgs = (() => {
 	return sep >= 0 ? argv.slice(sep + 1) : argv;
 })();
 
+/** Detect a CLI flag value from forwarded args */
+function detectFlag(flag: string): string | undefined {
+	const idx = forwardedArgs.indexOf(flag);
+	if (idx >= 0 && forwardedArgs[idx + 1]) {
+		return forwardedArgs[idx + 1];
+	}
+	return undefined;
+}
+
 /** Detect the port from forwarded args, defaulting to 3001 */
 function detectPort(): number {
-	const idx = forwardedArgs.indexOf("--port");
-	if (idx >= 0 && forwardedArgs[idx + 1]) {
-		return parseInt(forwardedArgs[idx + 1], 10);
+	const v = detectFlag("--port");
+	return v ? parseInt(v, 10) : 3001;
+}
+
+/**
+ * Detect the host to probe.
+ *
+ * The server binds to the address given via --host (or auto-detected NordLynx IP).
+ * The watchdog must probe that same address — probing 127.0.0.1 fails when the
+ * server is bound to a non-loopback interface.
+ *
+ * Strategy:
+ *  1. Use --host from forwarded args if present
+ *  2. Read ~/.pi/gateway-url written by the CLI on startup
+ *  3. Fall back to 127.0.0.1
+ */
+function detectHost(): string {
+	// 1. Explicit --host in forwarded args
+	const explicit = detectFlag("--host");
+	if (explicit) return explicit;
+
+	// 2. Read persisted gateway URL
+	try {
+		const gwUrlFile = path.join(piDir(), "gateway-url");
+		const raw = fs.readFileSync(gwUrlFile, "utf-8").trim();
+		const parsed = new URL(raw);
+		return parsed.hostname;
+	} catch {
+		// File doesn't exist yet or is unparseable — expected on first launch
 	}
-	return 3001;
+
+	// 3. Fallback
+	return "127.0.0.1";
 }
 
 const PORT = detectPort();
+/** Cached probe host — re-resolved from gateway-url after each harness launch */
+let probeHost = detectHost();
 
 /** How often to probe the server (ms) */
 const PROBE_INTERVAL_MS = 10_000;
@@ -95,7 +134,7 @@ function probeHealth(): Promise<boolean> {
 
 		const req = https.request(
 			{
-				hostname: "127.0.0.1",
+				hostname: probeHost,
 				port: PORT,
 				path: "/api/health",
 				method: "GET",
@@ -140,6 +179,15 @@ function launchHarness(): void {
 
 	lastLaunchTime = Date.now();
 	consecutiveFailures = 0;
+
+	// Re-resolve probe host after the server has time to write gateway-url
+	setTimeout(() => {
+		const newHost = detectHost();
+		if (newHost !== probeHost) {
+			console.log(`[watchdog] Probe host updated: ${probeHost} → ${newHost}`);
+			probeHost = newHost;
+		}
+	}, STARTUP_GRACE_MS + 2000);
 
 	harnessChild.on("exit", (code, signal) => {
 		const reason = signal ? `signal ${signal}` : `code ${code}`;
@@ -310,6 +358,7 @@ process.on("SIGTERM", shutdown);
 // ---------------------------------------------------------------------------
 
 console.log("[watchdog] Dev harness watchdog starting");
+console.log(`[watchdog] Probe host:        ${probeHost}`);
 console.log(`[watchdog] Port:              ${PORT}`);
 console.log(`[watchdog] Probe interval:    ${PROBE_INTERVAL_MS / 1000}s`);
 console.log(`[watchdog] Failure threshold: ${FAILURE_THRESHOLD} consecutive failures`);
