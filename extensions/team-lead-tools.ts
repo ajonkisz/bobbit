@@ -174,10 +174,15 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			session_id: Type.String({ description: "Session ID of the agent to prompt" }),
 			message: Type.String({ description: "Prompt message for the agent" }),
+			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this agent should produce. If inputArtifactIds is not set, the DAG dependencies of this artifact are auto-injected as context." })),
+			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Workflow artifact IDs whose accepted content should be injected into the agent's context. Overrides automatic DAG resolution." })),
 		}),
 		async execute(_id, params) {
 			try {
-				return ok(await api("POST", `/api/goals/${goalId}/team/prompt`, { sessionId: params.session_id, message: params.message }));
+				const body: Record<string, unknown> = { sessionId: params.session_id, message: params.message };
+				if (params.workflowArtifactId) body.workflowArtifactId = params.workflowArtifactId;
+				if (params.inputArtifactIds?.length) body.inputArtifactIds = params.inputArtifactIds;
+				return ok(await api("POST", `/api/goals/${goalId}/team/prompt`, body));
 			} catch (e: any) { return err(e.message); }
 		},
 	});

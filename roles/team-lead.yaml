@@ -66,7 +66,7 @@ promptTemplate: |+
   - **team_dismiss** — Terminate an agent and clean up its worktree.
   - **team_complete** — Dismiss all role agents and mark the goal complete. You (team lead) stay active.
   - **team_steer** — Send a mid-turn redirect to a running agent (must be streaming).
-  - **team_prompt** — Send a prompt to an agent (queued if busy, immediate if idle).
+  - **team_prompt** — Send a prompt to an agent (queued if busy, immediate if idle). Accepts optional `workflowArtifactId` and `inputArtifactIds` to inject artifact context into the prompt.
   - **team_abort** — Force-abort a stuck agent that won't respond to steering.
 
   ### Task Management
@@ -74,6 +74,8 @@ promptTemplate: |+
   - **task_list** — List all tasks with state, type, assignment, and dependencies.
   - **task_create** — Create a task. Returns 409 if required artifacts are missing.
     - `title`, `type`, `spec` (optional), `depends_on` (optional)
+    - `workflowArtifactId` (optional): workflow artifact this task should produce
+    - `inputArtifactIds` (optional): workflow artifact IDs to inject as context when prompting the agent
   - **task_update** — Update fields, assign to a session, and/or transition state — all in one call.
     - `task_id` (required), plus any of: `title`, `spec`, `result_summary`, `commit_sha`, `assigned_to`, `state`
 
@@ -178,11 +180,18 @@ promptTemplate: |+
   6. If no workflow, assess what phase you're in (design, implement, verify, complete) and proceed.
 
   ## Task Lifecycle
-  1. **Seed** — Create tasks with types and dependencies. 409 means produce the missing artifact first.
+  1. **Seed** — Create tasks with types, dependencies, and artifact links (`workflowArtifactId`, `inputArtifactIds`). 409 means produce the missing artifact first.
   2. **Assign** — Spawn an agent with `team_spawn`, then assign via `task_update(assigned_to=sessionId)`.
   3. **Monitor** — You receive automatic notifications when agents finish. No need to poll.
   4. **On completion** — Create follow-up tasks (review after code, test after review) with `depends_on`.
   5. **On findings** — Create fix tasks. Update artifacts with fixes.
+
+  ## Reusing Agents Across Tasks
+  Agents don't have to be dismissed after each task. You can reuse a running agent for multiple tasks:
+  - Use `team_prompt` with `workflowArtifactId` and/or `inputArtifactIds` to inject fresh artifact context for the new task.
+  - The resolved artifact content is prepended to the prompt message automatically.
+  - This avoids the overhead of spawning a new agent when the existing one already has relevant context.
+  - Store `workflowArtifactId` and `inputArtifactIds` on tasks via `task_create` so the artifact links are recorded even if the agent handles multiple tasks.
   6. **Cleanup** — Dismiss idle agents with `team_dismiss`.
   7. **Done** — All tasks complete, all artifacts accepted → call `team_complete`.
 

@@ -694,6 +694,8 @@ async function handleApiRoute(
 				parentTaskId: body.parentTaskId,
 				spec: body.spec,
 				dependsOn: body.dependsOn,
+				workflowArtifactId: typeof body.workflowArtifactId === "string" ? body.workflowArtifactId : undefined,
+				inputArtifactIds: Array.isArray(body.inputArtifactIds) ? body.inputArtifactIds as string[] : undefined,
 			});
 			json(task, 201);
 		} catch (err: any) {
@@ -882,6 +884,8 @@ async function handleApiRoute(
 					state: body.state,
 					assignedSessionId: body.assignedSessionId,
 					dependsOn: body.dependsOn,
+					workflowArtifactId: typeof body.workflowArtifactId === "string" ? body.workflowArtifactId : undefined,
+					inputArtifactIds: Array.isArray(body.inputArtifactIds) ? body.inputArtifactIds as string[] : undefined,
 				});
 				if (!ok) { json({ error: "Task not found" }, 404); return; }
 
@@ -1208,7 +1212,17 @@ async function handleApiRoute(
 			return;
 		}
 		try {
-			await sessionManager.enqueuePrompt(body.sessionId, body.message);
+			// Resolve workflow artifact context and prepend to message if provided
+			let message = body.message as string;
+			const wfArtifactId = typeof body.workflowArtifactId === "string" ? body.workflowArtifactId : undefined;
+			const inputIds = Array.isArray(body.inputArtifactIds) ? body.inputArtifactIds as string[] : undefined;
+			if (wfArtifactId || inputIds?.length) {
+				const ctx = teamManager.buildDependencyContext(goalId, wfArtifactId, inputIds);
+				if (ctx) {
+					message = ctx + "\n\n---\n\n" + message;
+				}
+			}
+			await sessionManager.enqueuePrompt(body.sessionId, message);
 			json({ ok: true, status: session.status === "idle" ? "dispatched" : "queued" });
 		} catch (err) {
 			json({ error: String(err) }, 500);

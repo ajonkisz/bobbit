@@ -19,6 +19,10 @@ export interface PersistedTask {
 	dependsOn?: string[];
 	commitSha?: string;
 	resultSummary?: string;
+	/** Workflow artifact ID this task should produce (0 or 1). */
+	workflowArtifactId?: string;
+	/** Workflow artifact IDs whose accepted content to inject when prompting the agent. */
+	inputArtifactIds?: string[];
 }
 
 const STORE_DIR = piDir();

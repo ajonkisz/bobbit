@@ -92,12 +92,16 @@ export default function (pi: ExtensionAPI) {
 			type: Type.String({ description: "Task type: implementation, code-review, testing, bug-fix, refactor, or custom" }),
 			spec: Type.Optional(Type.String({ description: "Detailed specification for the task" })),
 			depends_on: Type.Optional(Type.Array(Type.String(), { description: "Task IDs this task depends on" })),
+			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this task should produce. Used for context injection when the agent is prompted." })),
+			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Workflow artifact IDs whose accepted content to inject when prompting the assigned agent." })),
 		}),
 		async execute(_id, params) {
 			try {
 				const body: Record<string, unknown> = { title: params.title, type: params.type };
 				if (params.spec) body.spec = params.spec;
 				if (params.depends_on?.length) body.dependsOn = params.depends_on;
+				if (params.workflowArtifactId) body.workflowArtifactId = params.workflowArtifactId;
+				if (params.inputArtifactIds?.length) body.inputArtifactIds = params.inputArtifactIds;
 				return ok(await api("POST", `/api/goals/${goalId}/tasks`, body));
 			} catch (e: any) { return err(e.message); }
 		},

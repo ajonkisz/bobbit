@@ -21,7 +21,7 @@ export class TaskManager {
 		goalId: string,
 		title: string,
 		type: string,
-		opts?: { parentTaskId?: string; spec?: string; dependsOn?: string[] },
+		opts?: { parentTaskId?: string; spec?: string; dependsOn?: string[]; workflowArtifactId?: string; inputArtifactIds?: string[] },
 	): PersistedTask {
 		const { parentTaskId, spec } = opts ?? {};
 		// Deduplicate dependsOn
@@ -62,6 +62,8 @@ export class TaskManager {
 			createdAt: now,
 			updatedAt: now,
 			dependsOn: dependsOn?.length ? dependsOn : undefined,
+			workflowArtifactId: opts?.workflowArtifactId,
+			inputArtifactIds: opts?.inputArtifactIds?.length ? opts.inputArtifactIds : undefined,
 		};
 
 		this.store.put(task);
@@ -94,6 +96,8 @@ export class TaskManager {
 			state?: TaskState;
 			assignedSessionId?: string;
 			dependsOn?: string[];
+			workflowArtifactId?: string;
+			inputArtifactIds?: string[];
 		},
 	): boolean {
 		const task = this.store.get(id);
