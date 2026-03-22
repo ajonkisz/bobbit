@@ -33,6 +33,12 @@ async function handleHashChange(): Promise<void> {
 
 	try {
 		const route = getRouteFromHash();
+
+		// Clean up office polling when navigating away
+		if (route.view !== "office") {
+			import("./office-viz.js").then((m) => m.clearOfficeState()).catch(() => {});
+		}
+
 		const savedUrl = localStorage.getItem(GW_URL_KEY);
 		const savedToken = localStorage.getItem(GW_TOKEN_KEY);
 
@@ -186,6 +192,19 @@ async function handleHashChange(): Promise<void> {
 			await loadStaffPageData();
 			navigateToStaffEdit(route.staffId);
 			await refreshSessions();
+		} else if (route.view === "office") {
+			clearDashboardState();
+			if (state.remoteAgent) {
+				state.remoteAgent.disconnect();
+				state.remoteAgent = null;
+				state.connectionStatus = "disconnected";
+			}
+			state.goalDashboardId = null;
+			state.appView = "authenticated";
+			const { loadOfficeData } = await import("./office-viz.js");
+			loadOfficeData();
+			renderApp();
+			await refreshSessions();
 		} else if (route.view === "personalities") {
 			clearDashboardState();
 			if (state.remoteAgent) {
@@ -305,6 +324,9 @@ async function initApp() {
 				const { loadPersonalityPageData, navigateToPersonalityEdit } = await import("./personality-manager-page.js");
 				await loadPersonalityPageData();
 				navigateToPersonalityEdit(route.personalityName);
+			} else if (route.view === "office") {
+				const { loadOfficeData } = await import("./office-viz.js");
+				loadOfficeData();
 			}
 		} catch {
 			renderApp();
