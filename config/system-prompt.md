@@ -113,18 +113,18 @@ If `~/.pi/gateway-url` does not exist (older server version), fall back to detec
 GW="https://$(netstat -ano | grep LISTENING | grep ':3001' | grep -v '0.0.0.0\|::' | awk '{print $2}' | head -1)"
 ```
 
-Key endpoints: `GET /api/sessions`, `GET /api/sessions/:id`, `GET /api/goals`, `POST /api/goals/:id/team/spawn`, `GET /api/goals/:id/team/agents`, `GET /api/goals/:id/artifacts`, `POST /api/goals/:id/artifacts`, `GET /api/workflows`, `GET /api/skills`. See `AGENTS.md` for the full API surface.
+Key endpoints: `GET /api/sessions`, `GET /api/sessions/:id`, `GET /api/goals`, `POST /api/goals/:id/team/spawn`, `GET /api/goals/:id/team/agents`, `GET /api/goals/:id/gates`, `POST /api/goals/:id/gates/:gateId/signal`, `GET /api/workflows`, `GET /api/skills`. See `AGENTS.md` for the full API surface.
 
-# Goals, Workflows & Artifacts
+# Goals, Workflows & Gates
 
-Goals can optionally have a **workflow** — a DAG of artifacts the goal must produce. Workflows define dependency order, quality criteria, and verification. See [docs/goals-workflows-tasks.md](docs/goals-workflows-tasks.md) for the full architecture.
+Goals can optionally have a **workflow** — a DAG of gates the goal must pass. Workflows define dependency order, quality criteria, and verification. See [docs/goals-workflows-tasks.md](docs/goals-workflows-tasks.md) for the full architecture.
 
 Key concepts:
 - **Workflows** are YAML templates in `workflows/`. Snapshotted into the goal at creation (frozen).
-- **Artifacts** are goal deliverables (design-doc, review-findings, etc.). When linked to a workflow via `workflowArtifactId`, dependency gating and verification are enforced.
-- **Tasks** track operational work. Tasks can link to workflow artifacts via `workflowArtifactId` (output) and `inputArtifactIds` (context inputs).
-- **Context injection**: `team_spawn` and `team_prompt` accept `workflowArtifactId` and `inputArtifactIds` to inject accepted upstream artifact content into agent prompts.
-- **Server-enforced gates**: `design-doc` required before `implementation` tasks; `review-findings` required before `team_complete`; workflow dependency gating on artifact submission.
+- **Gates** are workflow checkpoints (design-doc, review-findings, etc.). When linked to a workflow via `workflowGateId`, dependency ordering and verification are enforced.
+- **Tasks** track operational work. Tasks can link to workflow gates via `workflowGateId` (output) and `inputGateIds` (context inputs).
+- **Context injection**: `team_spawn` and `team_prompt` accept `workflowGateId` and `inputGateIds` to inject passed upstream gate content into agent prompts.
+- **Server-enforced gates**: `design-doc` required before `implementation` tasks; `review-findings` required before `team_complete`; workflow dependency gating on gate signals.
 
 # Git conventions
 

@@ -704,8 +704,8 @@ async function handleApiRoute(
 				parentTaskId: body.parentTaskId,
 				spec: body.spec,
 				dependsOn: body.dependsOn,
-				workflowArtifactId: typeof body.workflowArtifactId === "string" ? body.workflowArtifactId : undefined,
-				inputArtifactIds: Array.isArray(body.inputArtifactIds) ? body.inputArtifactIds as string[] : undefined,
+				workflowGateId: typeof (body.workflowGateId ?? body.workflowArtifactId) === "string" ? (body.workflowGateId ?? body.workflowArtifactId) : undefined,
+				inputGateIds: Array.isArray(body.inputGateIds ?? body.inputArtifactIds) ? (body.inputGateIds ?? body.inputArtifactIds) as string[] : undefined,
 			});
 			json(task, 201);
 		} catch (err: any) {
@@ -911,8 +911,8 @@ async function handleApiRoute(
 					state: body.state,
 					assignedSessionId: body.assignedSessionId,
 					dependsOn: body.dependsOn,
-					workflowArtifactId: typeof body.workflowArtifactId === "string" ? body.workflowArtifactId : undefined,
-					inputArtifactIds: Array.isArray(body.inputArtifactIds) ? body.inputArtifactIds as string[] : undefined,
+					workflowGateId: typeof (body.workflowGateId ?? body.workflowArtifactId) === "string" ? (body.workflowGateId ?? body.workflowArtifactId) : undefined,
+					inputGateIds: Array.isArray(body.inputGateIds ?? body.inputArtifactIds) ? (body.inputGateIds ?? body.inputArtifactIds) as string[] : undefined,
 				});
 				if (!ok) { json({ error: "Task not found" }, 404); return; }
 
@@ -1013,10 +1013,12 @@ async function handleApiRoute(
 			return;
 		}
 		try {
-			const spawnOpts: { personalities?: string[]; workflowArtifactId?: string; inputArtifactIds?: string[] } = {};
+			const spawnOpts: { personalities?: string[]; workflowGateId?: string; inputGateIds?: string[] } = {};
 			if (Array.isArray(body.personalities)) spawnOpts.personalities = body.personalities as string[];
-			if (typeof body.workflowArtifactId === "string") spawnOpts.workflowArtifactId = body.workflowArtifactId;
-			if (Array.isArray(body.inputArtifactIds)) spawnOpts.inputArtifactIds = body.inputArtifactIds as string[];
+			const wfGateId = body.workflowGateId ?? body.workflowArtifactId;
+			if (typeof wfGateId === "string") spawnOpts.workflowGateId = wfGateId;
+			const inGateIds = body.inputGateIds ?? body.inputArtifactIds;
+			if (Array.isArray(inGateIds)) spawnOpts.inputGateIds = inGateIds as string[];
 			const result = await teamManager.spawnRole(goalId, body.role, body.task, spawnOpts);
 			json(result, 201);
 		} catch (err) {
@@ -1241,10 +1243,10 @@ async function handleApiRoute(
 		try {
 			// Resolve workflow gate context and prepend to message if provided
 			let message = body.message as string;
-			const wfArtifactId = typeof body.workflowArtifactId === "string" ? body.workflowArtifactId : undefined;
-			const inputIds = Array.isArray(body.inputArtifactIds) ? body.inputArtifactIds as string[] : undefined;
-			if (wfArtifactId || inputIds?.length) {
-				const ctx = teamManager.buildDependencyContext(goalId, wfArtifactId, inputIds);
+			const wfGateId = typeof (body.workflowGateId ?? body.workflowArtifactId) === "string" ? (body.workflowGateId ?? body.workflowArtifactId) : undefined;
+			const inputIds = Array.isArray(body.inputGateIds ?? body.inputArtifactIds) ? (body.inputGateIds ?? body.inputArtifactIds) as string[] : undefined;
+			if (wfGateId || inputIds?.length) {
+				const ctx = teamManager.buildDependencyContext(goalId, wfGateId, inputIds);
 				if (ctx) {
 					message = ctx + "\n\n---\n\n" + message;
 				}

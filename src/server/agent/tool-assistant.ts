@@ -64,7 +64,7 @@ provider:
   type: bobbit-extension
   extension: goal-tools.ts    # Path relative to extensions/
 \`\`\`
-Bobbit extensions: goal-tools.ts (task_* + artifact_* tools), team-lead-tools.ts (team_* tools)
+Bobbit extensions: goal-tools.ts (task_* + gate_* tools), team-lead-tools.ts (team_* tools)
 
 ## Role permissions
 

@@ -24,8 +24,8 @@ export interface PersistedGoal {
 	team?: boolean;
 	/** Session ID of the Team Lead agent (for team goals) */
 	teamLeadSessionId?: string;
-	/** Artifact types to skip requirement enforcement for */
-	skipArtifactRequirements?: string[];
+	/** Gate types to skip requirement enforcement for */
+	skipGateRequirements?: string[];
 	/** ID of the workflow template this goal was created from */
 	workflowId?: string;
 	/** Frozen snapshot of the workflow at goal creation time */
@@ -57,6 +57,11 @@ export class GoalStore {
 							if (g.swarm !== undefined && g.team === undefined) {
 								g.team = g.swarm;
 								delete g.swarm;
+							}
+							// Migrate skipArtifactRequirements → skipGateRequirements
+							if (g.skipArtifactRequirements && !g.skipGateRequirements) {
+								g.skipGateRequirements = g.skipArtifactRequirements;
+								delete g.skipArtifactRequirements;
 							}
 							this.goals.set(g.id, g);
 						}

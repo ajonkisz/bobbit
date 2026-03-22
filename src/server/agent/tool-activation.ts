@@ -6,7 +6,7 @@
  *    → Controlled via `--tools` flag
  * 2. **User extensions** (~/.pi/extensions/): delegate, web_search, web_fetch, browser_*, workflow
  *    → Controlled via `--no-extensions` + selective `--extension` flags
- * 3. **Bobbit extensions** (extensions/): task_*, artifact_*, team_*
+ * 3. **Bobbit extensions** (extensions/): task_*, gate_*, team_*
  *    → Controlled via `--extension` flag (added separately by session-manager)
  *
  * Provider info is read from tools/*.yaml via ToolManager instead of hardcoded maps.

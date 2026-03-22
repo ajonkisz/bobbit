@@ -427,16 +427,12 @@ export class TeamManager {
 	 * Sends the task as the first prompt.
 	 */
 	/**
-	 * Build context from passed upstream dependency gates for a workflow gate.
-	 * Returns formatted markdown with each dependency's content, or empty string if none.
-	 */
-	/**
 	 * Build context from passed upstream dependency gates.
 	 *
 	 * If `explicitInputIds` is provided, those workflow gate IDs are used directly.
-	 * Otherwise, auto-resolves from the DAG's `dependsOn` for `workflowArtifactId`.
+	 * Otherwise, auto-resolves from the DAG's `dependsOn` for `workflowGateId`.
 	 */
-	buildDependencyContext(goalId: string, workflowArtifactId?: string, explicitInputIds?: string[]): string {
+	buildDependencyContext(goalId: string, workflowGateId?: string, explicitInputIds?: string[]): string {
 		const goal = this.goalManager.getGoal(goalId);
 		if (!goal?.workflow || !this.config.gateStore) return "";
 
@@ -444,8 +440,8 @@ export class TeamManager {
 		let inputIds: string[];
 		if (explicitInputIds && explicitInputIds.length > 0) {
 			inputIds = explicitInputIds;
-		} else if (workflowArtifactId) {
-			const wfGate = goal.workflow.gates.find(g => g.id === workflowArtifactId);
+		} else if (workflowGateId) {
+			const wfGate = goal.workflow.gates.find(g => g.id === workflowGateId);
 			if (!wfGate || !wfGate.dependsOn?.length) return "";
 			inputIds = wfGate.dependsOn;
 		} else {
@@ -468,10 +464,10 @@ export class TeamManager {
 	}
 
 	/**
-	 * Try to extract a workflowArtifactId (gate ID) from the task description.
-	 * Looks for a pattern like `[workflowArtifact:some-id]` or `[gate:some-id]` in the task text.
+	 * Try to extract a workflowGateId from the task description.
+	 * Looks for a pattern like `[gate:some-id]` in the task text (also supports legacy `[workflowArtifact:some-id]`).
 	 */
-	private extractWorkflowArtifactId(task: string, goalId: string): string | undefined {
+	private extractWorkflowGateId(task: string, goalId: string): string | undefined {
 		// Check for explicit tag
 		const tagMatch = task.match(/\[(?:workflowArtifact|gate):([^\]]+)\]/);
 		if (tagMatch) return tagMatch[1];
@@ -493,7 +489,7 @@ export class TeamManager {
 		goalId: string,
 		role: string,
 		task: string,
-		opts?: { personalities?: string[]; workflowArtifactId?: string; inputArtifactIds?: string[] },
+		opts?: { personalities?: string[]; workflowGateId?: string; inputGateIds?: string[] },
 	): Promise<{ sessionId: string; worktreePath: string }> {
 		const roleStore = this.config.roleStore;
 		const storedRoleDef = roleStore?.get(role);
@@ -556,10 +552,10 @@ export class TeamManager {
 
 			// Build workflow dependency context for the system prompt
 			let workflowContext: string | undefined;
-			const wfArtifactId = opts?.workflowArtifactId ?? this.extractWorkflowArtifactId(task, goalId);
-			const explicitInputs = opts?.inputArtifactIds;
-			if (explicitInputs?.length || wfArtifactId) {
-				const ctx = this.buildDependencyContext(goalId, wfArtifactId, explicitInputs);
+			const wfGateId = opts?.workflowGateId ?? this.extractWorkflowGateId(task, goalId);
+			const explicitInputs = opts?.inputGateIds;
+			if (explicitInputs?.length || wfGateId) {
+				const ctx = this.buildDependencyContext(goalId, wfGateId, explicitInputs);
 				if (ctx) workflowContext = ctx;
 			}
 
@@ -788,7 +784,7 @@ export class TeamManager {
 		// Enforce gate requirements before allowing completion
 		if (this.config.gateStore) {
 			const goal = this.goalManager.getGoal(goalId);
-			const skipReqs = goal?.skipArtifactRequirements;
+			const skipReqs = goal?.skipGateRequirements;
 
 			if (goal?.workflow && (!skipReqs || !skipReqs.includes("workflow"))) {
 				const gateStates = this.config.gateStore.getGatesForGoal(goalId);

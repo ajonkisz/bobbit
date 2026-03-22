@@ -22,7 +22,7 @@ src/
 │   │   ├── color-store.ts              # Per-session color index persistence (~/.pi/gateway-session-colors.json)
 │   │   ├── cost-tracker.ts             # Per-session token/cost tracking
 │   │   ├── event-buffer.ts             # Circular buffer for tool_execution_update replay on reconnect
-│   │   ├── goal-artifact-store.ts      # Goal artifact storage (~/.pi/gateway-goal-artifacts.json)
+│   │   ├── gate-store.ts                # Gate state and signal history (~/.pi/gateway-gates.json)
 │   │   ├── goal-assistant.ts           # System prompt for the goal creation assistant
 │   │   ├── goal-manager.ts             # Goal CRUD operations
 │   │   ├── goal-store.ts               # Disk persistence (~/.pi/gateway-goals.json)
@@ -46,7 +46,7 @@ src/
 │   │   ├── tool-store.ts               # Tool metadata persistence (~/.pi/gateway-tools.json)
 │   │   ├── personality-manager.ts       # Personality definitions and management
 │   │   ├── personality-store.ts        # Personality persistence (YAML files in personalities/)
-│   │   ├── verification-harness.ts     # Async artifact verification (command + LLM review)
+│   │   ├── verification-harness.ts     # Async gate verification (command + LLM review)
 │   │   ├── workflow-manager.ts         # Workflow CRUD, DAG validation, cloning
 │   │   └── workflow-store.ts           # Workflow persistence (YAML files in workflows/)
 │   ├── auth/        # Token auth, rate limiting, TLS, OAuth, DNS
@@ -312,7 +312,7 @@ If you only changed UI code (`src/ui/`, `src/app/`), unit tests are sufficient. 
 
 **Debug compaction issues**: Check `_isCompacting`, `_compactionSyntheticMessages`, and `_usageStaleAfterCompaction` in `remote-agent.ts`. The `compacting_placeholder` message must be filtered out and re-added correctly across server refreshes. Manual compaction is fire-and-forget from the WS handler's perspective.
 
-**Debug goal artifacts**: Goal artifacts are stored in `GoalArtifactStore` (`~/.pi/gateway-goal-artifacts.json`). Artifact requirements are enforced on task creation — if the server returns 409, check which artifacts are missing via `GET /api/goals/:id/artifacts`.
+**Debug gates**: Gate state is stored in `GateStore` (`~/.pi/gateway-gates.json`). Gate dependencies are enforced — if a signal fails, check gate status via `GET /api/goals/:id/gates`.
 
 ## Git conventions
 
@@ -330,7 +330,7 @@ All persistent state lives under `~/.pi/`:
 | `gateway-session-colors.json` | `ColorStore` | Session → color index (0-13) mapping |
 | `gateway-tls/` | `tls.ts` | Self-signed TLS cert + key |
 | `session-prompts/{sessionId}.md` | `system-prompt.ts` | Assembled system prompts (cleaned up on session terminate) |
-| `gateway-goal-artifacts.json` | `GoalArtifactStore` | Goal artifact content and metadata |
+| `gateway-gates.json` | `GateStore` | Gate state and signal history |
 | `gateway-team-state.json` | `TeamStore` | Team state (agents, roles, goal associations) |
 | `gateway-tasks.json` | `TaskStore` | Task definitions, state, assignments |
 | `gateway-tools.json` | `ToolStore` | Tool metadata overrides (description, group, docs) |
@@ -349,12 +349,12 @@ Repo-local storage (YAML files, not in `~/.pi/`):
 |---|---|---|
 | `roles/*.yaml` | `RoleStore` | Role definitions and tool access |
 | `personalities/*.yaml` | `PersonalityStore` | Personality definitions |
-| `workflows/*.yaml` | `WorkflowStore` | Workflow templates (artifact DAGs, verification configs) |
+| `workflows/*.yaml` | `WorkflowStore` | Workflow templates (gate DAGs, verification configs) |
 
-## Goals, workflows, tasks & artifacts
+## Goals, workflows, tasks & gates
 
-Goals can optionally have a **workflow** — a DAG of artifacts the goal must produce, with dependency gating, quality criteria, and automated verification. Workflows are YAML templates snapshotted into the goal at creation.
+Goals can optionally have a **workflow** — a DAG of gates with dependency ordering, quality criteria, and automated verification. Workflows are YAML templates snapshotted into the goal at creation.
 
-**Tasks** link to workflow artifacts via `workflowArtifactId` (output) and `inputArtifactIds` (context inputs). **Context injection** feeds accepted upstream artifact content into agent prompts automatically — at spawn time (`team_spawn`) or prompt time (`team_prompt`).
+**Tasks** link to workflow gates via `workflowGateId` (output) and `inputGateIds` (context inputs). **Context injection** feeds passed upstream gate content into agent prompts automatically — at spawn time (`team_spawn`) or prompt time (`team_prompt`).
 
 For the full architecture — data models, context injection mechanics, verification lifecycle, REST API, and worked examples — see [docs/goals-workflows-tasks.md](docs/goals-workflows-tasks.md).
