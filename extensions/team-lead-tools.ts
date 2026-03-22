@@ -2,7 +2,7 @@
  * Team Lead tool extensions for Bobbit.
  *
  * Registers team management tools (spawn, dismiss, list, complete) for team lead
- * sessions only. Task and artifact tools are in goal-tools.ts, which is loaded
+ * sessions only. Task and gate tools are in goal-tools.ts, which is loaded
  * automatically for ALL goal sessions.
  *
  * Calls the gateway REST API directly — no CLI wrapper needed.
@@ -17,7 +17,7 @@ import { homedir } from "node:os";
 import goalTools from "./goal-tools.js";
 
 export default function (pi: ExtensionAPI) {
-	// Register goal tools first (task_list, task_create, artifact_create, etc.)
+	// Register goal tools first (task_list, task_create, gate_signal, etc.)
 	goalTools(pi);
 
 	// Self-signed TLS

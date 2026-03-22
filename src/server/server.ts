@@ -1243,10 +1243,10 @@ async function handleApiRoute(
 		try {
 			// Resolve workflow gate context and prepend to message if provided
 			let message = body.message as string;
-			const wfArtifactId = typeof (body.workflowGateId ?? body.workflowArtifactId) === "string" ? (body.workflowGateId ?? body.workflowArtifactId) : undefined;
+			const wfGateId = typeof (body.workflowGateId ?? body.workflowArtifactId) === "string" ? (body.workflowGateId ?? body.workflowArtifactId) : undefined;
 			const inputIds = Array.isArray(body.inputGateIds ?? body.inputArtifactIds) ? (body.inputGateIds ?? body.inputArtifactIds) as string[] : undefined;
-			if (wfArtifactId || inputIds?.length) {
-				const ctx = teamManager.buildDependencyContext(goalId, wfArtifactId, inputIds);
+			if (wfGateId || inputIds?.length) {
+				const ctx = teamManager.buildDependencyContext(goalId, wfGateId, inputIds);
 				if (ctx) {
 					message = ctx + "\n\n---\n\n" + message;
 				}

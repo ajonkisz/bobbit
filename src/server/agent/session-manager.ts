@@ -22,7 +22,7 @@ import { computeToolActivationArgs } from "./tool-activation.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Goal tools extension — task + artifact management for any goal session. */
+/** Goal tools extension — task + gate management for any goal session. */
 const GOAL_TOOLS_EXTENSION_PATH = path.resolve(__dirname, "../../../extensions/goal-tools.ts");
 
 export type SessionStatus = "starting" | "idle" | "streaming" | "terminated";

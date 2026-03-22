@@ -31,7 +31,7 @@ When ready, output a structured proposal block in EXACTLY this format:
 <prompt>
 The staff agent's system prompt / mission instructions.
 Be specific about what the agent should do, how it should behave,
-and what artifacts it should produce.
+and what gates it should pass.
 </prompt>
 <triggers>
 [
