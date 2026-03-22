@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
 
-// Also register goal-tools (task + artifact management)
+// Also register goal-tools (task + gate management)
 import goalTools from "./goal-tools.js";
 
 export default function (pi: ExtensionAPI) {
@@ -80,15 +80,15 @@ export default function (pi: ExtensionAPI) {
 			role: Type.String({ description: "Agent role: 'coder', 'reviewer', or 'tester'" }),
 			task: Type.String({ description: "Task description sent as the agent's first prompt" }),
 			personalities: Type.Optional(Type.Array(Type.String(), { description: "Personality names (e.g. 'thorough', 'creative'). If omitted, uses the role's default personalities." })),
-			workflowArtifactId: Type.Optional(Type.String({ description: "Gate ID this agent is working toward. If inputArtifactIds is not set, content from upstream passed gates is auto-injected as context." })),
-			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Gate IDs whose passed content should be injected into the agent's context. Overrides automatic DAG resolution." })),
+			workflowGateId: Type.Optional(Type.String({ description: "Gate ID this agent is working toward. If inputGateIds is not set, content from upstream passed gates is auto-injected as context." })),
+			inputGateIds: Type.Optional(Type.Array(Type.String(), { description: "Gate IDs whose passed content should be injected into the agent's context. Overrides automatic DAG resolution." })),
 		}),
 		async execute(_id, params) {
 			try {
 				const body: Record<string, unknown> = { role: params.role, task: params.task };
 				if (params.personalities && params.personalities.length > 0) body.personalities = params.personalities;
-				if (params.workflowArtifactId) body.workflowArtifactId = params.workflowArtifactId;
-				if (params.inputArtifactIds && params.inputArtifactIds.length > 0) body.inputArtifactIds = params.inputArtifactIds;
+				if (params.workflowGateId) body.workflowGateId = params.workflowGateId;
+				if (params.inputGateIds && params.inputGateIds.length > 0) body.inputGateIds = params.inputGateIds;
 				return ok(await api("POST", `/api/goals/${goalId}/team/spawn`, body));
 			} catch (e: any) { return err(e.message); }
 		},
@@ -174,14 +174,14 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			session_id: Type.String({ description: "Session ID of the agent to prompt" }),
 			message: Type.String({ description: "Prompt message for the agent" }),
-			workflowArtifactId: Type.Optional(Type.String({ description: "Gate ID this agent is working toward. If inputArtifactIds is not set, content from upstream passed gates is auto-injected as context." })),
-			inputArtifactIds: Type.Optional(Type.Array(Type.String(), { description: "Gate IDs whose passed content should be injected into the agent's context. Overrides automatic DAG resolution." })),
+			workflowGateId: Type.Optional(Type.String({ description: "Gate ID this agent is working toward. If inputGateIds is not set, content from upstream passed gates is auto-injected as context." })),
+			inputGateIds: Type.Optional(Type.Array(Type.String(), { description: "Gate IDs whose passed content should be injected into the agent's context. Overrides automatic DAG resolution." })),
 		}),
 		async execute(_id, params) {
 			try {
 				const body: Record<string, unknown> = { sessionId: params.session_id, message: params.message };
-				if (params.workflowArtifactId) body.workflowArtifactId = params.workflowArtifactId;
-				if (params.inputArtifactIds?.length) body.inputArtifactIds = params.inputArtifactIds;
+				if (params.workflowGateId) body.workflowGateId = params.workflowGateId;
+				if (params.inputGateIds?.length) body.inputGateIds = params.inputGateIds;
 				return ok(await api("POST", `/api/goals/${goalId}/team/prompt`, body));
 			} catch (e: any) { return err(e.message); }
 		},

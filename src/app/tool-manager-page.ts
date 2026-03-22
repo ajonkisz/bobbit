@@ -140,23 +140,6 @@ const TOOL_MOCK_DATA: Record<string, { params: any; result: any }> = {
 		params: { task_id: "task-002abcd", state: "complete", result_summary: "No issues found" },
 		result: mockResult('{"id":"task-002abcd","title":"Review auth module","type":"code-review","state":"complete"}'),
 	},
-	// Artifacts
-	artifact_list: {
-		params: {},
-		result: mockResult('{"artifacts":[{"id":"art-001","name":"Auth Design Doc","type":"design-doc","version":2},{"id":"art-002","name":"Security Review","type":"review-findings","version":1}]}'),
-	},
-	artifact_create: {
-		params: { name: "Test Plan", type: "test-plan", content: "# Test Plan\n\n## Scope\nAuthentication module..." },
-		result: mockResult('{"id":"art-003","name":"Test Plan","type":"test-plan","version":1}'),
-	},
-	artifact_get: {
-		params: { artifact_id: "art-001abc" },
-		result: mockResult('{"id":"art-001abc","name":"Auth Design Doc","type":"design-doc","version":2,"content":"# Authentication Design\\n\\n## Overview\\nToken-based auth with refresh rotation..."}'),
-	},
-	artifact_update: {
-		params: { artifact_id: "art-001abc", content: "# Updated Design Doc\n\n## Changes\nAdded rate limiting section..." },
-		result: mockResult('{"id":"art-001abc","name":"Auth Design Doc","type":"design-doc","version":3}'),
-	},
 	// Personalities
 	personalities_list: {
 		params: {},

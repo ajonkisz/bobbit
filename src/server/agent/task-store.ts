@@ -19,10 +19,10 @@ export interface PersistedTask {
 	dependsOn?: string[];
 	commitSha?: string;
 	resultSummary?: string;
-	/** Workflow artifact ID this task should produce (0 or 1). */
-	workflowArtifactId?: string;
-	/** Workflow artifact IDs whose accepted content to inject when prompting the agent. */
-	inputArtifactIds?: string[];
+	/** Workflow gate ID this task should produce (0 or 1). */
+	workflowGateId?: string;
+	/** Workflow gate IDs whose accepted content to inject when prompting the agent. */
+	inputGateIds?: string[];
 }
 
 const STORE_DIR = piDir();
@@ -46,6 +46,15 @@ export class TaskStore {
 				if (Array.isArray(data)) {
 					for (const t of data) {
 						if (t.id && t.goalId && t.title && t.type && t.state) {
+							// Migrate old field names
+							if (t.workflowArtifactId && !t.workflowGateId) {
+								t.workflowGateId = t.workflowArtifactId;
+								delete t.workflowArtifactId;
+							}
+							if (t.inputArtifactIds && !t.inputGateIds) {
+								t.inputGateIds = t.inputArtifactIds;
+								delete t.inputArtifactIds;
+							}
 							this.tasks.set(t.id, t);
 						}
 					}
