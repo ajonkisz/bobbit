@@ -50,7 +50,7 @@ artifacts:
       steps:
         - name: "Test fails on master (bug exists)"
           type: command
-          command: "git stash push -m verify -q && git checkout {{master}} -q && {{command}}; X=$?; git checkout {{branch}} -q && git stash pop -q 2>/dev/null; [ $X -ne 0 ]"
+          command: "git stash push -m verify -q && git checkout {{master}} -q && ({{command}}); X=$?; git checkout {{branch}} -q && git stash pop -q 2>/dev/null; [ $X -ne 0 ]"
           timeout: 300
         - name: "Test passes on fix branch (bug is fixed)"
           type: command
