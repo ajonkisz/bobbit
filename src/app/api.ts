@@ -322,25 +322,7 @@ export async function teardownTeam(goalId: string): Promise<boolean> {
 // GOAL ARTIFACT API
 // ============================================================================
 
-export interface GoalArtifact {
-	id: string;
-	goalId: string;
-	name: string;
-	type: string;
-	specId?: string;
-	workflowArtifactId?: string;
-	status?: string;
-	content: string;
-	producedBy: string;
-	skillId?: string;
-	version: number;
-	createdAt: number;
-	updatedAt: number;
-	verificationResult?: {
-		steps: Array<{ name: string; type: string; passed: boolean; output: string }>;
-	};
-	rejectionReason?: string;
-}
+
 
 // ============================================================================
 // WORKFLOW API
@@ -460,15 +442,7 @@ export async function cloneWorkflow(id: string): Promise<Workflow | null> {
 	}
 }
 
-export async function fetchGoalArtifacts(goalId: string): Promise<GoalArtifact[]> {
-	// Legacy — returns empty. Use fetchGoalGates instead.
-	return [];
-}
 
-export async function fetchGoalArtifact(goalId: string, artifactId: string): Promise<GoalArtifact | null> {
-	// Legacy — returns null. Use gate endpoints instead.
-	return null;
-}
 
 // ── Gate API ─────────────────────────────────────────────────────
 

@@ -1239,7 +1239,7 @@ async function handleApiRoute(
 			return;
 		}
 		try {
-			// Resolve workflow artifact context and prepend to message if provided
+			// Resolve workflow gate context and prepend to message if provided
 			let message = body.message as string;
 			const wfArtifactId = typeof body.workflowArtifactId === "string" ? body.workflowArtifactId : undefined;
 			const inputIds = Array.isArray(body.inputArtifactIds) ? body.inputArtifactIds as string[] : undefined;
@@ -1984,12 +1984,14 @@ async function handleApiRoute(
 }
 
 /** Check if gateId transitively depends on targetId in the workflow DAG */
-function hasTransitiveDep(workflow: import("./agent/workflow-store.js").Workflow, gateId: string, targetId: string): boolean {
+function hasTransitiveDep(workflow: import("./agent/workflow-store.js").Workflow, gateId: string, targetId: string, visited = new Set<string>()): boolean {
+	if (visited.has(gateId)) return false;
+	visited.add(gateId);
 	const gate = workflow.gates.find(g => g.id === gateId);
 	if (!gate) return false;
 	for (const dep of gate.dependsOn) {
 		if (dep === targetId) return true;
-		if (hasTransitiveDep(workflow, dep, targetId)) return true;
+		if (hasTransitiveDep(workflow, dep, targetId, visited)) return true;
 	}
 	return false;
 }

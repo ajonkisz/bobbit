@@ -158,6 +158,7 @@ export class GateStore {
 		for (const gate of this.gates.values()) {
 			const signal = gate.signals.find(s => s.id === signalId);
 			if (signal) {
+				if (signal.verification.status !== "running") return; // already finalized
 				signal.verification = verification;
 				gate.updatedAt = Date.now();
 				this.save();

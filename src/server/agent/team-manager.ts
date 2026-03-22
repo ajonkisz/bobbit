@@ -427,13 +427,13 @@ export class TeamManager {
 	 * Sends the task as the first prompt.
 	 */
 	/**
-	 * Build context from accepted upstream dependency artifacts for a workflow artifact.
+	 * Build context from passed upstream dependency gates for a workflow gate.
 	 * Returns formatted markdown with each dependency's content, or empty string if none.
 	 */
 	/**
-	 * Build context from accepted upstream dependency artifacts.
+	 * Build context from passed upstream dependency gates.
 	 *
-	 * If `explicitInputIds` is provided, those workflow artifact IDs are used directly.
+	 * If `explicitInputIds` is provided, those workflow gate IDs are used directly.
 	 * Otherwise, auto-resolves from the DAG's `dependsOn` for `workflowArtifactId`.
 	 */
 	buildDependencyContext(goalId: string, workflowArtifactId?: string, explicitInputIds?: string[]): string {
