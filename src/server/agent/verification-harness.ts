@@ -161,7 +161,7 @@ export class VerificationHarness {
 
 	private runCommandStep(command: string, cwd: string, timeoutSec: number): Promise<{ passed: boolean; output: string }> {
 		return new Promise((resolve) => {
-			exec(command, { cwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+			exec(command, { cwd, timeout: timeoutSec * 1000, maxBuffer: 1024 * 1024, shell: process.platform === "win32" ? "bash" : "/bin/sh" }, (error, stdout, stderr) => {
 				const output = (stdout + "\n" + stderr).trim().slice(-5000); // Keep last 5KB
 				if (error) {
 					resolve({ passed: false, output: output || error.message });
