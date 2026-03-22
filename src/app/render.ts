@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { ArrowLeft, MessagesSquare, ChevronDown, ChevronRight, Goal as GoalIcon, Layers, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, UserCheck, Users, Wrench } from "lucide";
+import { ArrowLeft, MessagesSquare, ChevronDown, ChevronRight, Goal as GoalIcon, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Sparkles, Trash2, Unplug, UserCheck, Users, Workflow as WorkflowIcon, Wrench } from "lucide";
 import {
 	state,
 	renderApp,
@@ -74,7 +74,7 @@ function renderMobileLanding() {
 					<div class="flex items-center gap-1">
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 							@click=${() => { import("./workflow-page.js").then((m) => m.loadWorkflowPageData()); setHashRoute("workflows"); }}>
-							${icon(Layers, "xs")} Workflows
+							${icon(WorkflowIcon, "xs")} Workflows
 						</button>
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 							@click=${() => showGoalDialog()}>
