@@ -89,6 +89,13 @@ export class GoalManager {
 			}
 			goal.workflowId = workflowId;
 			goal.workflow = JSON.parse(JSON.stringify(wf));
+		} else if (!workflowId && workflowStore) {
+			// Default to "general" workflow when none specified
+			const defaultWf = workflowStore.get("general");
+			if (defaultWf) {
+				goal.workflowId = "general";
+				goal.workflow = JSON.parse(JSON.stringify(defaultWf));
+			}
 		}
 
 		this.store.put(goal);

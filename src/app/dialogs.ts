@@ -842,7 +842,7 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 	let worktreeValue = true;
 	let cwdDropdownOpen = false;
 	let cwdHighlightIndex = -1;
-	let workflowId = proposal.workflow || "";
+	let workflowId = proposal.workflow || "general";
 	let _proposalWorkflows: Array<{ id: string; name: string; artifacts: any[] }> = [];
 
 	// Load workflows for the selector
@@ -929,13 +929,12 @@ export function showGoalEditDialogFromProposal(proposal: { title: string; spec: 
 								</div>
 								${_proposalWorkflows.length > 0 ? html`
 									<div>
-										<label class="text-xs text-muted-foreground mb-1 block">Workflow (optional)</label>
+										<label class="text-xs text-muted-foreground mb-1 block">Workflow</label>
 										<select
 											class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background text-foreground"
 											.value=${workflowId}
 											@change=${(e: Event) => { workflowId = (e.target as HTMLSelectElement).value; renderProposalDialog(); }}
 										>
-											<option value="">None</option>
 											${_proposalWorkflows.map((wf) => html`
 												<option value=${wf.id} ?selected=${workflowId === wf.id}>${wf.name} (${wf.artifacts.length} artifacts)</option>
 											`)}

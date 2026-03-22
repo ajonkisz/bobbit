@@ -179,7 +179,7 @@ function renderMobileLanding() {
 import { fetchWorkflows, type Workflow } from "./api.js";
 let _cachedWorkflows: Workflow[] = [];
 let _workflowsLoaded = false;
-let _selectedWorkflowId = "";
+let _selectedWorkflowId = "general";
 
 /** Set the selected workflow ID from outside the render module (e.g. from a goal proposal). */
 export function setSelectedWorkflowId(id: string): void {
@@ -208,10 +208,10 @@ function goalPreviewPanel() {
 		state.activeGoalProposal = null;
 		const teamMode = state.previewTeamMode;
 		const worktree = state.previewWorktree;
-		const workflowId = _selectedWorkflowId || undefined;
+		const workflowId = _selectedWorkflowId || "general";
 		state.previewTeamMode = true;
 		state.previewWorktree = true;
-		_selectedWorkflowId = "";
+		_selectedWorkflowId = "general";
 		// Clean up persisted draft
 		if (sessionId) {
 			deleteGoalDraft(sessionId);
@@ -281,13 +281,12 @@ function goalPreviewPanel() {
 				</div>
 				${_cachedWorkflows.length > 0 ? html`
 					<div>
-						<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Workflow (optional)</label>
+						<label class="text-xs text-muted-foreground mb-1.5 block font-medium">Workflow</label>
 						<select
 							class="w-full text-sm px-2 py-1.5 rounded-md border border-border bg-background text-foreground"
 							.value=${_selectedWorkflowId}
 							@change=${(e: Event) => { _selectedWorkflowId = (e.target as HTMLSelectElement).value; renderApp(); }}
 						>
-							<option value="">None</option>
 							${_cachedWorkflows.map((wf) => html`
 								<option value=${wf.id} ?selected=${_selectedWorkflowId === wf.id}>${wf.name} (${wf.artifacts.length} artifacts)</option>
 							`)}

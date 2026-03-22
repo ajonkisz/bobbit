@@ -456,7 +456,7 @@ async function handleApiRoute(
 		const spec = body?.spec || "";
 		const team = body?.team === true || body?.swarm === true; // Accept legacy 'swarm' field
 		const worktree = body?.worktree === true;
-		const workflowId = body?.workflowId;
+		const workflowId = (body?.workflowId && typeof body.workflowId === "string") ? body.workflowId : "general";
 		if (!title || typeof title !== "string") {
 			json({ error: "Missing title" }, 400);
 			return;
@@ -466,8 +466,8 @@ async function handleApiRoute(
 				spec,
 				team,
 				worktree,
-				workflowId: workflowId && typeof workflowId === "string" ? workflowId : undefined,
-				workflowStore: workflowId ? workflowManager.store : undefined,
+				workflowId,
+				workflowStore: workflowManager.store,
 			});
 			json(goal, 201);
 		} catch (err) {
