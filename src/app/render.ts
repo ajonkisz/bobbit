@@ -48,7 +48,8 @@ import { renderStaffPage } from "./staff-page.js";
 /** Compact session row for mobile — mirrors sidebar row with always-visible buttons */
 
 function renderMobileLanding() {
-	const ungroupedSessions = state.gatewaySessions.filter((s) => !s.goalId && !s.delegateOf);
+	const staffSessionIds = new Set(state.staffList.map((s) => s.currentSessionId).filter(Boolean));
+	const ungroupedSessions = state.gatewaySessions.filter((s) => !s.goalId && !s.delegateOf && !staffSessionIds.has(s.id));
 	const stateOrder: Record<GoalState, number> = { "in-progress": 0, "todo": 1, "complete": 2, "shelved": 3 };
 	const sortedGoals = [...state.goals].sort((a, b) => (stateOrder[a.state] ?? 9) - (stateOrder[b.state] ?? 9));
 	const isUngroupedExpanded = ungroupedExpanded;
@@ -1248,6 +1249,74 @@ function setupPreviewSwipe(): void {
 	}, { passive: true });
 }
 
+// ============================================================================
+// ASSISTANT SWIPE (mobile) — goal / role / tool / personality assistants
+// ============================================================================
+
+/** Touch-swipe between the assistant chat pane and its preview pane.
+ *  Left swipe on chat → show preview.  Right swipe on preview → show chat. */
+function setupAssistantSwipe(): void {
+	if ((window as any).__assistantSwipeListening) return;
+	(window as any).__assistantSwipeListening = true;
+
+	let startX = 0, startY = 0, captured = false, decided = false;
+	const el = document.getElementById("app")!;
+
+	el.addEventListener("touchstart", (e: TouchEvent) => {
+		if (!state.assistantType) return;
+		startX = e.touches[0].clientX;
+		startY = e.touches[0].clientY;
+		captured = false;
+		decided = false;
+	}, { passive: true });
+
+	el.addEventListener("touchmove", (e: TouchEvent) => {
+		if (!state.assistantType) return;
+		if (decided && !captured) return;
+		const dx = e.touches[0].clientX - startX;
+		const dy = e.touches[0].clientY - startY;
+		if (!decided && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+			decided = true;
+			// On chat tab: capture leftward swipes.  On preview tab: capture rightward swipes.
+			if (state.assistantTab === "chat") {
+				captured = dx < 0 && Math.abs(dx) > Math.abs(dy);
+			} else {
+				captured = dx > 0 && Math.abs(dx) > Math.abs(dy);
+			}
+			if (captured) {
+				const track = document.querySelector(".assistant-slider__track") as HTMLElement | null;
+				if (track) track.style.transition = "none";
+			}
+		}
+		if (captured) {
+			const track = document.querySelector(".assistant-slider__track") as HTMLElement | null;
+			if (track) {
+				const base = state.assistantTab === "chat" ? 0 : -50;
+				const dragPercent = (dx / track.parentElement!.clientWidth) * 50;
+				track.style.transform = `translateX(${Math.max(-50, Math.min(0, base + dragPercent))}%)`;
+			}
+		}
+	}, { passive: true });
+
+	el.addEventListener("touchend", (e: TouchEvent) => {
+		if (!captured) return;
+		const track = document.querySelector(".assistant-slider__track") as HTMLElement | null;
+		if (track) {
+			track.style.transition = "transform 0.3s ease-out";
+			const dx = e.changedTouches[0].clientX - startX;
+			const threshold = track.parentElement!.clientWidth * 0.2;
+			if (state.assistantTab === "chat" && dx < -threshold) {
+				state.assistantTab = "preview";
+			} else if (state.assistantTab === "preview" && dx > threshold) {
+				state.assistantTab = "chat";
+			}
+			track.style.transform = `translateX(${state.assistantTab === "chat" ? 0 : -50}%)`;
+		}
+		captured = false;
+		decided = false;
+		renderApp();
+	}, { passive: true });
+}
 
 
 // ============================================================================
@@ -1534,12 +1603,15 @@ export function doRenderApp(): void {
 					</div>
 				`;
 			}
+			const aSlideX = state.assistantTab === "chat" ? 0 : -50;
 			return html`
 				${reconnectBanner()}
-				${state.assistantTab === "chat"
-					? html`<div class="flex-1 min-h-0 flex flex-col">${state.chatPanel}</div>`
-					: html`<div class="flex-1 min-h-0 flex flex-col">${previewPanel}</div>`
-				}
+				<div class="assistant-slider flex-1 min-h-0" style="overflow:hidden;position:relative;">
+					<div class="assistant-slider__track" style="display:flex;width:200%;height:100%;transform:translateX(${aSlideX}%);transition:transform 0.3s ease-out;will-change:transform;">
+						<div style="width:50%;height:100%;min-width:0;display:flex;flex-direction:column;">${state.chatPanel}</div>
+						<div style="width:50%;height:100%;min-width:0;display:flex;flex-direction:column;">${previewPanel}</div>
+					</div>
+				</div>
 			`;
 		}
 		if (connected && state.isPreviewSession) {
@@ -1635,6 +1707,7 @@ export function doRenderApp(): void {
 		`, app);
 		ensureMobileScrollTracking();
 		setupPreviewSwipe();
+		setupAssistantSwipe();
 		requestAnimationFrame(() => {
 			const headerEl = document.getElementById("app-header");
 			if (headerEl) {
