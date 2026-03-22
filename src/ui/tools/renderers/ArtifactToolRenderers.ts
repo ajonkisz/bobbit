@@ -25,6 +25,7 @@ function artifactTypeBadge(type: string): TemplateResult {
 		"review-findings": "bg-purple-500/20 text-purple-600 dark:text-purple-400",
 		"gap-analysis": "bg-amber-500/20 text-amber-600 dark:text-amber-400",
 		"security-findings": "bg-red-500/20 text-red-600 dark:text-red-400",
+		"pr": "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400",
 		custom: "bg-muted text-muted-foreground",
 	};
 	const cls = styles[type] || "bg-muted text-muted-foreground";

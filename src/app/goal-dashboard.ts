@@ -423,6 +423,7 @@ const ARTIFACT_TYPE_LABELS: Record<string, string> = {
 	"gap-analysis": "Gap Analysis",
 	"security-findings": "Security Findings",
 	"summary-report": "Summary Report",
+	"pr": "Pull Request",
 	"custom": "Custom",
 };
 
@@ -433,6 +434,7 @@ const ARTIFACT_TYPE_ICONS: Record<string, string> = {
 	"gap-analysis": "\uD83D\uDCCA",
 	"security-findings": "\uD83D\uDD12",
 	"summary-report": "\uD83D\uDCDD",
+	"pr": "🔀",
 	"custom": "\uD83D\uDCCB",
 };
 

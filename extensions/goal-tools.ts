@@ -172,12 +172,12 @@ export default function (pi: ExtensionAPI) {
 		label: "Create Artifact",
 		description: [
 			"Create a goal artifact. Types: design-doc (blocks implementation tasks),",
-			"test-plan, review-findings (blocks goal completion), gap-analysis, security-findings, custom.",
+			"test-plan, review-findings (blocks goal completion), gap-analysis, security-findings, pr, custom.",
 		].join(" "),
 		promptSnippet: "Create a goal artifact (design-doc, review-findings, test-plan, etc.).",
 		parameters: Type.Object({
 			name: Type.String({ description: "Human-readable artifact name" }),
-			type: Type.String({ description: "Artifact type: design-doc, test-plan, review-findings, gap-analysis, security-findings, or custom" }),
+			type: Type.String({ description: "Artifact type: design-doc, test-plan, review-findings, gap-analysis, security-findings, pr, or custom" }),
 			content: Type.String({ description: "Artifact content (markdown or JSON)" }),
 			workflowArtifactId: Type.Optional(Type.String({ description: "Workflow artifact ID this fulfils. Links the artifact to a workflow definition and enforces dependency gating." })),
 		}),

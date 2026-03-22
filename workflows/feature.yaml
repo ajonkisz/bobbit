@@ -1,0 +1,126 @@
+id: feature
+name: Feature
+description: >
+  Implement a new feature with design, implementation, code review,
+  testing, PR creation, and final report.
+artifacts:
+  - id: design-doc
+    name: Design Document
+    description: Architecture, API surface, and file changes planned
+    kind: analysis
+    format: markdown
+    dependsOn: []
+    mustHave:
+      - Architecture and API surface
+      - File changes planned
+      - Acceptance criteria
+      - Requirements and approach
+    shouldHave:
+      - Risk assessment
+      - Alternative approaches considered
+    mustNotHave:
+      - Implementation code (that's a separate artifact)
+    verification:
+      type: llm-review
+      prompt: |
+        Review this design document. Verify:
+        1. Architecture and API surface are clearly described
+        2. File changes are listed with rationale
+        3. Acceptance criteria are specific and testable
+        4. Requirements and approach are complete
+
+  - id: implementation
+    name: Implementation
+    description: Code changes committed to goal branch
+    kind: deliverable
+    format: diff
+    dependsOn: [design-doc]
+    mustHave:
+      - All changes committed to goal branch
+      - Type-check passes (npm run check or equivalent)
+      - Addresses design requirements
+    mustNotHave:
+      - Commented-out code
+      - Unrelated changes mixed in
+    suggestedRole: coder
+    verification:
+      type: command
+      steps:
+        - name: "Type check passes"
+          type: command
+          command: "npm run check"
+          timeout: 120
+
+  - id: test-results
+    name: Test Results
+    description: Full test suite results proving no regressions
+    kind: verification
+    format: command
+    dependsOn: [implementation]
+    mustHave:
+      - Full test suite run command and output
+      - All tests pass
+    verification:
+      type: command
+      steps:
+        - name: "Full test suite passes"
+          type: command
+          command: "{{command}}"
+          timeout: 600
+
+  - id: code-review
+    name: Code Review
+    description: Expert review of the implementation
+    kind: review
+    format: markdown
+    dependsOn: [implementation]
+    mustHave:
+      - Specific observations about the code
+      - Clear accept/reject verdict
+    mustNotHave:
+      - Rubber-stamp approval without specific observations
+    suggestedRole: reviewer
+    verification:
+      type: llm-review
+      prompt: |
+        Review this code review artifact. Verify:
+        1. The reviewer made specific observations about the code, not generic praise
+        2. There is a clear verdict (accept/reject) with reasoning
+
+  - id: pr
+    name: Pull Request
+    description: Pull request created against origin master
+    kind: deliverable
+    format: markdown
+    dependsOn: [code-review, test-results]
+    mustHave:
+      - PR title and branch name
+      - Description of changes
+      - Changes ready for merge
+    mustNotHave:
+      - Direct merge to master without review
+    verification:
+      type: command
+      steps:
+        - name: "Branch is pushed to remote"
+          type: command
+          command: "git ls-remote --heads origin $(git rev-parse --abbrev-ref HEAD) | grep -q ."
+          timeout: 30
+
+  - id: feature-report
+    name: Feature Report
+    description: Final summary tying together the full feature lifecycle
+    kind: deliverable
+    format: html
+    dependsOn: [pr]
+    mustHave:
+      - Feature summary
+      - Implementation description
+      - Test evidence
+      - Review outcome
+    verification:
+      type: llm-review
+      prompt: |
+        Review this feature report. Verify all sections are present
+        and substantive (not just headings with placeholder text).
+        Cross-reference claims against the other artifacts in context.
