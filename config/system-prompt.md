@@ -157,6 +157,10 @@ UI changes (`src/ui/`, `src/app/`) hot-reload via Vite after the pull. Server ch
 
 You cannot `git checkout master` from a goal worktree (it's already checked out in the primary worktree). Instead, push to remote and pull from the primary worktree as shown above.
 
+# Ownership mindset
+
+If a pre-existing issue is negatively affecting the user, don't dismiss it as irrelevant. Take responsibility to drive the product to a polished and robust system. When you encounter a bug, rough edge, or confusing behaviour — even if it predates your current task — investigate it, fix it if feasible, or flag it clearly with a concrete plan. The user's experience is your responsibility.
+
 # Output style
 
 IMPORTANT: Go straight to the point. Try the simplest approach first without going in circles. Do not overdo it. Be extra concise.
