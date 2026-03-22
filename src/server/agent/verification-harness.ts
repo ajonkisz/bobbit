@@ -4,39 +4,32 @@ import path from "node:path";
 import type { GateStore, GateSignal } from "./gate-store.js";
 import type { WorkflowGate, Workflow } from "./workflow-store.js";
 
-/** Resolve a shell for verification commands.
- *  On Windows, find Git Bash so that Unix tools (grep, etc.) work in verify steps.
- *  Falls back to cmd.exe if Git Bash can't be found. */
-function resolveShell(): string {
-	if (process.platform !== "win32") return "/bin/sh";
-	// Try Git Bash via common install locations (use forward-slash paths which Node handles fine)
+/** Resolve Git Bash path on Windows for commands needing Unix tools. */
+function findGitBash(): string | null {
+	if (process.platform !== "win32") return null;
 	const candidates = [
-		"C:/Program Files/Git/usr/bin/bash.exe",
 		"C:/Program Files/Git/bin/bash.exe",
-		"C:/Program Files (x86)/Git/usr/bin/bash.exe",
+		"C:/Program Files/Git/usr/bin/bash.exe",
+		"C:/Program Files (x86)/Git/bin/bash.exe",
 	];
-	// Also try to find via `where.exe git` and traverse up
 	try {
 		const gitExe = execSync("where.exe git", { encoding: "utf-8", shell: process.env.ComSpec || "cmd.exe" }).split("\n")[0].trim();
 		if (gitExe) {
 			let dir = path.dirname(gitExe);
 			for (let i = 0; i < 4; i++) {
+				candidates.unshift(path.join(dir, "bin", "bash.exe").replace(/\\/g, "/"));
 				candidates.unshift(path.join(dir, "usr", "bin", "bash.exe").replace(/\\/g, "/"));
 				dir = path.dirname(dir);
 			}
 		}
 	} catch {}
 	for (const c of candidates) {
-		try {
-			statSync(c);
-			return c;
-		} catch {}
+		try { statSync(c); return c; } catch {}
 	}
-	// Last resort: cmd.exe (grep etc. won't work but npm scripts will)
-	return process.env.ComSpec || "cmd.exe";
+	return null;
 }
 
-const SHELL = resolveShell();
+const GIT_BASH = findGitBash();
 
 export class VerificationHarness {
 	constructor(
@@ -207,16 +200,32 @@ export class VerificationHarness {
 		expectFailure: boolean,
 	): Promise<{ passed: boolean; output: string }> {
 		return new Promise((resolve) => {
-			// Normalize cwd to forward slashes — Node's exec() on Windows fails with ENOENT on backslash paths
 			const normalizedCwd = cwd.replace(/\\/g, "/");
-			// Use spawn() directly with the shell as the executable and -c flag.
-			// Node's exec() shell option doesn't reliably use the specified shell path on Windows.
-			const child = spawn(SHELL, ["-c", command], {
-				cwd: normalizedCwd,
-				timeout: timeoutSec * 1000,
-				stdio: ["ignore", "pipe", "pipe"],
-				windowsHide: true,
-			});
+			// On Windows, use cmd.exe for npm/node commands, Git Bash for commands with Unix tools (grep, etc.)
+			const needsUnixShell = /\b(grep|awk|sed|cat|head|tail|wc|sort|uniq|xargs|find\s)\b/.test(command);
+			let child;
+			if (process.platform === "win32" && needsUnixShell && GIT_BASH) {
+				child = spawn(GIT_BASH, ["--login", "-c", command], {
+					cwd: normalizedCwd,
+					timeout: timeoutSec * 1000,
+					stdio: ["ignore", "pipe", "pipe"],
+					windowsHide: true,
+				});
+			} else if (process.platform === "win32") {
+				const shell = process.env.ComSpec || "cmd.exe";
+				child = spawn(shell, ["/d", "/s", "/c", command], {
+					cwd: normalizedCwd,
+					timeout: timeoutSec * 1000,
+					stdio: ["ignore", "pipe", "pipe"],
+					windowsHide: true,
+				});
+			} else {
+				child = spawn("/bin/sh", ["-c", command], {
+					cwd: normalizedCwd,
+					timeout: timeoutSec * 1000,
+					stdio: ["ignore", "pipe", "pipe"],
+				});
+			}
 			let stdout = "";
 			let stderr = "";
 			child.stdout.on("data", (d: Buffer) => { stdout += d.toString(); if (stdout.length > 1024 * 1024) stdout = stdout.slice(-512 * 1024); });
