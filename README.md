@@ -95,7 +95,7 @@ bobbit [options]
 | `system-prompt.ts` | Assembles session system prompts from three layers: global `config/system-prompt.md`, `AGENTS.md` (with `@ref` resolution), and goal spec. Writes to `~/.pi/session-prompts/`. |
 | `goal-manager.ts` | Goal CRUD operations, auto-transition from `todo` to `in-progress`, optional git worktree creation. |
 | `goal-store.ts` | Persists goals to `~/.pi/gateway-goals.json`. States: `todo`, `in-progress`, `complete`, `shelved`. |
-| `goal-artifact-store.ts` | Stores goal artifacts (design docs, test plans, review findings) in `~/.pi/gateway-goal-artifacts.json`. |
+| `gate-store.ts` | Stores gate state and signal history in `~/.pi/gateway-gates.json`. |
 | `goal-assistant.ts` | System prompt for goal creation assistant sessions. Outputs `<goal_proposal>` blocks. |
 | `task-manager.ts` | Task CRUD with state machine (todo → in-progress → complete/skipped/blocked), assignment, and dependency tracking. |
 | `task-store.ts` | Persists tasks to `~/.pi/gateway-tasks.json`. |
@@ -117,7 +117,7 @@ bobbit [options]
 | `assistant-registry.ts` | Unified registry mapping assistant types (`goal`, `role`, `tool`) to their prompts and titles. |
 | `workflow-store.ts` | Persists workflow templates as YAML files in `workflows/`. |
 | `workflow-manager.ts` | Workflow CRUD, DAG validation, cloning. |
-| `verification-harness.ts` | Async artifact verification — command runner + LLM reviewer. |
+| `verification-harness.ts` | Async gate verification — command runner + LLM reviewer. |
 
 ### `auth/` — Authentication, TLS, DNS
 
@@ -196,14 +196,12 @@ All routes require `Authorization: Bearer <token>`. Token can also be passed as 
 | `GET` | `/api/goals/:id/tasks` | List tasks for a goal |
 | `POST` | `/api/goals/:id/tasks` | Create a task (`{ title, type, spec?, parentTaskId?, dependsOn? }`) |
 
-### Goal Artifacts
+### Goal Gates
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/goals/:id/artifacts` | List artifacts for a goal |
-| `POST` | `/api/goals/:id/artifacts` | Create an artifact (`{ name, type, content, producedBy, skillId?, specId?, status? }`) |
-| `GET` | `/api/goals/:id/artifacts/:artifactId` | Get a specific artifact |
-| `PUT` | `/api/goals/:id/artifacts/:artifactId` | Revise an artifact (increments version) |
+| `GET` | `/api/goals/:id/gates` | List gates for a goal |
+| `POST` | `/api/goals/:id/gates/:gateId/signal` | Signal a gate (`{ status, content?, verifiedBy? }`) |
 
 ### Goal Team
 
@@ -362,7 +360,7 @@ Goals are a task-tracking layer on top of sessions. A goal has a title, spec (ma
 - **Goal assistant**: Sessions created with `assistantType: "goal"` get a special prompt that helps users define clear goals. The assistant outputs structured `<goal_proposal>` blocks parsed by the browser client.
 - **Auto-transition**: Goals move from `todo` to `in-progress` when their first session starts.
 - **Worktrees**: Goals can optionally create a dedicated git worktree for isolated work.
-- **Workflows**: Goals can optionally attach a workflow — a DAG of artifacts with dependency gating, quality criteria, and automated verification. See [docs/goals-workflows-tasks.md](docs/goals-workflows-tasks.md) for the full architecture.
+- **Workflows**: Goals can optionally attach a workflow — a DAG of gates with dependency ordering, quality criteria, and automated verification. See [docs/goals-workflows-tasks.md](docs/goals-workflows-tasks.md) for the full architecture.
 
 ### Teams
 
@@ -398,7 +396,7 @@ Personality traits that modify agent behaviour via prompt fragments.
 
 ### Skills
 
-Skills are reusable templates for spawning isolated sub-agents that produce structured artifacts.
+Skills are reusable templates for spawning isolated sub-agents that produce structured outputs.
 
 - **Isolation**: Sub-agents receive only skill instructions + explicit context + `AGENTS.md` — never the parent conversation.
 - **Built-in skills**: `correctness-review`, `security-review`, `design-review` (three code review perspectives), and `test-suite-report` (runs tests and produces a structured report).
@@ -426,7 +424,7 @@ See [docs/prompt-queue.md](docs/prompt-queue.md) for the full architecture.
 
 ### Workflows
 
-Workflows define the artifacts a goal must produce, their dependency relationships (a DAG), quality criteria, and verification configs. Stored as YAML in `workflows/`. Snapshotted into goals at creation (frozen). See [docs/goals-workflows-tasks.md](docs/goals-workflows-tasks.md).
+Workflows define the gates a goal must pass, their dependency relationships (a DAG), quality criteria, and verification configs. Stored as YAML in `workflows/`. Snapshotted into goals at creation (frozen). See [docs/goals-workflows-tasks.md](docs/goals-workflows-tasks.md).
 
 ### Assistant Registry
 
@@ -482,7 +480,7 @@ When the agent finishes a turn, the browser client notifies the user via:
 | `session-colors.ts` | Session color picker UI component. |
 | `storage.ts` | IndexedDB store initialisation (settings, provider keys, sessions, goals, roles, specs). |
 | `dialogs.ts` | Confirmation and prompt dialog helpers. |
-| `goal-dashboard.ts` | Goal detail page with tabs: overview, tasks, artifacts, team, commits, cost. |
+| `goal-dashboard.ts` | Goal detail page with tabs: overview, tasks, gates, team, commits, cost. |
 | `role-manager-page.ts` | Role list page and detail/edit view. |
 | `role-manager-dialog.ts` | Role creation and editing dialog. |
 | `tool-manager-page.ts` | Tool list (grouped) and detail page with docs editing. |
@@ -501,7 +499,7 @@ Forked from `@mariozechner/pi-web-ui`. Lit-based web components.
 - **`ChatPanel.ts`** — Top-level orchestrator: wires agent, message list, input, model selector
 - **`components/`** — Core components: `AgentInterface` (event→state bridge), `MessageList`, `StreamingMessageContainer`, `Messages` (per-role renderers), `Input` (chat input with attachments), `MessageEditor`, `GitStatusWidget`, `ThinkingBlock`, `ToolGroup`, sandboxed iframe providers
 - **`dialogs/`** — `ModelSelector`, `SettingsDialog`, `SessionListDialog`, `AttachmentOverlay`, `ApiKeyPromptDialog`, `CustomProviderDialog`, `PersistentStorageDialog`, `ProvidersModelsTab`
-- **`tools/`** — Specialised renderers for 20+ tool types (Bash, Read, Write, Edit, Grep, Find, Ls, Delegate, Browser*, WebSearch, WebFetch, Screenshot, SVG, HTML, Task, Team, Calculate, GetCurrentTime) + artifact display (HTML, SVG, PDF, Markdown, Docx, Excel, images)
+- **`tools/`** — Specialised renderers for 20+ tool types (Bash, Read, Write, Edit, Grep, Find, Ls, Delegate, Browser*, WebSearch, WebFetch, Screenshot, SVG, HTML, Task, Team, Calculate, GetCurrentTime) + inline content display (HTML, SVG, PDF, Markdown, Docx, Excel, images)
 - **`storage/`** — IndexedDB-backed persistence with typed stores for settings, sessions, provider keys, command history, goal/role/spec drafts
 - **`utils/`** — ANSI handling, text formatting, auth token, model discovery, i18n, proxy utilities
 
