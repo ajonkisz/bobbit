@@ -182,6 +182,22 @@ export function createGateway(config: GatewayConfig) {
 	}
 
 	verificationHarness = new VerificationHarness(gateStore, broadcastToGoal, roleStore);
+	verificationHarness.setTeamLeadNotifier((goalId, message) => {
+		const team = teamManager.getTeamState(goalId);
+		if (!team?.teamLeadSessionId) return;
+		const teamLeadSession = sessionManager.getSession(team.teamLeadSessionId);
+		if (!teamLeadSession || teamLeadSession.status === "terminated") return;
+		try {
+			if (teamLeadSession.status === "streaming") {
+				teamLeadSession.rpcClient.steer(message);
+			} else {
+				sessionManager.enqueuePrompt(team.teamLeadSessionId, message, { isSteered: true });
+			}
+			console.log(`[verification] Notified team lead for goal ${goalId}: ${message}`);
+		} catch (err) {
+			console.error(`[verification] Failed to notify team lead for goal ${goalId}:`, err);
+		}
+	});
 
 	server.on("upgrade", (req, socket, head) => {
 		const url = new URL(req.url || "/", `http://${req.headers.host}`);
