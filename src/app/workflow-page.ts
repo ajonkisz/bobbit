@@ -302,6 +302,94 @@ function handleDragEnd(): void {
 }
 
 // ============================================================================
+// TOUCH DRAG-TO-REORDER
+// ============================================================================
+
+let touchLongPressTimer: ReturnType<typeof setTimeout> | null = null;
+let touchStartY = 0;
+let touchDragging = false;
+
+function cancelTouchDrag(): void {
+	if (touchLongPressTimer) { clearTimeout(touchLongPressTimer); touchLongPressTimer = null; }
+	if (touchDragging || dragIndex !== null) {
+		touchDragging = false;
+		dragIndex = null;
+		dropTargetIndex = null;
+		renderApp();
+	}
+}
+
+/** Find which gate card index the touch Y coordinate is over */
+function touchDropTarget(clientY: number): number | null {
+	const cards = document.querySelectorAll(".wf-gate-card");
+	for (let i = 0; i < cards.length; i++) {
+		const rect = cards[i].getBoundingClientRect();
+		if (clientY < rect.top + rect.height / 2) return i;
+	}
+	return cards.length;
+}
+
+function startTouchDrag(index: number, clientY: number): void {
+	touchDragging = true;
+	dragIndex = index;
+	touchStartY = clientY;
+	dropTargetIndex = index;
+	renderApp();
+}
+
+/** Grip: immediate drag on touch */
+function handleGripTouchStart(e: TouchEvent, index: number): void {
+	e.preventDefault(); // prevent scroll
+	e.stopPropagation();
+	const touch = e.touches[0];
+	startTouchDrag(index, touch.clientY);
+}
+
+/** Header: long-press to drag */
+function handleHeaderTouchStart(e: TouchEvent, index: number): void {
+	const touch = e.touches[0];
+	touchStartY = touch.clientY;
+	const startX = touch.clientX;
+	touchLongPressTimer = setTimeout(() => {
+		touchLongPressTimer = null;
+		startTouchDrag(index, touch.clientY);
+	}, 500);
+	// Cancel on significant movement
+	const moveCancel = (ev: TouchEvent) => {
+		const t = ev.touches[0];
+		if (Math.abs(t.clientY - touchStartY) > 10 || Math.abs(t.clientX - startX) > 10) {
+			if (touchLongPressTimer) { clearTimeout(touchLongPressTimer); touchLongPressTimer = null; }
+			document.removeEventListener("touchmove", moveCancel);
+		}
+	};
+	document.addEventListener("touchmove", moveCancel, { passive: true });
+}
+
+function handleTouchMove(e: TouchEvent): void {
+	if (!touchDragging || dragIndex === null) return;
+	e.preventDefault(); // prevent scroll while dragging
+	const touch = e.touches[0];
+	const target = touchDropTarget(touch.clientY);
+	if (target !== null && target !== dropTargetIndex) {
+		dropTargetIndex = target;
+		renderApp();
+	}
+}
+
+function handleTouchEnd(): void {
+	if (touchLongPressTimer) { clearTimeout(touchLongPressTimer); touchLongPressTimer = null; }
+	if (!touchDragging || dragIndex === null) return;
+	if (dragIndex !== null && dropTargetIndex !== null) {
+		const to = dropTargetIndex > dragIndex ? dropTargetIndex - 1 : dropTargetIndex;
+		moveGate(dragIndex, to);
+	}
+	touchDragging = false;
+	dragIndex = null;
+	dropTargetIndex = null;
+	renderApp();
+}
+
+// ============================================================================
 // HELPERS
 // ============================================================================
 
@@ -529,8 +617,13 @@ function renderGateEditor(gate: WorkflowGate, idx: number): TemplateResult {
 				@dragover=${(e: DragEvent) => handleDragOver(e, idx)}
 				@drop=${handleDrop}
 				@dragend=${handleDragEnd}
+				@touchstart=${(e: TouchEvent) => handleHeaderTouchStart(e, idx)}
+				@touchmove=${handleTouchMove}
+				@touchend=${handleTouchEnd}
+				@touchcancel=${cancelTouchDrag}
 				@click=${() => toggleGateExpand(idx)}>
-				<span class="wf-gate-grip">${icon(GripVertical, "sm")}</span>
+				<span class="wf-gate-grip"
+					@touchstart=${(e: TouchEvent) => handleGripTouchStart(e, idx)}>${icon(GripVertical, "sm")}</span>
 				<span class="wf-gate-idx">${idx + 1}</span>
 				<code class="wf-gate-id">${gate.id || "(no id)"}</code>
 				<span class="wf-gate-name">${gate.name || ""}</span>
