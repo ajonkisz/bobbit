@@ -643,9 +643,9 @@ export class RemoteAgent {
 			case "session_status":
 				console.log(`[RemoteAgent] session_status: ${msg.status}, isStreaming was: ${this._state.isStreaming}`);
 				this._state.isStreaming = msg.status === "streaming";
-				if (msg.status === "streaming" && !this._state.turnStartTime) {
-					this._state.turnStartTime = Date.now();
-				} else if (msg.status !== "streaming") {
+				if (msg.status === "streaming") {
+					this._state.turnStartTime = msg.streamingStartedAt ?? this._state.turnStartTime ?? Date.now();
+				} else {
 					this._state.turnStartTime = null;
 				}
 				if (msg.status !== "streaming") this._isAborting = false;

@@ -230,7 +230,7 @@ export class AssistantMessage extends LitElement {
 				${orderedParts.length ? html` <div class="px-2 sm:px-4 flex flex-col gap-3">${orderedParts}</div> ` : ""}
 				${
 					this.isStreaming && this.turnStartTime
-						? html` <div class="px-2 sm:px-4 mt-2 text-xs text-muted-foreground text-right tabular-nums">
+						? html` <div class="px-2 sm:px-4 -mt-2 text-xs text-muted-foreground text-right tabular-nums">
 							<live-timer .startTime=${this.turnStartTime} .running=${true}></live-timer>
 						</div> `
 						: ""
