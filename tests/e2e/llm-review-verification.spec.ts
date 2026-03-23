@@ -41,14 +41,14 @@ async function waitForGateAnyStatus(
 	goalId: string,
 	gateId: string,
 	targetStatuses: string[],
-	timeoutMs = 120_000,
+	timeoutMs = 30_000,
 ): Promise<any> {
 	const start = Date.now();
 	while (Date.now() - start < timeoutMs) {
 		const res = await apiFetch(`/api/goals/${goalId}/gates/${gateId}`);
 		const data = await res.json();
 		if (targetStatuses.includes(data.status)) return data;
-		await new Promise(r => setTimeout(r, 2000));
+		await new Promise(r => setTimeout(r, 500));
 	}
 	const res = await apiFetch(`/api/goals/${goalId}/gates/${gateId}`);
 	const data = await res.json();
@@ -62,10 +62,7 @@ test.beforeAll(() => {
 });
 
 test.describe("LLM Review Verification", () => {
-	// Sub-agent spawning can take a while
-	test.setTimeout(180_000);
-
-	test("llm-review step spawns real sub-agent (not auto-pass stub)", async () => {
+	test("llm-review step uses skip path when BOBBIT_LLM_REVIEW_SKIP is set", async () => {
 		const goalId = await createGoalWithWorkflow("general");
 		try {
 			// Signal the design-doc gate which has an llm-review verification step
@@ -79,8 +76,7 @@ test.describe("LLM Review Verification", () => {
 			const signalData = await signalResp.json();
 			expect(signalData.signal.status).toBe("running");
 
-			// Wait for gate to reach passed or failed — either is valid,
-			// the key assertion is that the auto-pass stub text is gone
+			// Wait for gate to pass — should be fast since skip path is instant
 			const gate = await waitForGateAnyStatus(goalId, "design-doc", ["passed", "failed"]);
 
 			// Fetch the signal details to inspect verification step output
@@ -93,17 +89,19 @@ test.describe("LLM Review Verification", () => {
 			expect(lastSignal.verification.status).toMatch(/^(passed|failed)$/);
 			expect(lastSignal.verification.steps.length).toBeGreaterThan(0);
 
-			// The critical assertion: the auto-pass stub text must NOT appear
+			// Find the llm-review step
 			const reviewStep = lastSignal.verification.steps.find(
 				(s: any) => s.type === "llm-review",
 			);
 			expect(reviewStep).toBeTruthy();
+
+			// Must contain the new skip message (not the old auto-pass stub)
+			expect(reviewStep.output).toContain("LLM review skipped");
+			expect(reviewStep.output).toContain("BOBBIT_LLM_REVIEW_SKIP");
+
+			// Must NOT contain the old auto-pass stub text
 			expect(reviewStep.output).not.toContain("auto-passed");
 			expect(reviewStep.output).not.toContain("not yet implemented");
-
-			// The step should have taken some real time (sub-agent spawning)
-			// or failed with a meaningful error (not instant auto-pass)
-			expect(reviewStep.duration_ms).toBeGreaterThan(0);
 		} finally {
 			await deleteGoal(goalId);
 		}

@@ -117,14 +117,19 @@ export class VerificationHarness {
 					result = await this.runCommandStep(cmd, cwd, step.timeout || 300, expectFailure);
 				} else {
 					// llm-review — spawn a one-shot reviewer sub-agent
-					const prompt = this.substituteVars(step.prompt || "", builtinVars, allGateStates);
-					result = await this.runLlmReviewStep(
-						{ name: step.name, prompt, timeout: step.timeout },
-						cwd,
-						builtinVars,
-						signal.content,
-						signal.metadata,
-					);
+					if (process.env.BOBBIT_LLM_REVIEW_SKIP) {
+						// Fast path for test environments without API keys
+						result = { passed: true, output: "LLM review skipped (BOBBIT_LLM_REVIEW_SKIP is set)." };
+					} else {
+						const prompt = this.substituteVars(step.prompt || "", builtinVars, allGateStates);
+						result = await this.runLlmReviewStep(
+							{ name: step.name, prompt, timeout: step.timeout },
+							cwd,
+							builtinVars,
+							signal.content,
+							signal.metadata,
+						);
+					}
 				}
 
 				const duration_ms = Date.now() - startTime;

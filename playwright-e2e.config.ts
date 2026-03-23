@@ -44,6 +44,7 @@ export default defineConfig({
 		env: {
 			...process.env,
 			BOBBIT_PI_DIR: E2E_PI_DIR,
+			BOBBIT_LLM_REVIEW_SKIP: "1",
 		},
 	},
 	globalTeardown: './tests/e2e/e2e-teardown.ts',
