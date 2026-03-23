@@ -13,7 +13,7 @@ import { validateToken } from "./auth/token.js";
 import { oauthComplete, oauthStart, oauthStatus } from "./auth/oauth.js";
 import { handleWebSocketConnection } from "./ws/handler.js";
 import { exportSkillDefinitions, listSkills } from "./skills/index.js";
-import { TeamManager } from "./agent/team-manager.js";
+import { TeamManager, GateDependencyError } from "./agent/team-manager.js";
 import { RoleStore } from "./agent/role-store.js";
 import { RoleManager } from "./agent/role-manager.js";
 import { ToolStore } from "./agent/tool-store.js";
@@ -1051,7 +1051,11 @@ async function handleApiRoute(
 			const result = await teamManager.spawnRole(goalId, body.role, body.task, spawnOpts);
 			json(result, 201);
 		} catch (err) {
-			json({ error: String(err) }, 400);
+			if (err instanceof GateDependencyError) {
+				json({ error: String(err.message) }, 409);
+			} else {
+				json({ error: String(err) }, 400);
+			}
 		}
 		return;
 	}
@@ -1269,11 +1273,31 @@ async function handleApiRoute(
 			json({ error: "Session not found" }, 404);
 			return;
 		}
+		// Enforce gate dependency check for team/prompt
+		const wfGateId = typeof body.workflowGateId === "string" ? body.workflowGateId : undefined;
+		const inputIds = Array.isArray(body.inputGateIds) ? body.inputGateIds as string[] : undefined;
+		if (wfGateId) {
+			const goal = sessionManager.goalManager.getGoal(goalId);
+			if (goal?.workflow && gateStore) {
+				const wfGate = goal.workflow.gates.find((g: any) => g.id === wfGateId);
+				if (wfGate?.dependsOn?.length) {
+					const gateStates = gateStore.getGatesForGoal(goalId);
+					const passedIds = new Set(gateStates.filter((g: any) => g.status === "passed").map((g: any) => g.gateId));
+					const notPassed = wfGate.dependsOn.filter((depId: string) => !passedIds.has(depId));
+					if (notPassed.length > 0) {
+						const names = notPassed.map((id: string) => {
+							const def = goal.workflow!.gates.find((g: any) => g.id === id);
+							return def ? `${def.name} (${id})` : id;
+						});
+						json({ error: `Upstream gate(s) not passed: ${names.join(", ")}. Cannot prompt for gate "${wfGateId}" until dependencies are met.` }, 409);
+						return;
+					}
+				}
+			}
+		}
 		try {
 			// Resolve workflow gate context and prepend to message if provided
 			let message = body.message as string;
-			const wfGateId = typeof body.workflowGateId === "string" ? body.workflowGateId : undefined;
-			const inputIds = Array.isArray(body.inputGateIds) ? body.inputGateIds as string[] : undefined;
 			if (wfGateId || inputIds?.length) {
 				const ctx = teamManager.buildDependencyContext(goalId, wfGateId, inputIds);
 				if (ctx) {

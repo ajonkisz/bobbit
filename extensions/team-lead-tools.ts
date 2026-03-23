@@ -74,7 +74,7 @@ export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "team_spawn",
 		label: "Spawn Team Agent",
-		description: "Spawn a new role agent with its own git worktree. Returns the new session ID and worktree path. Optionally specify personalities to shape how the agent works.",
+		description: "Spawn a new role agent with its own git worktree. Returns the new session ID and worktree path. Optionally specify personalities to shape how the agent works. Returns 409 if workflowGateId is provided and its upstream dependency gates have not all passed.",
 		promptSnippet: "Spawn a coder, reviewer, or tester agent with a task description and optional personalities.",
 		parameters: Type.Object({
 			role: Type.String({ description: "Agent role: 'coder', 'reviewer', or 'tester'" }),
@@ -169,7 +169,7 @@ export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "team_prompt",
 		label: "Prompt Team Agent",
-		description: "Send a prompt to a team agent. If the agent is idle, it starts working immediately. If the agent is busy, the message is queued and dispatched when the current turn ends. Use this to assign follow-up work, nudge idle agents, or queue instructions.",
+		description: "Send a prompt to a team agent. If the agent is idle, it starts working immediately. If the agent is busy, the message is queued and dispatched when the current turn ends. Use this to assign follow-up work, nudge idle agents, or queue instructions. Returns 409 if workflowGateId is provided and its upstream dependency gates have not all passed.",
 		promptSnippet: "Send a prompt to a team agent (immediate if idle, queued if busy).",
 		parameters: Type.Object({
 			session_id: Type.String({ description: "Session ID of the agent to prompt" }),
