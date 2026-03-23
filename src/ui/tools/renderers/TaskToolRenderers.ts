@@ -122,8 +122,8 @@ export class TaskCreateRenderer implements ToolRenderer {
 
 		if (result.isError) {
 			const { text } = getResult(result);
-			// Highlight 409 artifact requirement errors
-			const is409 = text.includes("409") || text.toLowerCase().includes("artifact");
+			// Highlight 409 gate requirement errors
+			const is409 = text.includes("409") || text.toLowerCase().includes("gate");
 			return {
 				content: html`<div>
 					${renderHeader(state, SquarePlus, html`Failed to create task — <span class="font-medium text-xs">${truncate(title)}</span>`)}
