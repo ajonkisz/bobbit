@@ -368,12 +368,12 @@
 }
 
 .wf-gate-grip {
-	font-size: 14px;
+	display: flex;
+	align-items: center;
 	color: var(--muted-foreground);
 	cursor: grab;
 	flex-shrink: 0;
-	line-height: 1;
-	opacity: 0.5;
+	opacity: 0.4;
 	transition: opacity 150ms;
 }
 .wf-gate-header:hover .wf-gate-grip { opacity: 1; }
@@ -515,34 +515,10 @@
 	border-top: 1px solid var(--border);
 }
 
-/* Touch device fallback: up/down reorder buttons */
-.wf-gate-reorder-btns {
-	display: none;
-	gap: 2px;
-	flex-shrink: 0;
-}
-
+/* Touch devices: grip handle still works as visual affordance for drag */
 @media (pointer: coarse) {
-	.wf-gate-grip { display: none; }
-	.wf-gate-reorder-btns { display: flex; }
+	.wf-gate-grip { cursor: grab; }
 }
-
-.wf-gate-reorder-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 22px;
-	border: none;
-	background: none;
-	color: var(--muted-foreground);
-	cursor: pointer;
-	border-radius: 4px;
-	font-size: 12px;
-	flex-shrink: 0;
-}
-.wf-gate-reorder-btn:hover { background: var(--secondary); color: var(--foreground); }
-.wf-gate-reorder-btn:disabled { opacity: 0.3; cursor: default; }
 
 /* ============================================================================
  * TOGGLE ROW — label + toggle switch side by side

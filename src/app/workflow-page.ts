@@ -2,7 +2,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
-import { ArrowLeft, Copy, MessageSquare, Pencil, Plus, Terminal, Trash2 } from "lucide";
+import { ArrowLeft, Copy, GripVertical, MessageSquare, Pencil, Plus, Terminal, Trash2 } from "lucide";
 import {
 	fetchWorkflows,
 	fetchWorkflow,
@@ -530,11 +530,7 @@ function renderGateEditor(gate: WorkflowGate, idx: number): TemplateResult {
 				@drop=${handleDrop}
 				@dragend=${handleDragEnd}
 				@click=${() => toggleGateExpand(idx)}>
-				<span class="wf-gate-grip">\u2807</span>
-				<div class="wf-gate-reorder-btns">
-					<button class="wf-gate-reorder-btn" ?disabled=${idx === 0} @click=${(e: Event) => { e.stopPropagation(); moveGate(idx, idx - 1); }} title="Move up">\u25B2</button>
-					<button class="wf-gate-reorder-btn" ?disabled=${idx === editGates.length - 1} @click=${(e: Event) => { e.stopPropagation(); moveGate(idx, idx + 1); }} title="Move down">\u25BC</button>
-				</div>
+				<span class="wf-gate-grip">${icon(GripVertical, "sm")}</span>
 				<span class="wf-gate-idx">${idx + 1}</span>
 				<code class="wf-gate-id">${gate.id || "(no id)"}</code>
 				<span class="wf-gate-name">${gate.name || ""}</span>
