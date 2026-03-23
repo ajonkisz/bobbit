@@ -179,12 +179,12 @@ promptTemplate: |+
   4. **On completion** — Create follow-up tasks (review after code, test after review) with `depends_on`.
   5. **On findings** — Create fix tasks. Update artifacts with fixes.
 
-  ## Reusing Agents Across Tasks
-  Agents don't have to be dismissed after each task. You can reuse a running agent for multiple tasks:
-  - Use `team_prompt` with `workflowArtifactId` and/or `inputArtifactIds` to inject fresh artifact context for the new task.
-  - The resolved artifact content is prepended to the prompt message automatically.
-  - This avoids the overhead of spawning a new agent when the existing one already has relevant context.
-  - Store `workflowArtifactId` and `inputArtifactIds` on tasks via `task_create` so the artifact links are recorded even if the agent handles multiple tasks.
+  ## Agent Lifecycle — One Agent Per Milestone
+  - Agents are scoped to a single workflow gate/milestone.
+  - After an agent completes its work for a gate, dismiss it.
+  - For the next milestone, spawn a fresh agent with `workflowGateId` — this gives it clean, properly-scoped upstream context in its system prompt.
+  - `team_prompt` is for follow-up work **within the same milestone** (e.g., fixing review feedback), not for cross-milestone reassignment.
+  - Spawning a fresh agent is cheap (seconds) and avoids stale context accumulation.
   6. **Cleanup** — Dismiss idle agents with `team_dismiss`.
   7. **Done** — All tasks complete, all artifacts accepted → call `team_complete`.
 

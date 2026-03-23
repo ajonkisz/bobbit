@@ -14,6 +14,13 @@ import type { PersonalityManager } from "./personality-manager.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+export class GateDependencyError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "GateDependencyError";
+	}
+}
+
 /**
  * Format elapsed time since a timestamp as a human-readable string.
  * Exported for testing.
@@ -459,6 +466,19 @@ export class TeamManager {
 			}
 		}
 
+		if (parts.length === 0 && inputIds.length > 0) {
+			const injectableCount = inputIds.filter(depId => {
+				const gateDef = goal.workflow!.gates.find(g => g.id === depId);
+				return gateDef?.injectDownstream;
+			}).length;
+			if (injectableCount > 0) {
+				console.warn(
+					`[team-manager] buildDependencyContext: workflowGateId="${workflowGateId}" has ${injectableCount} ` +
+					`injectable upstream gate(s) but none produced content. Gates checked: ${inputIds.join(", ")}`
+				);
+			}
+		}
+
 		if (parts.length === 0) return "";
 		return "\n\n# Upstream Gates\n\nContent from passed upstream gates:\n\n" + parts.join("\n\n---\n\n");
 	}
@@ -525,6 +545,26 @@ export class TeamManager {
 				`This usually means the goal was created without team mode enabled, or the cwd is not a git repo. ` +
 				`Update the goal with repoPath set to the git repository root.`
 			);
+		}
+
+		// Enforce gate dependency check: upstream gates must be passed before spawning for a gate
+		const resolvedWorkflowGateId = opts?.workflowGateId ?? this.extractWorkflowGateId(task, goalId);
+		if (resolvedWorkflowGateId && this.config.gateStore && goal.workflow) {
+			const wfGate = goal.workflow.gates.find(g => g.id === resolvedWorkflowGateId);
+			if (wfGate?.dependsOn?.length) {
+				const gateStates = this.config.gateStore.getGatesForGoal(goalId);
+				const passedIds = new Set(gateStates.filter(g => g.status === "passed").map(g => g.gateId));
+				const notPassed = wfGate.dependsOn.filter(depId => !passedIds.has(depId));
+				if (notPassed.length > 0) {
+					const names = notPassed.map(id => {
+						const def = goal.workflow!.gates.find(g => g.id === id);
+						return def ? `${def.name} (${id})` : id;
+					});
+					throw new GateDependencyError(
+						`Upstream gate(s) not passed: ${names.join(", ")}. Cannot spawn agent for gate "${resolvedWorkflowGateId}" until dependencies are met.`
+					);
+				}
+			}
 		}
 
 		// Create a worktree for this role agent
