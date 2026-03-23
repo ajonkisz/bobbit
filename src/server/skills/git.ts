@@ -26,6 +26,25 @@ export function createWorktree(repoPath: string, branchName: string): WorktreeRe
 		stdio: "pipe",
 	});
 
+	// Seed node_modules into the worktree so npm scripts (tsc, tests) work
+	// immediately without a separate `npm install`. Uses `npm ci` with the
+	// local cache — safe (independent copy, can't corrupt source repo) and
+	// fast when the npm cache is warm (seconds, not minutes).
+	// NOTE: Never use symlinks/junctions for node_modules — worktree cleanup
+	// can follow the link and destroy the source repo's node_modules.
+	if (fs.existsSync(path.join(worktreePath, "package-lock.json"))) {
+		try {
+			execFileSync("npm", ["ci", "--prefer-offline", "--no-audit", "--no-fund"], {
+				cwd: worktreePath,
+				stdio: "pipe",
+				timeout: 120_000, // 2 min max
+				...(process.platform === "win32" ? { shell: true } : {}),
+			});
+		} catch {
+			// Non-fatal — agent can npm install manually
+		}
+	}
+
 	// Push the new branch and set upstream tracking so git-status can report ahead/behind
 	// and `git rev-parse @{u}` doesn't emit "fatal: no upstream" errors.
 	try {

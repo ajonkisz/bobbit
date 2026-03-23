@@ -1413,19 +1413,29 @@ export function doRenderApp(): void {
 			` : "";
 
 			if (!desktop) {
+				const activeSession = sid ? state.gatewaySessions.find(s => s.id === sid) : undefined;
+				const goalId = activeSession?.goalId || activeSession?.teamGoalId;
+				const goalTitle = goalId ? state.goals.find(g => g.id === goalId)?.title : undefined;
 				return html`
 					<div class="flex items-center w-full pr-2 relative" style="min-height:40px;">
 						<div class="shrink-0">${backBtn}</div>
-						<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+						<div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
 							<span class="text-sm font-medium text-foreground truncate px-16" title=${sessionTitle}>${sessionTitle}</span>
+							${goalTitle ? html`<span class="text-[10px] text-muted-foreground/60 truncate px-16 uppercase tracking-wider">${goalTitle}</span>` : ""}
 						</div>
 						<div class="ml-auto shrink-0">${editDeleteBtns}</div>
 					</div>
 				`;
 			}
+			const deskSession = sid ? state.gatewaySessions.find(s => s.id === sid) : undefined;
+			const deskGoalId = deskSession?.goalId || deskSession?.teamGoalId;
+			const deskGoalTitle = deskGoalId ? state.goals.find(g => g.id === deskGoalId)?.title : undefined;
 			return html`
 				<div class="flex items-center gap-2 px-3">
-					<span class="text-sm font-medium text-foreground truncate max-w-[320px] py-2" title=${sessionTitle}>${sessionTitle}</span>
+					<div class="flex flex-col min-w-0 py-1">
+						<span class="text-sm font-medium text-foreground truncate max-w-[320px]" title=${sessionTitle}>${sessionTitle}</span>
+						${deskGoalTitle ? html`<span class="text-[10px] text-muted-foreground/60 truncate max-w-[320px] uppercase tracking-wider">${deskGoalTitle}</span>` : ""}
+					</div>
 					${editDeleteBtns}
 				</div>
 			`;
