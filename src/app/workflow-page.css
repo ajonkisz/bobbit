@@ -388,8 +388,8 @@
 	font-size: 11px;
 	font-weight: 600;
 	flex-shrink: 0;
-	background: oklch(0.62 0.15 250 / 0.15);
-	color: oklch(0.72 0.15 250);
+	background: color-mix(in oklch, var(--primary) 15%, transparent);
+	color: var(--primary);
 }
 
 .wf-gate-id {
@@ -400,7 +400,8 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	max-width: 140px;
+	flex-shrink: 1;
+	min-width: 0;
 }
 
 .wf-gate-name {
@@ -665,9 +666,12 @@
 	.wf-nav { padding: 10px 14px; }
 	.wf-body { padding: 14px; }
 	.wf-field-row { flex-direction: column; }
-	.wf-gate-id { max-width: 80px; }
+	/* Remove fixed widths when stacking vertically */
+	.wf-field-row > .wf-field[style*="flex:0 0"] { flex: 1 1 auto !important; }
+}
 
-	/* On mobile, show dep count pill instead of individual chips */
+@media (max-width: 600px) {
+	/* On narrow screens, show dep count pill instead of individual chips */
 	.wf-gate-deps-desktop { display: none; }
 	.wf-gate-deps-mobile { display: flex; }
 }
@@ -679,4 +683,5 @@
 	.wf-gate-body-inner { padding: 8px; }
 	.wf-gate-name { font-size: 12px; }
 	.wf-gate-pill { font-size: 9px; padding: 1px 4px; }
+	.wf-gate-id { max-width: 100px; }
 }
