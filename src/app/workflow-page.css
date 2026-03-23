@@ -515,9 +515,10 @@
 	border-top: 1px solid var(--border);
 }
 
-/* Touch devices: grip handle still works as visual affordance for drag */
+/* Touch devices: grip handle is the primary drag affordance */
 @media (pointer: coarse) {
-	.wf-gate-grip { cursor: grab; }
+	.wf-gate-grip { cursor: grab; touch-action: none; }
+	.wf-gate-header { touch-action: pan-x; }
 }
 
 /* ============================================================================
