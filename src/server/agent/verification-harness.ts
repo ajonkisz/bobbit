@@ -44,11 +44,24 @@ export function parseVerdict(output: string): boolean | null {
 }
 
 export class VerificationHarness {
+	private notifyTeamLeadFn?: (goalId: string, message: string) => void;
+
 	constructor(
 		private gateStore: GateStore,
 		private broadcastFn: (goalId: string, event: any) => void,
 		private roleStore: RoleStore,
 	) {}
+
+	/** Register a callback to notify the team lead agent when verification completes. */
+	setTeamLeadNotifier(fn: (goalId: string, message: string) => void): void {
+		this.notifyTeamLeadFn = fn;
+	}
+
+	private notifyTeamLead(goalId: string, gateId: string, status: string): void {
+		if (!this.notifyTeamLeadFn) return;
+		const verb = status === "passed" ? "PASSED" : "FAILED";
+		this.notifyTeamLeadFn(goalId, `Gate verification ${verb}: "${gateId}". ${status === "passed" ? "Downstream work for this gate can now proceed." : "Check the verification output, fix the issues, and re-signal the gate."}`);
+	}
 
 	/**
 	 * Verify a gate signal asynchronously (fire-and-forget from caller).
@@ -80,6 +93,7 @@ export class VerificationHarness {
 				gateId: signal.gateId,
 				status: "passed",
 			});
+			this.notifyTeamLead(signal.goalId, signal.gateId, "passed");
 			return;
 		}
 
@@ -164,6 +178,7 @@ export class VerificationHarness {
 				gateId: signal.gateId,
 				status,
 			});
+			this.notifyTeamLead(signal.goalId, signal.gateId, status);
 		} catch (err: any) {
 			this.gateStore.updateSignalVerification(signal.id, {
 				status: "failed",
@@ -184,6 +199,7 @@ export class VerificationHarness {
 				gateId: signal.gateId,
 				status: "failed",
 			});
+			this.notifyTeamLead(signal.goalId, signal.gateId, "failed");
 		}
 	}
 
@@ -216,6 +232,18 @@ export class VerificationHarness {
 		if (step.prompt) {
 			sections.push(`\n## Review Step Instructions\n\n${step.prompt}`);
 		}
+
+		// Reinforce verdict requirement in system prompt (LLMs prioritise system prompt over user messages)
+		sections.push([
+			"\n## CRITICAL: Verdict Tag Requirement",
+			"",
+			"Every review you produce MUST end with exactly one `<verdict>` XML tag:",
+			"- `<verdict>pass</verdict>` — if no critical or high severity findings exist",
+			"- `<verdict>fail</verdict>` — if any critical or high severity findings exist",
+			"",
+			"If you omit this tag, the verification system cannot parse your output and the review FAILS automatically.",
+			"This is the single most important formatting requirement. Never omit it.",
+		].join("\n"));
 
 		// Signal context
 		const contextLines: string[] = [
@@ -278,13 +306,12 @@ export class VerificationHarness {
 				step.prompt || "",
 				"",
 				"## Required Output Format",
-				"You MUST produce your review in this exact format:",
 				"",
-				"<review>",
-				`# Code Review: ${step.name}`,
+				"Produce your review, then end with a <verdict> tag. Example:",
 				"",
+				"```",
 				"## Summary",
-				"...",
+				"Brief overview of what was reviewed and the outcome.",
 				"",
 				"## Findings",
 				"[critical] file.ts:line — Description",
@@ -293,15 +320,15 @@ export class VerificationHarness {
 				"[low] file.ts:line — Description",
 				"",
 				"## Verdict",
-				"...",
+				"Explanation of pass/fail decision.",
 				"",
-				"<verdict>pass</verdict> or <verdict>fail</verdict>",
-				"</review>",
+				"<verdict>pass</verdict>",
+				"```",
 				"",
-				"Rules:",
-				"- Use <verdict>fail</verdict> if any critical or high severity findings exist",
-				"- Use <verdict>pass</verdict> if no critical or high severity findings",
-				"- You MUST include exactly one <verdict> tag",
+				"## Rules",
+				"- **<verdict>fail</verdict>** if any critical or high severity findings exist",
+				"- **<verdict>pass</verdict>** if no critical or high severity findings",
+				"- **You MUST include exactly one `<verdict>pass</verdict>` or `<verdict>fail</verdict>` tag — if you omit it, the review fails automatically regardless of your findings**",
 			].join("\n");
 
 			await rpc.prompt(kickoff);

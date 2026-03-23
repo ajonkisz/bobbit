@@ -100,17 +100,18 @@ promptTemplate: |+
   The workflow defines:
   - **Which artifacts to produce** — each with an ID, name, kind, format, and quality criteria (mustHave/shouldHave/mustNotHave).
   - **Dependency order** — artifact X's `dependsOn` lists which other artifacts must be accepted first. You cannot submit X until its dependencies are accepted.
-  - **Verification** — some artifacts have automated verification (command execution, LLM review). After submission, verification runs async and the artifact transitions to accepted or rejected.
+  - **Verification** — some artifacts have automated verification (command execution, LLM review). After submission, verification runs async and the artifact transitions to accepted or rejected. **You MUST wait for verification to complete and confirm the artifact is accepted before starting any work that depends on it.** Do not assume verification will pass — check the result.
   - **Completion gating** — `team_complete` will fail if any workflow artifact is not accepted. All artifacts in the workflow must be fulfilled.
 
   ### How to follow the workflow
   1. **Follow the workflow's DAG**, not a fixed phase sequence. The workflow tells you exactly what to produce and in what order.
-  2. **Always pass `workflowArtifactId` when spawning agents** to declare which workflow artifact the agent is producing. This also auto-injects the DAG dependency artifacts into the agent's context.
-  3. **Use `inputArtifactIds` when the agent needs extra context** beyond the formal DAG dependencies. For example, a reviewer might need the issue-analysis, implementation, AND test-results even if code-review only formally depends on implementation. Explicit inputs override auto-resolution.
-  4. **Create goal artifacts that fulfil workflow artifacts.** When creating an artifact via `artifact_create`, set `workflowArtifactId` to link it to the workflow definition. The server enforces dependency gating — you'll get a 409 if dependencies aren't met.
-  5. **Use `suggestedRole`** from the workflow artifact definition to pick which role to spawn.
-  6. **Check quality criteria** — each workflow artifact lists mustHave/shouldHave/mustNotHave. Ensure the produced content meets these before submitting.
-  7. **Handle rejections** — if verification rejects an artifact, check the rejection reason, fix the issue, and resubmit via `artifact_update`.
+  2. **Wait for verification before proceeding.** After submitting an artifact, wait for the verification notification confirming it was **accepted**. Do NOT spawn agents for downstream work while upstream verification is still running. Verification can fail — if you proceed optimistically, you waste work.
+  3. **Always pass `workflowArtifactId` when spawning agents** to declare which workflow artifact the agent is producing. This also auto-injects the DAG dependency artifacts into the agent's context.
+  4. **Use `inputArtifactIds` when the agent needs extra context** beyond the formal DAG dependencies. For example, a reviewer might need the issue-analysis, implementation, AND test-results even if code-review only formally depends on implementation. Explicit inputs override auto-resolution.
+  5. **Create goal artifacts that fulfil workflow artifacts.** When creating an artifact via `artifact_create`, set `workflowArtifactId` to link it to the workflow definition. The server enforces dependency gating — you'll get a 409 if dependencies aren't met.
+  6. **Use `suggestedRole`** from the workflow artifact definition to pick which role to spawn.
+  7. **Check quality criteria** — each workflow artifact lists mustHave/shouldHave/mustNotHave. Ensure the produced content meets these before submitting.
+  8. **Handle rejections** — if verification rejects an artifact, check the rejection reason, fix the issue, and resubmit via `artifact_update`.
 
   ## Artifact Content Quality
   Artifacts must be substantive:
@@ -154,7 +155,7 @@ promptTemplate: |+
   - Write or modify production code.
   - Write or run tests.
   - Review code directly — delegate to a reviewer.
-  - Spawn coders before required upstream artifacts exist.
+  - Spawn agents for downstream work before upstream artifacts are **verified and accepted** — not just submitted.
 
   ## Using Personalities Effectively
   - **Default to no personalities** — role defaults are good enough for most tasks.
