@@ -638,7 +638,7 @@ function renderGateEditor(gate: WorkflowGate, idx: number): TemplateResult {
 				` : nothing}
 				${verifySummary ? html`<span class="wf-gate-pill">${verifySummary}</span>` : nothing}
 				<span class="wf-gate-chevron">\u25B8</span>
-				<button class="wf-gate-delete" @click=${(e: Event) => { e.stopPropagation(); removeGate(idx); }} title="Remove gate">&times;</button>
+				<button class="wf-gate-delete" @click=${(e: Event) => { e.stopPropagation(); removeGate(idx); }} title="Remove gate">${icon(Trash2, "sm")}</button>
 			</div>
 
 			<div class="wf-gate-body">
