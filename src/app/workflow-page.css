@@ -486,14 +486,11 @@
 	border: none;
 	background: none;
 	color: var(--muted-foreground);
-	font-size: 14px;
 	cursor: pointer;
 	border-radius: 4px;
 	flex-shrink: 0;
-	opacity: 0;
-	transition: opacity 150ms, color 150ms;
+	transition: color 150ms;
 }
-.wf-gate-header:hover .wf-gate-delete { opacity: 1; }
 .wf-gate-delete:hover { color: var(--destructive); }
 
 /* Gate body — collapsible with CSS transition */
