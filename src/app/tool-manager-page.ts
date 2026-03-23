@@ -12,7 +12,7 @@ import { renderTool } from "../ui/tools/index.js";
 // CONSTANTS
 // ============================================================================
 
-const TOOL_GROUPS = ["File System", "Shell", "Web", "Browser", "Agent", "Team", "Tasks", "Artifacts", "Other"];
+const TOOL_GROUPS = ["File System", "Shell", "Web", "Browser", "Agent", "Team", "Tasks", "Gates", "Other"];
 
 /** Build a mock ToolResultMessage with the correct content array format. */
 function mockResult(text: string): any {

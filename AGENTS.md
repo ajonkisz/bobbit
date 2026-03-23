@@ -119,7 +119,6 @@ src/
 │   │   ├── renderer-registry.ts   # Tool name → renderer mapping
 │   │   ├── types.ts               # Tool renderer type definitions
 │   │   ├── renderers/             # Per-tool renderers
-│   │   │   ├── ArtifactToolRenderers.ts   # Artifact tool renderers
 │   │   │   ├── BashRenderer.ts            # Shell command renderer
 │   │   │   ├── BrowserClickRenderer.ts    # Browser click tool renderer
 │   │   │   ├── BrowserEvalRenderer.ts     # Browser eval tool renderer

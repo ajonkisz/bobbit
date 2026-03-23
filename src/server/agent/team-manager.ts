@@ -465,11 +465,11 @@ export class TeamManager {
 
 	/**
 	 * Try to extract a workflowGateId from the task description.
-	 * Looks for a pattern like `[gate:some-id]` in the task text (also supports legacy `[workflowArtifact:some-id]`).
+	 * Looks for a pattern like `[gate:some-id]` in the task text.
 	 */
 	private extractWorkflowGateId(task: string, goalId: string): string | undefined {
 		// Check for explicit tag
-		const tagMatch = task.match(/\[(?:workflowArtifact|gate):([^\]]+)\]/);
+		const tagMatch = task.match(/\[gate:([^\]]+)\]/);
 		if (tagMatch) return tagMatch[1];
 
 		// Try to match against workflow gate names/IDs in the goal
