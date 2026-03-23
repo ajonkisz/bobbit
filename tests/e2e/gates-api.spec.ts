@@ -205,7 +205,8 @@ test.describe("Gates API", () => {
 	});
 
 	test("cascade reset — re-signaling upstream resets downstream", async () => {
-		const goalId = await createGoalWithWorkflow("general");
+		// Use test-fast workflow — general runs npm run check/test which is too slow for 30s timeout
+		const goalId = await createGoalWithWorkflow("test-fast");
 		try {
 			// Signal design-doc → pass
 			await apiFetch(`/api/goals/${goalId}/gates/design-doc/signal`, {
@@ -214,12 +215,12 @@ test.describe("Gates API", () => {
 			});
 			await waitForGateStatus(goalId, "design-doc", "passed");
 
-			// Signal implementation — has "npm run check" which should pass in our cwd
+			// Signal implementation (test-fast just runs "echo ok")
 			await apiFetch(`/api/goals/${goalId}/gates/implementation/signal`, {
 				method: "POST",
 				body: JSON.stringify({}),
 			});
-			await waitForGateStatus(goalId, "implementation", "passed", 60000);
+			await waitForGateStatus(goalId, "implementation", "passed");
 
 			// Verify both are passed
 			const gatesResp1 = await apiFetch(`/api/goals/${goalId}/gates`);
