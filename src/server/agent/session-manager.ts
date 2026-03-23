@@ -263,6 +263,7 @@ export class SessionManager {
 		// Optimistic status update to prevent double-dispatch race
 		session.status = "streaming";
 		session.streamingStartedAt = session.streamingStartedAt ?? Date.now();
+		this.store.update(session.id, { wasStreaming: true, streamingStartedAt: session.streamingStartedAt });
 		broadcast(session.clients, { type: "session_status", status: "streaming", streamingStartedAt: session.streamingStartedAt });
 
 		// Always dispatch as prompt — agent is idle, steer is only for mid-turn
@@ -313,12 +314,12 @@ export class SessionManager {
 			session.lastTurnErrored = false;
 			session.turnHadToolCalls = false;
 			session.streamingStartedAt = Date.now();
-			this.store.update(session.id, { wasStreaming: true });
+			this.store.update(session.id, { wasStreaming: true, streamingStartedAt: session.streamingStartedAt });
 			broadcast(session.clients, { type: "session_status", status: "streaming", streamingStartedAt: session.streamingStartedAt });
 		} else if (event.type === "agent_end") {
 			session.status = "idle";
 			session.streamingStartedAt = undefined;
-			this.store.update(session.id, { wasStreaming: false });
+			this.store.update(session.id, { wasStreaming: false, streamingStartedAt: undefined });
 			broadcast(session.clients, { type: "session_status", status: "idle" });
 			// Don't drain the queue if the turn ended with a model error —
 			// queued/steered messages should wait for a retry.
@@ -570,6 +571,7 @@ export class SessionManager {
 			personalities: ps.personalities,
 			allowedTools: restoredAllowedTools,
 			promptQueue: new PromptQueue(ps.messageQueue),
+			streamingStartedAt: ps.streamingStartedAt,
 		};
 
 		// Skip cost tracking during session restore (switch_session replays
@@ -1600,7 +1602,7 @@ export class SessionManager {
 			// This is authoritative — the in-memory status is always correct,
 			// and we write it here to handle the case where shutdown() races
 			// with a pending agent_end that hasn't flushed to disk yet.
-			this.store.update(id, { wasStreaming: session.status === "streaming" });
+			this.store.update(id, { wasStreaming: session.status === "streaming", streamingStartedAt: session.streamingStartedAt });
 
 			session.unsubscribe();
 			await session.rpcClient.stop();

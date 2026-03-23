@@ -16,6 +16,8 @@ export interface PersistedSession {
 	goalId?: string;
 	/** Whether the agent was actively streaming when the server last knew about it */
 	wasStreaming?: boolean;
+	/** Epoch ms when the current streaming turn started (survives server restarts) */
+	streamingStartedAt?: number;
 	/** If this session is a delegate, the parent session ID */
 	delegateOf?: string;
 	/** Role in a team goal (e.g., 'coder', 'reviewer', 'tester') */
@@ -120,7 +122,7 @@ export class SessionStore {
 	}
 
 	/** Update a subset of fields for an existing session */
-	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "assistantType" | "goalAssistant" | "roleAssistant" | "toolAssistant" | "taskId" | "staffId" | "accessory" | "preview" | "personalities" | "messageQueue">>): void {
+	update(id: string, updates: Partial<Pick<PersistedSession, "title" | "lastActivity" | "agentSessionFile" | "goalId" | "wasStreaming" | "streamingStartedAt" | "delegateOf" | "role" | "teamGoalId" | "worktreePath" | "assistantType" | "goalAssistant" | "roleAssistant" | "toolAssistant" | "taskId" | "staffId" | "accessory" | "preview" | "personalities" | "messageQueue">>): void {
 		const existing = this.sessions.get(id);
 		if (!existing) return;
 		Object.assign(existing, updates);
