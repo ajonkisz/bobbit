@@ -181,7 +181,7 @@ export function createGateway(config: GatewayConfig) {
 		}
 	}
 
-	verificationHarness = new VerificationHarness(gateStore, broadcastToGoal);
+	verificationHarness = new VerificationHarness(gateStore, broadcastToGoal, roleStore);
 
 	server.on("upgrade", (req, socket, head) => {
 		const url = new URL(req.url || "/", `http://${req.headers.host}`);

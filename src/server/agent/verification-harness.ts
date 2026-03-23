@@ -1,7 +1,12 @@
 import { execSync, spawn } from "node:child_process";
-import { statSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import fs, { statSync } from "node:fs";
 import path from "node:path";
+import { piDir } from "../pi-dir.js";
 import type { GateStore, GateSignal } from "./gate-store.js";
+import type { RoleStore } from "./role-store.js";
+import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
+import { assembleSystemPrompt } from "./system-prompt.js";
 import type { WorkflowGate, Workflow } from "./workflow-store.js";
 
 /** Resolve Git Bash path on Windows for commands needing Unix tools. */
@@ -31,10 +36,18 @@ function findGitBash(): string | null {
 
 const GIT_BASH = findGitBash();
 
+/** Extract pass/fail verdict from sub-agent output. Exported for unit testing. */
+export function parseVerdict(output: string): boolean | null {
+	const match = output.match(/<verdict>\s*(pass|fail)\s*<\/verdict>/i);
+	if (!match) return null;
+	return match[1].toLowerCase() === "pass";
+}
+
 export class VerificationHarness {
 	constructor(
 		private gateStore: GateStore,
 		private broadcastFn: (goalId: string, event: any) => void,
+		private roleStore: RoleStore,
 	) {}
 
 	/**
@@ -103,9 +116,15 @@ export class VerificationHarness {
 					const expectFailure = step.expect === "failure";
 					result = await this.runCommandStep(cmd, cwd, step.timeout || 300, expectFailure);
 				} else {
-					// llm-review — auto-pass with warning
-					console.warn(`[verification] LLM review step "${step.name}" auto-passed — not yet implemented`);
-					result = { passed: true, output: "⚠ LLM review not yet implemented — auto-passed." };
+					// llm-review — spawn a one-shot reviewer sub-agent
+					const prompt = this.substituteVars(step.prompt || "", builtinVars, allGateStates);
+					result = await this.runLlmReviewStep(
+						{ name: step.name, prompt, timeout: step.timeout },
+						cwd,
+						builtinVars,
+						signal.content,
+						signal.metadata,
+					);
 				}
 
 				const duration_ms = Date.now() - startTime;
@@ -160,6 +179,160 @@ export class VerificationHarness {
 				gateId: signal.gateId,
 				status: "failed",
 			});
+		}
+	}
+
+	/**
+	 * Spawn a one-shot reviewer sub-agent to perform an LLM-powered code review.
+	 * Follows the pattern from src/server/skills/sub-agent.ts.
+	 */
+	private async runLlmReviewStep(
+		step: { name: string; prompt?: string; timeout?: number },
+		cwd: string,
+		builtinVars: Record<string, string>,
+		signalContent?: string,
+		signalMetadata?: Record<string, string>,
+	): Promise<{ passed: boolean; output: string }> {
+		const role = this.roleStore.get("reviewer");
+		if (!role) {
+			return { passed: false, output: "LLM review failed: 'reviewer' role not found in role store." };
+		}
+
+		const subSessionId = `llm-review-${randomUUID().slice(0, 12)}`;
+		const timeoutMs = (step.timeout || 300) * 1000;
+
+		// Build system prompt from reviewer role template + step prompt + signal context
+		let rolePrompt = role.promptTemplate
+			.replace(/\{\{GOAL_BRANCH\}\}/g, builtinVars.branch || "HEAD")
+			.replace(/\{\{AGENT_ID\}\}/g, subSessionId);
+
+		const sections: string[] = [rolePrompt];
+
+		if (step.prompt) {
+			sections.push(`\n## Review Step Instructions\n\n${step.prompt}`);
+		}
+
+		// Signal context
+		const contextLines: string[] = [
+			"\n## Signal Context",
+			`- Branch: ${builtinVars.branch || "HEAD"}`,
+			`- Primary branch: ${builtinVars.master || "master"}`,
+			`- Working directory: ${cwd}`,
+		];
+		if (signalContent) {
+			contextLines.push(`\n### Signal Content\n${signalContent}`);
+		}
+		if (signalMetadata && Object.keys(signalMetadata).length > 0) {
+			contextLines.push("\n### Signal Metadata");
+			for (const [k, v] of Object.entries(signalMetadata)) {
+				contextLines.push(`- **${k}**: ${v}`);
+			}
+		}
+		sections.push(contextLines.join("\n"));
+
+		const combinedPrompt = sections.join("\n");
+
+		// Assemble system prompt to temp file
+		const systemPromptPath = assembleSystemPrompt(subSessionId, {
+			cwd,
+			goalSpec: combinedPrompt,
+			goalTitle: `LLM Review: ${step.name}`,
+			goalState: "active",
+		});
+
+		const bridgeOptions: RpcBridgeOptions = {
+			cwd,
+			args: ["--tools", role.allowedTools.join(",")],
+		};
+		if (systemPromptPath) bridgeOptions.systemPromptPath = systemPromptPath;
+
+		const rpc = new RpcBridge(bridgeOptions);
+
+		try {
+			await rpc.start();
+
+			// Wait for agent_end event with timeout
+			const completionPromise = new Promise<void>((resolve, reject) => {
+				const timer = setTimeout(() => {
+					reject(new Error(`LLM review sub-agent timed out after ${timeoutMs / 1000}s`));
+				}, timeoutMs);
+
+				const eventUnsub = rpc.onEvent((event: any) => {
+					if (event.type === "agent_end") {
+						clearTimeout(timer);
+						eventUnsub();
+						resolve();
+					}
+				});
+			});
+
+			// Send kickoff prompt
+			const kickoff = [
+				`Perform a code review for the gate verification step: "${step.name}".`,
+				"",
+				step.prompt || "",
+				"",
+				"## Required Output Format",
+				"You MUST produce your review in this exact format:",
+				"",
+				"<review>",
+				`# Code Review: ${step.name}`,
+				"",
+				"## Summary",
+				"...",
+				"",
+				"## Findings",
+				"[critical] file.ts:line — Description",
+				"[high] file.ts:line — Description",
+				"[medium] file.ts:line — Description",
+				"[low] file.ts:line — Description",
+				"",
+				"## Verdict",
+				"...",
+				"",
+				"<verdict>pass</verdict> or <verdict>fail</verdict>",
+				"</review>",
+				"",
+				"Rules:",
+				"- Use <verdict>fail</verdict> if any critical or high severity findings exist",
+				"- Use <verdict>pass</verdict> if no critical or high severity findings",
+				"- You MUST include exactly one <verdict> tag",
+			].join("\n");
+
+			await rpc.prompt(kickoff);
+			await completionPromise;
+
+			// Extract last assistant message
+			let output = "";
+			try {
+				const msgsResp = await rpc.getMessages();
+				if (msgsResp.success && Array.isArray(msgsResp.data)) {
+					output = extractLastAssistantOutput(msgsResp.data);
+				}
+			} catch {
+				// Non-fatal — we may still have partial output
+			}
+
+			const verdict = parseVerdict(output);
+			if (verdict === null) {
+				return { passed: false, output: output || "LLM review failed: no <verdict> tag found in sub-agent output." };
+			}
+
+			return { passed: verdict, output };
+		} catch (err: any) {
+			const isTimeout = err.message?.includes("timed out");
+			const errOutput = isTimeout
+				? `LLM review timed out after ${(timeoutMs / 1000)}s.`
+				: `LLM review failed: ${err.message}`;
+			return { passed: false, output: errOutput };
+		} finally {
+			await rpc.stop().catch(() => {});
+			// Clean up temporary system prompt
+			try {
+				const promptDir = path.join(piDir(), "session-prompts");
+				const promptFile = path.join(promptDir, `${subSessionId}.md`);
+				if (fs.existsSync(promptFile)) fs.unlinkSync(promptFile);
+			} catch { /* ignore */ }
 		}
 	}
 
@@ -244,4 +417,21 @@ export class VerificationHarness {
 			});
 		});
 	}
+}
+
+/**
+ * Extract the last assistant message text from agent messages.
+ */
+function extractLastAssistantOutput(messages: any[]): string {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const msg = messages[i];
+		if (!msg || msg.role !== "assistant") continue;
+
+		const text = Array.isArray(msg.content)
+			? msg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n")
+			: typeof msg.content === "string" ? msg.content : "";
+
+		if (text) return text;
+	}
+	return "";
 }
