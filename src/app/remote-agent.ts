@@ -109,6 +109,7 @@ export class RemoteAgent {
 			streamMessage: null as any,
 			pendingToolCalls: new Set<string>(),
 			error: undefined as string | undefined,
+			turnStartTime: null as number | null,
 		};
 	}
 
@@ -496,6 +497,7 @@ export class RemoteAgent {
 		this._state.isStreaming = false;
 		this._state.pendingToolCalls = new Set();
 		this._state.error = undefined;
+		this._state.turnStartTime = null;
 		this._deferredAssistantMessage = null;
 		this._pendingAttachments = null;
 		this._liveEventMessages = [];
@@ -641,6 +643,11 @@ export class RemoteAgent {
 			case "session_status":
 				console.log(`[RemoteAgent] session_status: ${msg.status}, isStreaming was: ${this._state.isStreaming}`);
 				this._state.isStreaming = msg.status === "streaming";
+				if (msg.status === "streaming" && !this._state.turnStartTime) {
+					this._state.turnStartTime = Date.now();
+				} else if (msg.status !== "streaming") {
+					this._state.turnStartTime = null;
+				}
 				if (msg.status !== "streaming") this._isAborting = false;
 				this.onStatusChange?.(msg.status);
 				break;
@@ -667,6 +674,7 @@ export class RemoteAgent {
 				// failed, the user message was already cleared from the editor
 				// but never echoed back — surface the error so the user knows.
 				this._state.isStreaming = false;
+				this._state.turnStartTime = null;
 				this._state.error = msg.message || "Unknown server error";
 				this._pendingAttachments = null;
 				// Add a dismissable error message to the chat history
@@ -743,6 +751,7 @@ export class RemoteAgent {
 				this._state.isStreaming = true;
 				this._state.error = undefined;
 				this._taskStartTime = Date.now();
+				this._state.turnStartTime = this._taskStartTime;
 				break;
 
 			case "agent_end": {
@@ -756,6 +765,7 @@ export class RemoteAgent {
 				const elapsed = this._taskStartTime ? Date.now() - this._taskStartTime : 0;
 				this._notifyTaskComplete(elapsed);
 				this._taskStartTime = null;
+				this._state.turnStartTime = null;
 				break;
 			}
 

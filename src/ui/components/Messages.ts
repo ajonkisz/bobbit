@@ -10,9 +10,9 @@ import { html, LitElement, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { renderTool } from "../tools/index.js";
 import type { Attachment } from "../utils/attachment-utils.js";
-import { formatUsage } from "../utils/format.js";
 import { i18n } from "../utils/i18n.js";
 import "./ThinkingBlock.js";
+import "./LiveTimer.js";
 import "./ToolGroup.js";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 
@@ -100,6 +100,7 @@ export class AssistantMessage extends LitElement {
 	@property({ type: Boolean }) hidePendingToolCalls = false;
 	@property({ attribute: false }) onCostClick?: () => void;
 	@property({ attribute: false }) onRetry?: () => void;
+	@property({ type: Number }) turnStartTime: number | null = null;
 	@state() private _retrying = false;
 
 	protected override createRenderRoot(): HTMLElement | DocumentFragment {
@@ -228,8 +229,10 @@ export class AssistantMessage extends LitElement {
 			<div>
 				${orderedParts.length ? html` <div class="px-2 sm:px-4 flex flex-col gap-3">${orderedParts}</div> ` : ""}
 				${
-					this.message.usage && this.isStreaming
-						? html` <div class="px-2 sm:px-4 mt-2 text-xs text-muted-foreground text-right">${formatUsage(this.message.usage)}</div> `
+					this.isStreaming && this.turnStartTime
+						? html` <div class="px-2 sm:px-4 mt-2 text-xs text-muted-foreground text-right tabular-nums">
+							<live-timer .startTime=${this.turnStartTime} .running=${true}></live-timer>
+						</div> `
 						: ""
 				}
 				${

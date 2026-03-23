@@ -53,7 +53,7 @@ export class LiveTimer extends LitElement {
 
 	override render() {
 		const elapsed = Math.max(0, Math.round((Date.now() - this.startTime) / 1000));
-		const display = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m${elapsed % 60}s`;
+		const display = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${String(elapsed % 60).padStart(2, '0')}s`;
 		return html`${display}`;
 	}
 }
