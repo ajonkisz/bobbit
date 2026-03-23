@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { GoalStore, type GoalState, type PersistedGoal } from "./goal-store.js";
 import { createWorktree, cleanupWorktree } from "../skills/git.js";
 import type { WorkflowStore } from "./workflow-store.js";
@@ -143,11 +145,55 @@ export class GoalManager {
 			console.warn(`[goal-manager] Deleting team goal "${goal.title}" — ensure no active team sessions remain (cannot check from GoalManager)`);
 		}
 		if (goal?.worktreePath && goal?.repoPath) {
+			// Clean up any leftover team agent worktrees in the sibling -wt-goal dir.
+			// Team agents get worktrees like <goalWorktree>-wt-goal/<agentBranch>/
+			// These may survive if dismissRole failed or the process crashed.
+			const teamWorktreeParent = goal.worktreePath + "-wt-goal";
+			if (fs.existsSync(teamWorktreeParent)) {
+				try {
+					const entries = fs.readdirSync(teamWorktreeParent, { withFileTypes: true });
+					for (const entry of entries) {
+						if (entry.isDirectory()) {
+							const agentWtPath = path.join(teamWorktreeParent, entry.name);
+							// Try to detect the branch name so we can delete it too
+							let agentBranch: string | undefined;
+							try {
+								agentBranch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+									cwd: agentWtPath,
+									stdio: "pipe",
+								}).toString().trim();
+								if (agentBranch === "HEAD") agentBranch = undefined; // detached
+							} catch {
+								// worktree may already be broken
+							}
+							try {
+								cleanupWorktree(goal.repoPath, agentWtPath, agentBranch, true);
+							} catch {
+								// Best-effort — directory may already be cleaned
+							}
+						}
+					}
+					// Remove the parent dir itself
+					fs.rmSync(teamWorktreeParent, { recursive: true, force: true });
+					console.log(`[goal-manager] Cleaned up team worktree dir: ${teamWorktreeParent}`);
+				} catch (err) {
+					console.error(`[goal-manager] Failed to clean up team worktree dir ${teamWorktreeParent}:`, err);
+				}
+			}
+
+			// Clean up the goal's own worktree and branch
 			try {
 				cleanupWorktree(goal.repoPath, goal.worktreePath, goal.branch, true);
 				console.log(`[goal-manager] Cleaned up worktree for goal "${goal.title}": ${goal.worktreePath}`);
 			} catch (err) {
 				console.error(`[goal-manager] Failed to clean up worktree for goal "${goal.title}":`, err);
+			}
+
+			// Prune stale worktree references
+			try {
+				execFileSync("git", ["worktree", "prune"], { cwd: goal.repoPath, stdio: "pipe" });
+			} catch {
+				// ignore
 			}
 		}
 		this.store.remove(id);

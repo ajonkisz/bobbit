@@ -514,6 +514,15 @@ async function handleApiRoute(
 		}
 
 		if (req.method === "DELETE") {
+			// Tear down any active team first (dismisses agents, cleans up their worktrees)
+			const teamState = teamManager.getTeamState(id);
+			if (teamState) {
+				try {
+					await teamManager.teardownTeam(id);
+				} catch (err) {
+					console.error(`[api] Error tearing down team for goal ${id}:`, err);
+				}
+			}
 			sessionManager.taskManager.deleteTasksForGoal(id);
 			gateStore.removeGoalGates(id);
 			sessionManager.goalManager.deleteGoal(id);
