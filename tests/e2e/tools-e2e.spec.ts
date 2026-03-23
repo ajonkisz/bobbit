@@ -735,29 +735,9 @@ test.describe.serial("Agent tools", () => {
 		}
 	});
 
-	// web_search, web_fetch, and delegate come from user extensions (~/.pi/extensions/)
-	// which are not present in the sandboxed E2E test environment (BOBBIT_PI_DIR).
-	// These tests are skipped here; they can be run manually against a full dev server.
-
-	test.skip("web_search tool — requires user extensions", async () => {
-		await verifyToolUsed(
-			'Use the web_search tool to search for "Playwright test framework". Just do the search and briefly report results.',
-			"web_search",
-		);
-	});
-
-	test.skip("web_fetch tool — requires user extensions", async () => {
-		await verifyToolUsed(
-			"Use the web_fetch tool to fetch the URL https://httpbin.org/get and show me the response.",
-			"web_fetch",
-		);
-	});
-
-	test.skip("delegate tool — requires user extensions", async () => {
-		await verifyToolUsed(
-			'Use the delegate tool to run this task in a separate agent process: "Run echo DELEGATE_OK using bash and report the output." You must use the delegate tool.',
-			"delegate",
-			120_000,
-		);
-	});
+	// web_search, web_fetch, and delegate are user extensions (~/.pi/extensions/)
+	// not present in the sandboxed E2E environment. The tool invocation pipeline
+	// is already proven by the Bash/Write/Read/Edit tests above. Extension loading
+	// is proven by bash-tool.ts (loaded in every E2E session). Tool activation
+	// mapping is covered by tests/tool-activation.spec.ts.
 });
