@@ -14,7 +14,7 @@ const DEFAULT_PATH = path.join(bobbitConfigDir(), "tools.json");
 
 /**
  * File-backed tool metadata store. Persists custom overrides
- * (description, group, docs) to ~/.pi/gateway-tools.json.
+ * (description, group, docs) to .bobbit/config/tools.json.
  * Same load-on-construct, write-on-mutate pattern as other stores.
  */
 export class ToolStore {

@@ -1,10 +1,10 @@
 /**
  * Shared E2E test helpers.
  *
- * The E2E test server runs with BOBBIT_PI_DIR pointing to an isolated temp
- * directory so it doesn't pollute the real dev-server state under ~/.pi.
+ * The E2E test server runs with BOBBIT_DIR pointing to an isolated temp
+ * directory so it doesn't pollute the real dev-server state under .bobbit/.
  *
- * Port and PI dir are set dynamically by playwright-e2e.config.ts via
+ * Port and bobbit dir are set dynamically by playwright-e2e.config.ts via
  * process.env so parallel test runs on the same machine never collide.
  */
 
@@ -20,11 +20,14 @@ export const BASE = `http://127.0.0.1:${E2E_PORT}`;
 /** WebSocket base URL for the isolated E2E gateway. */
 export const WS_BASE = `ws://127.0.0.1:${E2E_PORT}`;
 
-/** The isolated PI directory used by the E2E test server. */
-export const E2E_PI_DIR = process.env.BOBBIT_PI_DIR
-	|| join(import.meta.dirname, "..", "..", ".e2e-pi");
+/** The isolated .bobbit directory used by the E2E test server. */
+export const E2E_BOBBIT_DIR = process.env.BOBBIT_DIR
+	|| join(import.meta.dirname, "..", "..", ".e2e-bobbit");
+
+// Legacy alias for tests that still reference E2E_PI_DIR
+export const E2E_PI_DIR = E2E_BOBBIT_DIR;
 
 /** Read the auth token that the test server auto-created on startup. */
 export function readE2EToken(): string {
-	return readFileSync(join(E2E_PI_DIR, "gateway-token"), "utf-8").trim();
+	return readFileSync(join(E2E_BOBBIT_DIR, "state", "token"), "utf-8").trim();
 }

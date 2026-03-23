@@ -1,7 +1,7 @@
 /**
  * deSEC dynDNS integration.
  * Updates the domain's A record to point to the current host IP on startup.
- * Config stored in ~/.pi/desec.json
+ * Config stored in .bobbit/state/desec.json
  */
 
 import fs from "node:fs";

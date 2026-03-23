@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
 // Isolated state directory so UI E2E tests don't pollute ~/.pi
-const E2E_UI_PI_DIR = path.join(__dirname, "..", ".e2e-ui-pi");
+const E2E_UI_BOBBIT_DIR = path.join(__dirname, "..", ".e2e-ui-bobbit");
 
 /**
  * E2E config for tests that need the full UI (not just the API).
@@ -26,7 +26,7 @@ export default defineConfig({
 		stderr: "pipe",
 		env: {
 			...process.env,
-			BOBBIT_PI_DIR: E2E_UI_PI_DIR,
+			BOBBIT_DIR: E2E_UI_BOBBIT_DIR,
 		},
 	},
 	use: { baseURL: "http://127.0.0.1:3098" },

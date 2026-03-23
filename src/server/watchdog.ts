@@ -74,7 +74,7 @@ function detectPort(): number {
  *
  * Strategy:
  *  1. Use --host from forwarded args if present
- *  2. Read ~/.pi/gateway-url written by the CLI on startup
+ *  2. Read .bobbit/state/gateway-url written by the CLI on startup
  *  3. Fall back to 127.0.0.1
  */
 function detectHost(): string {

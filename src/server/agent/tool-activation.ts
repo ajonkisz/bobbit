@@ -4,7 +4,7 @@
  * Tools come from three sources (defined in tools/*.yaml `provider` field):
  * 1. **Builtin tools** (pi-coding-agent built-in): read, bash, edit, write, grep, find, ls
  *    → Controlled via `--tools` flag
- * 2. **User extensions** (~/.pi/extensions/): delegate, web_search, web_fetch, browser_*, workflow
+ * 2. **User extensions** (.bobbit/extensions/): delegate, web_search, web_fetch, browser_*, workflow
  *    → Controlled via `--no-extensions` + selective `--extension` flags
  * 3. **Bobbit extensions** (extensions/): task_*, gate_*, team_*
  *    → Controlled via `--extension` flag (added separately by session-manager)

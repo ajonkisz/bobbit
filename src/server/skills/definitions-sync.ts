@@ -5,7 +5,7 @@
  * On startup it writes them to a well-known JSON file so the
  * agent-side tool extension can discover them without duplication.
  *
- * Path: ~/.pi/skill-definitions.json
+ * Path: .bobbit/state/skill-definitions.json
  */
 
 import fs from "node:fs";

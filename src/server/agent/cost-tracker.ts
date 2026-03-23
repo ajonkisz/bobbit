@@ -33,7 +33,7 @@ function emptyCost(): SessionCost {
 
 /**
  * Tracks cumulative per-session cost/usage data.
- * Persists to ~/.pi/gateway-session-costs.json.
+ * Persists to .bobbit/state/session-costs.json.
  * Same load-on-construct, write-on-mutate pattern as GoalStore/SessionStore.
  */
 export class CostTracker {

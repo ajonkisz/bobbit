@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { bobbitDir } from "./bobbit-dir.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,9 +25,11 @@ function copyDir(src: string, dest: string): void {
  * Only runs if .bobbit/ doesn't already exist — never overwrites user config.
  */
 export function scaffoldBobbitDir(projectRoot: string): void {
-  const dotBobbit = path.join(projectRoot, ".bobbit");
+  const dotBobbit = bobbitDir(projectRoot);
 
-  if (fs.existsSync(dotBobbit)) return;
+  // Check for config/ subdir to determine if already scaffolded.
+  // The top-level dir may already exist (e.g. created by env var or mkdir).
+  if (fs.existsSync(path.join(dotBobbit, "config"))) return;
 
   console.log(`Creating .bobbit/ in ${projectRoot}...`);
 

@@ -12,7 +12,7 @@ import os from "node:os";
 
 const GATEWAY_HOST = "100.123.227.233";
 const GATEWAY_PORT = 3001;
-const AUTH_TOKEN = fs.readFileSync(path.join(os.homedir(), ".pi", "gateway-token"), "utf-8").trim();
+const AUTH_TOKEN = fs.readFileSync(path.join(process.cwd(), ".bobbit", "state", "token"), "utf-8").trim();
 const BASE_URL = `https://${GATEWAY_HOST}:${GATEWAY_PORT}`;
 const WS_BASE = `wss://${GATEWAY_HOST}:${GATEWAY_PORT}`;
 const REPO_PATH = process.cwd();

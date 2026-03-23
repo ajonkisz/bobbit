@@ -19,7 +19,7 @@ function readGatewayToken(): string {
 	try {
 		return readE2EToken();
 	} catch {
-		return fs.readFileSync(path.join(os.homedir(), ".pi", "gateway-token"), "utf-8").trim();
+		return fs.readFileSync(path.join(process.cwd(), ".bobbit", "state", "token"), "utf-8").trim();
 	}
 }
 

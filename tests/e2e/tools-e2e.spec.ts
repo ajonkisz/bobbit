@@ -735,7 +735,7 @@ test.describe.serial("Agent tools", () => {
 		}
 	});
 
-	// web_search, web_fetch, and delegate are user extensions (~/.pi/extensions/)
+	// web_search, web_fetch, and delegate are user extensions (.bobbit/extensions/)
 	// not present in the sandboxed E2E environment. The tool invocation pipeline
 	// is already proven by the Bash/Write/Read/Edit tests above. Extension loading
 	// is proven by bash-tool.ts (loaded in every E2E session). Tool activation

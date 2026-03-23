@@ -7,14 +7,14 @@ const projectRoot = path.resolve(import.meta.dirname, "..");
  * E2E config for tests that need a real LLM (session-rename, image-attachment,
  * compaction).
  *
- * Starts its own isolated gateway on port 3097 with BOBBIT_PI_DIR set to
- * `.e2e-real-pi` so test state (sessions, goals, tokens) is fully separated
- * from the real dev-server's `~/.pi`.
+ * Starts its own isolated gateway on port 3097 with BOBBIT_DIR set to
+ * `.e2e-real-bobbit` so test state (sessions, goals, tokens) is fully separated
+ * from the real dev-server's .bobbit/.
  *
  * The gateway must be built first: npm run build:server
  */
 
-const E2E_REAL_PI_DIR = path.join(projectRoot, ".e2e-real-pi");
+const E2E_REAL_BOBBIT_DIR = path.join(projectRoot, ".e2e-real-bobbit");
 
 export default defineConfig({
 	testDir: ".",
@@ -46,7 +46,7 @@ export default defineConfig({
 			env: {
 				...process.env,
 				VITE_HOST: "localhost",
-				BOBBIT_PI_DIR: E2E_REAL_PI_DIR,
+				BOBBIT_DIR: E2E_REAL_BOBBIT_DIR,
 			},
 		},
 		{
