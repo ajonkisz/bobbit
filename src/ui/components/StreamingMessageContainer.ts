@@ -1,7 +1,8 @@
 import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
 import type { ToolResultMessage } from "@mariozechner/pi-ai";
-import { html, LitElement } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { property, state } from "lit/decorators.js";
+import "./LiveTimer.js";
 
 export class StreamingMessageContainer extends LitElement {
 	@property({ type: Array }) tools: AgentTool[] = [];
@@ -11,6 +12,7 @@ export class StreamingMessageContainer extends LitElement {
 	@property({ type: Object }) toolResultsById?: Map<string, ToolResultMessage>;
 	@property({ type: Object }) toolPartialResults?: Record<string, any>;
 	@property({ attribute: false }) onCostClick?: () => void;
+	@property({ type: Number }) turnStartTime: number | null = null;
 
 	@state() private _message: AgentMessage | null = null;
 	@state() private _blobState: 'hidden' | 'active' | 'entering' | 'exiting' | 'idle' | 'compact-shake' | 'compacting' | 'compact-pop' = 'idle';
@@ -206,6 +208,11 @@ export class StreamingMessageContainer extends LitElement {
 						<div class="bobbit-blob__wizard-hat"></div>
 						<div class="bobbit-blob__shadow"></div>
 					</div>
+					${this.isStreaming && this.turnStartTime
+						? html`<div class="text-xs text-muted-foreground text-right tabular-nums" style="margin-top:-24px;">
+							<live-timer .startTime=${this.turnStartTime} .running=${true}></live-timer>
+						</div>`
+						: nothing}
 				</div>`;
 			return html``; // Empty until a message is set
 		}
@@ -230,6 +237,7 @@ export class StreamingMessageContainer extends LitElement {
 						.toolPartialResults=${this.toolPartialResults}
 						.hideToolCalls=${false}
 						.onCostClick=${this.onCostClick}
+						.turnStartTime=${this.turnStartTime}
 					></assistant-message>
 					${this._blobVisible ? html`<div class="${this._blobClass}">
 						<div class="bobbit-blob__sprite"></div>

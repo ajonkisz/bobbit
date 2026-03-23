@@ -469,6 +469,7 @@ export class AgentInterface extends LitElement {
 					.toolResultsById=${toolResultsById}
 					.toolPartialResults=${(state as any).toolPartialResults}
 					.onCostClick=${this.onCostClick}
+					.turnStartTime=${(state as any).turnStartTime ?? null}
 				></streaming-message-container>
 
 			</div>
