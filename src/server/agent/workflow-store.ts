@@ -29,6 +29,8 @@ export interface Workflow {
 	gates: WorkflowGate[];
 	createdAt: number;
 	updatedAt: number;
+	/** If true, workflow is hidden from the UI (e.g. test-only workflows) */
+	hidden?: boolean;
 }
 
 /** workflows/ directory at the repo root — version controlled */
@@ -85,7 +87,7 @@ export class WorkflowStore {
 
 	private normalizeWorkflow(data: Record<string, unknown>): Workflow {
 		const gates = Array.isArray(data.gates) ? data.gates : [];
-		return {
+		const wf: Workflow = {
 			id: data.id as string,
 			name: (data.name as string) ?? (data.id as string),
 			description: (data.description as string) ?? "",
@@ -93,6 +95,8 @@ export class WorkflowStore {
 			createdAt: (data.createdAt as number) ?? 0,
 			updatedAt: (data.updatedAt as number) ?? 0,
 		};
+		if (data.hidden === true) wf.hidden = true;
+		return wf;
 	}
 
 	private normalizeGate(data: Record<string, unknown>): WorkflowGate {
@@ -133,6 +137,7 @@ export class WorkflowStore {
 				id: workflow.id,
 				name: workflow.name,
 				description: workflow.description,
+				...(workflow.hidden ? { hidden: true } : {}),
 				gates: workflow.gates.map((g) => {
 					const out: Record<string, unknown> = {
 						id: g.id,
@@ -196,7 +201,7 @@ export class WorkflowStore {
 
 	getAll(): Workflow[] {
 		this.reload();
-		return Array.from(this.workflows.values());
+		return Array.from(this.workflows.values()).filter(w => !w.hidden);
 	}
 
 	update(id: string, updates: Partial<Omit<Workflow, "id" | "createdAt">>): boolean {
