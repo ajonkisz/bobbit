@@ -289,6 +289,7 @@ export class AgentInterface extends LitElement {
 					// Clear streaming container when agent finishes
 					if (this._streamingContainer) {
 						this._streamingContainer.isStreaming = false;
+						this._streamingContainer.turnStartTime = null;
 						this._streamingContainer.setMessage(null, true);
 					}
 					// Queue draining is handled server-side now
@@ -298,6 +299,7 @@ export class AgentInterface extends LitElement {
 					if (this._streamingContainer) {
 						const isStreaming = this.session?.state.isStreaming || false;
 						this._streamingContainer.isStreaming = isStreaming;
+						this._streamingContainer.turnStartTime = (this.session?.state as any).turnStartTime ?? null;
 						this._streamingContainer.setMessage(ev.message, !isStreaming);
 					}
 					this.requestUpdate();
