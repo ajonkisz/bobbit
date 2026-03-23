@@ -259,7 +259,7 @@
 	gap: 12px;
 }
 
-.wf-field-row { display: flex; gap: 12px; }
+.wf-field-row { display: flex; gap: 12px; align-items: flex-start; }
 .wf-field { display: flex; flex-direction: column; gap: 4px; }
 .wf-field-label { font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
 .wf-field-readonly { font-size: 13px; color: var(--muted-foreground); padding: 6px 0; font-family: monospace; }
@@ -424,6 +424,39 @@
 	flex-shrink: 0;
 }
 
+/* Dependency chips in collapsed header (desktop) */
+.wf-gate-deps-desktop {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	overflow: hidden;
+	flex-shrink: 1;
+	min-width: 0;
+}
+
+.wf-gate-dep-arrow {
+	font-size: 10px;
+	color: var(--muted-foreground);
+	flex-shrink: 0;
+}
+
+.wf-dep-chip {
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: color-mix(in oklch, var(--muted-foreground) 12%, transparent);
+	font-family: var(--font-mono, monospace);
+	color: var(--muted-foreground);
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
+/* Dependency count (mobile fallback) */
+.wf-gate-deps-mobile {
+	display: none;
+	flex-shrink: 0;
+}
+
 .wf-gate-chevron {
 	display: flex;
 	align-items: center;
@@ -511,66 +544,61 @@
 .wf-gate-reorder-btn:disabled { opacity: 0.3; cursor: default; }
 
 /* ============================================================================
- * VERIFICATION STEPS SUB-COLLAPSIBLE
+ * TOGGLE ROW — label + toggle switch side by side
  * ============================================================================ */
 
-.wf-verify-section-header {
+.wf-toggle-row {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
+	font-size: 13px;
 	cursor: pointer;
-	user-select: none;
-	padding: 4px 0;
-}
-
-.wf-verify-section-header:hover .wf-verify-section-label {
-	color: var(--foreground);
-}
-
-.wf-verify-section-chevron {
-	font-size: 10px;
-	color: var(--muted-foreground);
-	transition: transform 200ms ease;
-	flex-shrink: 0;
-}
-
-.wf-verify-section-chevron.expanded {
-	transform: rotate(90deg);
-}
-
-.wf-verify-section-label {
-	font-size: 12px;
-	font-weight: 500;
-	color: var(--muted-foreground);
-	transition: color 150ms;
-}
-
-.wf-verify-section-body {
-	max-height: 0;
-	overflow: hidden;
-	transition: max-height 0.3s ease;
-}
-
-.wf-verify-section-body.expanded {
-	max-height: 2000px;
-}
-
-.wf-verify-section-body-inner {
-	padding-top: 8px;
 }
 
 /* ============================================================================
  * DEPENDENCIES
  * ============================================================================ */
 
-.wf-dep-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.wf-dep-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-.wf-dep-item input[type="checkbox"] { margin: 0; }
+.wf-dep-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .wf-dep-none { font-size: 12px; color: var(--muted-foreground); }
 
+/* Dependency toggle chips (editor) */
+.wf-dep-toggle-chip {
+	font-size: 12px;
+	padding: 3px 10px;
+	border-radius: 6px;
+	border: 1px solid var(--border);
+	background: var(--background);
+	color: var(--muted-foreground);
+	font-family: var(--font-mono, monospace);
+	cursor: pointer;
+	transition: background 150ms, border-color 150ms, color 150ms;
+}
+.wf-dep-toggle-chip:hover {
+	border-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent);
+	color: var(--foreground);
+}
+.wf-dep-toggle-chip--active {
+	background: color-mix(in oklch, var(--primary) 15%, transparent);
+	border-color: var(--primary);
+	color: var(--foreground);
+}
+.wf-dep-toggle-chip--active:hover {
+	background: color-mix(in oklch, var(--primary) 25%, transparent);
+	border-color: var(--primary);
+}
+
 /* ============================================================================
- * VERIFICATION STEPS
+ * VERIFICATION STEPS — flat (no sub-collapsible)
  * ============================================================================ */
+
+.wf-verify-label {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--muted-foreground);
+	margin-bottom: 4px;
+	display: block;
+}
 
 .wf-verification-steps {
 	display: flex;
@@ -583,6 +611,16 @@
 	border: 1px solid var(--border);
 	border-radius: 6px;
 	background: var(--secondary);
+}
+
+.wf-verify-type-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	flex-shrink: 0;
+	color: var(--muted-foreground);
 }
 
 .wf-field-hint {
@@ -628,5 +666,17 @@
 	.wf-body { padding: 14px; }
 	.wf-field-row { flex-direction: column; }
 	.wf-gate-id { max-width: 80px; }
-	.wf-gate-pill { display: none; }
+
+	/* On mobile, show dep count pill instead of individual chips */
+	.wf-gate-deps-desktop { display: none; }
+	.wf-gate-deps-mobile { display: flex; }
+}
+
+@media (max-width: 480px) {
+	.wf-nav { padding: 8px 10px; }
+	.wf-body { padding: 10px; }
+	.wf-gate-header { padding: 6px 8px; gap: 6px; }
+	.wf-gate-body-inner { padding: 8px; }
+	.wf-gate-name { font-size: 12px; }
+	.wf-gate-pill { font-size: 9px; padding: 1px 4px; }
 }

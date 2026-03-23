@@ -2,7 +2,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, nothing, type TemplateResult } from "lit";
-import { ArrowLeft, Copy, Pencil, Plus, Trash2 } from "lucide";
+import { ArrowLeft, Copy, MessageSquare, Pencil, Plus, Terminal, Trash2 } from "lucide";
 import {
 	fetchWorkflows,
 	fetchWorkflow,
@@ -46,9 +46,8 @@ let editName = "";
 let editDescription = "";
 let editGates: WorkflowGate[] = [];
 
-// Collapse/expand state
-let expandedGateIndices: Set<number> = new Set([0]);
-let expandedVerifyIndices: Set<number> = new Set();
+// Collapse/expand state — all gates start collapsed
+let expandedGateIndices: Set<number> = new Set();
 
 // Drag-to-reorder state
 let dragIndex: number | null = null;
@@ -64,8 +63,7 @@ export async function loadWorkflowPageData(): Promise<void> {
 	loading = true;
 	saving = false;
 	isNew = false;
-	expandedGateIndices = new Set([0]);
-	expandedVerifyIndices = new Set();
+	expandedGateIndices = new Set();
 	dragIndex = null;
 	dropTargetIndex = null;
 	renderApp();
@@ -102,8 +100,7 @@ function showEdit(workflow: Workflow): void {
 	editDescription = workflow.description;
 	editGates = workflow.gates.map((g) => ({ ...g, dependsOn: [...g.dependsOn], verify: g.verify ? g.verify.map(v => ({ ...v })) : undefined, metadata: g.metadata ? { ...g.metadata } : undefined }));
 	saving = false;
-	expandedGateIndices = new Set(editGates.length > 0 ? [0] : []);
-	expandedVerifyIndices = new Set();
+	expandedGateIndices = new Set();
 	setHashRoute("workflow-edit", workflow.id);
 }
 
@@ -117,7 +114,6 @@ function showNewEdit(): void {
 	editGates = [];
 	saving = false;
 	expandedGateIndices = new Set();
-	expandedVerifyIndices = new Set();
 	renderApp();
 }
 
@@ -218,12 +214,6 @@ function removeGate(index: number): void {
 		else if (idx > index) newExpanded.add(idx - 1);
 	}
 	expandedGateIndices = newExpanded;
-	const newVerify = new Set<number>();
-	for (const idx of expandedVerifyIndices) {
-		if (idx < index) newVerify.add(idx);
-		else if (idx > index) newVerify.add(idx - 1);
-	}
-	expandedVerifyIndices = newVerify;
 	renderApp();
 }
 
@@ -237,15 +227,6 @@ function toggleGateExpand(index: number): void {
 		expandedGateIndices.delete(index);
 	} else {
 		expandedGateIndices.add(index);
-	}
-	renderApp();
-}
-
-function toggleVerifyExpand(index: number): void {
-	if (expandedVerifyIndices.has(index)) {
-		expandedVerifyIndices.delete(index);
-	} else {
-		expandedVerifyIndices.add(index);
 	}
 	renderApp();
 }
@@ -274,9 +255,6 @@ function moveGate(fromIdx: number, toIdx: number): void {
 	const newExpanded = new Set<number>();
 	for (const idx of expandedGateIndices) newExpanded.add(remap(idx));
 	expandedGateIndices = newExpanded;
-	const newVerify = new Set<number>();
-	for (const idx of expandedVerifyIndices) newVerify.add(remap(idx));
-	expandedVerifyIndices = newVerify;
 
 	renderApp();
 }
@@ -324,13 +302,30 @@ function handleDragEnd(): void {
 }
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+function getVerifySummary(gate: WorkflowGate): string {
+	const steps = gate.verify || [];
+	if (steps.length === 0) return "";
+	const cmdCount = steps.filter(s => s.type === "command").length;
+	const reviewCount = steps.filter(s => s.type === "llm-review").length;
+	const parts: string[] = [];
+	if (cmdCount > 0) parts.push(`${cmdCount} cmd`);
+	if (reviewCount > 0) parts.push(`${reviewCount} review`);
+	return parts.join(", ");
+}
+
+// ============================================================================
 // RENDER: VERIFY STEP EDITOR
 // ============================================================================
 
 function renderVerifyStepEditor(gate: WorkflowGate, gateIdx: number, step: VerifyStep, stepIdx: number): TemplateResult {
+	const typeIcon = step.type === "command" ? Terminal : MessageSquare;
 	return html`
 		<div class="wf-verification-step">
 			<div class="wf-field-row">
+				<div class="wf-verify-type-icon">${icon(typeIcon, "sm")}</div>
 				<div class="wf-field" style="flex:1;">
 					<input class="wf-input" .value=${step.name || ""} placeholder="Step name"
 						@input=${(e: Event) => {
@@ -522,9 +517,8 @@ function renderGateEditor(gate: WorkflowGate, idx: number): TemplateResult {
 	const otherIds = editGates.filter((_, i) => i !== idx).map((g) => g.id).filter(Boolean);
 	const isExpanded = expandedGateIndices.has(idx);
 	const isDragging = dragIndex === idx;
-	const depCount = gate.dependsOn.length;
+	const verifySummary = getVerifySummary(gate);
 	const verifyCount = (gate.verify || []).length;
-	const isVerifyExpanded = expandedVerifyIndices.has(idx);
 
 	return html`
 		${dropTargetIndex === idx && dragIndex !== null && dragIndex !== idx ? html`<div class="wf-drop-indicator"></div>` : nothing}
@@ -544,8 +538,16 @@ function renderGateEditor(gate: WorkflowGate, idx: number): TemplateResult {
 				<span class="wf-gate-idx">${idx + 1}</span>
 				<code class="wf-gate-id">${gate.id || "(no id)"}</code>
 				<span class="wf-gate-name">${gate.name || ""}</span>
-				${depCount > 0 ? html`<span class="wf-gate-pill">${depCount} dep${depCount !== 1 ? "s" : ""}</span>` : nothing}
-				${verifyCount > 0 ? html`<span class="wf-gate-pill">${verifyCount} verify</span>` : nothing}
+				${gate.dependsOn.length > 0 ? html`
+					<span class="wf-gate-deps-desktop">
+						<span class="wf-gate-dep-arrow">\u2190</span>
+						${gate.dependsOn.map(d => html`<span class="wf-dep-chip">${d}</span>`)}
+					</span>
+					<span class="wf-gate-deps-mobile">
+						<span class="wf-gate-pill">${gate.dependsOn.length} dep${gate.dependsOn.length !== 1 ? "s" : ""}</span>
+					</span>
+				` : nothing}
+				${verifySummary ? html`<span class="wf-gate-pill">${verifySummary}</span>` : nothing}
 				<span class="wf-gate-chevron">\u25B8</span>
 				<button class="wf-gate-delete" @click=${(e: Event) => { e.stopPropagation(); removeGate(idx); }} title="Remove gate">&times;</button>
 			</div>
@@ -567,15 +569,15 @@ function renderGateEditor(gate: WorkflowGate, idx: number): TemplateResult {
 
 					<div class="wf-field-row">
 						<div class="wf-field" style="flex:1;">
-							<label class="wf-dep-item">
-								<input type="checkbox" .checked=${gate.content === true}
+							<label class="wf-toggle-row">
+								<input type="checkbox" class="toggle-switch" .checked=${gate.content === true}
 									@change=${(e: Event) => updateGateField(idx, "content", (e.target as HTMLInputElement).checked || undefined)} />
 								<span>Content gate (accepts markdown content)</span>
 							</label>
 						</div>
 						<div class="wf-field" style="flex:1;">
-							<label class="wf-dep-item">
-								<input type="checkbox" .checked=${gate.injectDownstream === true}
+							<label class="wf-toggle-row">
+								<input type="checkbox" class="toggle-switch" .checked=${gate.injectDownstream === true}
 									@change=${(e: Event) => updateGateField(idx, "injectDownstream", (e.target as HTMLInputElement).checked || undefined)} />
 								<span>Inject content downstream</span>
 							</label>
@@ -588,36 +590,27 @@ function renderGateEditor(gate: WorkflowGate, idx: number): TemplateResult {
 							${otherIds.length > 0 ? otherIds.map((depId) => {
 								const checked = gate.dependsOn.includes(depId);
 								return html`
-									<label class="wf-dep-item">
-										<input type="checkbox" .checked=${checked}
-											@change=${(e: Event) => {
-												const c = (e.target as HTMLInputElement).checked;
-												const newDeps = c ? [...gate.dependsOn, depId] : gate.dependsOn.filter((d) => d !== depId);
-												updateGateField(idx, "dependsOn", newDeps);
-											}} />
-										<span>${depId}</span>
-									</label>
+									<button class="wf-dep-toggle-chip ${checked ? "wf-dep-toggle-chip--active" : ""}"
+										@click=${() => {
+											const newDeps = checked ? gate.dependsOn.filter((d) => d !== depId) : [...gate.dependsOn, depId];
+											updateGateField(idx, "dependsOn", newDeps);
+										}}>
+										${depId}
+									</button>
 								`;
 							}) : html`<span class="wf-dep-none">No other gates to depend on</span>`}
 						</div>
 					</div>
 
 					<div class="wf-field">
-						<div class="wf-verify-section-header" @click=${(e: Event) => { e.stopPropagation(); toggleVerifyExpand(idx); }}>
-							<span class="wf-verify-section-chevron ${isVerifyExpanded ? "expanded" : ""}">\u25B8</span>
-							<span class="wf-verify-section-label">Verification Steps (${verifyCount})</span>
-						</div>
-						<div class="wf-verify-section-body ${isVerifyExpanded ? "expanded" : ""}">
-							<div class="wf-verify-section-body-inner">
-								<div class="wf-verification-steps">
-									${(gate.verify || []).map((step, si) => renderVerifyStepEditor(gate, idx, step, si))}
-									<button class="wf-criteria-add-btn" @click=${(e: Event) => {
-										e.stopPropagation();
-										const steps = [...(gate.verify || []), { name: "", type: "command" as const, run: "" }];
-										updateGateField(idx, "verify", steps);
-									}}>Add Step</button>
-								</div>
-							</div>
+						<span class="wf-verify-label">Verification Steps (${verifyCount})</span>
+						<div class="wf-verification-steps">
+							${(gate.verify || []).map((step, si) => renderVerifyStepEditor(gate, idx, step, si))}
+							<button class="wf-criteria-add-btn" @click=${(e: Event) => {
+								e.stopPropagation();
+								const steps = [...(gate.verify || []), { name: "", type: "command" as const, run: "" }];
+								updateGateField(idx, "verify", steps);
+							}}>Add Step</button>
 						</div>
 					</div>
 				</div>
