@@ -73,7 +73,8 @@ export class VerificationHarness {
 		cwd: string,
 		goalBranch?: string,
 		primaryBranch?: string,
-		allGateStates?: Map<string, { metadata?: Record<string, string> }>,
+		allGateStates?: Map<string, { metadata?: Record<string, string>; content?: string; status?: string; injectDownstream?: boolean }>,
+		goalSpec?: string,
 	): Promise<void> {
 		const steps = gate.verify;
 		if (!steps || steps.length === 0) {
@@ -110,6 +111,7 @@ export class VerificationHarness {
 				branch: goalBranch || "HEAD",
 				master: primaryBranch || "master",
 				cwd,
+				goal_spec: goalSpec || "",
 			};
 
 			// Also include the current signal's metadata as bare variables
@@ -119,45 +121,54 @@ export class VerificationHarness {
 				}
 			}
 
-			const results: GateSignal["verification"]["steps"] = [];
+			// Run all verification steps in parallel
+			const indexedResults = await Promise.all(
+				steps.map(async (step, index) => {
+					let result: { passed: boolean; output: string };
+					const startTime = Date.now();
 
-			for (const step of steps) {
-				let result: { passed: boolean; output: string };
-				const startTime = Date.now();
-
-				if (step.type === "command") {
-					const cmd = this.substituteVars(step.run || "", builtinVars, allGateStates);
-					const expectFailure = step.expect === "failure";
-					result = await this.runCommandStep(cmd, cwd, step.timeout || 300, expectFailure);
-				} else {
-					// llm-review — spawn a one-shot reviewer sub-agent
-					if (process.env.BOBBIT_LLM_REVIEW_SKIP) {
-						// Fast path for test environments without API keys
-						result = { passed: true, output: "LLM review skipped (BOBBIT_LLM_REVIEW_SKIP is set)." };
+					if (step.type === "command") {
+						const cmd = this.substituteVars(step.run || "", builtinVars, allGateStates);
+						const expectFailure = step.expect === "failure";
+						result = await this.runCommandStep(cmd, cwd, step.timeout || 300, expectFailure);
 					} else {
-						const prompt = this.substituteVars(step.prompt || "", builtinVars, allGateStates);
-						result = await this.runLlmReviewStep(
-							{ name: step.name, prompt, timeout: step.timeout },
-							cwd,
-							builtinVars,
-							signal.content,
-							signal.metadata,
-						);
+						// llm-review — spawn a one-shot reviewer sub-agent
+						if (process.env.BOBBIT_LLM_REVIEW_SKIP) {
+							// Fast path for test environments without API keys
+							result = { passed: true, output: "LLM review skipped (BOBBIT_LLM_REVIEW_SKIP is set)." };
+						} else {
+							const prompt = this.substituteVars(step.prompt || "", builtinVars, allGateStates);
+							result = await this.runLlmReviewStep(
+								{ name: step.name, prompt, timeout: step.timeout },
+								cwd,
+								builtinVars,
+								signal.content,
+								signal.metadata,
+								goalSpec,
+								allGateStates,
+							);
+						}
 					}
-				}
 
-				const duration_ms = Date.now() - startTime;
-				results.push({
-					name: step.name,
-					type: step.type,
-					passed: result.passed,
-					output: result.output,
-					duration_ms,
-					expect: step.expect,
-				});
+					const duration_ms = Date.now() - startTime;
+					return {
+						index,
+						stepResult: {
+							name: step.name,
+							type: step.type,
+							passed: result.passed,
+							output: result.output,
+							duration_ms,
+							expect: step.expect,
+						},
+					};
+				})
+			);
 
-				if (!result.passed) break; // Stop on first failure
-			}
+			// Sort by original YAML order for deterministic results
+			const results = indexedResults
+				.sort((a, b) => a.index - b.index)
+				.map(r => r.stepResult);
 
 			const allPassed = results.every(r => r.passed);
 			const status = allPassed ? "passed" : "failed";
@@ -213,6 +224,8 @@ export class VerificationHarness {
 		builtinVars: Record<string, string>,
 		signalContent?: string,
 		signalMetadata?: Record<string, string>,
+		goalSpec?: string,
+		allGateStates?: Map<string, { metadata?: Record<string, string>; content?: string; status?: string; injectDownstream?: boolean }>,
 	): Promise<{ passed: boolean; output: string }> {
 		const role = this.roleStore.get("reviewer");
 		if (!role) {
@@ -244,6 +257,24 @@ export class VerificationHarness {
 			"If you omit this tag, the verification system cannot parse your output and the review FAILS automatically.",
 			"This is the single most important formatting requirement. Never omit it.",
 		].join("\n"));
+
+		// Goal specification context
+		if (goalSpec) {
+			sections.push(`\n## Goal Specification\n\n${goalSpec}`);
+		}
+
+		// Upstream gate content (from passed gates with injectDownstream)
+		if (allGateStates) {
+			const upstreamParts: string[] = [];
+			for (const [gateId, gs] of allGateStates) {
+				if (gs.status === "passed" && gs.injectDownstream && gs.content) {
+					upstreamParts.push(`### Gate: ${gateId}\n\n${gs.content}`);
+				}
+			}
+			if (upstreamParts.length > 0) {
+				sections.push(`\n## Upstream Gate Content\n\n${upstreamParts.join("\n\n")}`);
+			}
+		}
 
 		// Signal context
 		const contextLines: string[] = [
@@ -397,7 +428,7 @@ export class VerificationHarness {
 	private substituteVars(
 		template: string,
 		builtinVars: Record<string, string>,
-		allGateStates?: Map<string, { metadata?: Record<string, string> }>,
+		allGateStates?: Map<string, { metadata?: Record<string, string>; content?: string; status?: string; injectDownstream?: boolean }>,
 	): string {
 		return template.replace(/\{\{([^}]+)\}\}/g, (match, key: string) => {
 			const trimmed = key.trim();

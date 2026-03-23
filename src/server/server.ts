@@ -859,15 +859,21 @@ async function handleApiRoute(
 		// Broadcast signal received
 		broadcastToGoal(goalId, { type: "gate_signal_received", goalId, gateId, signalId: signal.id });
 
-		// Build gate state map for metadata variable resolution
-		const allGateStates = new Map<string, { metadata?: Record<string, string> }>();
+		// Build gate state map for metadata variable resolution + LLM reviewer context
+		const allGateStates = new Map<string, { metadata?: Record<string, string>; content?: string; status?: string; injectDownstream?: boolean }>();
 		for (const gs of gateStore.getGatesForGoal(goalId)) {
-			allGateStates.set(gs.gateId, { metadata: gs.currentMetadata });
+			const def = goal.workflow?.gates?.find((g: any) => g.id === gs.gateId);
+			allGateStates.set(gs.gateId, {
+				metadata: gs.currentMetadata,
+				content: gs.currentContent,
+				status: gs.status,
+				injectDownstream: def?.injectDownstream,
+			});
 		}
 
 		// Fire-and-forget verification
 		verificationHarness.verifyGateSignal(
-			signal, gateDef, goal.cwd, goal.branch, "master", allGateStates,
+			signal, gateDef, goal.cwd, goal.branch, "master", allGateStates, goal.spec,
 		).catch(err => console.error("[verification] Gate signal error:", err));
 
 		json({ signal: { id: signal.id, gateId, status: "running" } }, 201);
