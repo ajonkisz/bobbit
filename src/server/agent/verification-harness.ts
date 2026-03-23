@@ -284,6 +284,10 @@ export class VerificationHarness {
 		try {
 			await rpc.start();
 
+			// Collect assistant text from streaming events as a fallback
+			// in case getMessages() fails after agent_end (race with process exit).
+			let streamedAssistantText = "";
+
 			// Wait for agent_end event with timeout
 			const completionPromise = new Promise<void>((resolve, reject) => {
 				const timer = setTimeout(() => {
@@ -291,6 +295,20 @@ export class VerificationHarness {
 				}, timeoutMs);
 
 				const eventUnsub = rpc.onEvent((event: any) => {
+					// Capture assistant text from message_end events as they arrive.
+					// This serves as a fallback if getMessages() fails after agent_end.
+					if (event.type === "message_end" && event.message?.role === "assistant") {
+						const msg = event.message;
+						if (Array.isArray(msg.content)) {
+							const text = msg.content
+								.filter((c: any) => c.type === "text")
+								.map((c: any) => c.text)
+								.join("\n");
+							if (text) streamedAssistantText = text;
+						} else if (typeof msg.content === "string" && msg.content) {
+							streamedAssistantText = msg.content;
+						}
+					}
 					if (event.type === "agent_end") {
 						clearTimeout(timer);
 						eventUnsub();
@@ -334,7 +352,7 @@ export class VerificationHarness {
 			await rpc.prompt(kickoff);
 			await completionPromise;
 
-			// Extract last assistant message
+			// Extract last assistant message — try getMessages() first, fall back to streamed text
 			let output = "";
 			try {
 				const msgsResp = await rpc.getMessages();
@@ -342,7 +360,11 @@ export class VerificationHarness {
 					output = extractLastAssistantOutput(msgsResp.data);
 				}
 			} catch {
-				// Non-fatal — we may still have partial output
+				// Non-fatal — we may still have partial output from streaming
+			}
+			// If getMessages() returned nothing (race with process exit), use streamed text
+			if (!output && streamedAssistantText) {
+				output = streamedAssistantText;
 			}
 
 			const verdict = parseVerdict(output);

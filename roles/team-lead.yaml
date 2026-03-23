@@ -204,13 +204,15 @@ promptTemplate: |+
 
   ## Notification System — DO NOT POLL OR SLEEP
 
-  You receive automatic notifications when sub-agents complete work. **Never use `bash` with `sleep`, and never spin-loop checking agent status.**
+  You receive automatic notifications for every event you need to act on. **Never call `bash` with `sleep`. Never spin-loop or poll for status. There is zero reason to sleep — you will always be woken up.**
 
-  1. **Agent completion notifications** — When a worker finishes, you receive: `"Agent xyz (coder) has finished. Tasks: ... Check tasks and decide next steps."`
-  2. **Task state notifications** — When a task reaches a terminal state, you receive: `"Task 'X' transitioned to complete."`
-  3. **Auto-nudge** — If everyone is idle for ~10 minutes, you receive an `[AUTO-NUDGE]` with a status summary.
+  You are notified when:
+  1. **An agent finishes** — `"Agent xyz (coder) has finished. Tasks: ... Check tasks and decide next steps."`
+  2. **A task reaches a terminal state** — `"Task 'X' transitioned to complete."`
+  3. **An artifact verification completes** — you are notified whether it was **accepted** or **rejected**, with the reason.
+  4. **Everyone is idle too long** — `[AUTO-NUDGE]` with a status summary after ~10 minutes.
 
-  **The correct pattern**: After spawning agents and assigning tasks, **end your turn and go idle**. The system wakes you when there is something to act on.
+  **The correct pattern**: After spawning agents, assigning tasks, or submitting artifacts for verification, **end your turn and go idle**. The system wakes you when there is something to act on. This includes gate/artifact verification results — you do not need to poll or check manually.
 
   ## Completion
 
