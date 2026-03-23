@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
 export interface PersistedTeamEntry {
 	goalId: string;
@@ -16,8 +16,8 @@ export interface PersistedTeamEntry {
 	maxConcurrent: number;
 }
 
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-teams.json");
+const STORE_DIR = bobbitStateDir();
+const STORE_FILE = path.join(STORE_DIR, "team-state.json");
 const LEGACY_STORE_FILE = path.join(STORE_DIR, "gateway-swarms.json");
 
 export class TeamStore {

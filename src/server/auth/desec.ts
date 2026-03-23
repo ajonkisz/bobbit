@@ -6,10 +6,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
-const PI_DIR = piDir();
-const CONFIG_PATH = path.join(PI_DIR, "desec.json");
+const STATE_DIR = bobbitStateDir();
+const CONFIG_PATH = path.join(STATE_DIR, "desec.json");
 
 export interface DesecConfig {
 	domain: string;
@@ -28,7 +28,7 @@ export function loadDesecConfig(): DesecConfig | null {
 
 /** Save deSEC config to disk. */
 export function saveDesecConfig(config: DesecConfig): void {
-	fs.mkdirSync(PI_DIR, { recursive: true });
+	fs.mkdirSync(STATE_DIR, { recursive: true });
 	fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 

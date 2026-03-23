@@ -22,7 +22,7 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { piDir } from "./pi-dir.js";
+import { bobbitStateDir } from "./bobbit-dir.js";
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -38,7 +38,7 @@ const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const CLI_PATH = path.join(__dirname, "cli.js");
 
 /** Sentinel file — any write triggers a restart */
-const SENTINEL = path.join(piDir(), "gateway-restart");
+const SENTINEL = path.join(bobbitStateDir(), "gateway-restart");
 
 // Ensure the sentinel directory exists
 const sentinelDir = path.dirname(SENTINEL);

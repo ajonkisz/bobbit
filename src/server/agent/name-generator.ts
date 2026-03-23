@@ -7,7 +7,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { refreshOAuthToken } from "../auth/oauth.js";
-import { piDir } from "../pi-dir.js";
+import { globalAuthPath } from "../bobbit-dir.js";
 import { invalidateRoleNameCache } from "./team-names.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -23,7 +23,7 @@ interface AuthCredentials {
 }
 
 function loadAuth(): AuthCredentials | null {
-	const authPath = join(piDir(), "agent", "auth.json");
+	const authPath = globalAuthPath();
 	if (!existsSync(authPath)) return null;
 	try {
 		const data = JSON.parse(readFileSync(authPath, "utf-8"));

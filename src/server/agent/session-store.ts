@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { QueuedMessage } from "../ws/protocol.js";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
 /** Persisted metadata for a single gateway session */
 export interface PersistedSession {
@@ -47,8 +47,8 @@ export interface PersistedSession {
 	messageQueue?: QueuedMessage[];
 }
 
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-sessions.json");
+const STORE_DIR = bobbitStateDir();
+const STORE_FILE = path.join(STORE_DIR, "sessions.json");
 
 /**
  * Simple JSON file store for gateway session metadata.

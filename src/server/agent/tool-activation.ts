@@ -14,7 +14,7 @@
  */
 
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitDir } from "../bobbit-dir.js";
 import type { ToolManager } from "./tool-manager.js";
 
 export interface ToolActivationResult {
@@ -41,7 +41,7 @@ export function computeToolActivationArgs(allowedTools?: string[], toolManager?:
 		return { args };
 	}
 
-	const extDir = path.join(piDir(), "extensions");
+	const extDir = path.join(bobbitDir(), "extensions");
 
 	// Load all providers in a single YAML scan
 	const providers = toolManager.getToolProviders();

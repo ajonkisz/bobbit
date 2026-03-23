@@ -10,10 +10,10 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 import { listSkills } from "./registry.js";
 
-export const SKILL_DEFINITIONS_PATH = path.join(piDir(), "skill-definitions.json");
+export const SKILL_DEFINITIONS_PATH = path.join(bobbitStateDir(), "skill-definitions.json");
 
 /**
  * Write all registered skill definitions to disk.

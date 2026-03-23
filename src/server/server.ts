@@ -4,7 +4,7 @@ import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
 import path from "node:path";
-import { piDir } from "./pi-dir.js";
+import { bobbitStateDir } from "./bobbit-dir.js";
 import { WebSocketServer } from "ws";
 import { ColorStore } from "./agent/color-store.js";
 import { SessionManager } from "./agent/session-manager.js";
@@ -56,7 +56,7 @@ export function createGateway(config: GatewayConfig) {
 	const colorStore = new ColorStore();
 	const personalityStore = new PersonalityStore();
 	const personalityManager = new PersonalityManager(personalityStore);
-	fs.mkdirSync(piDir(), { recursive: true });
+	fs.mkdirSync(bobbitStateDir(), { recursive: true });
 	const roleStore = new RoleStore();
 	const roleManager = new RoleManager(roleStore);
 	const toolStore = new ToolStore();
@@ -1868,8 +1868,8 @@ async function handleApiRoute(
 	if (url.pathname === "/api/preview" && req.method === "GET") {
 		const sessionId = url.searchParams.get("sessionId");
 		const previewPath = sessionId
-			? path.join(piDir(), `preview-${sessionId}.html`)
-			: path.join(piDir(), "preview.html");
+			? path.join(bobbitStateDir(), `preview-${sessionId}.html`)
+			: path.join(bobbitStateDir(), "preview.html");
 		try {
 			const content = fs.readFileSync(previewPath, "utf-8");
 			const stat = fs.statSync(previewPath);
@@ -1885,8 +1885,8 @@ async function handleApiRoute(
 		const body = await readBody(req);
 		const sessionId = url.searchParams.get("sessionId");
 		const previewPath = sessionId
-			? path.join(piDir(), `preview-${sessionId}.html`)
-			: path.join(piDir(), "preview.html");
+			? path.join(bobbitStateDir(), `preview-${sessionId}.html`)
+			: path.join(bobbitStateDir(), "preview.html");
 		fs.writeFileSync(previewPath, body?.html || "", "utf-8");
 		json({ ok: true });
 		return;

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 import type { Workflow, WorkflowGate } from "./workflow-store.js";
 
 export type GateStatus = "pending" | "passed" | "failed";
@@ -42,8 +42,8 @@ export interface GateState {
 	updatedAt: number;
 }
 
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-gates.json");
+const STORE_DIR = bobbitStateDir();
+const STORE_FILE = path.join(STORE_DIR, "gates.json");
 
 function compositeKey(goalId: string, gateId: string): string {
 	return `${goalId}::${gateId}`;

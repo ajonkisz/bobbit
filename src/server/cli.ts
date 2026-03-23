@@ -4,7 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { piDir } from "./pi-dir.js";
+import { setProjectRoot, bobbitConfigDir, bobbitStateDir } from "./bobbit-dir.js";
+import { scaffoldBobbitDir } from "./scaffold.js";
 import { loadOrCreateToken, readToken } from "./auth/token.js";
 import { ensureTlsCert } from "./auth/tls.js";
 import { loadDesecConfig, updateDesecIp } from "./auth/desec.js";
@@ -124,12 +125,27 @@ async function main() {
 		}
 	}
 
+	// Set project root early — all stores resolve paths from this
+	setProjectRoot(args.cwd);
+
+	// Scaffold .bobbit/ on first run (creates config, extensions, state dirs)
+	scaffoldBobbitDir(args.cwd);
+
+	// Warn about legacy ~/.pi state
+	const legacyPiDir = path.join(os.homedir(), ".pi");
+	if (fs.existsSync(path.join(legacyPiDir, "gateway-sessions.json")) && !fs.existsSync(path.join(args.cwd, ".bobbit"))) {
+		console.warn(
+			`\n⚠  Found legacy state in ~/.pi/ but no .bobbit/ folder.\n` +
+			`   Bobbit now stores state in <project-root>/.bobbit/state/.\n` +
+			`   Your existing sessions/goals will not be visible until migrated.\n` +
+			`   Run 'bobbit migrate' to copy state, or start fresh.\n`
+		);
+	}
+
 	const authToken = loadOrCreateToken(args.newToken);
 
-	// Resolve custom system prompt: check config/system-prompt.md relative to project root
-	const __cliDir = path.dirname(fileURLToPath(import.meta.url));
-	const projectRoot = path.resolve(__cliDir, "..", "..");
-	const systemPromptFile = path.join(projectRoot, "config", "system-prompt.md");
+	// Resolve custom system prompt from .bobbit/config/
+	const systemPromptFile = path.join(bobbitConfigDir(), "system-prompt.md");
 	const systemPromptPath = fs.existsSync(systemPromptFile) ? systemPromptFile : undefined;
 	if (systemPromptPath) {
 		console.log(`  System prompt: ${systemPromptPath}`);
@@ -179,7 +195,7 @@ async function main() {
 	// Write gateway URL to a discoverable file so extensions can call the API.
 	// Skip for loopback addresses to avoid E2E tests clobbering the real URL.
 	if (!isLoopback) {
-		const gatewayUrlPath = path.join(piDir(), "gateway-url");
+		const gatewayUrlPath = path.join(bobbitStateDir(), "gateway-url");
 		fs.writeFileSync(gatewayUrlPath, baseUrl, "utf-8");
 	}
 

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { stringify, parse } from "yaml";
+import { bobbitConfigDir } from "../bobbit-dir.js";
 
 export interface Personality {
 	/** Unique identifier — lowercase alphanumeric + hyphens */
@@ -16,9 +16,8 @@ export interface Personality {
 	updatedAt: number;
 }
 
-/** personalities/ directory at the repo root — version controlled */
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PERSONALITIES_DIR = path.resolve(__dirname, "../../../personalities");
+/** personalities/ directory in .bobbit/config — version controlled */
+const PERSONALITIES_DIR = path.join(bobbitConfigDir(), "personalities");
 
 /**
  * File-backed personality store. Each personality is a YAML file in personalities/<name>.yaml

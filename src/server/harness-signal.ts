@@ -10,9 +10,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "./pi-dir.js";
+import { bobbitStateDir } from "./bobbit-dir.js";
 
-const SENTINEL = path.join(piDir(), "gateway-restart");
+const SENTINEL = path.join(bobbitStateDir(), "gateway-restart");
 
 const dir = path.dirname(SENTINEL);
 if (!fs.existsSync(dir)) {

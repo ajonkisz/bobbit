@@ -1,12 +1,12 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
-const PI_DIR = piDir();
-const TLS_DIR = path.join(PI_DIR, "gateway-tls");
-const CERT_PATH = path.join(PI_DIR, "gateway-cert.pem");
-const KEY_PATH = path.join(PI_DIR, "gateway-key.pem");
+const STATE_DIR = bobbitStateDir();
+const TLS_DIR = path.join(STATE_DIR, "tls");
+const CERT_PATH = path.join(TLS_DIR, "cert.pem");
+const KEY_PATH = path.join(TLS_DIR, "key.pem");
 
 // mkcert CA files
 const CA_CERT_PATH = path.join(TLS_DIR, "ca.crt");
@@ -53,7 +53,7 @@ export interface TlsFiles {
  * Returns paths to the cert, key, and optionally the CA cert.
  */
 export async function ensureTlsCert(host: string): Promise<TlsFiles> {
-	fs.mkdirSync(PI_DIR, { recursive: true });
+	fs.mkdirSync(STATE_DIR, { recursive: true });
 	fs.mkdirSync(TLS_DIR, { recursive: true });
 
 	// If existing cert covers this host, reuse it
@@ -159,7 +159,7 @@ function generateSelfSignedCert(host: string): TlsFiles {
 		// Try alternate openssl syntax for older versions that don't support -addext
 		try {
 			// Write a minimal openssl config with SAN
-			const cnfPath = path.join(PI_DIR, "gateway-openssl.cnf");
+			const cnfPath = path.join(TLS_DIR, "openssl.cnf");
 			fs.writeFileSync(cnfPath, [
 				"[req]",
 				"distinguished_name = req_dn",
