@@ -23,9 +23,12 @@ gates:
       - name: "Type check passes"
         type: command
         run: "npm run check"
-      - name: "Full test suite"
+      - name: "Unit tests"
         type: command
-        run: "npm test"
+        run: "npm run test:unit"
+      - name: "E2E tests"
+        type: command
+        run: "npm run test:e2e"
       - name: "Code review"
         type: llm-review
         prompt: |

@@ -231,7 +231,8 @@ npm run dev:harness    # Gateway via restart harness + vite (use this for develo
 npm run restart-server # Signal the harness to rebuild & restart the server
 npm start              # Run built gateway (serves embedded UI)
 npm run check          # Type-check both server and web without emitting
-npm test               # Unit tests (Playwright file:// fixtures)
+npm test               # Run all tests (unit + E2E)
+npm run test:unit      # Unit tests (Playwright file:// fixtures)
 npm run test:e2e       # E2E tests (auto-starts sandboxed gateway via Playwright webServer)
 ```
 
@@ -261,7 +262,7 @@ See [docs/dev-workflow.md](docs/dev-workflow.md) for the full guide on running m
 npm run check
 
 # Unit tests (fast, no server needed)
-npx playwright test tests/mobile-header.spec.ts --config tests/playwright.config.ts --reporter=json 2>/dev/null | node scripts/test-filter.mjs
+npx playwright test --config tests/playwright.config.ts --reporter=json 2>/dev/null | node scripts/test-filter.mjs
 
 # E2E tests (starts sandboxed gateway on port 3099 automatically)
 npm run build:server && npx playwright test --config playwright-e2e.config.ts --reporter=json 2>/dev/null | node scripts/test-filter.mjs

@@ -16,8 +16,9 @@
     "restart-server": "node dist/server/harness-signal.js",
     "start": "node dist/server/cli.js --cwd .",
     "check": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit",
-    "test": "playwright test tests/mobile-header.spec.ts --config tests/playwright.config.ts",
+    "test:unit": "playwright test --config tests/playwright.config.ts",
     "test:e2e": "npm run build:server && npx playwright test --config playwright-e2e.config.ts",
+    "test": "npm run test:unit && npm run test:e2e",
     "test:e2e:ui": "npm run build && npx playwright test --config tests/playwright-e2e-ui.config.ts",
     "clean": "shx rm -rf dist"
   },
