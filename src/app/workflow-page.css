@@ -582,18 +582,30 @@
 }
 
 .wf-verification-step {
-	padding: 0.5rem;
+	padding: 8px;
 	border: 1px solid var(--border);
 	border-radius: 6px;
 	background: var(--secondary);
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
 }
+
+/* Header row: icon + name + type + expect + delete — always horizontal */
+.wf-vstep-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.wf-vstep-name { flex: 1; min-width: 80px; }
+.wf-vstep-type { flex: 0 0 auto; width: auto; }
+.wf-vstep-expect { flex: 0 0 auto; width: auto; }
 
 .wf-verify-type-icon {
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
 	flex-shrink: 0;
 	color: var(--muted-foreground);
 }
@@ -608,14 +620,13 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 18px;
-	height: 18px;
+	width: 24px;
+	height: 24px;
 	border: none;
 	background: none;
 	color: var(--muted-foreground);
 	cursor: pointer;
 	border-radius: 4px;
-	font-size: 13px;
 	flex-shrink: 0;
 }
 .wf-criteria-remove:hover { color: var(--destructive); }
