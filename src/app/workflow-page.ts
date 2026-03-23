@@ -412,48 +412,42 @@ function renderVerifyStepEditor(gate: WorkflowGate, gateIdx: number, step: Verif
 	const typeIcon = step.type === "command" ? Terminal : MessageSquare;
 	return html`
 		<div class="wf-verification-step">
-			<div class="wf-field-row">
-				<div class="wf-verify-type-icon">${icon(typeIcon, "sm")}</div>
-				<div class="wf-field" style="flex:1;">
-					<input class="wf-input" .value=${step.name || ""} placeholder="Step name"
-						@input=${(e: Event) => {
-							const steps = [...(gate.verify || [])];
-							steps[stepIdx] = { ...steps[stepIdx], name: (e.target as HTMLInputElement).value };
-							updateGateField(gateIdx, "verify", steps);
-						}} />
-				</div>
-				<div class="wf-field" style="flex:0 0 140px;">
-					<select class="wf-select" .value=${step.type || "command"}
+			<div class="wf-vstep-header">
+				<span class="wf-verify-type-icon">${icon(typeIcon, "sm")}</span>
+				<input class="wf-input wf-vstep-name" .value=${step.name || ""} placeholder="Step name"
+					@input=${(e: Event) => {
+						const steps = [...(gate.verify || [])];
+						steps[stepIdx] = { ...steps[stepIdx], name: (e.target as HTMLInputElement).value };
+						updateGateField(gateIdx, "verify", steps);
+					}} />
+				<select class="wf-select wf-vstep-type" .value=${step.type || "command"}
+					@change=${(e: Event) => {
+						const steps = [...(gate.verify || [])];
+						steps[stepIdx] = { ...steps[stepIdx], type: (e.target as HTMLSelectElement).value as "command" | "llm-review" };
+						updateGateField(gateIdx, "verify", steps);
+					}}>
+					<option value="command" ?selected=${step.type === "command"}>command</option>
+					<option value="llm-review" ?selected=${step.type === "llm-review"}>llm-review</option>
+				</select>
+				${step.type === "command" ? html`
+					<select class="wf-select wf-vstep-expect" .value=${step.expect || "success"}
 						@change=${(e: Event) => {
 							const steps = [...(gate.verify || [])];
-							steps[stepIdx] = { ...steps[stepIdx], type: (e.target as HTMLSelectElement).value as "command" | "llm-review" };
+							steps[stepIdx] = { ...steps[stepIdx], expect: (e.target as HTMLSelectElement).value as "success" | "failure" };
 							updateGateField(gateIdx, "verify", steps);
 						}}>
-						<option value="command" ?selected=${step.type === "command"}>command</option>
-						<option value="llm-review" ?selected=${step.type === "llm-review"}>llm-review</option>
+						<option value="success" ?selected=${step.expect !== "failure"}>expect: success</option>
+						<option value="failure" ?selected=${step.expect === "failure"}>expect: failure</option>
 					</select>
-				</div>
-				${step.type === "command" ? html`
-					<div class="wf-field" style="flex:0 0 120px;">
-						<select class="wf-select" .value=${step.expect || "success"}
-							@change=${(e: Event) => {
-								const steps = [...(gate.verify || [])];
-								steps[stepIdx] = { ...steps[stepIdx], expect: (e.target as HTMLSelectElement).value as "success" | "failure" };
-								updateGateField(gateIdx, "verify", steps);
-							}}>
-							<option value="success" ?selected=${step.expect !== "failure"}>expect: success</option>
-							<option value="failure" ?selected=${step.expect === "failure"}>expect: failure</option>
-						</select>
-					</div>
 				` : nothing}
 				<button class="wf-criteria-remove" @click=${(e: Event) => {
 					e.stopPropagation();
 					const steps = (gate.verify || []).filter((_: any, i: number) => i !== stepIdx);
 					updateGateField(gateIdx, "verify", steps);
-				}}>&times;</button>
+				}}>${icon(Trash2, "sm")}</button>
 			</div>
 			${step.type === "command" ? html`
-				<input class="wf-input" style="margin-top:4px;" .value=${step.run || ""} placeholder="Command to run..."
+				<input class="wf-input" .value=${step.run || ""} placeholder="Command to run..."
 					@input=${(e: Event) => {
 						const steps = [...(gate.verify || [])];
 						steps[stepIdx] = { ...steps[stepIdx], run: (e.target as HTMLInputElement).value };
@@ -461,7 +455,7 @@ function renderVerifyStepEditor(gate: WorkflowGate, gateIdx: number, step: Verif
 					}} />
 				<div class="wf-field-hint">Variables: {{branch}}, {{master}}, {{cwd}}, {{gate_id.field}}</div>
 			` : html`
-				<textarea class="wf-textarea" style="margin-top:4px;" .value=${step.prompt || ""} placeholder="Review prompt..."
+				<textarea class="wf-textarea" .value=${step.prompt || ""} placeholder="Review prompt..."
 					@input=${(e: Event) => {
 						const steps = [...(gate.verify || [])];
 						steps[stepIdx] = { ...steps[stepIdx], prompt: (e.target as HTMLTextAreaElement).value };
