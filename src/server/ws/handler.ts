@@ -117,7 +117,7 @@ export function handleWebSocketConnection(
 				}
 			}
 
-			send(ws, { type: "session_status", status: session.status });
+			send(ws, { type: "session_status", status: session.status, ...(session.streamingStartedAt ? { streamingStartedAt: session.streamingStartedAt } : {}) });
 			send(ws, { type: "session_title", sessionId, title: session.title });
 			send(ws, { type: "queue_update", sessionId, queue: session.promptQueue.toArray() });
 			return;

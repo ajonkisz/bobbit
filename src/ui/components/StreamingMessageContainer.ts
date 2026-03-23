@@ -209,7 +209,7 @@ export class StreamingMessageContainer extends LitElement {
 						<div class="bobbit-blob__shadow"></div>
 					</div>
 					${this.isStreaming && this.turnStartTime
-						? html`<div class="px-2 sm:px-4 text-xs text-muted-foreground text-right tabular-nums" style="margin-top:-24px;">
+						? html`<div class="px-2 sm:px-4 text-xs text-muted-foreground text-right tabular-nums" style="margin-top:-32px;">
 							<live-timer .startTime=${this.turnStartTime} .running=${true}></live-timer>
 						</div>`
 						: nothing}

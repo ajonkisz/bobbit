@@ -69,6 +69,8 @@ export interface SessionInfo {
 	lastTurnErrored?: boolean;
 	/** Whether tool calls were executed during the current/last turn */
 	turnHadToolCalls?: boolean;
+	/** Timestamp when the current streaming turn started */
+	streamingStartedAt?: number;
 	/** Last user prompt text, for retry on fresh-response errors */
 	lastPromptText?: string;
 	/** Last user prompt images, for retry on fresh-response errors */
@@ -260,7 +262,8 @@ export class SessionManager {
 
 		// Optimistic status update to prevent double-dispatch race
 		session.status = "streaming";
-		broadcast(session.clients, { type: "session_status", status: "streaming" });
+		session.streamingStartedAt = session.streamingStartedAt ?? Date.now();
+		broadcast(session.clients, { type: "session_status", status: "streaming", streamingStartedAt: session.streamingStartedAt });
 
 		// Always dispatch as prompt — agent is idle, steer is only for mid-turn
 		session.rpcClient.prompt(next.text, next.images).catch((err: any) => {
@@ -309,10 +312,12 @@ export class SessionManager {
 			session.status = "streaming";
 			session.lastTurnErrored = false;
 			session.turnHadToolCalls = false;
+			session.streamingStartedAt = Date.now();
 			this.store.update(session.id, { wasStreaming: true });
-			broadcast(session.clients, { type: "session_status", status: "streaming" });
+			broadcast(session.clients, { type: "session_status", status: "streaming", streamingStartedAt: session.streamingStartedAt });
 		} else if (event.type === "agent_end") {
 			session.status = "idle";
+			session.streamingStartedAt = undefined;
 			this.store.update(session.id, { wasStreaming: false });
 			broadcast(session.clients, { type: "session_status", status: "idle" });
 			// Don't drain the queue if the turn ended with a model error —
