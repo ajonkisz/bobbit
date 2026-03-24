@@ -300,7 +300,7 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 
 	const compactTopOffset = compactSquish ? 5.4 : 0;
 	const eyeTop = addsHeight ? `${4 + compactTopOffset}px` : `${compactTopOffset}px`;
-	const eyeLeft = hasAccessory ? "0" : "1px";
+	const eyeLeft = "0";
 	const eyeLayer = isSelected
 		? html`<span style="position:absolute;left:${eyeLeft};top:${eyeTop};display:block;width:1px;height:1px;image-rendering:pixelated;box-shadow:${eyeShadow};${eyeAnim}"></span>`
 		: "";
@@ -329,6 +329,6 @@ export function statusBobbit(status: string, isCompacting = false, sessionId?: s
 
 	const containerWidth = "20px";
 
-	const innerLeft = hasAccessory ? "0" : "1px";
+	const innerLeft = "0";
 	return html`<span style="display:inline-flex;align-items:center;justify-content:center;width:${containerWidth};height:${containerHeight};flex-shrink:0;position:relative;overflow:hidden;margin-top:2px;${filterStyle}${bobAnim}${cancelAnim}${idleAnim}"><span style="position:absolute;left:${innerLeft};top:${innerTop};display:block;width:1px;height:1px;image-rendering:pixelated;${baseTransform}box-shadow:${shadow};${shimmer}"></span>${eyeLayer}${accessoryLayer}</span>`;
 }
