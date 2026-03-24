@@ -35,10 +35,12 @@ function getPoolForRole(role: string): string[] {
 	const filePath = join(DATA_DIR, "team-names", `${role}.json`);
 	if (existsSync(filePath)) {
 		try {
-			const pool = JSON.parse(readFileSync(filePath, "utf-8"));
-			if (Array.isArray(pool) && pool.length > 0) {
-				rolePools.set(role, pool);
-				return pool;
+			const roleNames = JSON.parse(readFileSync(filePath, "utf-8"));
+			if (Array.isArray(roleNames) && roleNames.length > 0) {
+				// Merge role-specific names with generic pool, deduplicating
+				const merged = [...new Set([...roleNames, ...GENERIC_POOL])];
+				rolePools.set(role, merged);
+				return merged;
 			}
 		} catch {
 			// Fall through to generic

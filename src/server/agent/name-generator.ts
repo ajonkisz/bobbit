@@ -82,22 +82,27 @@ export async function generateRoleNames(roleName: string, roleLabel: string): Pr
 		? `You are Claude Code, Anthropic's official CLI for Claude. You generate funny names for AI coding agents.`
 		: `You generate funny names for AI coding agents.`;
 
-	const prompt = `Generate exactly 50 funny names for an AI agent whose role is "${roleLabel}" (id: "${roleName}").
+	const prompt = `Generate exactly 500 funny names for an AI agent whose role is "${roleLabel}" (id: "${roleName}").
 
 Rules:
-1. Each name must obviously feel like a name (human name, pet name, or nickname)
-2. Keep them SHORT — max 3 words, ideally 1-2. We display these in a tight UI
-3. Make them FUNNY — puns, pop culture references, wordplay, absurdist humour
-4. Each name should be tangentially related to the "${roleLabel}" role
-5. Mix styles: celebrity pun names, alliterative nicknames, "<Role thing> Mc<Thing>face" patterns, mashups
+1. Every name MUST feel like a real name — something you'd call a person, pet, or character. First+Last, a nickname, or a character name. If you wouldn't introduce someone by it, reject it.
+2. Keep them SHORT — 2 words max. No exceptions.
+3. The humor can come from: puns on real names (JSON Derulo, Lint Eastwood, Meryl Heap), light absurdity (Señor Bugs), or just a fun character name (Forky, The Dude). Not every name needs a tech pun.
+4. NO jargon-only names, NO keyboard symbols (Ctrl+Z), NO acronyms, NO "Mc___face" patterns, NO compound words that aren't names (Semicolonoscopy).
+5. Pop culture references are great when the original is well-known and the pun is obvious. Obscure references don't land.
+6. Every name should make the reader smirk. If a name is just a random noun or a straight celebrity name with no twist, cut it.
+7. The role connection can be subtle or absent — a great name beats a forced pun. A forced pun where you have to squint to see the connection is worse than no pun at all.
+8. Mix: ~50% punny celebrity/character names with a tech twist, ~25% beloved fictional characters, ~25% short characterful nicknames (pet names, food names, fun single words with personality).
+9. No verbatim movie/show titles — the reference should be transformed, not copied.
 
-Example of excellent coding agent names: "JSON Derulo", "Lil Merge Conflict", "Boba Fetch", "Crash Bandicoder"
+GOOD examples: "JSON Derulo", "Lint Eastwood", "Meryl Heap", "Boba Fetch", "Veto Corleone", "Null Jackman", "Señor Bugs", "Forky", "Pickle", "Phoebe Buffering"
+BAD examples: "Semicolonoscopy", "LGTM-NOT", "Ctrl+Zendaya", "Testy McTestface", "Cache Money", "Dwayne The Docs Johnson"
 
-Output a JSON array of 50 strings. Output ONLY the JSON array, no explanation, no markdown fences.`;
+Output a JSON array of 500 strings. Output ONLY the JSON array, no explanation, no markdown fences.`;
 
 	const body = {
 		model: MODEL,
-		max_tokens: 2048,
+		max_tokens: 16384,
 		system: auth.type === "oauth"
 			? [{ type: "text", text: systemText }]
 			: systemText,
@@ -146,9 +151,9 @@ Output a JSON array of 50 strings. Output ONLY the JSON array, no explanation, n
 		// Filter to only valid short strings
 		const valid = names
 			.filter((n: unknown): n is string => typeof n === "string" && n.length > 0 && n.length <= 30)
-			.slice(0, 50);
+			.slice(0, 500);
 
-		if (valid.length < 10) {
+		if (valid.length < 50) {
 			console.error(`[name-gen] Only ${valid.length} valid names generated, skipping`);
 			return;
 		}
