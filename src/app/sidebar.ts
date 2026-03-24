@@ -232,7 +232,7 @@ export function renderStaffSidebarSection() {
 	return html`
 		<div class="border-t border-border/30 my-1 mx-2"></div>
 		<div class="flex flex-col gap-0.5">
-			<div class="flex items-center ${mobile ? "gap-1.5 px-2 py-1.5" : "gap-1 px-1 py-0.5"} rounded-md cursor-pointer ${mobile ? "active:bg-secondary/50" : "hover:bg-secondary/30"} transition-colors"
+			<div class="flex items-center ${mobile ? "gap-1.5 pl-0 pr-2 py-1.5" : "gap-1 px-1 py-0.5"} rounded-md cursor-pointer ${mobile ? "active:bg-secondary/50" : "hover:bg-secondary/30"} transition-colors"
 				@click=${() => { setStaffSectionExpanded(!staffSectionExpanded); renderApp(); }}>
 				<span class="${mobile ? "text-sm" : "text-[11px]"} text-muted-foreground shrink-0 select-none" style="width:${mobile ? "14" : "12"}px;text-align:center;">${staffSectionExpanded ? "▾" : "▸"}</span>
 				<span class="shrink-0 text-muted-foreground">${icon(Bot, mobile ? "sm" : "xs")}</span>
@@ -266,11 +266,20 @@ export function renderStaffSidebarSection() {
 					@click=${(e: Event) => { e.stopPropagation(); window.location.hash = `#/staff/${agent.id}`; }}
 					title="Edit">${icon(Pencil, "xs")}</button>`;
 				return html`
-				<div class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-3 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors
+				<div class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-2 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors
 					${active ? "bg-secondary text-foreground" : mobile ? "text-muted-foreground active:bg-secondary/50" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
 					@click=${() => handleStaffClick(agent)}>
 					${statusBobbit(sessionStatus, isCompacting, agent.currentSessionId, active, isAborting, false, false, accessory)}
-					<span class="flex-1 truncate ${mobile ? "text-base" : "text-xs"} ${active ? "font-medium" : "font-normal"}">${agent.name}</span>
+					<div class="flex-1 min-w-0 ${mobile ? "flex items-baseline gap-1" : ""} mt-0.5 ${active ? "font-medium" : "font-normal"}"><span class="truncate ${mobile ? "text-base" : "text-xs"}">${agent.name}</span>${mobile && session ? (() => {
+							const isActiveSession = sessionStatus === "streaming" || sessionStatus === "busy" || isCompacting;
+							if (isActiveSession) return html`<span class="shrink-0 text-[11px] text-muted-foreground/40">·</span><span class="shrink-0 inline-flex items-center text-[11px] text-muted-foreground/50" style="letter-spacing:0.01em;vertical-align:middle;">${"active".split("").map((ch, i) =>
+								html`<span class="sidebar-shimmer-letter" style="animation-delay:${i * 0.18}s">${ch}</span>`
+							)}</span>`;
+							const time = terseRelativeTime(session.lastActivity);
+							if (!time) return "";
+							const unseen = hasUnseenActivity(session);
+							return html`<span class="shrink-0 text-[11px] text-muted-foreground/40">·</span><span class="shrink-0 inline-flex items-center gap-0.5 text-[11px] tabular-nums ${unseen ? "text-foreground/70 font-medium" : "text-muted-foreground/50"}" style="vertical-align:middle;" title="${formatSessionAge(session.lastActivity)}">${time}${unseen ? html`<span class="text-primary" style="font-size:6px;line-height:1;">●</span>` : ""}</span>`;
+						})() : ""}</div>
 					${!mobile && session ? (() => {
 						const time = terseRelativeTime(session.lastActivity);
 						if (!time) return "";

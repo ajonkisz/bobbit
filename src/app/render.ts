@@ -117,7 +117,7 @@ function renderMobileLanding() {
 								${sortedGoals.length > 0 ? html`
 									<div class="border-t border-border/30 my-1 mx-2"></div>
 									<div class="flex flex-col gap-0.5">
-										<div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer active:bg-secondary/50 transition-colors"
+										<div class="flex items-center gap-1.5 pl-0 pr-2 py-1.5 rounded-md cursor-pointer active:bg-secondary/50 transition-colors"
 											@click=${() => { setUngroupedExpanded(!ungroupedExpanded); renderApp(); }}>
 											<span class="text-sm text-muted-foreground shrink-0 select-none" style="width:14px;text-align:center;">${isUngroupedExpanded ? "▾" : "▸"}</span>
 											<span class="shrink-0 text-muted-foreground">${icon(MessagesSquare, "sm")}</span>
@@ -142,7 +142,7 @@ function renderMobileLanding() {
 									</div>
 								` : ungroupedSessions.length > 0 ? html`
 									<div class="flex flex-col gap-0.5">
-										<div class="flex items-center gap-1.5 px-2 py-1.5">
+										<div class="flex items-center gap-1.5 pl-0 pr-2 py-1.5">
 											<span class="flex-1 text-sm text-muted-foreground uppercase tracking-wider font-medium flex items-center gap-1.5" style="padding-left:15px;"><span class="shrink-0">${icon(MessagesSquare, "sm")}</span> Sessions</span>
 											<div class="flex items-center relative">
 												<button

@@ -165,7 +165,7 @@ export function stopTimeRefresh(): void {
 /** Render "active" with a subtle shimmer wave across each letter. */
 function renderActiveShimmer() {
 	const letters = "active".split("");
-	return html`<span class="shrink-0 flex items-center text-[10px] text-muted-foreground/50" style="letter-spacing:0.01em;">${letters.map((ch, i) =>
+	return html`<span class="shrink-0 inline-flex items-center text-[11px] text-muted-foreground/50" style="letter-spacing:0.01em;vertical-align:middle;">${letters.map((ch, i) =>
 		html`<span class="sidebar-shimmer-letter" style="animation-delay:${i * 0.18}s">${ch}</span>`
 	)}</span>`;
 }
@@ -178,7 +178,8 @@ function renderSessionTime(session: GatewaySession) {
 	if (!time) return "";
 	const unseen = hasUnseenActivity(session);
 	return html`<span
-		class="shrink-0 flex items-center gap-0.5 text-[10px] tabular-nums ${unseen ? "text-foreground/70 font-medium" : "text-muted-foreground/50"}"
+		class="shrink-0 inline-flex items-center gap-0.5 text-[11px] tabular-nums ${unseen ? "text-foreground/70 font-medium" : "text-muted-foreground/50"}"
+		style="vertical-align:middle;"
 		title="${formatSessionAge(session.lastActivity)}"
 	>${time}${unseen ? html`<span class="text-primary" style="font-size:6px;line-height:1;">●</span>` : ""}</span>`;
 }
@@ -219,7 +220,7 @@ export function renderSessionRow(session: GatewaySession) {
 
 	return html`
 		<div
-			class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-3 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors text-sm
+			class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-2 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors text-sm
 				${active ? "bg-secondary text-foreground sidebar-session-active" : connecting ? "bg-secondary/30 text-muted-foreground" : mobile ? "text-muted-foreground active:bg-secondary/50" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
 			${mobile ? "" : html``}
 			@mouseenter=${mobile ? null : (e: MouseEvent) => showSessionTooltip(e, session, displayTitle)}
@@ -231,8 +232,8 @@ export function renderSessionRow(session: GatewaySession) {
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, session.role === "team-lead", session.role === "coder", session.accessory)}
 			</div>
-			<div class="flex-1 min-w-0 flex flex-col">
-				<div class="truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			<div class="flex-1 min-w-0 flex flex-col justify-center">
+				<div class="${mobile ? "flex items-baseline gap-1 min-w-0" : ""} mt-0.5 ${isActive ? "font-semibold" : "font-normal"}"><span class="truncate ${mobile ? "text-base" : "text-xs"}">${displayTitle}</span>${mobile ? html`<span class="shrink-0 text-[11px] text-muted-foreground/40">·</span>${renderSessionTime(session)}` : ""}</div>
 				${session.personalities && session.personalities.length > 0 ? html`
 					<div class="flex flex-wrap gap-0.5 mt-0.5">
 						${session.personalities.map((t) => html`<span
@@ -294,7 +295,7 @@ function renderTeamLeadRow(session: GatewaySession, childCount: number, expanded
 
 	return html`
 		<div
-			class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-2 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors text-sm
+			class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-1 pr-1 ${rowPy} rounded-md cursor-pointer transition-colors text-sm
 				${active ? "bg-secondary text-foreground sidebar-session-active" : connecting ? "bg-secondary/30 text-muted-foreground" : mobile ? "text-muted-foreground active:bg-secondary/50" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}"
 			@mouseenter=${mobile ? null : (e: MouseEvent) => showSessionTooltip(e, session, displayTitle)}
 			@mouseleave=${mobile ? null : hideSessionTooltip}
@@ -306,7 +307,7 @@ function renderTeamLeadRow(session: GatewaySession, childCount: number, expanded
 					? html`<svg class="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`
 					: statusBobbit(session.status, session.isCompacting, session.id, active, session.isAborting, true, false, session.accessory)}
 			</div>
-			<div class="flex-1 min-w-0 truncate ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}">${displayTitle}</div>
+			<div class="flex-1 min-w-0 ${mobile ? "flex items-baseline gap-1" : "truncate"} mt-0.5 ${mobile ? "text-base" : "text-xs"} ${isActive ? "font-semibold" : "font-normal"}"><span class="${mobile ? "truncate" : ""}">${displayTitle}</span>${mobile ? html`<span class="shrink-0 text-[11px] text-muted-foreground/40">·</span>${renderSessionTime(session)}` : ""}</div>
 			${childBadge}
 			${!mobile ? renderSessionTime(session) : ""}
 			${mobile
@@ -377,7 +378,7 @@ export function renderGoalGroup(goal: Goal) {
 	`;
 
 	const emptyState = html`
-		<div class="pl-3 py-1 ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground">
+		<div class="pl-2 py-1 ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground">
 			${isTeamGoal
 				? html`No agents — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${handleStartTeam}>${isLoading ? "starting\u2026" : "start team"}</button>`
 				: html`No sessions — <button class="text-primary ${mobile ? "" : "hover:underline"}" @click=${() => createAndConnectSession(goal.id)}>start one</button>`}
@@ -407,7 +408,7 @@ export function renderGoalGroup(goal: Goal) {
 
 	return html`
 		<div class="flex flex-col ${goal.state === "shelved" ? "opacity-60" : ""}">
-			<div class="${mobile ? "" : "group relative"} flex items-center gap-1 px-1 ${mobile ? "py-1" : "py-0.5"} rounded-md cursor-pointer ${mobile ? "active:bg-secondary/50" : "hover:bg-secondary/50"} transition-colors"
+			<div class="${mobile ? "" : "group relative"} flex items-center gap-1 pl-0 pr-1 ${mobile ? "py-1" : "py-0.5"} rounded-md cursor-pointer ${mobile ? "active:bg-secondary/50" : "hover:bg-secondary/50"} transition-colors"
 				@click=${toggleExpand}
 				@dblclick=${!mobile ? () => { if (goal.team) { const tl = goalSessions.find(s => s.role === "team-lead"); if (tl) connectToSession(tl.id, true); } } : null}>
 				<span class="text-[11px] text-muted-foreground shrink-0 select-none" style="width:12px;text-align:center;">${isExpanded ? "▾" : "▸"}</span>
@@ -422,7 +423,7 @@ export function renderGoalGroup(goal: Goal) {
 			${isExpanded ? html`
 				<div class="flex flex-col gap-0.5">
 					${goalSessions.length === 0 && !isCreatingHere ? emptyState : (isTeamGoal ? renderTeamGroup() : goalSessions.map(renderSessionRow))}
-					${isCreatingHere ? html`<div class="pl-3 py-1 ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground flex items-center gap-1">
+					${isCreatingHere ? html`<div class="pl-2 py-1 ${mobile ? "text-xs" : "text-[10px]"} text-muted-foreground flex items-center gap-1">
 						<svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
 						Creating…
 					</div>` : ""}
