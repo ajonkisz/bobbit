@@ -224,12 +224,18 @@ src/
 │   ├── sidebar.ts               # Desktop session sidebar
 │   ├── state.ts                 # App-level state management
 │   ├── storage.ts               # Client-side storage helpers
+│   ├── personality-manager-page.ts # Personality management page
+│   ├── personality-manager.css  # Personality manager page styles
+│   ├── staff-page.ts           # Staff agent management page
 │   ├── tool-manager-page.ts     # Tool management UI (list + detail views)
-│   └── tool-manager.css         # Tool management page styles
+│   ├── tool-manager.css         # Tool management page styles
+│   ├── workflow-page.ts         # Workflow list and detail/edit page
+│   └── workflow-page.css        # Workflow page styles
 docs/
+├── bobbit-sprites.md    # Bobbit pixel art, animation & accessory system reference
 ├── dev-workflow.md      # Development workflow guide
-├── prompt-queue.md      # Prompt queue architecture
-└── bobbit-sprites.md    # Bobbit pixel art, animation & accessory system reference
+├── goals-workflows-tasks.md  # Goals, workflows, tasks & gates architecture
+└── prompt-queue.md      # Prompt queue architecture
 ```
 
 ## Commands
