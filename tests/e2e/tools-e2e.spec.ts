@@ -1,18 +1,17 @@
 /**
- * End-to-end tests for Bobbit agent tools and server APIs.
+ * End-to-end tests for Bobbit server APIs and WebSocket protocol.
  *
- * Tests run against a real gateway (started by Playwright webServer on port 3099).
+ * Tests run against a real gateway (started by Playwright webServer).
  * They verify:
  *   1. REST API endpoints (sessions, goals, tasks, artifacts, skills, health)
- *   2. WebSocket protocol (auth, ping/pong, session lifecycle, prompt dispatch)
- *   3. Agent tool invocations (Read, Write, Edit, Bash — verified via WS events)
+ *   2. WebSocket protocol (auth, ping/pong, set_title, client join/leave)
+ *
+ * Agent tool invocations (Read, Write, Edit, Bash) that spawn real agent
+ * subprocesses have been moved to agent-tools-e2e.spec.ts (excluded by default).
  *
  * Run with: npm run build:server && npx playwright test --config playwright-e2e.config.ts tests/e2e/tools-e2e.spec.ts
  */
 import { test, expect } from "@playwright/test";
-import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import WebSocket from "ws";
 import { readE2EToken, BASE, WS_BASE } from "./e2e-setup.js";
 
@@ -576,168 +575,6 @@ test.describe("WebSocket protocol", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 9. WebSocket — Session lifecycle (streaming, idle, abort)
+// 9-10. Session lifecycle + Agent tools — moved to agent-tools-e2e.spec.ts
+//       (spawns real pi-coding-agent processes; excluded from default E2E runs)
 // ═══════════════════════════════════════════════════════════════════════════
-
-test.describe("Session lifecycle", () => {
-	let sessionId: string;
-	test.afterEach(async () => { if (sessionId) { await deleteSession(sessionId); sessionId = ""; } });
-
-	test("prompt triggers streaming then idle", async () => {
-		sessionId = await createSession();
-		const conn = await connectWs(sessionId);
-		try {
-			conn.send({ type: "prompt", text: "Reply with just the word OK and nothing else." });
-			await conn.waitFor((m) => m.type === "session_status" && m.status === "streaming", 30_000);
-			await conn.waitFor((m) => m.type === "session_status" && m.status === "idle", 90_000);
-		} finally {
-			conn.close();
-		}
-	});
-
-	test("abort stops a streaming session", async () => {
-		sessionId = await createSession();
-		const conn = await connectWs(sessionId);
-		try {
-			conn.send({
-				type: "prompt",
-				text: "Write a very long essay about the complete history of computing, at least 5000 words.",
-			});
-			await conn.waitFor((m) => m.type === "session_status" && m.status === "streaming", 30_000);
-			await new Promise((r) => setTimeout(r, 3000));
-			conn.send({ type: "abort" });
-			await conn.waitFor((m) => m.type === "session_status" && m.status === "idle", 30_000);
-		} finally {
-			conn.close();
-		}
-	});
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 10. Agent tool invocations — serial to avoid overwhelming the server
-//
-// Each test sends a targeted prompt and verifies the correct tool is invoked
-// by watching for tool_execution_start events on the WebSocket.
-// ═══════════════════════════════════════════════════════════════════════════
-
-test.describe.serial("Agent tools", () => {
-	let sessionId: string;
-
-	// Reuse one session for all agent tool tests to reduce subprocess overhead.
-	// Wait for the agent subprocess to be fully ready before running tests.
-	test.beforeAll(async () => {
-		sessionId = await createSession();
-
-		// Wait for session to be idle (agent subprocess ready)
-		for (let i = 0; i < 30; i++) {
-			const resp = await apiFetch(`/api/sessions/${sessionId}`);
-			const data = await resp.json();
-			if (data.status === "idle") break;
-			await new Promise((r) => setTimeout(r, 500));
-		}
-
-		// Warm up: send a trivial prompt and wait for it to complete.
-		// This ensures the agent subprocess is fully initialized.
-		const conn = await connectWs(sessionId);
-		try {
-			conn.send({ type: "prompt", text: "Reply with just: ready" });
-			await conn.waitFor(
-				(m) => m.type === "session_status" && m.status === "streaming",
-				30_000,
-			);
-			await conn.waitFor(agentEndPredicate(), 60_000);
-		} finally {
-			conn.close();
-		}
-
-		// Wait for idle again
-		for (let i = 0; i < 30; i++) {
-			const resp = await apiFetch(`/api/sessions/${sessionId}`);
-			const data = await resp.json();
-			if (data.status === "idle") break;
-			await new Promise((r) => setTimeout(r, 500));
-		}
-	});
-	test.afterAll(async () => {
-		if (sessionId) await deleteSession(sessionId);
-	});
-
-	/** Helper: connect, send prompt, wait for tool + agent_end, disconnect */
-	async function verifyToolUsed(prompt: string, toolName: string, timeoutMs = 90_000): Promise<void> {
-		// Poll REST to ensure session is idle before connecting WS
-		for (let i = 0; i < 60; i++) {
-			const resp = await apiFetch(`/api/sessions/${sessionId}`);
-			const data = await resp.json();
-			if (data.status === "idle") break;
-			await new Promise((r) => setTimeout(r, 1000));
-		}
-
-		const conn = await connectWs(sessionId);
-		try {
-			conn.send({ type: "prompt", text: prompt });
-
-			const toolEvent = await conn.waitFor(toolStartPredicate(toolName), timeoutMs);
-			expect(toolEvent.data.toolName.toLowerCase()).toBe(toolName.toLowerCase());
-
-			await conn.waitFor(agentEndPredicate(), timeoutMs);
-		} finally {
-			conn.close();
-		}
-	}
-
-	test("Bash tool", async () => {
-		await verifyToolUsed(
-			'Run this exact bash command and show me the output: echo BOBBIT_TOOL_TEST_OK_12345',
-			"Bash",
-		);
-	});
-
-	test("Write tool", async () => {
-		const testFile = join(tmpdir(), `bobbit-e2e-write-${Date.now()}.txt`);
-		try {
-			await verifyToolUsed(
-				`Use the Write tool to write the text "E2E_WRITE_TEST" to the file ${testFile}`,
-				"Write",
-			);
-			expect(existsSync(testFile)).toBe(true);
-			expect(readFileSync(testFile, "utf-8")).toContain("E2E_WRITE_TEST");
-		} finally {
-			try { unlinkSync(testFile); } catch { /* ignore */ }
-		}
-	});
-
-	test("Read tool", async () => {
-		const testFile = join(tmpdir(), `bobbit-e2e-read-${Date.now()}.txt`);
-		writeFileSync(testFile, "READ_THIS_CONTENT_E2E\n", "utf-8");
-		try {
-			await verifyToolUsed(
-				`Use the Read tool to read the file ${testFile} and tell me what it contains.`,
-				"Read",
-			);
-		} finally {
-			try { unlinkSync(testFile); } catch { /* ignore */ }
-		}
-	});
-
-	test("Edit tool", async () => {
-		const testFile = join(tmpdir(), `bobbit-e2e-edit-${Date.now()}.txt`);
-		writeFileSync(testFile, "line1: ORIGINAL_VALUE\nline2: keep this\n", "utf-8");
-		try {
-			await verifyToolUsed(
-				`Use the Edit tool to replace "ORIGINAL_VALUE" with "EDITED_VALUE" in the file ${testFile}. Do not use any other tool for the replacement.`,
-				"Edit",
-			);
-			const content = readFileSync(testFile, "utf-8");
-			expect(content).toContain("EDITED_VALUE");
-			expect(content).not.toContain("ORIGINAL_VALUE");
-		} finally {
-			try { unlinkSync(testFile); } catch { /* ignore */ }
-		}
-	});
-
-	// web_search, web_fetch, and delegate are user extensions (.bobbit/extensions/)
-	// not present in the sandboxed E2E environment. The tool invocation pipeline
-	// is already proven by the Bash/Write/Read/Edit tests above. Extension loading
-	// is proven by bash-tool.ts (loaded in every E2E session). Tool activation
-	// mapping is covered by tests/tool-activation.spec.ts.
-});

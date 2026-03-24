@@ -128,19 +128,19 @@ async function main() {
 	// Set project root early — all stores resolve paths from this
 	setProjectRoot(args.cwd);
 
-	// Scaffold .bobbit/ on first run (creates config, extensions, state dirs)
-	scaffoldBobbitDir(args.cwd);
-
-	// Warn about legacy ~/.pi state
+	// Warn about legacy ~/.pi state BEFORE scaffolding (scaffold creates .bobbit/)
 	const legacyPiDir = path.join(os.homedir(), ".pi");
 	if (fs.existsSync(path.join(legacyPiDir, "gateway-sessions.json")) && !fs.existsSync(path.join(args.cwd, ".bobbit"))) {
 		console.warn(
 			`\n⚠  Found legacy state in ~/.pi/ but no .bobbit/ folder.\n` +
 			`   Bobbit now stores state in <project-root>/.bobbit/state/.\n` +
 			`   Your existing sessions/goals will not be visible until migrated.\n` +
-			`   Run 'bobbit migrate' to copy state, or start fresh.\n`
+			`   Copy files manually from ~/.pi/ to .bobbit/state/, or start fresh.\n`
 		);
 	}
+
+	// Scaffold .bobbit/ on first run (creates config, extensions, state dirs)
+	scaffoldBobbitDir(args.cwd);
 
 	const authToken = loadOrCreateToken(args.newToken);
 
