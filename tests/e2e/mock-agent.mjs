@@ -11,6 +11,9 @@ import fs from "node:fs";
 
 const rl = createInterface({ input: process.stdin });
 
+/** Track conversation messages for get_messages */
+const conversationMessages = [];
+
 /** Send a JSONL message to stdout */
 function send(msg) {
 	process.stdout.write(JSON.stringify(msg) + "\n");
@@ -55,14 +58,39 @@ function respondToPrompt(text) {
 	return null;
 }
 
+/** Abort controller for cancellable delays */
+let currentAbortController = null;
+
+/** Small async delay to simulate realistic agent timing (abortable) */
+const tick = (ms = 10) => new Promise(r => {
+	const timer = setTimeout(r, ms);
+	if (currentAbortController) {
+		currentAbortController.signal.addEventListener("abort", () => {
+			clearTimeout(timer);
+			r();
+		});
+	}
+});
+
 /** Simulate a full agent turn: streaming start → tool calls → assistant text → end */
 async function handlePrompt(requestId, text) {
+	currentAbortController = new AbortController();
 	// Acknowledge the prompt
 	send({ type: "response", id: requestId, success: true });
+
+	// Echo back the user message (real agent does this)
+	const userMsg = { role: "user", content: [{ type: "text", text }] };
+	conversationMessages.push(userMsg);
+	emit({ type: "message_end", message: userMsg });
+
+	// Brief delay before starting — mirrors real agent startup
+	await tick(50);
 
 	// Emit agent lifecycle events
 	emit({ type: "agent_start" });
 	emit({ type: "session_status", status: "streaming" });
+
+	await tick(20);
 
 	const toolAction = respondToPrompt(text);
 
@@ -98,26 +126,39 @@ async function handlePrompt(requestId, text) {
 		});
 
 		// Assistant message with tool result
-		emit({
-			type: "message_end",
-			message: {
-				role: "assistant",
-				content: [
-					{ type: "tool_use", id: toolId, name: toolAction.tool, input: toolAction.input },
-					{ type: "text", text: `Done. Used ${toolAction.tool} tool.` },
-				],
-			},
-		});
+		const assistantMsg = {
+			role: "assistant",
+			content: [
+				{ type: "tool_use", id: toolId, name: toolAction.tool, input: toolAction.input },
+				{ type: "text", text: `Done. Used ${toolAction.tool} tool.` },
+			],
+		};
+		conversationMessages.push(assistantMsg);
+		emit({ type: "message_end", message: assistantMsg });
 	} else {
 		// Simple text response
-		emit({
-			type: "message_end",
-			message: {
-				role: "assistant",
-				content: [{ type: "text", text: "OK" }],
-			},
-		});
+		const assistantMsg = {
+			role: "assistant",
+			content: [{ type: "text", text: "OK" }],
+		};
+		conversationMessages.push(assistantMsg);
+		emit({ type: "message_end", message: assistantMsg });
 	}
+
+	// Delay before completing — longer delay for prompts that need the agent
+	// to stay "busy" (queue/abort/steer tests), shorter for everything else
+	const lower = text.toLowerCase();
+	const needsLongBusy = lower.includes("sleep 120") || lower.includes("sleep 60");
+	const needsBusyState = needsLongBusy || lower.includes("working") || lower.includes("first prompt")
+		|| lower.includes("long essay");
+	await tick(needsLongBusy ? 120000 : needsBusyState ? 3000 : 50);
+
+	// If aborted during delay, don't emit end events (abort handler already did)
+	if (!currentAbortController || currentAbortController.signal.aborted) {
+		currentAbortController = null;
+		return;
+	}
+	currentAbortController = null;
 
 	// Agent turn complete
 	emit({ type: "agent_end" });
@@ -147,6 +188,10 @@ rl.on("line", async (line) => {
 			break;
 
 		case "abort":
+			if (currentAbortController) {
+				currentAbortController.abort();
+				currentAbortController = null;
+			}
 			send({ type: "response", id: msg.id, success: true });
 			emit({ type: "agent_end" });
 			emit({ type: "session_status", status: "idle" });
@@ -157,7 +202,7 @@ rl.on("line", async (line) => {
 			break;
 
 		case "get_messages":
-			send({ type: "response", id: msg.id, success: true, data: [] });
+			send({ type: "response", id: msg.id, success: true, data: conversationMessages });
 			break;
 
 		case "set_model":

@@ -326,7 +326,7 @@ test.describe("Tasks API", () => {
 	test.beforeEach(async () => {
 		const resp = await apiFetch("/api/goals", {
 			method: "POST",
-			body: JSON.stringify({ title: "Task test goal " + Date.now(), cwd: process.cwd(), team: true }),
+			body: JSON.stringify({ title: "Task test goal " + Date.now(), cwd: process.cwd(), team: true, worktree: false }),
 		});
 		goalId = (await resp.json()).id;
 	});

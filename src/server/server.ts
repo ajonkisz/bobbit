@@ -475,7 +475,7 @@ async function handleApiRoute(
 		const cwd = body?.cwd || config.defaultCwd;
 		const spec = body?.spec || "";
 		const team = body?.team === true || body?.swarm === true; // Accept legacy 'swarm' field
-		const worktree = body?.worktree === true;
+		const worktree = body?.worktree !== undefined ? body.worktree === true : team; // default to team value
 		const workflowId = (body?.workflowId && typeof body.workflowId === "string") ? body.workflowId : "general";
 		if (!title || typeof title !== "string") {
 			json({ error: "Missing title" }, 400);

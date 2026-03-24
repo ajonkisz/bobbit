@@ -36,7 +36,7 @@ export default defineConfig({
 		'**/team-lifecycle*',    // spawns real agents; needs long timeouts + real config
 		'**/real-app-mobile*',   // needs Vite UI (server runs --no-ui)
 	],
-	timeout: 30_000,
+	timeout: 60_000,
 	workers: 1, // serial — all tests share a single gateway instance
 	webServer: {
 		command: `node dist/server/cli.js --host 127.0.0.1 --port ${E2E_PORT} --no-tls --no-ui --agent-cli ${MOCK_AGENT}`,
