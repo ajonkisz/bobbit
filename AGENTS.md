@@ -16,16 +16,19 @@ src/
 │   ├── harness.ts   # Dev server wrapper (watches sentinel file, auto-restarts)
 │   ├── harness-signal.ts  # Touches sentinel to trigger harness restart
 │   ├── index.ts     # Server barrel export
-│   ├── pi-dir.ts    # Resolves ~/.pi directory path (respects BOBBIT_PI_DIR env var)
+│   ├── bobbit-dir.ts # Resolves .bobbit/ directory paths (config, state, global auth)
+│   ├── scaffold.ts  # First-run scaffolding — creates .bobbit/ with defaults
+│   ├── pi-dir.ts    # @deprecated — use bobbit-dir.ts instead
+│   ├── defaults/    # Bundled default templates (roles, workflows, personalities, system-prompt)
 │   ├── agent/       # Session lifecycle, RPC bridge, persistence, goals, teams, title generation
 │   │   ├── assistant-registry.ts       # Registry of assistant types (goal, role, tool)
-│   │   ├── color-store.ts              # Per-session color index persistence (~/.pi/gateway-session-colors.json)
+│   │   ├── color-store.ts              # Per-session color index persistence (.bobbit/state/session-colors.json)
 │   │   ├── cost-tracker.ts             # Per-session token/cost tracking
 │   │   ├── event-buffer.ts             # Circular buffer for tool_execution_update replay on reconnect
-│   │   ├── gate-store.ts                # Gate state and signal history (~/.pi/gateway-gates.json)
+│   │   ├── gate-store.ts                # Gate state and signal history (.bobbit/state/gates.json)
 │   │   ├── goal-assistant.ts           # System prompt for the goal creation assistant
 │   │   ├── goal-manager.ts             # Goal CRUD operations
-│   │   ├── goal-store.ts               # Disk persistence (~/.pi/gateway-goals.json)
+│   │   ├── goal-store.ts               # Disk persistence (.bobbit/state/goals.json)
 │   │   ├── name-generator.ts           # Random name generator for team agents
 │   │   ├── prompt-queue.ts             # Server-side prompt queue with priority sorting
 │   │   ├── role-assistant.ts           # System prompt for role assistant
@@ -33,17 +36,17 @@ src/
 │   │   ├── role-store.ts               # Role persistence (YAML files in roles/)
 │   │   ├── rpc-bridge.ts               # JSONL stdin/stdout bridge to agent subprocess
 │   │   ├── session-manager.ts          # Create/destroy/restore sessions, broadcast events, force abort
-│   │   ├── session-store.ts            # Disk persistence (~/.pi/gateway-sessions.json)
+│   │   ├── session-store.ts            # Disk persistence (.bobbit/state/sessions.json)
 │   │   ├── system-prompt.ts            # Assemble system prompt from global + AGENTS.md + goal spec
 │   │   ├── task-manager.ts             # Task CRUD and state transitions
-│   │   ├── task-store.ts               # Disk persistence (~/.pi/gateway-tasks.json)
+│   │   ├── task-store.ts               # Disk persistence (.bobbit/state/tasks.json)
 │   │   ├── team-manager.ts             # Team lifecycle (spawn/dismiss agents, start/complete/teardown)
 │   │   ├── team-names.ts               # Themed name lists for team agents
-│   │   ├── team-store.ts               # Disk persistence (~/.pi/gateway-team-state.json)
+│   │   ├── team-store.ts               # Disk persistence (.bobbit/state/team-state.json)
 │   │   ├── title-generator.ts          # Auto-generate session titles via Claude Haiku
 │   │   ├── tool-assistant.ts           # System prompt for tool management assistant
 │   │   ├── tool-manager.ts             # Tool CRUD with renderer discovery
-│   │   ├── tool-store.ts               # Tool metadata persistence (~/.pi/gateway-tools.json)
+│   │   ├── tool-store.ts               # Tool metadata persistence (.bobbit/config/tools.json)
 │   │   ├── personality-manager.ts       # Personality definitions and management
 │   │   ├── personality-store.ts        # Personality persistence (YAML files in personalities/)
 │   │   ├── verification-harness.ts     # Async gate verification (command + LLM review)
@@ -53,8 +56,8 @@ src/
 │   │   ├── desec.ts       # deSEC dynamic DNS updates on startup
 │   │   ├── oauth.ts       # OAuth flow (start, complete, status)
 │   │   ├── rate-limit.ts  # IP-based rate limiting for auth failures
-│   │   ├── tls.ts         # Self-signed TLS certificate generation (~/.pi/gateway-tls/)
-│   │   └── token.ts       # Load/create/validate auth tokens (~/.pi/gateway-token)
+│   │   ├── tls.ts         # Self-signed TLS certificate generation (.bobbit/state/tls/)
+│   │   └── token.ts       # Load/create/validate auth tokens (.bobbit/state/token)
 │   ├── ws/          # WebSocket protocol types and message handler
 │   │   ├── protocol.ts   # ClientMessage / ServerMessage type unions
 │   │   └── handler.ts    # Auth handshake, command routing, skill dispatch
@@ -63,7 +66,7 @@ src/
 │       ├── registry.ts        # In-memory skill definition registry
 │       ├── sub-agent.ts       # Spawn isolated agent subprocesses for skill execution
 │       ├── git.ts             # Git worktree helpers
-│       ├── definitions-sync.ts  # Export definitions to ~/.pi/skill-definitions.json
+│       ├── definitions-sync.ts  # Export definitions to .bobbit/state/skill-definitions.json
 │       ├── index.ts           # Barrel export + auto-registration of built-in skills
 │       └── definitions/       # Built-in skill templates
 │           ├── code-review.ts       # Correctness, security, and design review skills
@@ -212,8 +215,6 @@ src/
 │   ├── storage.ts               # Client-side storage helpers
 │   ├── tool-manager-page.ts     # Tool management UI (list + detail views)
 │   └── tool-manager.css         # Tool management page styles
-config/
-└── system-prompt.md  # Custom system prompt for agent sessions
 docs/
 ├── dev-workflow.md      # Development workflow guide
 ├── prompt-queue.md      # Prompt queue architecture
@@ -238,14 +239,14 @@ npm run test:e2e       # E2E tests (auto-starts sandboxed gateway via Playwright
 
 ### Dev server harness
 
-When developing Bobbit itself, use `npm run dev:harness` instead of `npm run dev`. The harness wraps the server process and watches a sentinel file (`~/.pi/gateway-restart`). When an agent finishes making server-side changes, it runs `npm run restart-server` to trigger:
+When developing Bobbit itself, use `npm run dev:harness` instead of `npm run dev`. The harness wraps the server process and watches a sentinel file (`.bobbit/state/gateway-restart`). When an agent finishes making server-side changes, it runs `npm run restart-server` to trigger:
 
 1. Kill the running server
 2. Wait for the port to clear
 3. `npm run build:server` to recompile TypeScript
 4. Relaunch the server
 
-The harness also auto-restarts on unexpected crashes. Sessions survive restarts thanks to disk persistence (`~/.pi/gateway-sessions.json`).
+The harness also auto-restarts on unexpected crashes. Sessions survive restarts thanks to disk persistence (`.bobbit/state/sessions.json`).
 
 ## Development workflow
 
@@ -282,7 +283,7 @@ If you only changed UI code (`src/ui/`, `src/app/`), unit tests are sufficient. 
 
 **Writing new tests**: Prefer `file://` fixtures with plain HTML/JS that simulate the logic under test. Extract state machine logic into testable functions where possible. For tests that need a real server (WebSocket, API integration), add to `tests/e2e/` — they use the `webServer` pattern in `playwright-e2e.config.ts`.
 
-**Test isolation**: All tests must operate in isolation. Avoid using centralised or non-ephemeral systems and dependencies. E2E tests run with `BOBBIT_PI_DIR` set to `.e2e-pi/` (a gitignored temp directory), so the test server's state files (sessions, goals, tasks, costs, tokens) are fully separated from the real dev server's `~/.pi`. Never read from or write to `~/.pi` in tests — use the isolated directory via `readE2EToken()` from `tests/e2e/e2e-setup.ts`. Unit tests should use `file://` fixtures with no external dependencies.
+**Test isolation**: All tests must operate in isolation. Avoid using centralised or non-ephemeral systems and dependencies. E2E tests run with `BOBBIT_DIR` set to `.e2e-bobbit-<id>/` (a gitignored temp directory), so the test server's state files (sessions, goals, tasks, costs, tokens) are fully separated from the real dev server's `.bobbit/`. Never read from or write to `.bobbit/` in tests — use the isolated directory via `readE2EToken()` from `tests/e2e/e2e-setup.ts`. Unit tests should use `file://` fixtures with no external dependencies.
 
 **Do NOT start background servers manually** from bash (`node server.js &`, `nohup`, etc.) — the bash tool waits for all stdout/stderr pipes to close, so backgrounded processes that inherit those FDs cause the bash tool to hang forever and crash the agent session. Always use Playwright's `webServer` config instead.
 
@@ -308,11 +309,11 @@ If you only changed UI code (`src/ui/`, `src/app/`), unit tests are sufficient. 
 
 **Debug duplicate messages**: The deferred message pattern in `remote-agent.ts` is subtle. `MessageList` renders `state.messages` (completed), `StreamingMessageContainer` renders `state.streamMessage` (in-progress). They must never show the same message. Tool-call messages stay in streaming until the next message starts. Check `flushDeferredMessage()` and `_deferredAssistantMessage`.
 
-**Debug session persistence**: Check `~/.pi/gateway-sessions.json` for persisted session data. Sessions restore on startup via `session-manager.ts` `restoreSessions()`. If an agent's `.jsonl` session file is missing, that session is skipped. Failed restores create dormant entries that revive on client connect.
+**Debug session persistence**: Check `.bobbit/state/sessions.json` for persisted session data. Sessions restore on startup via `session-manager.ts` `restoreSessions()`. If an agent's `.jsonl` session file is missing, that session is skipped. Failed restores create dormant entries that revive on client connect.
 
 **Debug compaction issues**: Check `_isCompacting`, `_compactionSyntheticMessages`, and `_usageStaleAfterCompaction` in `remote-agent.ts`. The `compacting_placeholder` message must be filtered out and re-added correctly across server refreshes. Manual compaction is fire-and-forget from the WS handler's perspective.
 
-**Debug gates**: Gate state is stored in `GateStore` (`~/.pi/gateway-gates.json`). Gate dependencies are enforced — if a signal fails, check gate status via `GET /api/goals/:id/gates`.
+**Debug gates**: Gate state is stored in `GateStore` (`.bobbit/state/gates.json`). Gate dependencies are enforced — if a signal fails, check gate status via `GET /api/goals/:id/gates`.
 
 ## Git conventions
 
@@ -320,36 +321,46 @@ The primary branch is **`master`** (not `main`). If the user refers to "main", t
 
 ## Disk state summary
 
-All persistent state lives under `~/.pi/`:
+All per-project state lives under `<project-root>/.bobbit/`:
+
+### `.bobbit/config/` — user-facing configuration (version controlled)
 
 | File / Directory | Owner | Purpose |
 |---|---|---|
-| `gateway-token` | `token.ts` | Auth token (mode 0600) |
-| `gateway-sessions.json` | `SessionStore` | Session metadata (id, title, cwd, agentSessionFile, wasStreaming) |
-| `gateway-goals.json` | `GoalStore` | Goal definitions (title, spec, cwd, state) |
-| `gateway-session-colors.json` | `ColorStore` | Session → color index (0-13) mapping |
-| `gateway-tls/` | `tls.ts` | Self-signed TLS cert + key |
-| `session-prompts/{sessionId}.md` | `system-prompt.ts` | Assembled system prompts (cleaned up on session terminate) |
-| `gateway-gates.json` | `GateStore` | Gate state and signal history |
-| `gateway-team-state.json` | `TeamStore` | Team state (agents, roles, goal associations) |
-| `gateway-tasks.json` | `TaskStore` | Task definitions, state, assignments |
-| `gateway-tools.json` | `ToolStore` | Tool metadata overrides (description, group, docs) |
-| `gateway-session-costs.json` | `CostTracker` | Per-session token and cost data |
+| `system-prompt.md` | `cli.ts` | Global system prompt for agent sessions |
+| `roles/*.yaml` | `RoleStore` | Role definitions and tool access |
+| `workflows/*.yaml` | `WorkflowStore` | Workflow templates (gate DAGs, verification configs) |
+| `personalities/*.yaml` | `PersonalityStore` | Personality definitions |
+| `tools.json` | `ToolStore` | Tool metadata overrides (description, group, docs) |
+
+### `.bobbit/state/` — runtime state (gitignored)
+
+| File / Directory | Owner | Purpose |
+|---|---|---|
+| `token` | `token.ts` | Auth token (mode 0600) |
+| `sessions.json` | `SessionStore` | Session metadata (id, title, cwd, agentSessionFile, wasStreaming) |
+| `goals.json` | `GoalStore` | Goal definitions (title, spec, cwd, state) |
+| `tasks.json` | `TaskStore` | Task definitions, state, assignments |
+| `gates.json` | `GateStore` | Gate state and signal history |
+| `team-state.json` | `TeamStore` | Team state (agents, roles, goal associations) |
+| `staff.json` | `StaffStore` | Staff agent definitions and state |
+| `session-costs.json` | `CostTracker` | Per-session token and cost data |
+| `session-colors.json` | `ColorStore` | Session → color index (0-13) mapping |
 | `skill-definitions.json` | `definitions-sync.ts` | Exported skill definitions for agent discovery |
+| `session-prompts/` | `system-prompt.ts` | Assembled per-session prompt files (cleaned up on terminate) |
+| `tls/` | `tls.ts` | TLS certificates and keys |
 | `gateway-url` | `cli.ts` | Last-started gateway base URL (e.g. `https://100.x.x.x:3001`) |
+| `gateway-restart` | `harness.ts` | Sentinel file for dev server restart |
 | `desec.json` | `desec.ts` | deSEC dynDNS config (domain + API token) |
-| `gateway-cert.pem` | `tls.ts` | TLS server certificate |
-| `gateway-key.pem` | `tls.ts` | TLS server private key |
-| `agent/auth.json` | (external) | API auth credentials (read by title-generator) |
 | `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
 
-Repo-local storage (YAML files, not in `~/.pi/`):
+### `.bobbit/extensions/` — user tool extensions (version controlled)
 
-| Directory | Owner | Purpose |
+### Global state (not per-project)
+
+| File | Owner | Purpose |
 |---|---|---|
-| `roles/*.yaml` | `RoleStore` | Role definitions and tool access |
-| `personalities/*.yaml` | `PersonalityStore` | Personality definitions |
-| `workflows/*.yaml` | `WorkflowStore` | Workflow templates (gate DAGs, verification configs) |
+| `~/.pi/agent/auth.json` | `oauth.ts` | API auth credentials — global, not per-project |
 
 ## Goals, workflows, tasks & gates
 

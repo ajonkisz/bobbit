@@ -1,8 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { stringify, parse } from "yaml";
-import { piDir } from "../pi-dir.js";
+import { bobbitConfigDir } from "../bobbit-dir.js";
 
 export interface Role {
 	/** Unique identifier — lowercase alphanumeric + hyphens, immutable after creation */
@@ -21,9 +20,8 @@ export interface Role {
 	updatedAt: number;
 }
 
-/** roles/ directory at the repo root — version controlled */
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROLES_DIR = path.resolve(__dirname, "../../../roles");
+/** roles/ directory in .bobbit/config — version controlled */
+const ROLES_DIR = path.join(bobbitConfigDir(), "roles");
 
 /**
  * File-backed role store. Each role is a YAML file in roles/<name>.yaml
@@ -36,11 +34,6 @@ export class RoleStore {
 	constructor() {
 		fs.mkdirSync(ROLES_DIR, { recursive: true });
 		this.loadAll();
-		// Migrate: remove legacy JSON blob if YAML files now exist
-		const legacyPath = path.join(piDir(), "gateway-roles.json");
-		if (fs.existsSync(legacyPath) && this.roles.size > 0) {
-			try { fs.unlinkSync(legacyPath); } catch { /* ignore */ }
-		}
 	}
 
 	private roleFilePath(name: string): string {

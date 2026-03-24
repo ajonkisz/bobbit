@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { stringify, parse } from "yaml";
+import { bobbitConfigDir } from "../bobbit-dir.js";
 
 export interface VerifyStep {
 	name: string;
@@ -33,9 +33,8 @@ export interface Workflow {
 	hidden?: boolean;
 }
 
-/** workflows/ directory at the repo root — version controlled */
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const WORKFLOWS_DIR = path.resolve(__dirname, "../../../workflows");
+/** workflows/ directory in .bobbit/config — version controlled */
+const WORKFLOWS_DIR = path.join(bobbitConfigDir(), "workflows");
 
 /**
  * File-backed workflow store. Each workflow is a YAML file in

@@ -51,8 +51,8 @@ export class GoalManager {
 		let repoPath: string | undefined;
 		let goalCwd = cwd;
 
-		// Create a git worktree if the cwd is a git repo (only for team goals)
-		if ((team || worktree) && isGitRepo(cwd)) {
+		// Create a git worktree if the cwd is a git repo (explicit worktree flag, defaults to true for team goals)
+		if (worktree && isGitRepo(cwd)) {
 			repoPath = getRepoRoot(cwd);
 			branch = `goal/${toBranchName(title)}-${id.slice(0, 8)}`;
 			try {

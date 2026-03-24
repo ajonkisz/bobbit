@@ -4,7 +4,7 @@ import { state, renderApp, activeSessionId } from "./state.js";
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let lastMtime = 0;
 
-/** Start polling ~/.pi/preview-{sessionId}.html for changes. */
+/** Start polling preview-{sessionId}.html for changes. */
 export function startPreviewPolling(): void {
 	if (pollTimer) return;
 	lastMtime = 0;

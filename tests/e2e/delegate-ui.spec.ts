@@ -21,9 +21,9 @@ import { E2E_PI_DIR, readE2EToken } from "./e2e-setup.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Resolve the PI directory — uses BOBBIT_PI_DIR (E2E isolation) or ~/.pi */
-function getPiDir(): string {
-	return process.env.BOBBIT_PI_DIR || E2E_PI_DIR || path.join(os.homedir(), ".pi");
+/** Resolve the .bobbit directory — uses BOBBIT_DIR (E2E isolation) or cwd/.bobbit */
+function getBobbitDir(): string {
+	return process.env.BOBBIT_DIR || E2E_PI_DIR || path.join(process.cwd(), ".bobbit");
 }
 
 function readGatewayToken(): string {
@@ -31,7 +31,7 @@ function readGatewayToken(): string {
 	try {
 		return readE2EToken();
 	} catch {
-		const tokenPath = path.join(os.homedir(), ".pi", "gateway-token");
+		const tokenPath = path.join(process.cwd(), ".bobbit", "state", "token");
 		const token = fs.readFileSync(tokenPath, "utf-8").trim();
 		if (!token || token.length < 64) throw new Error("No valid gateway token found");
 		return token;
@@ -47,7 +47,7 @@ function getGatewayUrl(): string {
 // ---------------------------------------------------------------------------
 
 test.describe("Delegate logs endpoint", () => {
-	const logsDir = path.join(getPiDir(), "delegate-logs");
+	const logsDir = path.join(getBobbitDir(), "delegate-logs");
 	const testId = `test-logserve-${Date.now()}`;
 	const logPath = path.join(logsDir, `${testId}.jsonl`);
 
@@ -196,7 +196,7 @@ test.describe("Delegate live progress plumbing", () => {
 test.describe("Delegate IDs pre-generated for running log links", () => {
 	test("delegate extension pre-generates IDs and emits heartbeat updates", async () => {
 		const delegateTs = fs.readFileSync(
-			path.join(process.cwd(), ".pi/extensions/delegate.ts"),
+			path.join(process.cwd(), ".bobbit/extensions/delegate.ts"),
 			"utf-8",
 		);
 
@@ -214,7 +214,7 @@ test.describe("Delegate IDs pre-generated for running log links", () => {
 
 	test("workflow extension pre-generates IDs and emits heartbeat updates", async () => {
 		const workflowTs = fs.readFileSync(
-			path.join(process.cwd(), ".pi/extensions/workflow.ts"),
+			path.join(process.cwd(), ".bobbit/extensions/workflow.ts"),
 			"utf-8",
 		);
 
@@ -318,7 +318,7 @@ test.describe("Running delegate status rendering", () => {
 test.describe("Delegate abort/cancel support", () => {
 	test("runDelegate accepts an AbortSignal parameter", async () => {
 		const delegateTs = fs.readFileSync(
-			path.join(process.cwd(), ".pi/extensions/delegate.ts"),
+			path.join(process.cwd(), ".bobbit/extensions/delegate.ts"),
 			"utf-8",
 		);
 
@@ -336,7 +336,7 @@ test.describe("Delegate abort/cancel support", () => {
 
 	test("workflow extension passes signal to delegate calls", async () => {
 		const workflowTs = fs.readFileSync(
-			path.join(process.cwd(), ".pi/extensions/workflow.ts"),
+			path.join(process.cwd(), ".bobbit/extensions/workflow.ts"),
 			"utf-8",
 		);
 
@@ -404,7 +404,7 @@ test.describe("Delegate log viewer HTML", () => {
 		const gw = getGatewayUrl();
 
 		// Create a realistic log file
-		const logsDir = path.join(getPiDir(), "delegate-logs");
+		const logsDir = path.join(getBobbitDir(), "delegate-logs");
 		const viewerId = `test-viewer-${Date.now()}`;
 		const viewerPath = path.join(logsDir, `${viewerId}.jsonl`);
 		const events = [

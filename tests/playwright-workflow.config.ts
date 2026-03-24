@@ -10,7 +10,7 @@ import { defineConfig } from "@playwright/test";
  *
  * For automated / CI testing, use playwright-e2e.config.ts instead,
  * which spins up an isolated sandboxed gateway on port 3099 with
- * BOBBIT_PI_DIR set to .e2e-pi/.
+ * BOBBIT_DIR set to .e2e-bobbit/.
  *
  * Usage:
  *   1. Start the dev server:  npm run dev:harness

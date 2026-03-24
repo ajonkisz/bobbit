@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitConfigDir } from "../bobbit-dir.js";
 
 export interface ToolMetadata {
 	name: string;
@@ -10,11 +10,11 @@ export interface ToolMetadata {
 	updatedAt: number;
 }
 
-const DEFAULT_PATH = path.join(piDir(), "gateway-tools.json");
+const DEFAULT_PATH = path.join(bobbitConfigDir(), "tools.json");
 
 /**
  * File-backed tool metadata store. Persists custom overrides
- * (description, group, docs) to ~/.pi/gateway-tools.json.
+ * (description, group, docs) to .bobbit/config/tools.json.
  * Same load-on-construct, write-on-mutate pattern as other stores.
  */
 export class ToolStore {

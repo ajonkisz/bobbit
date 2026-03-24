@@ -39,14 +39,14 @@ When mocking up UI changes, animations, or visual design options, write a self-c
 
 1. **Enable preview mode** on the session via `PATCH /api/sessions/:id` with `{ "preview": true }`:
    ```bash
-   TOKEN=$(cat ~/.pi/gateway-token) && GW=$(cat ~/.pi/gateway-url)
+   TOKEN=$(cat .bobbit/state/token) && GW=$(cat .bobbit/state/gateway-url)
    curl -sk "$GW/api/sessions/$SESSION_ID" -X PATCH \
      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      -d '{"preview": true}'
    ```
    The user may need to refresh the page once to pick up the flag. After that, the split-pane appears.
 
-2. **Write your preview HTML to `~/.pi/preview-$BOBBIT_SESSION_ID.html`** (the `BOBBIT_SESSION_ID` environment variable is set automatically). The panel polls this file every second and auto-updates the iframe. Each session has its own preview file so switching sessions shows the correct preview.
+2. **Write your preview HTML to `.bobbit/state/preview-$BOBBIT_SESSION_ID.html`** (the `BOBBIT_SESSION_ID` environment variable is set automatically). The panel polls this file every second and auto-updates the iframe. Each session has its own preview file so switching sessions shows the correct preview.
 
 3. **Reference real app CSS and components** — do NOT duplicate styles. Since the preview iframe is same-origin with the Vite dev server, you can `<link rel="stylesheet" href="/src/ui/app.css">` to use the actual production CSS. Use the same DOM structure and class names as the real components. This guarantees the preview is pixel-identical to the app.
 
@@ -60,7 +60,7 @@ When mocking up UI changes, animations, or visual design options, write a self-c
 
 This approach is fast, accurate, and eliminates the risk of preview-vs-reality drift. Every CSS change hot-reloads into the preview automatically.
 
-5. **Do NOT render preview HTML inline in the chat.** When iterating with the preview panel, write the file to `~/.pi/preview.html` only — the user sees it in the side panel. Rendering it again in the chat message is redundant noise. Just describe what changed and let the preview speak for itself.
+5. **Do NOT render preview HTML inline in the chat.** When iterating with the preview panel, write the file to `.bobbit/state/preview-$BOBBIT_SESSION_ID.html` only — the user sees it in the side panel. Rendering it again in the chat message is redundant noise. Just describe what changed and let the preview speak for itself.
 
 ### Process — do the homework first
 
@@ -97,18 +97,18 @@ This research is what separates a useful mockup from a misleading one. If you sk
 
 You are running inside the Bobbit gateway. To call gateway REST APIs (e.g. spawn team agents, list sessions, manage goals), read credentials from disk — never rely on environment variables which may not survive session restarts.
 
-- **Auth token**: `~/.pi/gateway-token` (read with `cat ~/.pi/gateway-token`)
-- **Gateway URL**: `~/.pi/gateway-url` (read with `cat ~/.pi/gateway-url`) — written by the server at startup
+- **Auth token**: `.bobbit/state/token` (read with `cat .bobbit/state/token`)
+- **Gateway URL**: `.bobbit/state/gateway-url` (read with `cat .bobbit/state/gateway-url`) — written by the server at startup
 - **Protocol**: HTTPS with self-signed cert — always use `curl -sk` to skip TLS verification
 
 Example:
 ```bash
-TOKEN=$(cat ~/.pi/gateway-token)
-GW=$(cat ~/.pi/gateway-url)
+TOKEN=$(cat .bobbit/state/token)
+GW=$(cat .bobbit/state/gateway-url)
 curl -sk "$GW/api/goals" -H "Authorization: Bearer $TOKEN"
 ```
 
-If `~/.pi/gateway-url` does not exist (older server version), fall back to detecting the address:
+If `.bobbit/state/gateway-url` does not exist (older server version), fall back to detecting the address:
 ```bash
 GW="https://$(netstat -ano | grep LISTENING | grep ':3001' | grep -v '0.0.0.0\|::' | awk '{print $2}' | head -1)"
 ```

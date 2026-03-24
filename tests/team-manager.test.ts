@@ -7,12 +7,12 @@ import path from "node:path";
 
 // Isolate from real ~/.pi state by using a temp directory
 const TEST_PI_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "bobbit-team-test-"));
-process.env.BOBBIT_PI_DIR = TEST_PI_DIR;
+process.env.BOBBIT_DIR = TEST_PI_DIR;
 
-// Import AFTER setting env var so piDir() picks it up
+// Import AFTER setting env var so bobbitDir() picks it up
 const { TeamManager } = await import("../src/server/agent/team-manager.ts");
 
-const TEAM_STORE_FILE = path.join(TEST_PI_DIR, "gateway-teams.json");
+const TEAM_STORE_FILE = path.join(TEST_PI_DIR, "state", "team-state.json");
 function clearTeamStore() { try { fs.unlinkSync(TEAM_STORE_FILE); } catch { /* ignore */ } }
 clearTeamStore();
 

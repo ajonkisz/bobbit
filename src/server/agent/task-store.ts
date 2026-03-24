@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
 export type TaskState = "todo" | "in-progress" | "blocked" | "complete" | "skipped";
 
@@ -25,8 +25,8 @@ export interface PersistedTask {
 	inputGateIds?: string[];
 }
 
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-tasks.json");
+const STORE_DIR = bobbitStateDir();
+const STORE_FILE = path.join(STORE_DIR, "tasks.json");
 
 /**
  * Simple JSON file store for tasks.

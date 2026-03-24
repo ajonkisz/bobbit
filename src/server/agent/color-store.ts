@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-session-colors.json");
+const STORE_DIR = bobbitStateDir();
+const STORE_FILE = path.join(STORE_DIR, "session-colors.json");
 
 /**
  * Migration mappings between palette versions. Each maps old index → new index.

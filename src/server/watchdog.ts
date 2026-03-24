@@ -24,7 +24,7 @@ import https from "node:https";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { piDir } from "./pi-dir.js";
+import { bobbitStateDir } from "./bobbit-dir.js";
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -37,7 +37,7 @@ const PROJECT_ROOT = path.resolve(__dirname, "..", "..");
 const HARNESS_PATH = path.join(__dirname, "harness.js");
 
 /** Watchdog state file — records harness PID and last healthy timestamp */
-const STATE_FILE = path.join(piDir(), "gateway-watchdog.json");
+const STATE_FILE = path.join(bobbitStateDir(), "watchdog.json");
 
 // ---------------------------------------------------------------------------
 // Config
@@ -74,7 +74,7 @@ function detectPort(): number {
  *
  * Strategy:
  *  1. Use --host from forwarded args if present
- *  2. Read ~/.pi/gateway-url written by the CLI on startup
+ *  2. Read .bobbit/state/gateway-url written by the CLI on startup
  *  3. Fall back to 127.0.0.1
  */
 function detectHost(): string {
@@ -84,7 +84,7 @@ function detectHost(): string {
 
 	// 2. Read persisted gateway URL
 	try {
-		const gwUrlFile = path.join(piDir(), "gateway-url");
+		const gwUrlFile = path.join(bobbitStateDir(), "gateway-url");
 		const raw = fs.readFileSync(gwUrlFile, "utf-8").trim();
 		const parsed = new URL(raw);
 		return parsed.hostname;

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 import type { Workflow } from "./workflow-store.js";
 
 export type GoalState = "todo" | "in-progress" | "complete" | "shelved";
@@ -32,8 +32,8 @@ export interface PersistedGoal {
 	workflow?: Workflow;
 }
 
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-goals.json");
+const STORE_DIR = bobbitStateDir();
+const STORE_FILE = path.join(STORE_DIR, "goals.json");
 
 /**
  * Simple JSON file store for goals.

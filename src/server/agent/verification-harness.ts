@@ -2,7 +2,7 @@ import { execSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs, { statSync } from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 import type { GateStore, GateSignal } from "./gate-store.js";
 import type { RoleStore } from "./role-store.js";
 import { RpcBridge, type RpcBridgeOptions } from "./rpc-bridge.js";
@@ -414,7 +414,7 @@ export class VerificationHarness {
 			await rpc.stop().catch(() => {});
 			// Clean up temporary system prompt
 			try {
-				const promptDir = path.join(piDir(), "session-prompts");
+				const promptDir = path.join(bobbitStateDir(), "session-prompts");
 				const promptFile = path.join(promptDir, `${subSessionId}.md`);
 				if (fs.existsSync(promptFile)) fs.unlinkSync(promptFile);
 			} catch { /* ignore */ }

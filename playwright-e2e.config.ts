@@ -13,11 +13,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // all processes in the same run agree on the same port and PI dir.
 const RUN_ID = process.env._E2E_RUN_ID ??= crypto.randomBytes(4).toString('hex');
 const E2E_PORT = 3100 + (parseInt(RUN_ID, 16) % 900);
-const E2E_PI_DIR = path.join(__dirname, `.e2e-pi-${RUN_ID}`);
+const E2E_BOBBIT_DIR = path.join(__dirname, `.e2e-bobbit-${RUN_ID}`);
+
+// Mock agent: lightweight JSONL stub that replaces pi-coding-agent in tests.
+// Responds instantly with deterministic tool calls — no API key needed.
+const MOCK_AGENT = path.join(__dirname, 'tests/e2e/mock-agent.mjs');
 
 // Expose to e2e-setup.ts (loaded by test files in the same worker process).
 process.env.E2E_PORT = String(E2E_PORT);
-process.env.BOBBIT_PI_DIR = E2E_PI_DIR;
+process.env.BOBBIT_DIR = E2E_BOBBIT_DIR;
 
 export default defineConfig({
 	testDir: './tests/e2e',
@@ -32,10 +36,10 @@ export default defineConfig({
 		'**/team-lifecycle*',    // spawns real agents; needs long timeouts + real config
 		'**/real-app-mobile*',   // needs Vite UI (server runs --no-ui)
 	],
-	timeout: 30_000,
+	timeout: 60_000,
 	workers: 1, // serial — all tests share a single gateway instance
 	webServer: {
-		command: `node dist/server/cli.js --host 127.0.0.1 --port ${E2E_PORT} --no-tls --no-ui`,
+		command: `node dist/server/cli.js --host 127.0.0.1 --port ${E2E_PORT} --no-tls --no-ui --agent-cli ${MOCK_AGENT}`,
 		url: `http://127.0.0.1:${E2E_PORT}/api/sessions`,
 		reuseExistingServer: false,
 		timeout: 30_000,
@@ -43,7 +47,7 @@ export default defineConfig({
 		stderr: 'pipe',
 		env: {
 			...process.env,
-			BOBBIT_PI_DIR: E2E_PI_DIR,
+			BOBBIT_DIR: E2E_BOBBIT_DIR,
 			BOBBIT_LLM_REVIEW_SKIP: "1",
 		},
 	},

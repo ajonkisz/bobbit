@@ -5,15 +5,15 @@
  * On startup it writes them to a well-known JSON file so the
  * agent-side tool extension can discover them without duplication.
  *
- * Path: ~/.pi/skill-definitions.json
+ * Path: .bobbit/state/skill-definitions.json
  */
 
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 import { listSkills } from "./registry.js";
 
-export const SKILL_DEFINITIONS_PATH = path.join(piDir(), "skill-definitions.json");
+export const SKILL_DEFINITIONS_PATH = path.join(bobbitStateDir(), "skill-definitions.json");
 
 /**
  * Write all registered skill definitions to disk.

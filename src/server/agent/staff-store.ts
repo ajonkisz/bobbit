@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
 export type StaffState = "active" | "paused" | "retired";
 export type TriggerType = "schedule" | "git" | "manual";
@@ -39,8 +39,8 @@ export interface PersistedStaff {
 	currentSessionId?: string;
 }
 
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-staff.json");
+const STORE_DIR = bobbitStateDir();
+const STORE_FILE = path.join(STORE_DIR, "staff.json");
 
 /**
  * Simple JSON file store for staff agents.

@@ -4,7 +4,7 @@
  * Tools come from three sources (defined in tools/*.yaml `provider` field):
  * 1. **Builtin tools** (pi-coding-agent built-in): read, bash, edit, write, grep, find, ls
  *    → Controlled via `--tools` flag
- * 2. **User extensions** (~/.pi/extensions/): delegate, web_search, web_fetch, browser_*, workflow
+ * 2. **User extensions** (.bobbit/extensions/): delegate, web_search, web_fetch, browser_*, workflow
  *    → Controlled via `--no-extensions` + selective `--extension` flags
  * 3. **Bobbit extensions** (extensions/): task_*, gate_*, team_*
  *    → Controlled via `--extension` flag (added separately by session-manager)
@@ -14,7 +14,7 @@
  */
 
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitDir } from "../bobbit-dir.js";
 import type { ToolManager } from "./tool-manager.js";
 
 export interface ToolActivationResult {
@@ -41,7 +41,7 @@ export function computeToolActivationArgs(allowedTools?: string[], toolManager?:
 		return { args };
 	}
 
-	const extDir = path.join(piDir(), "extensions");
+	const extDir = path.join(bobbitDir(), "extensions");
 
 	// Load all providers in a single YAML scan
 	const providers = toolManager.getToolProviders();

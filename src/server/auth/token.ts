@@ -1,10 +1,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
-const TOKEN_DIR = piDir();
-const TOKEN_FILE = path.join(TOKEN_DIR, "gateway-token");
+const TOKEN_DIR = bobbitStateDir();
+const TOKEN_FILE = path.join(TOKEN_DIR, "token");
 
 export function generateToken(): string {
 	return crypto.randomBytes(32).toString("hex"); // 256 bits = 64 hex chars

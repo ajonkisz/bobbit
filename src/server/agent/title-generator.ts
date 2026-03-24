@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { refreshOAuthToken } from "../auth/oauth.js";
-import { piDir } from "../pi-dir.js";
+import { globalAuthPath } from "../bobbit-dir.js";
 
 const TITLE_MODEL = "claude-haiku-4-5-20251001";
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -19,7 +19,7 @@ interface AuthCredentials {
 }
 
 function loadAuth(): AuthCredentials | null {
-	const authPath = join(piDir(), "agent", "auth.json");
+	const authPath = globalAuthPath();
 	if (!existsSync(authPath)) {
 		console.error("[title-gen] Auth file not found:", authPath);
 		return null;

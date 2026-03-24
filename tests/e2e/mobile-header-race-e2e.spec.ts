@@ -14,9 +14,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const BASE = "http://127.0.0.1:3098";
 
-/** The isolated PI directory used by the UI E2E test server — must match playwright-e2e-ui.config.ts */
-const E2E_UI_PI_DIR = join(__dirname, "..", "..", ".e2e-ui-pi");
-const TOKEN = readFileSync(join(E2E_UI_PI_DIR, "gateway-token"), "utf-8").trim();
+/** The isolated .bobbit directory used by the UI E2E test server — must match playwright-e2e-ui.config.ts */
+const E2E_UI_BOBBIT_DIR = join(__dirname, "..", "..", ".e2e-ui-bobbit");
+const TOKEN = readFileSync(join(E2E_UI_BOBBIT_DIR, "state", "token"), "utf-8").trim();
 
 /** Create a goal assistant session via REST */
 async function createGoalAssistantSession(): Promise<string> {

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { piDir } from "../pi-dir.js";
+import { bobbitStateDir } from "../bobbit-dir.js";
 
 export interface SessionCost {
 	inputTokens: number;
@@ -18,8 +18,8 @@ export interface UsageData {
 	cost?: number;
 }
 
-const STORE_DIR = piDir();
-const STORE_FILE = path.join(STORE_DIR, "gateway-session-costs.json");
+const STORE_DIR = bobbitStateDir();
+const STORE_FILE = path.join(STORE_DIR, "session-costs.json");
 
 function emptyCost(): SessionCost {
 	return {
@@ -33,7 +33,7 @@ function emptyCost(): SessionCost {
 
 /**
  * Tracks cumulative per-session cost/usage data.
- * Persists to ~/.pi/gateway-session-costs.json.
+ * Persists to .bobbit/state/session-costs.json.
  * Same load-on-construct, write-on-mutate pattern as GoalStore/SessionStore.
  */
 export class CostTracker {

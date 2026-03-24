@@ -28,6 +28,7 @@ test.beforeEach(async () => {
 			spec: "Test spec",
 			cwd: process.cwd(),
 			team: true,
+			worktree: false,
 		}),
 	});
 	const goal = await resp.json();

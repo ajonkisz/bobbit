@@ -7,7 +7,7 @@
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { piDir } from "../pi-dir.js";
+import { globalAuthPath } from "../bobbit-dir.js";
 
 // Anthropic OAuth constants (same as in @mariozechner/pi-ai)
 const CLIENT_ID = Buffer.from("OWQxYzI1MGEtZTYxYi00NGQ5LTg4ZWQtNTk0NGQxOTYyZjVl", "base64").toString();
@@ -26,7 +26,7 @@ const pendingFlows = new Map<string, PendingOAuth>();
 const FLOW_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function getAuthJsonPath(): string {
-	return join(piDir(), "agent", "auth.json");
+	return globalAuthPath();
 }
 
 function base64urlEncode(buf: Buffer): string {

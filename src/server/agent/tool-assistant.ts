@@ -50,11 +50,11 @@ provider:
 \`\`\`
 Builtin tools: read, write, edit, bash, grep, find, ls
 
-**\`user-extension\`** — An extension in \`~/.pi/extensions/\`, activated via \`--extension\` flag:
+**\`user-extension\`** — An extension in \`.bobbit/extensions/\`, activated via \`--extension\` flag:
 \`\`\`yaml
 provider:
   type: user-extension
-  extension: web-research.ts    # Path relative to ~/.pi/extensions/
+  extension: web-research.ts    # Path relative to .bobbit/extensions/
 \`\`\`
 User extensions: delegate.ts, web-research.ts (web_search + web_fetch), playwright/index.ts (browser_* tools), workflow.ts
 
@@ -92,7 +92,7 @@ To give a role access to a new tool, add the tool name to that role's \`allowedT
 Follow these steps in order:
 
 ### 1. Write the extension code
-- **User extension**: Create \`~/.pi/extensions/{name}.ts\` (or a directory with index.ts)
+- **User extension**: Create \`.bobbit/extensions/{name}.ts\` (or a directory with index.ts)
 - **Bobbit extension**: Create \`extensions/{name}.ts\` in the repo
 - The extension must export a tool definition compatible with pi-coding-agent's extension API
 - Skip this step for builtin tools (they already exist in pi-coding-agent)
