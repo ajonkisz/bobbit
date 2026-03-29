@@ -1,0 +1,27 @@
+id: build-and-merge
+name: Build and Merge
+description: Lean workflow — automated checks only, no LLM review gates. Type check, tests, push, PR.
+gates:
+  - id: implementation
+    name: Implementation
+    verify:
+      - name: Type check passes
+        type: command
+        run: "{{project.typecheck_command}}"
+      - name: Unit tests
+        type: command
+        run: "{{project.test_unit_command}}"
+  - id: ready-to-merge
+    name: Ready to Merge
+    depends_on:
+      - implementation
+    verify:
+      - name: "Branch pushed to remote"
+        type: command
+        run: "git push origin {{branch}} && git ls-remote --heads origin {{branch}} | grep -q ."
+      - name: "Master merged into branch"
+        type: command
+        run: "git fetch origin {{master}} && git merge-base --is-ancestor origin/{{master}} {{branch}}"
+      - name: "PR raised"
+        type: command
+        run: "gh pr list --head {{branch}} --base {{master}} --state open --json url -q \".[0].url\" | grep -q ."
