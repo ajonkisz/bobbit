@@ -91,7 +91,7 @@ The value is a JSON-encoded array of `{"path": "..."}` objects. Paths support `~
 
 **Query task outcomes**: `GET /api/outcomes` returns recorded task outcomes with optional filters (`?goal_id=`, `?agent_role=`, `?outcome=` (`completed`|`blocked`|`abandoned`), `?since=`). `GET /api/outcomes/stats` returns aggregate statistics (success rate by role, avg duration by task type, total cost). Outcomes are automatically recorded when tasks reach terminal states, building a dataset for self-improvement analysis. Data is stored in `.bobbit/state/outcomes.db` (SQLite). The `OutcomeStore` is in `src/server/agent/outcome-store.ts`.
 
-**Trigger the Observer**: `POST /api/observer/run` creates (or wakes) the Observer staff agent, which analyzes task outcomes and agent memories to propose improvements to role prompts, AGENTS.md, and system prompts. On first run it creates a permanent staff session; subsequent runs wake the existing session.
+**Trigger the Observer**: The Observer enables a self-improvement loop — it analyzes agent performance on real tasks and proposes prompt/config changes to reduce failure rates and costs. `POST /api/observer/run` creates (or wakes) the Observer staff agent, which analyzes task outcomes and agent memories to propose improvements to role prompts, AGENTS.md, and system prompts. On first run it creates a permanent staff session; subsequent runs wake the existing session.
 
 **Proposal API**: Proposals are stored in SQLite (`outcomes.db`, shared with `OutcomeStore`) and managed via REST:
 - `GET /api/proposals` — list proposals, optional `?status=pending`

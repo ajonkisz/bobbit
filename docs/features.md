@@ -95,8 +95,13 @@ A unified registry (`assistant-registry.ts`) maps assistant types to their promp
 - `personality` — Personality creation assistant
 - `staff` — Staff agent creation assistant
 - `setup` — Project setup wizard
+- `observer` — Observer Staff Agent (analyzes outcomes and proposes improvements)
 
 Sessions created with an `assistantType` get the corresponding system prompt automatically. Assistant prompts can be edited via their YAML files and are reloaded on change.
+
+## Observer
+
+The Observer is a staff agent that enables a self-improvement loop. It analyzes task outcomes (`GET /api/outcomes`), searches agent memories for failure patterns, and creates proposals for concrete changes to role prompts, AGENTS.md, and system prompts. Proposals are stored in SQLite (shared `outcomes.db`) and managed via REST (`GET/POST /api/proposals`, `PUT /api/proposals/:id`). On approval, changes are applied to the target file and a Claude Code memory file is written for cross-session knowledge sharing. Trigger manually via `POST /api/observer/run`.
 
 ## Compaction
 
