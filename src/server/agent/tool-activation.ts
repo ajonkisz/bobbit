@@ -86,35 +86,39 @@ export function generateMcpProxyExtension(
     description: ${desc},
     parameters: ${schema},
     execute: async (args) => {
-      const body = JSON.stringify({ tool: ${JSON.stringify(fullName)}, args });
-      const url = new URL(gwUrl + "/api/internal/mcp-call");
-      const mod = url.protocol === "https:" ? await import("node:https") : await import("node:http");
-      const result = await new Promise((resolve, reject) => {
-        const req = mod.request(url, {
-          method: "POST",
-          headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
-          ...(url.protocol === "https:" ? { rejectUnauthorized: false } : {}),
-        }, (res) => {
-          let data = "";
-          res.on("data", (chunk) => data += chunk);
-          res.on("end", () => {
-            try { resolve(JSON.parse(data)); } catch { resolve({ content: [{ type: "text", text: data }] }); }
+      try {
+        const body = JSON.stringify({ tool: ${JSON.stringify(fullName)}, args });
+        const url = new URL(gwUrl + "/api/internal/mcp-call");
+        const mod = url.protocol === "https:" ? await import("node:https") : await import("node:http");
+        const result = await new Promise((resolve, reject) => {
+          const req = mod.request(url, {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+            ...(url.protocol === "https:" ? { rejectUnauthorized: false } : {}),
+          }, (res) => {
+            let data = "";
+            res.on("data", (chunk) => data += chunk);
+            res.on("end", () => {
+              try { resolve(JSON.parse(data)); } catch { resolve({ content: [{ type: "text", text: data }] }); }
+            });
           });
+          req.on("error", (err) => resolve({ content: [{ type: "text", text: "MCP call error: " + err.message }] }));
+          req.write(body);
+          req.end();
         });
-        req.on("error", reject);
-        req.write(body);
-        req.end();
-      });
-      const r = result;
-      let text;
-      if (r && r.content && Array.isArray(r.content)) {
-        text = r.content.map(c => c.text || "").join("\\n");
-      } else if (r && r.error) {
-        text = "Error: " + r.error;
-      } else {
-        text = JSON.stringify(r);
+        const r = result;
+        let text;
+        if (r && r.content && Array.isArray(r.content)) {
+          text = r.content.map(c => c.text || "").join("\\n");
+        } else if (r && r.error) {
+          text = "Error: " + r.error;
+        } else {
+          text = JSON.stringify(r);
+        }
+        return text || "(no results)";
+      } catch (err) {
+        return "MCP tool error: " + (err && err.message ? err.message : String(err));
       }
-      return text || "(no results)";
     }
   });`;
 	}).join('\n');
