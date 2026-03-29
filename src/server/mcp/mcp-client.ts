@@ -55,6 +55,9 @@ export class McpClient {
   private _readline: ReadlineInterface | null = null;
   private _pendingRequests = new Map<number, PendingRequest>();
 
+  // HTTP transport state — MCP streamable HTTP session tracking
+  private _sessionId: string | null = null;
+
   constructor(private serverName: string) {}
 
   /** Whether the client is currently connected */
@@ -300,8 +303,11 @@ export class McpClient {
     const url = this._config!.url!;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
       ...this._config!.headers,
     };
+    // MCP streamable HTTP session tracking
+    if (this._sessionId) headers['Mcp-Session-Id'] = this._sessionId;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -319,6 +325,22 @@ export class McpClient {
         throw new Error(`HTTP ${response.status}: ${body.slice(0, 500)}`);
       }
 
+      // Capture session ID from server (set on initialize response)
+      const sessionId = response.headers.get('mcp-session-id');
+      if (sessionId) this._sessionId = sessionId;
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/event-stream')) {
+        // Parse SSE: extract JSON from "data: {...}" lines
+        const text = await response.text();
+        for (const line of text.split('\n')) {
+          if (line.startsWith('data: ')) {
+            return JSON.parse(line.slice(6)) as JsonRpcResponse;
+          }
+        }
+        throw new Error(`[mcp:${this.serverName}] No data in SSE response`);
+      }
+
       return await response.json() as JsonRpcResponse;
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -334,8 +356,10 @@ export class McpClient {
     const url = this._config!.url!;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
       ...this._config!.headers,
     };
+    if (this._sessionId) headers['Mcp-Session-Id'] = this._sessionId;
 
     // Fire and forget — notifications don't expect responses
     try {
