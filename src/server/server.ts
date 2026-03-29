@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { bobbitStateDir, bobbitConfigDir } from "./bobbit-dir.js";
@@ -26,6 +27,8 @@ import { PersonalityManager } from "./agent/personality-manager.js";
 import { getPromptSections } from "./agent/system-prompt.js";
 import type { TaskState, PersistedTask } from "./agent/task-store.js";
 import { OutcomeStore } from "./agent/outcome-store.js";
+import { ProposalStore } from "./agent/proposal-store.js";
+import type { PromptProposal } from "./agent/proposal-store.js";
 import { BgProcessManager } from "./agent/bg-process-manager.js";
 import { GateStore } from "./agent/gate-store.js";
 import { WorkflowStore } from "./agent/workflow-store.js";
@@ -149,6 +152,7 @@ export function createGateway(config: GatewayConfig) {
 	const toolManager = new ToolManager();
 	const gateStore = new GateStore();
 	const outcomeStore = new OutcomeStore();
+	const proposalStore = new ProposalStore();
 	const workflowStore = new WorkflowStore();
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
@@ -224,7 +228,7 @@ export function createGateway(config: GatewayConfig) {
 				}
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, prStatusStore, teamManager, roleManager, toolManager, gateStore, personalityManager, bgProcessManager, staffManager, workflowManager, verificationHarness, preferencesStore, projectConfigStore, broadcastToGoal, broadcastToAll, outcomeStore);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, prStatusStore, teamManager, roleManager, toolManager, gateStore, personalityManager, bgProcessManager, staffManager, workflowManager, verificationHarness, preferencesStore, projectConfigStore, broadcastToGoal, broadcastToAll, outcomeStore, proposalStore);
 
 			return;
 		}
@@ -443,6 +447,7 @@ async function handleApiRoute(
 	broadcastToGoal: (goalId: string, event: any) => void,
 	broadcastToAll: (event: any) => void,
 	outcomeStore: OutcomeStore,
+	proposalStore: ProposalStore,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -3218,7 +3223,171 @@ async function handleApiRoute(
 		return;
 	}
 
+	// ── Proposal endpoints ──
+
+	// GET /api/proposals — list proposals
+	if (url.pathname === "/api/proposals" && req.method === "GET") {
+		const status = url.searchParams.get("status") || undefined;
+		json({ proposals: proposalStore.list(status ? { status } : undefined) });
+		return;
+	}
+
+	// POST /api/proposals — create proposal
+	if (url.pathname === "/api/proposals" && req.method === "POST") {
+		const body = await readBody(req);
+		const { targetType, targetName, reasoning, evidence, proposedDiff, observerSessionId } = body || {};
+		if (!targetType || !targetName || !reasoning || !proposedDiff) {
+			json({ error: "Missing required fields: targetType, targetName, reasoning, proposedDiff" }, 400);
+			return;
+		}
+		if (!["role_prompt", "agents_md", "system_prompt"].includes(targetType)) {
+			json({ error: "Invalid targetType. Must be: role_prompt, agents_md, system_prompt" }, 400);
+			return;
+		}
+		const proposal = proposalStore.create({ observerSessionId: observerSessionId || null, targetType, targetName, reasoning, evidence: evidence || null, proposedDiff });
+		json(proposal, 201);
+		return;
+	}
+
+	// GET/PUT /api/proposals/:id
+	const proposalIdMatch = url.pathname.match(/^\/api\/proposals\/([^/]+)$/);
+	if (proposalIdMatch && req.method === "GET") {
+		const proposal = proposalStore.getById(proposalIdMatch[1]);
+		if (!proposal) { json({ error: "Not found" }, 404); return; }
+		json(proposal);
+		return;
+	}
+	if (proposalIdMatch && req.method === "PUT") {
+		const body = await readBody(req);
+		if (!body?.status || !["approved", "rejected"].includes(body.status)) {
+			json({ error: "Invalid status. Must be: approved, rejected" }, 400);
+			return;
+		}
+		const proposal = proposalStore.updateStatus(proposalIdMatch[1], body.status);
+		if (!proposal) { json({ error: "Not found" }, 404); return; }
+		if (body.status === "approved") {
+			applyProposal(proposal, config.defaultCwd);
+			writeClaudeCodeMemory(proposal, config.defaultCwd);
+		}
+		json(proposal);
+		return;
+	}
+
+	// POST /api/observer/run — trigger observer assistant
+	if (url.pathname === "/api/observer/run" && req.method === "POST") {
+		try {
+			const session = await sessionManager.createSession(config.defaultCwd, undefined, undefined, "observer");
+			sessionManager.updateSessionMeta(session.id, { role: "assistant", accessory: "telescope" });
+			json({ sessionId: session.id, status: "started" }, 201);
+		} catch (err) {
+			json({ error: String(err) }, 500);
+		}
+		return;
+	}
+
 	json({ error: "Not found" }, 404);
+}
+
+/** Apply an approved proposal to its target file. */
+function applyProposal(proposal: PromptProposal, cwd: string): void {
+	try {
+		if (proposal.targetType === "role_prompt") {
+			const filePath = path.join(bobbitConfigDir(), "roles", "assistant", `${proposal.targetName}.yaml`);
+			if (!fs.existsSync(filePath)) {
+				console.warn(`[observer] role file not found, skipping: ${filePath}`);
+				return;
+			}
+			const content = fs.readFileSync(filePath, "utf-8");
+			// Simple approach: append to prompt field by appending to file content
+			// Parse YAML to find and update the prompt field
+			const lines = content.split("\n");
+			try {
+				// Find the `prompt:` field and append to it
+				const promptIdx = lines.findIndex((l: string) => l.startsWith("prompt:"));
+				if (promptIdx >= 0) {
+					// If it's a block scalar (prompt: > or prompt: |), append at the end
+					// If it's inline (prompt: "..."), convert to block
+					const promptLine = lines[promptIdx];
+					if (promptLine.match(/^prompt:\s*[>|]/)) {
+						// Block scalar — find the end of the block (next non-indented line)
+						let endIdx = promptIdx + 1;
+						while (endIdx < lines.length && (lines[endIdx].startsWith("  ") || lines[endIdx].trim() === "")) {
+							endIdx++;
+						}
+						// Insert before endIdx
+						const indentedDiff = proposal.proposedDiff.split("\n").map((l: string) => "  " + l).join("\n");
+						lines.splice(endIdx, 0, indentedDiff);
+						fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
+					} else {
+						// Inline or other — append to file
+						fs.appendFileSync(filePath, "\n" + proposal.proposedDiff + "\n", "utf-8");
+					}
+				} else {
+					// No prompt field found — append as new field
+					fs.appendFileSync(filePath, "\nprompt_addition: |\n  " + proposal.proposedDiff.split("\n").join("\n  ") + "\n", "utf-8");
+				}
+			} catch {
+				// Fallback: just append
+				fs.appendFileSync(filePath, "\n" + proposal.proposedDiff + "\n", "utf-8");
+			}
+		} else if (proposal.targetType === "agents_md") {
+			const filePath = path.join(cwd, "AGENTS.md");
+			const existing = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "";
+			fs.writeFileSync(filePath, existing + "\n\n" + proposal.proposedDiff, "utf-8");
+		} else if (proposal.targetType === "system_prompt") {
+			const filePath = path.join(bobbitConfigDir(), "system-prompt.md");
+			const existing = fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf-8") : "";
+			fs.writeFileSync(filePath, existing + "\n\n" + proposal.proposedDiff, "utf-8");
+		}
+		console.log(`[observer] Applied proposal ${proposal.id} to ${proposal.targetType}:${proposal.targetName}`);
+	} catch (err) {
+		console.error(`[observer] Failed to apply proposal ${proposal.id}:`, err);
+	}
+}
+
+/** Write a Claude Code memory file summarizing an approved proposal. */
+function writeClaudeCodeMemory(proposal: PromptProposal, cwd: string): void {
+	try {
+		const encodedCwd = cwd.replace(/\//g, "-").replace(/^-/, "");
+		const memDir = path.join(os.homedir(), ".claude", "projects", encodedCwd, "memory");
+		fs.mkdirSync(memDir, { recursive: true });
+
+		const slug = proposal.reasoning
+			.slice(0, 30)
+			.toLowerCase()
+			.replace(/\s+/g, "-")
+			.replace(/[^a-z0-9-]/g, "");
+		const date = new Date().toISOString().split("T")[0];
+		const filename = `${date}-observer-${slug}.md`;
+		const name = `Observer: ${proposal.targetType} update for ${proposal.targetName}`;
+		const description = proposal.reasoning.split("\n")[0].slice(0, 100);
+
+		const content = `---
+name: ${name}
+description: ${description}
+type: feedback
+---
+
+## Reasoning
+
+${proposal.reasoning}
+
+## Proposed Change (${proposal.targetType}: ${proposal.targetName})
+
+${proposal.proposedDiff}
+`;
+		fs.writeFileSync(path.join(memDir, filename), content, "utf-8");
+
+		// Update MEMORY.md index
+		const memoryMdPath = path.join(memDir, "MEMORY.md");
+		const existing = fs.existsSync(memoryMdPath) ? fs.readFileSync(memoryMdPath, "utf-8") : "";
+		const entry = `- [${name}](${filename}) - ${description}`;
+		fs.writeFileSync(memoryMdPath, existing ? existing + "\n" + entry : entry + "\n", "utf-8");
+
+		console.log(`[observer] Wrote Claude Code memory: ${filename}`);
+	} catch (err) {
+		console.error("[observer] Failed to write Claude Code memory:", err);
+	}
 }
 
 /** Record a task outcome to the outcome store (non-fatal on error). */
