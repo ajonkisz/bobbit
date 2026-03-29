@@ -139,6 +139,22 @@ Thinking token budgets per level (hardcoded in `src/app/remote-agent.ts`, not cu
 | medium | 10,240 |
 | high | 32,768 |
 
+### Claude Code memory integration
+
+Bobbit reads `CLAUDE.md` from the session's working directory alongside `AGENTS.md`. Both files support `@filename.md` reference expansion. If `CLAUDE.md` contains only `@AGENTS.md`, it is skipped to avoid duplication. When both exist with distinct content, CLAUDE.md is merged into the "Project Context" section of the assembled prompt.
+
+Bobbit also reads Claude Code's project memory files from `~/.claude/projects/{encodedCwd}/memory/*.md`, where `encodedCwd` is the session's working directory with `/` replaced by `-`:
+
+```
+/Users/aj/Documents/Development/bobbit → -Users-aj-Documents-Development-bobbit
+```
+
+**Filtering:** Only memory files with frontmatter `type` of `user`, `feedback`, or `project` are included — `reference` type files are skipped. The index file `MEMORY.md` is also skipped. A maximum of 20 files are included (sorted alphabetically), with total content capped at ~4000 tokens (~16000 characters).
+
+**Prompt assembly order:** Memories appear as a `# Claude Code Project Memories` section after the Project Context (AGENTS.md + CLAUDE.md) and before the Goal spec. In the prompt inspector UI, CLAUDE.md and memories appear as separate labeled sections.
+
+**Timing:** Memory files are read at session creation time only (same as AGENTS.md). If the memory directory doesn't exist, it is silently skipped.
+
 ## Debugging tips
 
 **Debug duplicate messages**: The deferred message pattern in `remote-agent.ts` is subtle. `MessageList` renders `state.messages` (completed), `StreamingMessageContainer` renders `state.streamMessage` (in-progress). They must never show the same message. Tool-call messages stay in streaming until the next message starts. Check `flushDeferredMessage()` and `_deferredAssistantMessage`.
