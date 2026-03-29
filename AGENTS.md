@@ -89,6 +89,8 @@ skill_directories: '[{"path":"~/my-team-skills"},{"path":"/shared/skills"}]'
 
 The value is a JSON-encoded array of `{"path": "..."}` objects. Paths support `~` expansion. Custom directories are additive — the default directories (`.claude/skills/`, `.bobbit/skills/`, `~/.claude/skills/`, `~/.bobbit/skills/`, `.claude/commands/`) are always scanned. Skills from custom directories get source label `"custom"` and have lower priority than built-in directories (built-in skills with the same name win).
 
+**Query task outcomes**: `GET /api/outcomes` returns recorded task outcomes with optional filters (`?goal_id=`, `?agent_role=`, `?outcome=` (`completed`|`blocked`|`abandoned`), `?since=`). `GET /api/outcomes/stats` returns aggregate statistics (success rate by role, avg duration by task type, total cost). Outcomes are automatically recorded when tasks reach terminal states, building a dataset for self-improvement analysis. Data is stored in `.bobbit/state/outcomes.db` (SQLite). The `OutcomeStore` is in `src/server/agent/outcome-store.ts`.
+
 **Add a goal-related feature**: Goal CRUD is in `goal-manager.ts`/`goal-store.ts`. REST endpoints in `server.ts`. Goal assistant prompt in `goal-assistant.ts`. Client-side proposal parsing in `remote-agent.ts` `_checkForGoalProposal()`. Re-attempt flow: `buildReattemptContext()` in `goal-assistant.ts`, `startReattempt()` in `session-manager.ts` (client), re-attempt buttons in `goal-dashboard.ts` and `render-helpers.ts`.
 
 **Add/edit tool documentation**: Navigate to `#/tools`, click a tool, edit the Description/Group/Docs fields, and Save. Or launch a Tool Assistant session for AI-guided documentation. Server-side: tool metadata lives in `.bobbit/config/tools/<group>/*.yaml` files, managed by `tool-manager.ts`, API routes in `server.ts`.
@@ -267,6 +269,7 @@ All per-project state lives under `<project-root>/.bobbit/`:
 | `desec.json` | `desec.ts` | deSEC dynDNS config (domain + API token) |
 | `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
 | `mcp-extensions/` | `tool-activation.ts` | Generated proxy extension files for MCP tool calls |
+| `outcomes.db` | `OutcomeStore` | SQLite database recording task outcome data (duration, cost, tokens, role) |
 
 ### `.bobbit/config/tools/<group>/` — tool definitions and extensions
 
