@@ -234,8 +234,8 @@ worktree_setup_command: python -m venv .venv && .venv/bin/pip install -r require
 # Rust project
 worktree_setup_command: cargo fetch
 
-# Copy node_modules from source repo (fastest for npm — avoids full reinstall)
-worktree_setup_command: cp -r "$SOURCE_REPO/node_modules" node_modules
+# Symlink node_modules from source repo (fastest for npm — instant, atomic, always consistent)
+worktree_setup_command: ln -s "$SOURCE_REPO/node_modules" node_modules
 
 # No dependencies to install
 worktree_setup_command: ""
