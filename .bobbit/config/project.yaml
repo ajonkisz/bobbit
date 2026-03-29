@@ -6,5 +6,5 @@ test_unit_command: npx playwright test --config tests/playwright.config.ts
 test_e2e_command: npm run build && npx playwright test --config
   playwright-e2e.config.ts --reporter=json 2>/dev/null | node
   scripts/test-filter.mjs
-worktree_setup_command: cp -r "$SOURCE_REPO/node_modules" node_modules
+worktree_setup_command: ln -s "$SOURCE_REPO/node_modules" node_modules
 skill_directories: '[{"path":"/tmp/.bobbit"}]'
