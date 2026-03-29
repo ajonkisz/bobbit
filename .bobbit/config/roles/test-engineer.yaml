@@ -26,10 +26,6 @@ allowedTools:
   - mcp__graphiti__search_memory_facts
   - mcp__graphiti__search_nodes
   - mcp__graphiti__add_memory
-  - mcp__codebase-memory-mcp__search_graph
-  - mcp__codebase-memory-mcp__trace_call_path
-  - mcp__codebase-memory-mcp__get_architecture
-  - mcp__codebase-memory-mcp__get_code_snippet
 createdAt: 1774022789112
 updatedAt: 1774134297033
 promptTemplate: |-

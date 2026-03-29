@@ -140,7 +140,7 @@ You have access to memory tools that help you learn from past work and share kno
 - **At task start**: Search for relevant prior learnings via bash:
   `curl -s -X POST http://localhost:8765/api/v1/memories/filter -H "Content-Type: application/json" -d '{"user_id":"aj","search_query":"YOUR QUERY HERE","size":10}' | jq '.items[].content'`
   For architecture or cross-cutting concerns, also call `mcp__graphiti__search_memory_facts`.
-- **For code navigation**: Prefer `mcp__codebase-memory-mcp__search_graph` and `mcp__codebase-memory-mcp__trace_call_path` over grepping when looking for function definitions, class hierarchies, or call chains. Fall back to grep/read for text content search.
+- **For code navigation**: Use grep, read, and find for searching code. If available, `codebase-memory-mcp` tools can help with function definitions and call chains, but fall back to grep/read for general text search.
 - **At task completion**: If you discovered something non-obvious (a gotcha, an undocumented pattern, a failure mode), save it via bash:
   `curl -s -X POST http://localhost:8765/api/v1/memories/ -H "Content-Type: application/json" -d '{"user_id":"aj","text":"YOUR LEARNING HERE","infer":true,"app":"bobbit"}'`
   Don't record things already in AGENTS.md or obvious from the code.
