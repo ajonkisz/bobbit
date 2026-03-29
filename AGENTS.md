@@ -91,6 +91,20 @@ The value is a JSON-encoded array of `{"path": "..."}` objects. Paths support `~
 
 **Query task outcomes**: `GET /api/outcomes` returns recorded task outcomes with optional filters (`?goal_id=`, `?agent_role=`, `?outcome=` (`completed`|`blocked`|`abandoned`), `?since=`). `GET /api/outcomes/stats` returns aggregate statistics (success rate by role, avg duration by task type, total cost). Outcomes are automatically recorded when tasks reach terminal states, building a dataset for self-improvement analysis. Data is stored in `.bobbit/state/outcomes.db` (SQLite). The `OutcomeStore` is in `src/server/agent/outcome-store.ts`.
 
+**Trigger the Observer**: `POST /api/observer/run` creates (or wakes) the Observer staff agent, which analyzes task outcomes and agent memories to propose improvements to role prompts, AGENTS.md, and system prompts. On first run it creates a permanent staff session; subsequent runs wake the existing session.
+
+**Proposal API**: Proposals are stored in SQLite (`outcomes.db`, shared with `OutcomeStore`) and managed via REST:
+- `GET /api/proposals` — list proposals, optional `?status=pending`
+- `GET /api/proposals/:id` — single proposal
+- `POST /api/proposals` — create proposal (fields: `target_type`, `target_name`, `reasoning`, `evidence`, `proposed_diff`)
+- `PUT /api/proposals/:id` — approve/reject (`{ "status": "approved" }` or `"rejected"`)
+
+On approval, the server applies the proposed change to the target file: `role_prompt` → updates `.bobbit/config/roles/{name}.yaml` prompt field; `agents_md` → appends to `AGENTS.md`; `system_prompt` → appends to `.bobbit/config/system-prompt.md`. A Claude Code memory file is also written to `~/.claude/projects/{encodedCwd}/memory/` with `type: feedback` frontmatter, and the `MEMORY.md` index is updated.
+
+**Proposal store**: `src/server/agent/proposal-store.ts` — `ProposalStore` class with `create()`, `list()`, `getById()`, `updateStatus()` methods. Shares `outcomes.db` with `OutcomeStore`.
+
+**Observer prompt**: Defined in `.bobbit/config/roles/assistant/observer.yaml` and `src/server/agent/observer-assistant.ts`. Registered in `assistant-registry.ts` as type `observer`.
+
 **Add a goal-related feature**: Goal CRUD is in `goal-manager.ts`/`goal-store.ts`. REST endpoints in `server.ts`. Goal assistant prompt in `goal-assistant.ts`. Client-side proposal parsing in `remote-agent.ts` `_checkForGoalProposal()`. Re-attempt flow: `buildReattemptContext()` in `goal-assistant.ts`, `startReattempt()` in `session-manager.ts` (client), re-attempt buttons in `goal-dashboard.ts` and `render-helpers.ts`.
 
 **Add/edit tool documentation**: Navigate to `#/tools`, click a tool, edit the Description/Group/Docs fields, and Save. Or launch a Tool Assistant session for AI-guided documentation. Server-side: tool metadata lives in `.bobbit/config/tools/<group>/*.yaml` files, managed by `tool-manager.ts`, API routes in `server.ts`.
@@ -280,7 +294,7 @@ All per-project state lives under `<project-root>/.bobbit/`:
 | `desec.json` | `desec.ts` | deSEC dynDNS config (domain + API token) |
 | `rpc-debug.log` | `rpc-bridge.ts` | Debug log of all RPC events |
 | `mcp-extensions/` | `tool-activation.ts` | Generated proxy extension files for MCP tool calls |
-| `outcomes.db` | `OutcomeStore` | SQLite database recording task outcome data (duration, cost, tokens, role) |
+| `outcomes.db` | `OutcomeStore`, `ProposalStore` | SQLite database recording task outcome data and observer prompt proposals |
 
 ### `.bobbit/config/tools/<group>/` — tool definitions and extensions
 
