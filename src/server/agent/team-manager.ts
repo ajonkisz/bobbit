@@ -837,6 +837,17 @@ export class TeamManager {
 		const entry = this.teams.get(goalId);
 		if (!entry) return; // No active team — skip registration silently
 
+		// Enforce maxConcurrent for reviewers too (same limit as workers)
+		const activeReviewers = entry.agents.filter(a => a.role === 'reviewer');
+		if (entry.agents.length >= entry.maxConcurrent) {
+			console.warn(
+				`[team-manager] Cannot register reviewer for goal ${goalId}: ` +
+				`${entry.agents.length} agents already at max (${entry.maxConcurrent}). ` +
+				`Active reviewers: ${activeReviewers.length}. Skipping.`,
+			);
+			return;
+		}
+
 		const agent: TeamAgent = {
 			sessionId,
 			role: 'reviewer',
@@ -849,6 +860,29 @@ export class TeamManager {
 		this.sessionToGoal.set(sessionId, goalId);
 		this.assignUniqueColor(sessionId);
 		this.persistEntry(goalId);
+	}
+
+	/**
+	 * Clean up all orphaned reviewer sessions for a goal.
+	 * Called before spawning new reviewers on gate re-signal to prevent proliferation.
+	 */
+	async cleanupOrphanedReviewers(goalId: string): Promise<number> {
+		const entry = this.teams.get(goalId);
+		if (!entry) return 0;
+
+		const reviewers = entry.agents.filter(a => a.role === 'reviewer');
+		let cleaned = 0;
+		for (const reviewer of reviewers) {
+			try {
+				await this.sessionManager?.terminateSession(reviewer.sessionId);
+			} catch { /* ignore — may already be terminated */ }
+			this.unregisterReviewerSession(goalId, reviewer.sessionId);
+			cleaned++;
+		}
+		if (cleaned > 0) {
+			console.log(`[team-manager] Cleaned up ${cleaned} orphaned reviewer(s) for goal ${goalId}`);
+		}
+		return cleaned;
 	}
 
 	/**

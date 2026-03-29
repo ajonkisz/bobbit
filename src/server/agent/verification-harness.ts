@@ -94,15 +94,15 @@ export class VerificationHarness {
 				active.cancelled = true;
 				active.overallStatus = "cancelled";
 
-				// Terminate all running reviewer sessions
+				// Terminate ALL reviewer sessions for this verification (not just "running" ones)
 				for (const step of active.steps) {
-					if (step.sessionId && step.status === "running") {
+					if (step.sessionId) {
 						try {
 							await this.sessionManager?.terminateSession(step.sessionId);
 						} catch { /* ignore — may already be terminated */ }
 						if (this.teamManager) {
 							try {
-								await this.teamManager.unregisterReviewerSession(goalId, step.sessionId);
+								this.teamManager.unregisterReviewerSession(goalId, step.sessionId);
 							} catch { /* ignore */ }
 						}
 					}
@@ -120,6 +120,12 @@ export class VerificationHarness {
 
 				console.log(`[verification] Cancelled stale verification ${signalId} for gate ${gateId}`);
 			}
+		}
+
+		// Also clean up orphaned reviewers that are no longer tracked in activeVerifications
+		// (e.g., from verifications that completed but whose sessions weren't cleaned up)
+		if (this.teamManager) {
+			await this.teamManager.cleanupOrphanedReviewers(goalId);
 		}
 	}
 

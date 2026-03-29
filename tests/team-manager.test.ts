@@ -990,4 +990,161 @@ describe("TeamManager", () => {
 			}
 		});
 	});
+
+	// -----------------------------------------------------------------------
+	// Reviewer session registration — maxConcurrent enforcement
+	// -----------------------------------------------------------------------
+
+	describe("registerReviewerSession", () => {
+		let team: InstanceType<typeof TeamManager>;
+		let sm: ReturnType<typeof createMockSessionManager>;
+		let goals: Map<string, MockGoal>;
+
+		beforeEach(async () => {
+			clearTeamStore();
+			goals = new Map();
+			goals.set("goal-rev", createMockGoal({ id: "goal-rev", title: "Reviewer Test" }));
+			sm = createMockSessionManager(goals);
+			team = createTeamManager(sm);
+			await team.startTeam("goal-rev");
+		});
+
+		afterEach(async () => {
+			try { await team.teardownTeam("goal-rev"); } catch { /* ignore */ }
+			clearTeamStore();
+		});
+
+		it("registers a reviewer session as a team agent", () => {
+			team.registerReviewerSession("goal-rev", "rev-1", "Security review");
+			const agents = team.listAgents("goal-rev");
+			const reviewer = agents.find(a => a.sessionId === "rev-1");
+			assert.ok(reviewer);
+			assert.equal(reviewer.role, "reviewer");
+			assert.equal(reviewer.task, "Verification review: Security review");
+		});
+
+		it("enforces maxConcurrent for reviewers", () => {
+			// Fill up to maxConcurrent (12) — team lead takes 1 slot, so 11 more
+			for (let i = 0; i < 11; i++) {
+				team.registerReviewerSession("goal-rev", `rev-fill-${i}`, `Step ${i}`);
+			}
+			const agentsBefore = team.listAgents("goal-rev");
+			assert.equal(agentsBefore.length, 11); // 11 reviewers (lead is separate)
+
+			// Now try to register one more — should be silently skipped
+			// since agents.length (11) + 1 (lead in entry but not in agents) >= 12
+			// Actually maxConcurrent counts entry.agents which is the reviewers
+			// Let me check: does the team lead count in entry.agents?
+			// From spawnTeam: entry.agents starts as [], lead is tracked separately
+			// in entry.teamLeadSessionId. So 11 agents < 12 maxConcurrent.
+			// Register one more to hit exactly 12:
+			team.registerReviewerSession("goal-rev", "rev-fill-11", "Step 11");
+			const agentsAt12 = team.listAgents("goal-rev");
+			assert.equal(agentsAt12.length, 12);
+
+			// 13th should be rejected
+			team.registerReviewerSession("goal-rev", "rev-overflow", "Overflow");
+			const agentsAfter = team.listAgents("goal-rev");
+			assert.equal(agentsAfter.length, 12, "Should not exceed maxConcurrent");
+			assert.ok(!agentsAfter.find(a => a.sessionId === "rev-overflow"));
+		});
+
+		it("allows registering after unregistering a reviewer", () => {
+			// Fill to max
+			for (let i = 0; i < 12; i++) {
+				team.registerReviewerSession("goal-rev", `rev-${i}`, `Step ${i}`);
+			}
+			assert.equal(team.listAgents("goal-rev").length, 12);
+
+			// Unregister one
+			team.unregisterReviewerSession("goal-rev", "rev-5");
+			assert.equal(team.listAgents("goal-rev").length, 11);
+
+			// Now a new one should work
+			team.registerReviewerSession("goal-rev", "rev-new", "New Step");
+			assert.equal(team.listAgents("goal-rev").length, 12);
+		});
+
+		it("silently skips registration for unknown goals", () => {
+			// Should not throw
+			team.registerReviewerSession("nonexistent-goal", "rev-x", "Step X");
+		});
+	});
+
+	// -----------------------------------------------------------------------
+	// cleanupOrphanedReviewers
+	// -----------------------------------------------------------------------
+
+	describe("cleanupOrphanedReviewers", () => {
+		let team: InstanceType<typeof TeamManager>;
+		let sm: ReturnType<typeof createMockSessionManager>;
+		let goals: Map<string, MockGoal>;
+
+		beforeEach(async () => {
+			clearTeamStore();
+			goals = new Map();
+			goals.set("goal-cleanup", createMockGoal({ id: "goal-cleanup", title: "Cleanup Test" }));
+			sm = createMockSessionManager(goals);
+			team = createTeamManager(sm);
+			await team.startTeam("goal-cleanup");
+		});
+
+		afterEach(async () => {
+			try { await team.teardownTeam("goal-cleanup"); } catch { /* ignore */ }
+			clearTeamStore();
+		});
+
+		it("removes all reviewer agents from the team", async () => {
+			team.registerReviewerSession("goal-cleanup", "rev-1", "Review A");
+			team.registerReviewerSession("goal-cleanup", "rev-2", "Review B");
+			team.registerReviewerSession("goal-cleanup", "rev-3", "Review C");
+			assert.equal(team.listAgents("goal-cleanup").length, 3);
+
+			const cleaned = await team.cleanupOrphanedReviewers("goal-cleanup");
+			assert.equal(cleaned, 3);
+			assert.equal(team.listAgents("goal-cleanup").length, 0);
+		});
+
+		it("does not remove non-reviewer agents", async () => {
+			// Manually register a non-reviewer agent (simulating a coder without needing git)
+			const entry = (team as any).teams.get("goal-cleanup");
+			entry.agents.push({
+				sessionId: "coder-1",
+				role: "coder",
+				worktreePath: undefined,
+				branch: undefined,
+				task: "Write some code",
+				createdAt: Date.now(),
+			});
+			team.registerReviewerSession("goal-cleanup", "rev-1", "Review A");
+
+			const agentsBefore = team.listAgents("goal-cleanup");
+			assert.equal(agentsBefore.length, 2); // 1 coder + 1 reviewer
+
+			const cleaned = await team.cleanupOrphanedReviewers("goal-cleanup");
+			assert.equal(cleaned, 1); // Only the reviewer
+
+			const agentsAfter = team.listAgents("goal-cleanup");
+			assert.equal(agentsAfter.length, 1);
+			assert.equal(agentsAfter[0].role, "coder");
+		});
+
+		it("calls terminateSession for each reviewer", async () => {
+			team.registerReviewerSession("goal-cleanup", "rev-1", "Review A");
+			team.registerReviewerSession("goal-cleanup", "rev-2", "Review B");
+
+			await team.cleanupOrphanedReviewers("goal-cleanup");
+			assert.equal(sm.terminateSession.mock.callCount(), 2);
+		});
+
+		it("returns 0 for goal with no reviewers", async () => {
+			const cleaned = await team.cleanupOrphanedReviewers("goal-cleanup");
+			assert.equal(cleaned, 0);
+		});
+
+		it("returns 0 for nonexistent goal", async () => {
+			const cleaned = await team.cleanupOrphanedReviewers("nonexistent");
+			assert.equal(cleaned, 0);
+		});
+	});
 });

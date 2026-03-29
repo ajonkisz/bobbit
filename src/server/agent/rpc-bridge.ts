@@ -62,6 +62,9 @@ export class RpcBridge {
 		});
 
 		this.process.stderr!.on("data", (chunk: Buffer) => {
+			// Filter out NODE_TLS_REJECT_UNAUTHORIZED warnings from pi-coding-agent
+			const text = chunk.toString("utf-8");
+			if (text.includes("NODE_TLS_REJECT_UNAUTHORIZED") || text.includes("disabling certificate verification")) return;
 			process.stderr.write(chunk);
 		});
 
