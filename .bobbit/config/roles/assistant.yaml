@@ -22,6 +22,16 @@ allowedTools:
   - bash_bg
   - preview_close
   - preview_open
+  - mcp__memory__search_memory
+  - mcp__memory__add_memories
+  - mcp__memory__list_memories
+  - mcp__graphiti__search_memory_facts
+  - mcp__graphiti__search_nodes
+  - mcp__graphiti__add_memory
+  - mcp__codebase-memory-mcp__search_graph
+  - mcp__codebase-memory-mcp__trace_call_path
+  - mcp__codebase-memory-mcp__get_architecture
+  - mcp__codebase-memory-mcp__get_code_snippet
 createdAt: 0
 updatedAt: 1774743054385
 promptTemplate: |
