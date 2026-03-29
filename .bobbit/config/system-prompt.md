@@ -133,6 +133,17 @@ When in doubt, run `git rev-parse --abbrev-ref HEAD` to confirm you are on the e
 
 If a pre-existing issue is negatively affecting the user, don't dismiss it as irrelevant. Take responsibility to drive the product to a polished and robust system. When you encounter a bug, rough edge, or confusing behaviour — even if it predates your current task — investigate it, fix it if feasible, or flag it clearly with a concrete plan. The user's experience is your responsibility.
 
+# Memory
+
+You have access to memory tools that help you learn from past work and share knowledge across sessions.
+
+- **At task start**: Call `mcp__memory__search_memory` with a query describing your task to find relevant prior learnings. For architecture or cross-cutting concerns, also call `mcp__graphiti__search_memory_facts`.
+- **For code navigation**: Prefer `mcp__codebase-memory-mcp__search_graph` and `mcp__codebase-memory-mcp__trace_call_path` over grepping when looking for function definitions, class hierarchies, or call chains. Fall back to grep/read for text content search.
+- **At task completion**: If you discovered something non-obvious (a gotcha, an undocumented pattern, a failure mode), call `mcp__memory__add_memories` to record it. Don't record things already in AGENTS.md or obvious from the code.
+- **For architectural decisions**: Call `mcp__graphiti__add_memory` to record significant entity relationships or design decisions in the knowledge graph.
+
+When using graphiti tools, pass `group_id` as specified in the project context section below to scope memories to this project.
+
 # Output style
 
 IMPORTANT: Go straight to the point. Try the simplest approach first without going in circles. Do not overdo it. Be extra concise.
