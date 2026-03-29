@@ -227,6 +227,27 @@ Routes accept both `/team/` and legacy `/swarm/` paths.
 
 **`POST /api/internal/mcp-call`** is the internal proxy endpoint used by generated agent extensions. Returns the raw MCP `{ content, isError }` response.
 
+### Task Outcomes
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/outcomes` | List task outcomes. Filters: `?goal_id=`, `?agent_role=`, `?outcome=`, `?since=` (ISO date) |
+| `GET` | `/api/outcomes/stats` | Aggregate outcome statistics. Filters: `?goal_id=`, `?agent_role=`, `?since=` |
+
+Outcomes are automatically recorded when tasks reach terminal states. The `outcome` field uses mapped values: `completed`, `blocked`, or `abandoned` (mapped from task states `complete`, `blocked`, `skipped`).
+
+**`GET /api/outcomes`** response:
+```json
+{ "outcomes": [{ "id": "...", "session_id": "...", "goal_id": "...", "task_id": "...", "agent_role": "coder", "task_type": "implementation", "outcome": "completed", "duration_ms": 120000, "input_tokens": 5000, "output_tokens": 2000, "cost_usd": 0.05, "created_at": "2025-01-01 12:00:00" }] }
+```
+
+**`GET /api/outcomes/stats`** response:
+```json
+{ "successRateByRole": { "coder": 0.95, "reviewer": 1.0 }, "avgDurationByType": { "implementation": 180000, "code-review": 60000 }, "totalCost": 1.25, "totalOutcomes": 42 }
+```
+
+Data is stored in `.bobbit/state/outcomes.db` (SQLite, WAL mode). Source: `src/server/agent/outcome-store.ts`.
+
 ### Preview
 
 | Method | Path | Description |
