@@ -246,7 +246,48 @@ Outcomes are automatically recorded when tasks reach terminal states. The `outco
 { "successRateByRole": { "coder": 0.95, "reviewer": 1.0 }, "avgDurationByType": { "implementation": 180000, "code-review": 60000 }, "totalCost": 1.25, "totalOutcomes": 42 }
 ```
 
-Data is stored in `.bobbit/state/outcomes.db` (SQLite, WAL mode). Source: `src/server/agent/outcome-store.ts`.
+Data is stored in `.bobbit/state/outcomes.db` (SQLite, WAL mode), which also stores prompt proposals via `ProposalStore`. Source: `src/server/agent/outcome-store.ts`, `src/server/agent/proposal-store.ts`.
+
+### Proposals
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/proposals` | List proposals. Optional `?status=pending` filter |
+| `GET` | `/api/proposals/:id` | Get a single proposal (404 if not found) |
+| `POST` | `/api/proposals` | Create a proposal |
+| `PUT` | `/api/proposals/:id` | Approve or reject a proposal |
+
+**`POST /api/proposals`** request body:
+```json
+{ "target_type": "role_prompt", "target_name": "coder", "reasoning": "High failure rate on implementation tasks", "evidence": "[\"outcome-id-1\", \"outcome-id-2\"]", "proposed_diff": "Add a reminder to run tests before committing", "observer_session_id": "optional-session-id" }
+```
+
+Valid `target_type` values: `role_prompt`, `agents_md`, `system_prompt`, `workflow`. Returns 201 with the created proposal.
+
+**`PUT /api/proposals/:id`** request body:
+```json
+{ "status": "approved" }
+```
+
+Status must be `"approved"` or `"rejected"`. On approval, the server applies the change to the target file (`role_prompt` → `.bobbit/config/roles/{name}.yaml`, `agents_md` → `AGENTS.md`, `system_prompt` → `.bobbit/config/system-prompt.md`) and writes a Claude Code memory file to `~/.claude/projects/{encodedCwd}/memory/` with `type: feedback` frontmatter.
+
+**`GET /api/proposals`** response:
+```json
+{ "proposals": [{ "id": "...", "observer_session_id": "...", "target_type": "role_prompt", "target_name": "coder", "reasoning": "...", "evidence": "...", "proposed_diff": "...", "status": "pending", "created_at": "2025-01-01 12:00:00", "reviewed_at": null }] }
+```
+
+### Observer
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/observer/run` | Trigger the Observer staff agent |
+
+Creates the Observer staff agent on first call, wakes the existing one on subsequent calls. The Observer analyzes task outcomes and agent memories, then creates proposals for improvements to role prompts, AGENTS.md, and system prompts.
+
+**Response:**
+```json
+{ "sessionId": "...", "staffId": "..." }
+```
 
 ### Preview
 
