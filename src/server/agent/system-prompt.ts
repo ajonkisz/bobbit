@@ -230,6 +230,11 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 		sections.push(memories);
 	}
 
+	// 2.8. Memory group_id hint
+	const projectName = path.basename(parts.cwd);
+	const memoryHint = `# Memory Context\n\nWhen using graphiti tools, pass \`group_id: '${projectName}'\` to scope memories to this project.`;
+	sections.push(memoryHint);
+
 	// 3. Goal spec (merge rolePrompt and toolRestrictions into goalSpec section for backward compat)
 	{
 		let effectiveGoalSpec = parts.goalSpec || "";
@@ -324,6 +329,14 @@ export function getPromptSections(parts: PromptParts): PromptSection[] {
 	if (memoriesContent.trim()) {
 		sections.push({ label: "Claude Code Memories", source: "~/.claude/projects/.../memory/", content: memoriesContent.trim() });
 	}
+
+	// 2.8. Memory group_id
+	const projectNameForSections = path.basename(parts.cwd);
+	sections.push({
+		label: "Memory Context",
+		source: "Derived from cwd",
+		content: `When using graphiti tools, pass \`group_id: '${projectNameForSections}'\` to scope memories to this project.`
+	});
 
 	// 3. Goal spec (separate from role)
 	if (parts.goalSpec?.trim()) {
