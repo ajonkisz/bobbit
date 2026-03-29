@@ -31,9 +31,6 @@ allowedTools:
   - find
   - grep
   - ls
-  - mcp__memory__search_memory
-  - mcp__memory__add_memories
-  - mcp__memory__list_memories
   - mcp__graphiti__search_memory_facts
   - mcp__graphiti__search_nodes
   - mcp__graphiti__add_memory

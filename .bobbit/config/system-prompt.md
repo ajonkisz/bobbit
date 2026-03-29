@@ -137,9 +137,13 @@ If a pre-existing issue is negatively affecting the user, don't dismiss it as ir
 
 You have access to memory tools that help you learn from past work and share knowledge across sessions.
 
-- **At task start**: Call `mcp__memory__search_memory` with a query describing your task to find relevant prior learnings. For architecture or cross-cutting concerns, also call `mcp__graphiti__search_memory_facts`.
+- **At task start**: Search for relevant prior learnings via bash:
+  `curl -s -X POST http://localhost:8765/api/v1/memories/filter -H "Content-Type: application/json" -d '{"user_id":"aj","search_query":"YOUR QUERY HERE","size":10}' | jq '.items[].content'`
+  For architecture or cross-cutting concerns, also call `mcp__graphiti__search_memory_facts`.
 - **For code navigation**: Prefer `mcp__codebase-memory-mcp__search_graph` and `mcp__codebase-memory-mcp__trace_call_path` over grepping when looking for function definitions, class hierarchies, or call chains. Fall back to grep/read for text content search.
-- **At task completion**: If you discovered something non-obvious (a gotcha, an undocumented pattern, a failure mode), call `mcp__memory__add_memories` to record it. Don't record things already in AGENTS.md or obvious from the code.
+- **At task completion**: If you discovered something non-obvious (a gotcha, an undocumented pattern, a failure mode), save it via bash:
+  `curl -s -X POST http://localhost:8765/api/v1/memories/ -H "Content-Type: application/json" -d '{"user_id":"aj","text":"YOUR LEARNING HERE","infer":true,"app":"bobbit"}'`
+  Don't record things already in AGENTS.md or obvious from the code.
 - **For architectural decisions**: Call `mcp__graphiti__add_memory` to record significant entity relationships or design decisions in the knowledge graph.
 
 When using graphiti tools, pass `group_id` as specified in the project context section below to scope memories to this project.

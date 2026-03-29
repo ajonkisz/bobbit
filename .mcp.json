@@ -4,10 +4,6 @@
       "command": "npx",
       "args": ["@playwright/mcp@latest"]
     },
-    "memory": {
-      "command": "node",
-      "args": ["scripts/openmemory-mcp-bridge.mjs"]
-    },
     "graphiti": {
       "url": "http://localhost:8000/mcp"
     }
