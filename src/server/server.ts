@@ -24,7 +24,8 @@ import { PersonalityStore } from "./agent/personality-store.js";
 import { PersonalityManager } from "./agent/personality-manager.js";
 
 import { getPromptSections } from "./agent/system-prompt.js";
-import type { TaskState } from "./agent/task-store.js";
+import type { TaskState, PersistedTask } from "./agent/task-store.js";
+import { OutcomeStore } from "./agent/outcome-store.js";
 import { BgProcessManager } from "./agent/bg-process-manager.js";
 import { GateStore } from "./agent/gate-store.js";
 import { WorkflowStore } from "./agent/workflow-store.js";
@@ -147,6 +148,7 @@ export function createGateway(config: GatewayConfig) {
 	const roleManager = new RoleManager(roleStore);
 	const toolManager = new ToolManager();
 	const gateStore = new GateStore();
+	const outcomeStore = new OutcomeStore();
 	const workflowStore = new WorkflowStore();
 	const sessionManager = new SessionManager({
 		agentCliPath: config.agentCliPath,
@@ -222,7 +224,7 @@ export function createGateway(config: GatewayConfig) {
 				}
 			}
 
-			await handleApiRoute(url, req, res, sessionManager, config, colorStore, prStatusStore, teamManager, roleManager, toolManager, gateStore, personalityManager, bgProcessManager, staffManager, workflowManager, verificationHarness, preferencesStore, projectConfigStore, broadcastToGoal, broadcastToAll);
+			await handleApiRoute(url, req, res, sessionManager, config, colorStore, prStatusStore, teamManager, roleManager, toolManager, gateStore, personalityManager, bgProcessManager, staffManager, workflowManager, verificationHarness, preferencesStore, projectConfigStore, broadcastToGoal, broadcastToAll, outcomeStore);
 
 			return;
 		}
@@ -440,6 +442,7 @@ async function handleApiRoute(
 	projectConfigStore: ProjectConfigStore,
 	broadcastToGoal: (goalId: string, event: any) => void,
 	broadcastToAll: (event: any) => void,
+	outcomeStore: OutcomeStore,
 ) {
 	const json = (data: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -1667,6 +1670,14 @@ async function handleApiRoute(
 				});
 				if (!ok) { json({ error: "Task not found" }, 404); return; }
 
+				// Record outcome for terminal states
+				if (body.state && (body.state === "complete" || body.state === "skipped" || body.state === "blocked")) {
+					const updatedTask = sessionManager.taskManager.getTask(id);
+					if (updatedTask) {
+						recordTaskOutcome(updatedTask, outcomeStore, sessionManager, teamManager);
+					}
+				}
+
 				// Notify team lead when state transitions to terminal or blocked via PUT
 				if (body.state && body.state !== prevState && (body.state === "complete" || body.state === "skipped" || body.state === "blocked") && task?.goalId) {
 					teamManager.notifyTeamLeadOfTaskCompletion(task.goalId, task.title, body.state);
@@ -1725,6 +1736,14 @@ async function handleApiRoute(
 			const task = sessionManager.taskManager.getTask(taskId);
 			const ok = sessionManager.taskManager.transitionTask(taskId, state as TaskState);
 			if (!ok) { json({ error: "Task not found" }, 400); return; }
+
+			// Record outcome for terminal states
+			if (state === "complete" || state === "skipped" || state === "blocked") {
+				const updatedTask = sessionManager.taskManager.getTask(taskId);
+				if (updatedTask) {
+					recordTaskOutcome(updatedTask, outcomeStore, sessionManager, teamManager);
+				}
+			}
 
 			// Notify team lead when a task reaches a terminal or blocked state
 			if ((state === "complete" || state === "skipped" || state === "blocked") && task?.goalId) {
@@ -3178,7 +3197,81 @@ async function handleApiRoute(
 		return;
 	}
 
+	// GET /api/outcomes — list task outcomes
+	if (url.pathname === "/api/outcomes" && req.method === "GET") {
+		const goalId = url.searchParams.get("goal_id") || undefined;
+		const agentRole = url.searchParams.get("agent_role") || undefined;
+		const outcome = url.searchParams.get("outcome") || undefined;
+		const since = url.searchParams.get("since") || undefined;
+		const outcomes = outcomeStore.getOutcomes({ goalId, agentRole, outcome, since });
+		json({ outcomes });
+		return;
+	}
+
+	// GET /api/outcomes/stats — aggregate outcome statistics
+	if (url.pathname === "/api/outcomes/stats" && req.method === "GET") {
+		const goalId = url.searchParams.get("goal_id") || undefined;
+		const agentRole = url.searchParams.get("agent_role") || undefined;
+		const since = url.searchParams.get("since") || undefined;
+		const stats = outcomeStore.getStats({ goalId, agentRole, since });
+		json(stats);
+		return;
+	}
+
 	json({ error: "Not found" }, 404);
+}
+
+/** Record a task outcome to the outcome store (non-fatal on error). */
+function recordTaskOutcome(
+	task: PersistedTask,
+	outcomeStore: OutcomeStore,
+	sessionManager: SessionManager,
+	teamManager: TeamManager,
+): void {
+	try {
+		const outcomeMap: Record<string, string> = { complete: "completed", blocked: "blocked", skipped: "abandoned" };
+		const outcome = outcomeMap[task.state] || task.state;
+		const durationMs = task.completedAt && task.createdAt ? task.completedAt - task.createdAt : null;
+
+		let inputTokens: number | null = null;
+		let outputTokens: number | null = null;
+		let costUsd: number | null = null;
+		if (task.assignedSessionId) {
+			const cost = sessionManager.getCostTracker().getSessionCost(task.assignedSessionId);
+			if (cost) {
+				inputTokens = cost.inputTokens;
+				outputTokens = cost.outputTokens;
+				costUsd = cost.totalCost;
+			}
+		}
+
+		let agentRole: string | null = null;
+		if (task.assignedSessionId && task.goalId) {
+			const agents = teamManager.listAgents(task.goalId);
+			const agent = agents.find(a => a.sessionId === task.assignedSessionId);
+			agentRole = agent?.role ?? null;
+		}
+
+		outcomeStore.recordOutcome({
+			sessionId: task.assignedSessionId || null,
+			goalId: task.goalId,
+			taskId: task.id,
+			agentRole,
+			workflowId: null,
+			gateId: task.workflowGateId || null,
+			taskType: task.type,
+			taskSummary: task.resultSummary || task.title,
+			outcome,
+			failureReason: null,
+			durationMs,
+			inputTokens,
+			outputTokens,
+			toolCallCount: null,
+			costUsd,
+		});
+	} catch (err) {
+		console.error("[outcome] Failed to record task outcome:", err);
+	}
 }
 
 /** Check if gateId transitively depends on targetId in the workflow DAG */
