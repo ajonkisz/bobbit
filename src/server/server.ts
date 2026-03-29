@@ -3258,6 +3258,11 @@ async function handleApiRoute(
 			json({ error: "Missing required fields: target_type, target_name, reasoning, proposed_diff" }, 400);
 			return;
 		}
+		const validTargetTypes = ["role_prompt", "agents_md", "system_prompt", "workflow"];
+		if (!validTargetTypes.includes(body.target_type)) {
+			json({ error: `target_type must be one of: ${validTargetTypes.join(", ")}` }, 400);
+			return;
+		}
 		const proposal = proposalStore.create({
 			observerSessionId: body.observer_session_id || undefined,
 			targetType: body.target_type,
@@ -3287,7 +3292,8 @@ async function handleApiRoute(
 		const updated = proposalStore.updateStatus(proposalMatch[1], body.status);
 		if (!updated) { json({ error: "Not found" }, 404); return; }
 
-		const proposal = proposalStore.getById(proposalMatch[1])!;
+		const proposal = proposalStore.getById(proposalMatch[1]);
+		if (!proposal) { json({ error: "Not found" }, 404); return; }
 
 		if (body.status === "approved") {
 			try {
@@ -3397,6 +3403,11 @@ function applyProposal(proposal: Proposal): void {
 	const { targetType, targetName, proposedDiff } = proposal;
 
 	if (targetType === "role_prompt") {
+		// Sanitize targetName to prevent path traversal
+		if (targetName.includes("/") || targetName.includes("\\") || targetName.includes("..")) {
+			console.error("[proposals] Invalid targetName for role_prompt:", targetName);
+			return;
+		}
 		const rolePath = path.join(bobbitConfigDir(), "roles", `${targetName}.yaml`);
 		if (fs.existsSync(rolePath)) {
 			const content = fs.readFileSync(rolePath, "utf-8");
@@ -3431,7 +3442,7 @@ function writeProposalMemory(proposal: Proposal): void {
 		const shortName = `Observer: ${proposal.targetType} ${proposal.targetName}`;
 		const shortDesc = proposal.reasoning.slice(0, 100);
 
-		const content = `---\nname: ${shortName}\ndescription: ${shortDesc}\ntype: feedback\n---\n${proposal.proposedDiff}\n`;
+		const content = `---\nname: "${shortName.replace(/"/g, '\\"')}"\ndescription: "${shortDesc.replace(/"/g, '\\"').replace(/\n/g, ' ')}"\ntype: feedback\n---\n${proposal.proposedDiff}\n`;
 		fs.writeFileSync(path.join(memoryDir, filename), content, "utf-8");
 
 		// Update MEMORY.md index
