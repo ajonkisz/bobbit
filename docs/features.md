@@ -113,7 +113,8 @@ Each session's system prompt is assembled from these layers (in order):
 2. **AGENTS.md** — From the session's working directory, with `@FILENAME.md` inline inclusion (recursive, circular-reference safe)
 3. **CLAUDE.md** — From the session's working directory (if present and not just `@AGENTS.md`), merged into the Project Context section alongside AGENTS.md
 4. **Claude Code project memories** — Memory files from `~/.claude/projects/{encodedCwd}/memory/*.md`, filtered by type and capped at 20 files / ~4000 tokens (see AGENTS.md "Claude Code memory integration" for details)
-5. **Goal spec** — If the session belongs to a goal, the goal's spec is appended
+5. **Memory Context** — A project-scoped `group_id` hint for graphiti tools, derived from `path.basename(cwd)`. Always injected so agents scope knowledge-graph operations to the current project.
+6. **Goal spec** — If the session belongs to a goal, the goal's spec is appended
 
 The assembled prompt is written to `.bobbit/state/session-prompts/{sessionId}.md` and cleaned up on session termination.
 

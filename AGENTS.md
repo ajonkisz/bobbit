@@ -126,6 +126,17 @@ REST API: `GET /api/mcp-servers` (list servers and status), `POST /api/mcp-serve
 
 **Change how messages render**: `src/ui/components/Messages.ts` for standard roles, `src/ui/components/message-renderer-registry.ts` for custom types.
 
+### Memory tool integration
+
+Agents have memory MCP tools in their `allowedTools` by default across all roles. The global system prompt (`.bobbit/config/system-prompt.md`) includes a `# Memory` section instructing agents when to use memory tools — searching at task start, preferring codebase-memory-mcp for code navigation, recording non-obvious learnings at task completion, and persisting architectural decisions to graphiti.
+
+The assembled prompt also includes a **Memory Context** section (step 2.8) injected between Claude Code memories and the Goal spec. This section provides a project-scoped `group_id` derived from `path.basename(cwd)`, so graphiti memories are scoped per-project.
+
+The memory tools added to all roles:
+- `mcp__memory__search_memory`, `mcp__memory__add_memories`, `mcp__memory__list_memories`
+- `mcp__graphiti__search_memory_facts`, `mcp__graphiti__search_nodes`, `mcp__graphiti__add_memory`
+- `mcp__codebase-memory-mcp__search_graph`, `mcp__codebase-memory-mcp__trace_call_path`, `mcp__codebase-memory-mcp__get_architecture`, `mcp__codebase-memory-mcp__get_code_snippet`
+
 ### Thinking level configuration
 
 The default thinking level for new sessions is configurable via `default_thinking_level` in `.bobbit/config/project.yaml` or the Settings page Project tab. Valid values: `"off"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, or `""` (empty string = use the agent's built-in default of `"medium"`).
@@ -155,7 +166,7 @@ Bobbit also reads Claude Code's project memory files from `~/.claude/projects/{e
 
 **Filtering:** Only memory files with frontmatter `type` of `user`, `feedback`, or `project` are included — `reference` type files are skipped. The index file `MEMORY.md` is also skipped. A maximum of 20 files are included (sorted alphabetically), with total content capped at ~4000 tokens (~16000 characters).
 
-**Prompt assembly order:** Memories appear as a `# Claude Code Project Memories` section after the Project Context (AGENTS.md + CLAUDE.md) and before the Goal spec. In the prompt inspector UI, CLAUDE.md and memories appear as separate labeled sections.
+**Prompt assembly order:** Memories appear as a `# Claude Code Project Memories` section after the Project Context (AGENTS.md + CLAUDE.md). Next, a **Memory Context** section (step 2.8) is injected with the project-scoped graphiti `group_id` (derived from `path.basename(cwd)`). The Goal spec follows after that. In the prompt inspector UI, CLAUDE.md, memories, and Memory Context appear as separate labeled sections.
 
 **Timing:** Memory files are read at session creation time only (same as AGENTS.md). If the memory directory doesn't exist, it is silently skipped.
 
