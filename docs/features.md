@@ -107,11 +107,13 @@ Context compaction reduces token usage by summarising the conversation.
 
 ## System Prompt Assembly
 
-Each session's system prompt is assembled from three layers:
+Each session's system prompt is assembled from these layers (in order):
 
 1. **Global** — `.bobbit/config/system-prompt.md` from the Bobbit project root
 2. **AGENTS.md** — From the session's working directory, with `@FILENAME.md` inline inclusion (recursive, circular-reference safe)
-3. **Goal spec** — If the session belongs to a goal, the goal's spec is appended
+3. **CLAUDE.md** — From the session's working directory (if present and not just `@AGENTS.md`), merged into the Project Context section alongside AGENTS.md
+4. **Claude Code project memories** — Memory files from `~/.claude/projects/{encodedCwd}/memory/*.md`, filtered by type and capped at 20 files / ~4000 tokens (see AGENTS.md "Claude Code memory integration" for details)
+5. **Goal spec** — If the session belongs to a goal, the goal's spec is appended
 
 The assembled prompt is written to `.bobbit/state/session-prompts/{sessionId}.md` and cleaned up on session termination.
 

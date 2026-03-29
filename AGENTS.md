@@ -141,12 +141,14 @@ Thinking token budgets per level (hardcoded in `src/app/remote-agent.ts`, not cu
 
 ### Claude Code memory integration
 
+Bobbit bridges Claude Code's project knowledge into agent sessions, so that preferences, conventions, and project context captured in Claude Code are automatically available to Bobbit agents without re-teaching. See also `docs/features.md` "System Prompt Assembly" for the full prompt layer order.
+
 Bobbit reads `CLAUDE.md` from the session's working directory alongside `AGENTS.md`. Both files support `@filename.md` reference expansion. If `CLAUDE.md` contains only `@AGENTS.md`, it is skipped to avoid duplication. When both exist with distinct content, CLAUDE.md is merged into the "Project Context" section of the assembled prompt.
 
 Bobbit also reads Claude Code's project memory files from `~/.claude/projects/{encodedCwd}/memory/*.md`, where `encodedCwd` is the session's working directory with `/` replaced by `-`:
 
 ```
-/Users/aj/Documents/Development/bobbit → -Users-aj-Documents-Development-bobbit
+/home/user/my-project → -home-user-my-project
 ```
 
 **Filtering:** Only memory files with frontmatter `type` of `user`, `feedback`, or `project` are included — `reference` type files are skipped. The index file `MEMORY.md` is also skipped. A maximum of 20 files are included (sorted alphabetically), with total content capped at ~4000 tokens (~16000 characters).
