@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { bobbitStateDir } from "../bobbit-dir.js";
 
@@ -62,6 +63,84 @@ export function readAgentsMd(cwd: string): string {
 	try {
 		const raw = fs.readFileSync(agentsPath, "utf-8");
 		return resolveMarkdownRefs(raw, cwd);
+	} catch {
+		return "";
+	}
+}
+
+/**
+ * Parse YAML frontmatter from a Claude Code memory file.
+ * Returns extracted fields and body content, or null if invalid.
+ */
+export function parseMemoryFile(content: string): { name: string; description: string; type: string; body: string } | null {
+	if (!content.startsWith('---')) return null;
+	const endIdx = content.indexOf('\n---', 3);
+	if (endIdx === -1) return null;
+	const frontmatter = content.slice(3, endIdx);
+	const body = content.slice(endIdx + 4).trim();
+	const name = frontmatter.match(/^name:\s*(.+)$/m)?.[1]?.trim() || '';
+	const description = frontmatter.match(/^description:\s*(.+)$/m)?.[1]?.trim() || '';
+	const type = frontmatter.match(/^type:\s*(.+)$/m)?.[1]?.trim() || '';
+	return { name, description, type, body };
+}
+
+/**
+ * Read CLAUDE.md from a directory, resolving `@` references.
+ * Returns empty string if not found or if content is just `@AGENTS.md` (dedup).
+ */
+export function readClaudeMd(cwd: string): string {
+	const claudePath = path.join(cwd, "CLAUDE.md");
+	if (!fs.existsSync(claudePath)) return "";
+
+	try {
+		const raw = fs.readFileSync(claudePath, "utf-8");
+		// Skip if CLAUDE.md is just a reference to AGENTS.md (avoid duplication)
+		if (raw.trim() === "@AGENTS.md") return "";
+		return resolveMarkdownRefs(raw, cwd);
+	} catch {
+		return "";
+	}
+}
+
+/**
+ * Read Claude Code project memory files from ~/.claude/projects/{encodedCwd}/memory/*.md.
+ * Returns a formatted section string, or empty string if no memories found.
+ */
+export function readClaudeCodeMemories(cwd: string): string {
+	try {
+		const encodedCwd = cwd.replace(/\//g, "-");
+		const memoryDir = path.join(os.homedir(), ".claude", "projects", encodedCwd, "memory");
+
+		if (!fs.existsSync(memoryDir)) return "";
+
+		const files = fs.readdirSync(memoryDir)
+			.filter(f => f.endsWith(".md") && f !== "MEMORY.md")
+			.sort()
+			.slice(0, 20);
+
+		if (files.length === 0) return "";
+
+		const allowedTypes = new Set(["user", "feedback", "project"]);
+		const parts: string[] = [];
+		let totalLength = 0;
+
+		for (const file of files) {
+			try {
+				const content = fs.readFileSync(path.join(memoryDir, file), "utf-8");
+				const parsed = parseMemoryFile(content);
+				if (!parsed || !allowedTypes.has(parsed.type)) continue;
+
+				const entry = `### ${parsed.name}\n\n${parsed.body}`;
+				if (totalLength + entry.length > 16000) break;
+				parts.push(entry);
+				totalLength += entry.length;
+			} catch {
+				// Skip unreadable files
+			}
+		}
+
+		if (parts.length === 0) return "";
+		return "# Claude Code Project Memories\n\n" + parts.join("\n\n");
 	} catch {
 		return "";
 	}
@@ -132,6 +211,23 @@ export function assembleSystemPrompt(sessionId: string, parts: PromptParts): str
 	const agentsMd = readAgentsMd(parts.cwd);
 	if (agentsMd.trim()) {
 		sections.push("# Project Context\n\n" + agentsMd.trim());
+	}
+
+	// 2.5. CLAUDE.md from working directory
+	const claudeMd = readClaudeMd(parts.cwd);
+	if (claudeMd.trim()) {
+		if (agentsMd.trim()) {
+			// Merge into the existing Project Context section
+			sections[sections.length - 1] = "# Project Context\n\n" + agentsMd.trim() + "\n\n" + claudeMd.trim();
+		} else {
+			sections.push("# Project Context\n\n" + claudeMd.trim());
+		}
+	}
+
+	// 2.7. Claude Code project memories
+	const memories = readClaudeCodeMemories(parts.cwd);
+	if (memories.trim()) {
+		sections.push(memories);
 	}
 
 	// 3. Goal spec (merge rolePrompt and toolRestrictions into goalSpec section for backward compat)
@@ -216,6 +312,18 @@ export function getPromptSections(parts: PromptParts): PromptSection[] {
 	// 2. AGENTS.md
 	const agentsMd = readAgentsMd(parts.cwd);
 	if (agentsMd.trim()) sections.push({ label: "Project Context", source: "AGENTS.md", content: agentsMd.trim() });
+
+	// 2.5. CLAUDE.md
+	const claudeMd = readClaudeMd(parts.cwd);
+	if (claudeMd.trim()) {
+		sections.push({ label: "CLAUDE.md", source: "CLAUDE.md", content: claudeMd.trim() });
+	}
+
+	// 2.7. Claude Code memories
+	const memoriesContent = readClaudeCodeMemories(parts.cwd);
+	if (memoriesContent.trim()) {
+		sections.push({ label: "Claude Code Memories", source: "~/.claude/projects/.../memory/", content: memoriesContent.trim() });
+	}
 
 	// 3. Goal spec (separate from role)
 	if (parts.goalSpec?.trim()) {
