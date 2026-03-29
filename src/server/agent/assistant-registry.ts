@@ -11,6 +11,7 @@ import { PERSONALITY_ASSISTANT_PROMPT } from "./personality-assistant.js";
 import { STAFF_ASSISTANT_PROMPT } from "./staff-assistant.js";
 import { SETUP_ASSISTANT_PROMPT } from "./setup-assistant.js";
 import { WORKFLOW_ASSISTANT_PROMPT } from "./workflow-assistant.js";
+import { OBSERVER_ASSISTANT_PROMPT } from "./observer-assistant.js";
 
 export interface AssistantDef {
 	type: string;
@@ -62,6 +63,12 @@ const FALLBACK_DEFAULTS: Record<string, AssistantDef> = {
 		title: "Workflow Assistant",
 		promptTitle: "Workflow Creation Assistant",
 		prompt: WORKFLOW_ASSISTANT_PROMPT,
+	},
+	observer: {
+		type: "observer",
+		title: "Observer Assistant",
+		promptTitle: "System Observer",
+		prompt: OBSERVER_ASSISTANT_PROMPT,
 	},
 };
 
