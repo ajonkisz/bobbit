@@ -4,7 +4,7 @@ import { icon } from "@mariozechner/mini-lit";
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import { html, render } from "lit";
-import { Archive, ArrowLeft, FileText, MessagesSquare, ChevronDown, Drama, Goal as GoalIcon, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Settings, Trash2, Unplug, UserCheck, Users, WandSparkles, Workflow as WorkflowIcon, Wrench, Zap } from "lucide";
+import { Archive, ArrowLeft, FileText, Lightbulb, MessagesSquare, ChevronDown, Drama, Goal as GoalIcon, PanelRightClose, PanelRightOpen, Pencil, Plus, QrCode, Server, Settings, Trash2, Unplug, UserCheck, Users, WandSparkles, Workflow as WorkflowIcon, Wrench, Zap } from "lucide";
 import {
 	state,
 	renderApp,
@@ -57,6 +57,7 @@ import "./personality-manager.css";
 import { renderStaffPage } from "./staff-page.js";
 import { renderSkillsPage } from "./skills-page.js";
 import { renderSettingsPage } from "./settings-page.js";
+import { renderProposalsPage } from "./proposals-page.js";
 
 // ============================================================================
 // MOBILE LANDING PAGE
@@ -82,6 +83,7 @@ function renderMobileLanding() {
 						const isToolsActive = isRouteActive("tools", "tool-edit");
 						const isWorkflowsActive = isRouteActive("workflows", "workflow-edit");
 						const isSkillsActive = isRouteActive("skills");
+						const isProposalsActive = isRouteActive("proposals");
 						return html`
 					<div class="flex items-center gap-1">
 						<button class="flex-1 text-sm px-1.5 py-1 rounded transition-colors flex items-center justify-center gap-1 ${isRolesActive ? 'text-primary bg-primary/10 font-medium' : 'text-muted-foreground active:bg-secondary/50'}"
@@ -110,6 +112,11 @@ function renderMobileLanding() {
 							title="View skills"
 							@click=${() => toggleConfigPage(["skills"], () => { import("./skills-page.js").then((m) => m.loadSkillsPageData()); setHashRoute("skills"); })}>
 							${icon(Zap, "xs")} Skills
+						</button>
+						<button class="flex-1 text-sm px-1.5 py-1 rounded transition-colors flex items-center justify-center gap-1 ${isProposalsActive ? 'text-primary bg-primary/10 font-medium' : 'text-muted-foreground active:bg-secondary/50'}"
+							title="Proposals"
+							@click=${() => toggleConfigPage(["proposals"], () => { import("./proposals-page.js").then((m) => m.loadProposalsPageData()); setHashRoute("proposals"); })}>
+							${icon(Lightbulb, "xs")} Proposals
 						</button>
 						<button class="flex-1 text-sm text-muted-foreground px-1.5 py-1 rounded active:bg-secondary/50 transition-colors flex items-center justify-center gap-1"
 							@click=${() => showGoalDialog()}
@@ -2239,6 +2246,9 @@ export function doRenderApp(): void {
 		}
 		if (route.view === "skills") {
 			return renderSkillsPage();
+		}
+		if (route.view === "proposals") {
+			return renderProposalsPage();
 		}
 		if (route.view === "settings") {
 			return renderSettingsPage();

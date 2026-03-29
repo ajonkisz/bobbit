@@ -208,6 +208,9 @@ export async function refreshSessions(): Promise<void> {
 			.catch(() => {});
 	}
 
+	// Fetch pending proposal count for sidebar badge
+	fetchPendingProposalCount();
+
 	// Lazy-load archived sessions on initial load only if user had "Show archived" persisted.
 	// Also re-fetch when sessions changed while archived view is active, so newly-archived
 	// sessions appear immediately without requiring a manual toggle.
@@ -1097,5 +1100,26 @@ export async function deleteDraftFromServer(sessionId: string, type: string): Pr
 		});
 	} catch (err) {
 		console.error("[draft-api] Failed to delete draft:", err);
+	}
+}
+
+// ============================================================================
+// PROPOSALS API
+// ============================================================================
+
+/** Fetch pending proposal count for sidebar badge. Fire-and-forget. */
+export async function fetchPendingProposalCount(): Promise<void> {
+	try {
+		const res = await gatewayFetch("/api/proposals?status=pending");
+		if (res.ok) {
+			const data = await res.json();
+			const count = (data.proposals || []).length;
+			if (count !== state.pendingProposalCount) {
+				state.pendingProposalCount = count;
+				renderApp();
+			}
+		}
+	} catch {
+		// ignore — non-critical
 	}
 }

@@ -2,7 +2,7 @@
 // URL ROUTING (hash-based: #/ = landing, #/session/{id} = connected, #/goal/{id} = dashboard)
 // ============================================================================
 
-export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles" | "role-edit" | "tools" | "tool-edit" | "workflows" | "workflow-edit" | "personalities" | "personality-edit" | "staff" | "staff-edit" | "skills" | "settings";
+export type RouteView = "landing" | "session" | "goal" | "goal-dashboard" | "roles" | "role-edit" | "tools" | "tool-edit" | "workflows" | "workflow-edit" | "personalities" | "personality-edit" | "staff" | "staff-edit" | "skills" | "settings" | "proposals";
 
 export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalId?: string; roleName?: string; toolName?: string; workflowId?: string; personalityName?: string; staffId?: string } {
 	const hash = window.location.hash || "";
@@ -55,6 +55,9 @@ export function getRouteFromHash(): { view: RouteView; sessionId?: string; goalI
 	if (hash === "#/settings") {
 		return { view: "settings" };
 	}
+	if (hash === "#/proposals") {
+		return { view: "proposals" };
+	}
 	return { view: "landing" };
 }
 
@@ -88,6 +91,8 @@ export function setHashRoute(view: RouteView, id?: string, replace?: boolean): v
 		newHash = "#/personalities";
 	} else if (view === "settings") {
 		newHash = "#/settings";
+	} else if (view === "proposals") {
+		newHash = "#/proposals";
 	} else {
 		newHash = "#/";
 	}
@@ -109,7 +114,7 @@ export function setHashRoute(view: RouteView, id?: string, replace?: boolean): v
 /** Config page route views (not landing, session, or goal-dashboard). */
 const CONFIG_VIEWS: Set<RouteView> = new Set([
 	"roles", "role-edit", "tools", "tool-edit", "workflows", "workflow-edit",
-	"personalities", "personality-edit", "skills", "settings", "staff", "staff-edit",
+	"personalities", "personality-edit", "skills", "settings", "staff", "staff-edit", "proposals",
 ]);
 
 /** Returns true if the current hash route is a config page (not a session or landing). */

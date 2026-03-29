@@ -117,6 +117,8 @@ export const state = {
 	goalsGeneration: -1,
 	/** Gate status cache: goalId → { passed, total, verifying } */
 	gateStatusCache: new Map<string, { passed: number; total: number; verifying: boolean }>(),
+	/** Count of pending observer proposals (for badge) */
+	pendingProposalCount: 0,
 	/** PR status cache: goalId → { state, url, number, reviewDecision } */
 	prStatusCache: new Map<string, { state: string; url?: string; number?: number; reviewDecision?: string | null; mergeable?: string }>(),
 	sessionsLoading: false,

@@ -1,6 +1,6 @@
 import { icon } from "@mariozechner/mini-lit";
 import { html } from "lit";
-import { Archive, Bot, ChevronDown, Drama, Goal as GoalIcon, List, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Settings, Users, WandSparkles, Workflow, Wrench, X, Zap } from "lucide";
+import { Archive, Bot, ChevronDown, Drama, Goal as GoalIcon, Lightbulb, List, MessagesSquare, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Settings, Users, WandSparkles, Workflow, Wrench, X, Zap } from "lucide";
 import {
 	state,
 	renderApp,
@@ -24,7 +24,7 @@ import { statusBobbit, sessionAcronym } from "./session-colors.js";
 import { renderGoalGroup, renderSessionRow, renderArchivedSessionRow, renderArchivedDelegates, SESSION_ROW_PY, INDENT, CHEVRON_W, HEADER_CHEVRON_W, terseRelativeTime, hasUnseenActivity, formatSessionAge, renderSessionTitle } from "./render-helpers.js";
 import type { GatewaySession } from "./state.js";
 import { resetArchivedExpandState } from "./state.js";
-import { isRouteActive, toggleConfigPage } from "./routing.js";
+import { isRouteActive, setHashRoute, toggleConfigPage } from "./routing.js";
 
 // ============================================================================
 // ROLE + PERSONALITY PICKER
@@ -834,6 +834,18 @@ export function renderSidebar() {
 					${icon(Settings, "sm")}
 					<span>Settings</span>
 				</button>`; })()}
+				${(() => {
+					const isProposals = isRouteActive("proposals");
+					const count = state.pendingProposalCount;
+					return html`<button
+						class="flex items-center gap-1.5 px-2 py-2 text-xs transition-colors ${isProposals ? "text-primary bg-primary/10 font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}"
+						@click=${() => { import("./proposals-page.js").then((m) => { m.loadProposalsPageData(); }); setHashRoute("proposals"); }}
+						title="Proposals"
+					>
+						${icon(Lightbulb, "sm")}
+						${count > 0 ? html`<span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold rounded-full bg-primary text-primary-foreground">${count}</span>` : ""}
+					</button>`;
+				})()}
 				<button
 					class="flex items-center gap-1.5 px-2 py-2 text-xs ${state.showArchived ? "text-primary bg-primary/10 font-medium" : "text-muted-foreground"} hover:text-foreground hover:bg-secondary/50 rounded transition-colors"
 					@click=${() => {
