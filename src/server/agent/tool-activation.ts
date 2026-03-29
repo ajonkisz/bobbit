@@ -106,11 +106,15 @@ export function generateMcpProxyExtension(
         req.end();
       });
       const r = result;
+      let text;
       if (r && r.content && Array.isArray(r.content)) {
-        return r.content.map(c => c.text || "").join("\\n");
+        text = r.content.map(c => c.text || "").join("\\n");
+      } else if (r && r.error) {
+        text = "Error: " + r.error;
+      } else {
+        text = JSON.stringify(r);
       }
-      if (r && r.error) return "Error: " + r.error;
-      return JSON.stringify(r);
+      return text || "(no results)";
     }
   });`;
 	}).join('\n');
