@@ -13,6 +13,7 @@ toolPolicies:
   goal_decide_mutation: never
   goal_set_policy: never
 thinkingLevel: low
+model: anthropic/claude-haiku-4-5
 createdAt: 1773948781652
 updatedAt: 1774972319697
 promptTemplate: |-
